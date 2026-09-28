@@ -6,13 +6,15 @@ Trainings-App für Zuhause (Klimmzugstange, Ringe, Kurzhantel, Seilzug) und Stud
 - **Automatischer Plan** (Ganzkörper, OK/UK oder PPL) mit Zuhause- und Studio-Version und einer Begründung für jede Übung
 - **Satz-für-Satz-Algorithmus** (`engine.js → recommend`): Nach jedem Satz wird aus Gewicht, Wiederholungen und Reserve (RIR) ein geschätztes Maximum berechnet (Epley). Daraus kommen das nächste Gewicht (nur Gewichte, die du wirklich hast), die Wiederholungen und die Satzanzahl (Abbruch bei mehr als 15 % Leistungsabfall, Zusatzsatz bei viel Reserve, Tagesform)
 - **5-Wochen-Zyklus** mit steigender Intensität und Deload
-- **Übungsbibliothek** mit rund 140 Übungen und Progressionsstufen, dazu eigene Übungen
+- **Übungsbibliothek** mit rund 140 Übungen, animierten Übungsbildern (`figures.js`), Filtern und Progressionsstufen, dazu eigene Übungen
+- **Wie große Trainings-Apps:** Vorher-Werte pro Satz, Scheibenrechner, Muskel-Erholung, 1RM-Tabelle, Notizen pro Übung, Erfolge
 - **Fortschritt**: Kraftkurven, Rekorde, Sätze pro Muskelgruppe, Körpergewicht
 - **Timer**: Pause, Intervall (Tabata, EMOM), Stoppuhr
 
 ## Dateien
 - `exercises.js`: Übungsdatenbank
 - `engine.js`: Fragebogen, Planerstellung, Empfehlungsalgorithmus, Statistik
+- `figures.js`: Übungsbilder (Figuren per inverser Kinematik, als SVG animiert)
 - `app.js`: Oberfläche und Speicherung (Claude-Artifact-Datenbank oder localStorage)
 - `index.html`: Styles und Einstieg
 - `pwa/`: eigenständige, offline-fähige Version (`node pwa/build.js` baut nach `pwa/dist`)

@@ -9,7 +9,7 @@
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-  const st = { profile: null, workouts: [], active: null, tab: 'heute', ov: null, sheet: null, rest: null, hold: null, toast: null, progSeg: 'overview', libQ: '', libGroup: '', libAvail: true, chartEx: null, timer: { mode: 'rest' }, planLoc: null, homeLoc: null };
+  const st = { profile: null, workouts: [], active: null, tab: 'heute', ov: null, sheet: null, rest: null, hold: null, toast: null, progSeg: 'overview', libQ: '', libGroup: '', libAvail: true, libTab: 'all', libF: {}, homeFilter: 'all', chartEx: null, timer: { mode: 'rest' }, planLoc: null, homeLoc: null };
 
   /* ================= Icons ================= */
   const I = {
@@ -27,6 +27,11 @@
     swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg>',
     info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>',
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>'
   };
 
@@ -111,6 +116,24 @@
     if (ex && ex.kind === 'hold') return r * 3 >= 15 ? '15+ s' : (r * 3) + ' s';
     return settings().rpe ? 'RPE ' + fmt(Math.max(5, 10 - r), 1) : (r >= 5 ? '5+' : String(r));
   }
+  const figSVG = (ex, o) => ex ? window.FIG.svg(ex, o) : '';
+  const thumb = ex => `<div class="thumb">${figSVG(ex)}</div>`;
+  function dayFocus(day, loc) {
+    const cnt = {}; for (const sl of day.slots) { const ex = getEx(sl.ex[loc]); if (!ex) continue; for (const g in D.GROUPS) if (ex.prim.some(m => D.GROUPS[g].includes(m))) cnt[g] = (cnt[g] || 0) + (sl.r === 'main' ? 2 : 1); }
+    return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 3).join(' / ');
+  }
+  function heroEx(day, loc) { const sl = day.slots.find(x => x.r === 'main' && x.ex[loc]) || day.slots.find(x => x.ex[loc]); return sl ? getEx(sl.ex[loc]) : null; }
+  function recovery() {
+    const last = {}; const now = Date.now();
+    for (const w of st.workouts) {
+      const per = {};
+      for (const e of w.exercises) { const ex = getEx(e.exId); if (!ex) continue; const n = e.sets.length; for (const g in D.GROUPS) if (ex.prim.some(m => D.GROUPS[g].includes(m))) per[g] = (per[g] || 0) + n; }
+      for (const g in per) if (!last[g] || last[g].ts < w.ts) last[g] = { ts: w.ts || 0, sets: per[g] };
+    }
+    return Object.keys(D.GROUPS).map(g => { const l = last[g]; if (!l) return { g, pct: 100, fresh: true }; const need = l.sets >= 6 ? 72 : l.sets >= 3 ? 48 : 24; const h = (now - l.ts) / 36e5; return { g, pct: Math.max(5, Math.min(100, Math.round(h / need * 100))), h }; });
+  }
+  function prevEntry(exId) { const h = E.historyFor(exId, st.workouts); return h.length ? h[h.length - 1] : null; }
+  const shortSet = (ex, s) => !s ? '–' : (ex.kind === 'hold' || ex.kind === 'int') ? fmt(s.sec) + ' s' : ex.kind === 'load' ? fmt(s.w) + '×' + fmt(s.reps) : ((s.w ? '+' + fmt(s.w) + '×' : '') + fmt(s.reps));
   function toast(msg, ms) { st.toast = msg; renderToast(); clearTimeout(toast.t); toast.t = setTimeout(() => { st.toast = null; renderToast(); }, ms || 2600); }
 
   /* Ton & Vibration */
@@ -142,8 +165,8 @@
     let t = $('#tabs');
     if (!show) { if (t) t.remove(); return; }
     if (!t) { t = document.createElement('div'); t.id = 'tabs'; t.className = 'tabs'; document.body.appendChild(t); }
-    const tabs = [['heute', 'Training', I.dumbbell], ['plan', 'Plan', I.plan], ['uebungen', 'Übungen', I.book], ['fortschritt', 'Fortschritt', I.chart], ['timer', 'Timer', I.timer]];
-    t.innerHTML = '<nav>' + tabs.map(([k, n, ic]) => `<button data-a="tab" data-k="${k}" ${st.tab === k ? 'aria-current="page"' : ''}>${ic}<span>${n}</span></button>`).join('') + '</nav>';
+    const tabs = [['heute', 'Start', I.home], ['plan', 'Plan', I.plan], ['uebungen', 'Übungen', I.dumbbell], ['fortschritt', 'Fortschritt', I.chart], ['timer', 'Timer', I.timer]];
+    t.innerHTML = '<nav>' + tabs.map(([k, n, ic]) => `<button data-a="tab" data-k="${k}" aria-label="${n}" ${st.tab === k ? 'aria-current="page"' : ''}>${ic}<span>${n}</span></button>`).join('') + '</nav>';
   }
   function layerEl(id) { let el = document.getElementById(id); if (!el) { el = document.createElement('div'); el.id = id; $('#layer').appendChild(el); } return el; }
   function renderLayer() { renderOverlay(); renderSheet(); renderRest(); renderToast(); }
@@ -172,12 +195,13 @@
   function welcomeView() {
     return `<div class="topbar"><h1>Satzwerk</h1></div>
     <div class="stack">
-      <div class="hero grad stack">
+      <div class="card lime rings-bg stack">
         <div class="eyebrow">Dein Trainingsplan · Zuhause & Studio</div>
+        <div class="figdark" style="width:46%;align-self:flex-end;margin:-10px -10px -30px 0">${figSVG(D.byId["pullup"], { anim: 2.6 })}</div>
         <h2>Ein Fragebogen, ein Plan, jeder Satz neu berechnet.</h2>
         <p style="margin:0;opacity:.92">Satzwerk wählt Übungen passend zu deiner Ausrüstung (Klimmzugstange, Ringe, Kurzhantel, Seilzug oder Studio) und deinem Können. Nach jedem Satz rechnet der Algorithmus Gewicht, Wiederholungen und Satzanzahl neu aus.</p>
-        <button class="btn white big" data-a="quizStart">Fragebogen starten</button>
-        <button class="btn" data-a="quickStart" style="background:rgba(255,255,255,.18);color:#fff;box-shadow:none">Mit Beispielprofil ausprobieren</button>
+        <button class="btn dark big" data-a="quizStart">Fragebogen starten</button>
+        <button class="btn" data-a="quickStart" style="background:rgba(20,20,22,.1);color:var(--on-light)">Mit Beispielprofil ausprobieren</button>
         <p class="tiny" style="margin:0;opacity:.85">Der Fragebogen dauert etwa 3 Minuten und hat ${E.Q.length} Fragen.</p>
       </div>
       <div class="list">
@@ -197,34 +221,45 @@
     const todayIdx = (new Date().getDay() + 6) % 7;
     const di = st.homeDay ?? nextDayIdx(); const day = p.days[di] || p.days[0];
     const loc = st.homeLoc || defLoc();
-    const hour = new Date().getHours();
-    const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
-    const last = st.workouts[st.workouts.length - 1];
     const slots = day.slots.filter(s => s.ex[loc]);
-    const goal = +a.days || p.days.length; const cnt = weekW.length;
-    const R = 27, C = 2 * Math.PI * R, frac = Math.min(1, cnt / goal);
-    const totalSets = slots.reduce((t, sl) => { const ex = getEx(sl.ex[loc]); return t + (ex ? E.prescription(sl, ex, P(), p).sets : 0); }, 0);
-    const rirMain = E.prescription({ r: 'main', sets: 3, rest: 120 }, { kind: 'load', role: 'c', rr: [6, 10] }, P(), p).rir;
-    return `<div class="topbar"><div class="grow"><div class="eyebrow">${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${greet}${a.name ? ', ' + esc(a.name) : ''}</h1></div><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
+    const goal = +a.days || p.days.length; const cnt = weekW.length; const pct = Math.min(100, Math.round(cnt / goal * 100));
+    const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics', fit: 'Fitness', health: 'Gesundheit' }[p.goal] || 'Training';
+    const hx = heroEx(day, loc);
+    const R = 20, C = 2 * Math.PI * R;
+    const last = st.workouts[st.workouts.length - 1];
+    const setsWeek = weekW.reduce((t, w) => t + w.exercises.reduce((u, e) => u + e.sets.length, 0), 0);
+    const filt = st.homeFilter || 'all';
+    const focusN = { full: 'Ganzkörper', upper: 'Oberkörper', lower: 'Unterkörper' };
+    const foci = [...new Set(p.days.map(d => d.focus))];
+    const rec = recovery();
+    return `<div class="topbar"><div class="avatar">${esc((a.name || 'S').trim()[0] || 'S').toUpperCase()}</div><div class="grow"><h1 style="font-size:21px;text-transform:uppercase">Hi${a.name ? ' ' + esc(a.name) : ''}</h1><div class="small muted">⚡ ${goalN} · Woche ${wi.w} von ${wi.len}</div></div><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
     <div class="stack">
-      ${st.active ? `<div class="hero grad stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="opacity:.9">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn white big" data-a="resume">${I.play} Weiter trainieren</button></div>` : ''}
-      ${!st.active ? `<div class="hero grad stack">
-        <div class="row between"><span class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Heute dran'}</span><span class="eyebrow">≈ ${estMinutes(day, loc)} min</span></div>
-        <div><h2 class="xl">${esc(day.name)}</h2><div class="small" style="opacity:.9;margin-top:6px;font-weight:700">${slots.length} Übungen · ${totalSets} Sätze · Woche ${wi.w}${wi.deload ? ' · Deload' : ''}</div></div>
-        ${locs().length > 1 ? `<div class="seg glass">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        <button class="btn white big" data-a="startWorkout" data-d="${di}" data-l="${loc}">${I.play} Training starten</button>
-      </div>
-      <div class="chips">${p.days.map((d, i) => `<button class="chip ${i === di ? 'on' : ''}" data-a="homeDay" data-i="${i}">${esc(d.name)}</button>`).join('')}</div>
-      <div class="list">${slots.map(sl => { const ex = getEx(sl.ex[loc]); return ex ? `<button class="li" data-a="exInfo" data-id="${ex.id}">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:700">${esc(ex.name)}</div><div class="small muted">${sl.sets} × ${rrText(E.prescription(sl, ex, P(), p).rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>` : ''; }).join('')}</div>` : ''}
-      <div class="card stack">
-        <div class="row" style="gap:16px">
-          <svg class="ring" width="68" height="68" viewBox="0 0 68 68" aria-label="${cnt} von ${goal} Trainings diese Woche"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A1F"/><stop offset="1" stop-color="#FF2E63"/></linearGradient></defs><circle class="bgc" cx="34" cy="34" r="${R}" fill="none" stroke-width="8"/><circle cx="34" cy="34" r="${R}" fill="none" stroke="url(#rg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 34 34)"/><text x="34" y="39" text-anchor="middle" style="font:800 16px var(--display);fill:var(--ink)">${cnt}/${goal}</text></svg>
-          <div class="grow"><div class="eyebrow">Diese Woche</div><div style="font-weight:800;font-size:17px">Woche ${wi.w} von ${wi.len} · ${wi.label}</div><div class="small muted">${wi.deload ? 'Weniger Sätze, leichtere Gewichte' : 'Ziel-Reserve Grundübungen: ' + rirMain + ' Wdh.'}</div></div>
+      <div class="card" style="padding:14px 10px"><div class="row between" style="padding:0 8px 8px"><b class="num" style="font-size:17px">${new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</b><span class="small muted">${cnt} von ${goal} Trainings</span></div>
+        <div class="cal">${DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); return `<div><div class="d">${d}</div><div class="n ${i === todayIdx ? 'today' : ''} ${doneDays.has(i) ? 'done' : ''}">${dt.getDate()}</div></div>`; }).join('')}</div></div>
+      ${st.active ? `<div class="card lime rings-bg stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="font-weight:800">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn dark big" data-a="resume">${I.play} Weiter trainieren</button></div>` : `
+      <div class="card lime rings-bg" style="position:relative;min-height:230px;padding:20px">
+        <div style="position:relative;z-index:2;max-width:60%" class="stack">
+          <div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Heute dran'}</div>
+          <div><h2 class="xl">${esc(day.name)}</h2><div class="small" style="font-weight:800;margin-top:4px;opacity:.75">${esc(dayFocus(day, loc))} · ${estMinutes(day, loc)} min</div></div>
+          ${locs().length > 1 ? `<div class="seg onlight" style="max-width:220px">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
+          <button class="btn dark" data-a="startWorkout" data-d="${di}" data-l="${loc}" style="align-self:flex-start;padding-right:10px">${slots.length} Übungen starten <span style="display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--lime);color:var(--on-light)">${I.arrow}</span></button>
         </div>
-        <div class="weekdots">${DAYS.map((d, i) => `<span class="${doneDays.has(i) ? 'done' : ''} ${i === todayIdx ? 'today' : ''}">${d}</span>`).join('')}</div>
+        <svg class="ringnum" width="54" height="54" viewBox="0 0 54 54" style="position:absolute;top:14px;right:14px;z-index:3" aria-label="Woche ${pct} Prozent"><circle cx="27" cy="27" r="${R}" fill="none" stroke="rgba(20,20,22,.15)" stroke-width="5"/><circle cx="27" cy="27" r="${R}" fill="none" stroke="#141416" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 27 27)"/><text x="27" y="31" text-anchor="middle" style="font:800 12px var(--display);fill:#141416">${pct}%</text></svg>
+        <div class="figdark" style="position:absolute;right:-8px;bottom:-10px;width:50%;z-index:1">${figSVG(hx, { anim: 2.8 })}</div>
+      </div>`}
+      <div class="section" style="margin-top:6px"><div class="head"><h2>Dein Plan</h2><button class="btn ghost sm" data-a="tab" data-k="plan">Bearbeiten</button></div>
+        <div class="chips">${[['all', 'Alle Einheiten'], ...foci.map(f => [f, focusN[f]])].map(([k, n]) => `<button class="chip ${filt === k ? 'on' : ''}" data-a="homeFilter" data-k="${k}">${n}</button>`).join('')}</div>
+        ${p.days.map((d, i) => ({ d, i })).filter(x => filt === 'all' || x.d.focus === filt).map(({ d, i }) => { const ex = heroEx(d, loc); const n = d.slots.filter(s => s.ex[loc]).length; return `<button class="daycard ${i % 2 ? 'card lilac' : 'card lav'}" data-a="dayOpen" data-i="${i}"><div class="txt"><h3 style="font-size:20px">${esc(d.name)}</h3><div class="row wrap" style="gap:6px"><span class="tag">${n} Übungen</span>${i === nextDayIdx() ? '<span class="tag" style="background:#141416;color:#fff">Als Nächstes</span>' : ''}</div><div class="small" style="font-weight:800;margin-top:auto">${esc(dayFocus(d, loc))}</div></div><div class="minbadge">${estMinutes(d, loc)}<small>min</small></div><div class="figwrap figdark">${figSVG(ex)}</div></button>`; }).join('')}
       </div>
+      <div class="duo">
+        <div class="card lilac stack" style="gap:6px"><div class="row between"><b>Sätze</b><span class="tag">Woche</span></div><div class="num" style="font-size:32px;font-weight:800">${setsWeek}</div><div class="small" style="font-weight:700;opacity:.7">abgeschlossene Sätze</div></div>
+        <div class="card lav stack" style="gap:6px"><b>Wochenziel</b><div class="small" style="font-weight:700;opacity:.75">${cnt >= goal ? 'Geschafft! Stark.' : 'Noch ' + (goal - cnt) + ' Training' + (goal - cnt > 1 ? 's' : '') + ' bis zum Ziel.'}</div><span class="pillpct" style="--p:${pct}%;align-self:flex-end;margin-top:auto"><i></i>${pct}%</span></div>
+      </div>
+      <div class="card stack"><div class="row between"><h3>Erholung</h3><span class="small muted">Muskelgruppen</span></div>
+        <div class="bars">${rec.map(r => `<div class="bar"><span>${r.g}</span><div class="track"><i class="${r.pct >= 90 ? 'lime' : r.pct < 50 ? 'warn' : ''}" style="width:${r.pct}%"></i></div><span class="num small" style="text-align:right">${r.pct}%</span></div>`).join('')}</div>
+        <div class="tiny muted">Geschätzt aus Sätzen und Zeit seit dem letzten Training. Grün = bereit.</div></div>
       <div class="row"><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button><button class="btn grow" data-a="tab" data-k="timer">${I.timer} Timer</button></div>
-      ${last ? `<div class="section"><div class="head"><h3>Letztes Training</h3><button class="btn ghost sm" data-a="tab" data-k="fortschritt" style="background:none">Alle</button></div>${workoutRow(last)}</div>` : ''}
+      ${last ? `<div class="section"><div class="head"><h3>Letztes Training</h3><button class="btn ghost sm" data-a="progGo" data-k="history">Alle</button></div>${workoutRow(last)}</div>` : ''}
       ${bwNudge()}
     </div>`;
   }
@@ -235,7 +270,7 @@
   }
   function workoutRow(w) {
     const sets = w.exercises.reduce((t, e) => t + e.sets.length, 0);
-    return `<button class="li card" data-a="wDetail" data-id="${w.id}"><div class="grow"><div style="font-weight:600">${esc(w.name)}</div><div class="small muted">${dateDE(w.date)} · ${LOCN[w.loc] || ''} · ${durTxt(w.dur || 0)} · ${sets} Sätze${w.prs && w.prs.length ? ` · <span class="pr">${w.prs.length} Rekord${w.prs.length > 1 ? 'e' : ''}</span>` : ''}</div></div><span class="chev">${I.chev}</span></button>`;
+    return `<button class="li card" data-a="wDetail" data-id="${w.id}">${thumb(getEx((w.exercises[0] || {}).exId))}<div class="grow"><div style="font-weight:800">${esc(w.name)}</div><div class="small muted">${dateDE(w.date)} · ${LOCN[w.loc] || ''} · ${durTxt(w.dur || 0)} · ${sets} Sätze${w.prs && w.prs.length ? ` · <span class="pr">${w.prs.length} Rekord${w.prs.length > 1 ? 'e' : ''}</span>` : ''}</div></div><span class="chev">${I.chev}</span></button>`;
   }
 
   /* ================= Plan ================= */
@@ -244,51 +279,76 @@
     const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
     return `<div class="topbar"><h1>Plan</h1><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
     <div class="stack">
-      <div class="card stack">
-        <div class="row wrap"><span class="chip">${esc(p.splitName)}</span><span class="chip">${p.days.length} Tage / Woche</span><span class="chip">${goalN}</span></div>
-        <div class="row between"><div><div class="eyebrow">Zyklus</div><b>Woche ${wi.w} von ${wi.len}: ${wi.label}</b></div>
-        <button class="btn sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
+      <div class="card lime rings-bg stack">
+        <div class="row wrap" style="gap:6px"><span class="tag">${esc(p.splitName)}</span><span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
+        <div class="row between"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
+        <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
         <div class="meter"><i style="width:${wi.w / wi.len * 100}%"></i></div>
-        <div class="small muted">Woche 1 startet locker (mehr Reserve), Woche 2–3 Aufbau, Woche 4 am härtesten, Woche 5 Deload mit halben Sätzen.</div>
+        <div class="small" style="font-weight:700;opacity:.7">Woche 1 locker, Woche 2–3 Aufbau, Woche 4 am härtesten, Woche 5 Deload mit halben Sätzen.</div>
       </div>
       ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-      ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">≈ ${estMinutes(d, loc)} min</span></div>
-        <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><span class="plate p-${sl.r}"></span><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
-          return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
-        <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--accent);font-weight:600">${I.plus.replace('<svg', '<svg width="20" height="20"')} Übung hinzufügen</button></div></div>`).join('')}
+      ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span></div>
+        <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
+          return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
+        <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
       <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
       <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
     </div>`;
   }
 
   /* ================= Übungen ================= */
-  function libView() {
+  const LVL = [[1, 'Einsteiger'], [2, 'Leicht'], [3, 'Mittel'], [4, 'Fortgeschritten'], [5, 'Profi']];
+  function libList() {
     const eqs = new Set([...E.locEquip(P(), 'home'), ...(locs().includes('gym') ? E.locEquip(P(), 'gym') : [])]);
-    const q = st.libQ.trim().toLowerCase();
-    let list = E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q)) && (!st.libGroup || D.GROUPS[st.libGroup].some(m => ex.prim.includes(m))) && (!st.libAvail || E.available(ex, eqs)));
-    list.sort((a, b) => a.pat.localeCompare(b.pat) || (a.rank || a.lvl) - (b.rank || b.lvl));
-    const groups = {}; for (const ex of list) (groups[ex.pat] = groups[ex.pat] || []).push(ex);
+    const q = st.libQ.trim().toLowerCase(); const F = st.libF || {};
+    const trained = new Set(st.workouts.flatMap(w => w.exercises.map(e => e.exId)));
+    return E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q) || ex.prim.some(m => D.MUSCLES[m].toLowerCase().includes(q)))
+      && (!F.group || D.GROUPS[F.group].some(m => ex.prim.includes(m))) && (!F.lvl || ex.lvl === F.lvl) && (!F.pat || ex.pat === F.pat) && (!F.eq || ex.eq.includes(F.eq))
+      && (!st.libAvail || E.available(ex, eqs)) && (st.libTab !== 'mine' || trained.has(ex.id)))
+      .sort((a, b) => a.pat.localeCompare(b.pat) || (a.rank || a.lvl) - (b.rank || b.lvl));
+  }
+  function libView() {
+    const list = libList(); const F = st.libF || {};
+    const chip = (k, label, val) => `<button class="chip ${val ? 'set' : ''}" data-a="libFilter" data-k="${k}">${val ? esc(val) : label} ▾</button>`;
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
-      <input class="field" id="libq" data-in="libQ" type="search" placeholder="Suchen, z. B. Klimmzug, Seilzug, Bizeps" value="${esc(st.libQ)}">
-      <div class="chips"><button class="chip ${!st.libGroup ? 'on' : ''}" data-a="libGroup" data-g="">Alle</button>${Object.keys(D.GROUPS).map(g => `<button class="chip ${st.libGroup === g ? 'on' : ''}" data-a="libGroup" data-g="${g}">${g}</button>`).join('')}</div>
-      <label class="row small"><input type="checkbox" id="libAvail" data-a="libAvail" ${st.libAvail ? 'checked' : ''}> Nur mit meiner Ausrüstung machbar</label>
-      <div class="small muted">${list.length} Übungen</div>
-      ${Object.keys(groups).map(pat => `<div class="section"><div class="head"><h3>${esc(D.PATTERNS[pat] || pat)}</h3></div><div class="list">${groups[pat].map(exRow).join('')}</div></div>`).join('') || '<div class="empty">Keine Übung gefunden.</div>'}
+      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine'}">Alle Übungen</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
+      <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
+      <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
+      <div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
+      ${list.length ? `<div class="exgrid">${list.map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : 'Keine Übung gefunden.'}</div>`}
     </div>`;
-  }
-  function exRow(ex) {
-    const h = E.historyFor(ex.id, st.workouts);
-    return `<button class="li" data-a="exInfo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}${ex.custom ? ' <span class="chip">Eigene</span>' : ''}</div><div class="small muted">${ex.eq.map(e => D.EQUIP[e]).join(' + ')} · ${'●'.repeat(ex.lvl)}${'○'.repeat(Math.max(0, 5 - ex.lvl))}${h.length ? ' · ' + h.length + '× trainiert' : ''}</div></div><span class="chev">${I.chev}</span></button>`;
   }
 
   /* ================= Fortschritt ================= */
   function progView() {
     const seg = st.progSeg;
-    const tabs = [['overview', 'Übersicht'], ['history', 'Verlauf'], ['records', 'Rekorde'], ['body', 'Körper']];
-    const body = { overview: progOverview, history: progHistory, records: progRecords, body: progBody }[seg]();
+    const tabs = [['overview', 'Übersicht'], ['history', 'Verlauf'], ['records', 'Rekorde'], ['badges', 'Erfolge'], ['body', 'Körper']];
+    const body = { overview: progOverview, history: progHistory, records: progRecords, badges: progBadges, body: progBody }[seg]();
     return `<div class="topbar"><h1>Fortschritt</h1><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
-      <div class="stack"><div class="seg">${tabs.map(([k, n]) => `<button data-a="progSeg" data-k="${k}" aria-pressed="${seg === k}">${n}</button>`).join('')}</div>${body}</div>`;
+      <div class="stack"><div class="chips">${tabs.map(([k, n]) => `<button class="chip ${seg === k ? 'on' : ''}" data-a="progSeg" data-k="${k}">${n}</button>`).join('')}</div>${body}</div>`;
+  }
+  function badgeList() {
+    const W = st.workouts; const n = W.length;
+    const sets = W.reduce((t, w) => t + w.exercises.reduce((u, e) => u + e.sets.length, 0), 0);
+    const prs = W.reduce((t, w) => t + ((w.prs || []).length), 0);
+    const vol = W.reduce((t, w) => t + (w.vol || 0), 0);
+    const early = W.some(w => new Date((w.ts || 0) - (w.dur || 0) * 1000).getHours() < 8);
+    const skill = W.some(w => w.exercises.some(e => { const x = getEx(e.exId); return x && x.role === 's'; }));
+    const both = new Set(W.map(w => w.loc)).size > 1;
+    const streak = weeksStreak();
+    return [
+      ['1', 'Erster Schritt', 'Erstes Training gespeichert', n >= 1], ['10', 'Dranbleiber', '10 Trainings', n >= 10], ['25', 'Routine', '25 Trainings', n >= 25], ['50', 'Eisern', '50 Trainings', n >= 50], ['100', 'Legende', '100 Trainings', n >= 100],
+      ['4W', 'Serie', '4 Wochen am Stück', streak >= 4], ['12W', 'Unaufhaltsam', '12 Wochen am Stück', streak >= 12],
+      ['PR', 'Rekordjäger', 'Erster persönlicher Rekord', prs >= 1], ['10', 'Rekordserie', '10 Rekorde', prs >= 10],
+      ['500', 'Satzwerk', '500 Sätze', sets >= 500], ['10t', 'Schwerlast', '10 Tonnen bewegt', vol >= 10000],
+      ['6h', 'Frühaufsteher', 'Training vor 8 Uhr', early], ['S', 'Artist', 'Einen Skill trainiert', skill], ['2×', 'Flexibel', 'Zuhause und im Studio', both]
+    ];
+  }
+  function progBadges() {
+    const b = badgeList(); const got = b.filter(x => x[3]).length;
+    return `<div class="card lav stack" style="gap:6px"><b>${got} von ${b.length} Erfolgen</b><div class="meter" style="background:rgba(20,20,22,.12)"><i style="width:${got / b.length * 100}%;background:#141416"></i></div></div>
+      <div class="badges">${b.map(([ic, t, d, ok]) => `<div class="badge ${ok ? 'got' : ''}"><div class="ic">${ic}</div><b>${t}</b><span>${d}</span></div>`).join('')}</div>`;
   }
   function weeksStreak() {
     const target = Math.max(1, Math.min(+((P().answers || {}).days) || 3, 7) - 1);
@@ -464,16 +524,24 @@
   function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, label: label || '' }; renderRest(); }
   function renderRest() {
     const el = layerEl('rb');
-    if (st.hold) { el.innerHTML = `<div class="restbar"><div class="in"><div class="grow"><div class="tiny" style="opacity:.75">Halten · ${esc(st.hold.name)}</div><div class="t" id="holdT">${mmss((Date.now() - st.hold.start) / 1000)}</div></div><button data-a="holdStop" style="background:var(--accent);color:var(--accent-ink);padding:14px 20px">Stopp</button></div></div>`; return; }
-    if (!st.rest || !st.ov || st.ov.type !== 'workout') { el.innerHTML = ''; return; }
-    const left = (st.rest.end - Date.now()) / 1000;
-    el.innerHTML = `<div class="restbar"><div class="prog" id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></div><div class="in"><div class="grow"><div class="tiny" style="opacity:.75" id="restLbl">${left > 0 ? 'Pause' : 'Los geht’s'}${st.rest.label ? ' · ' + esc(st.rest.label) : ''}</div><div class="t" id="restT">${left > 0 ? mmss(left) : '0:00'}</div></div><button data-a="restAdj" data-s="-15">−15</button><button data-a="restAdj" data-s="15">+15</button><button data-a="restSkip">Weiter</button></div></div>`;
+    if (!st.ov || st.ov.type !== 'workout' || !st.active) { el.innerHTML = st.hold ? holdPanel() : ''; return; }
+    if (st.hold) { el.innerHTML = holdPanel(); return; }
+    const a = st.active; const ci = curIndex(); const S = ci >= 0 ? exState(a.exercises[ci]) : null;
+    const left = st.rest ? (st.rest.end - Date.now()) / 1000 : 0;
+    const resting = st.rest && left > -4;
+    el.innerHTML = `<div class="panel"><div class="cols"><div><small>Dauer</small><div class="v" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</div></div>
+      <div><small style="text-align:center" id="restLbl">${resting ? (left > 0 ? 'Pause' : 'Los geht’s') : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${resting ? mmss(Math.max(0, left)) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div></div>
+      <div style="text-align:right"><small>Satz</small><div class="v">${S ? Math.min(S.done.length + 1, S.planned) + '/' + S.planned : '–'}</div></div></div>
+      ${resting ? `<div class="prog"><i id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></i></div>` : ''}
+      <div class="ctrl">${resting ? `<button data-a="restAdj" data-s="-15">−15 s</button><button data-a="restAdj" data-s="15">+15 s</button><button class="go" data-a="restSkip">Weiter</button>` : S ? `<button data-a="manualRest">${I.timer.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Pause</button><button class="go" data-a="doneCur">Satz fertig ✓</button>` : `<button class="go" data-a="finishAsk">Training beenden</button>`}</div></div>`;
   }
+  function holdPanel() { return `<div class="panel"><div class="cols"><div><small>Halten</small><div class="v" style="font-size:14px">${esc(st.hold.name)}</div></div><div><small style="text-align:center">Sekunden</small><div class="big" id="holdT">${mmss((Date.now() - st.hold.start) / 1000)}</div></div><div></div></div><div class="ctrl"><button class="go" data-a="holdStop">Stopp</button></div></div>`; }
   function tickRest(now) {
+    const pe = $('#pElapsed'); if (pe && st.active) pe.textContent = mmss((now - st.active.start) / 1000);
     if (!st.rest) return;
     const left = (st.rest.end - now) / 1000;
     const t = $('#restT'), p = $('#restProg');
-    if (t) t.textContent = left > 0 ? mmss(left) : '0:00';
+    if (t && left > -4) t.textContent = mmss(Math.max(0, left));
     if (p) p.style.width = Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100)) + '%';
     if (left <= 3 && left > 0 && st.rest.beeped !== Math.ceil(left)) { st.rest.beeped = Math.ceil(left); beep(700, 0.1); }
     if (left <= 0 && !st.rest.fired) { st.rest.fired = true; beep(1100, 0.45); buzz([250, 120, 250]); const l = $('#restLbl'); if (l) l.textContent = 'Los geht’s'; setTimeout(() => { if (st.rest && st.rest.fired) { st.rest = null; renderRest(); } }, 4000); }
@@ -511,60 +579,55 @@
   function workoutView() {
     const a = st.active; if (!a) return '';
     const ci = curIndex();
-    const totalDone = a.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0);
     const wi = E.weekInfo(plan(), P());
-    return `<div class="ohead"><button class="iconbtn" data-a="wMin" aria-label="Minimieren">${I.back}</button><div class="grow"><div class="eyebrow">${LOCN[a.loc]} · Woche ${wi.w}${wi.deload ? ' · Deload' : ''}</div><h2 style="font-size:22px">${esc(a.name)}</h2></div><button class="btn primary sm" data-a="finishAsk">Beenden</button></div>
-      <div class="row small muted" style="margin-bottom:10px"><span class="num" id="wElapsed" style="font-size:18px;color:var(--ink)">${mmss((Date.now() - a.start) / 1000)}</span><span>·</span><span>${totalDone} Sätze erledigt</span></div>
-      <div class="stack">${a.exercises.map((e, i) => exCard(e, i, i === ci)).join('')}
-        <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button>
-        <button class="btn primary big" data-a="finishAsk">Training beenden</button>
+    return `<div class="ohead"><button class="iconbtn" data-a="wMin" aria-label="Minimieren">${I.back}</button><div class="grow"><div class="eyebrow">${LOCN[a.loc]} · Woche ${wi.w}${wi.deload ? ' · Deload' : ''}</div><h2 style="font-size:20px">${esc(a.name)}</h2></div><button class="btn primary sm" data-a="finishAsk">Beenden</button></div>
+      <div class="stack">
+        ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>`}
+        <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
+          ${a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''}" data-a="focusEx" data-i="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join('')}
+          <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
   }
-  function exCard(entry, idx, isCur) {
+  function focusCard(entry, idx) {
     const S = exState(entry); const { ex, presc, done, rec, planned, finished } = S;
     if (!ex) return '';
     const kind = ex.kind; const isHold = kind === 'hold' || kind === 'int';
     const showW = kind === 'load' || (kind === 'bw' && ex.addw && (E.loadOptions(ex, st.active.loc, P()) || []).length > 1);
-    const role = presc.role;
-    const head = `<div class="eh">${plateHTML(role)}<h3 data-a="exInfo" data-id="${ex.id}" style="cursor:pointer">${esc(ex.name)}</h3><span class="small muted num" style="font-size:16px">${done.length}/${planned}</span></div>`;
-    if (!isCur && finished) {
-      return `<div class="exc" data-a="focusEx" data-i="${idx}" style="cursor:pointer">${head}<div class="small muted" style="padding:0 12px 12px 48px">${done.map(s => setTxt(ex, s)).join(' · ')}</div></div>`;
-    }
     const v = entry.draft || {};
     const nextW = v.w ?? rec.w, nextR = v.reps ?? rec.reps, nextS = v.sec ?? rec.sec;
-    const unitNote = ex.uni ? (isHold ? ' pro Seite' : ' pro Seite') : '';
+    const unitNote = ex.uni ? ' pro Seite' : '';
+    const prev = prevEntry(ex.id); const prevSets = prev ? prev.entry.sets : [];
+    const lastNote = prev && prev.entry.note;
+    const pills = Array.from({ length: Math.min(planned, 8) }, (_, i) => `<i class="${i < done.length ? 'on' : i === done.length ? 'cur' : ''}"></i>`).join('');
     let target = '';
     if (!finished) {
       const n = done.length + 1;
-      const main = isHold ? `${fmt(rec.sec)} s${unitNote}` : (showW ? (kind === 'bw' ? (rec.w ? '+' + fmt(rec.w) + ' kg · ' : 'Körpergewicht · ') : fmt(rec.w) + ' kg · ') : '') + (isHold ? '' : `${fmt(rec.reps)} Wdh.${unitNote}`);
-      target = `<div class="target"><div class="row between"><span class="eyebrow" style="color:var(--accent)">Satz ${n} von ${planned}</span><span class="small muted">Ziel ${rrText(presc.rr, ex)} · Reserve ${rirLabel(rec.rir, ex)}</span></div><b>${main}</b>
+      const main = isHold ? `${fmt(rec.sec)} s${unitNote}` : (showW ? (kind === 'bw' ? (rec.w ? '+' + fmt(rec.w) + ' kg · ' : 'Körpergewicht · ') : fmt(rec.w) + ' kg · ') : '') + `${fmt(rec.reps)} Wdh.${unitNote}`;
+      target = `<div class="target"><div class="row between"><span class="eyebrow">Satz ${n} von ${planned} · Empfehlung</span><span class="small" style="font-weight:800;opacity:.65">Reserve ${rirLabel(rec.rir, ex)}</span></div><b>${main}</b>
+        <div class="note">Ziel ${rrText(presc.rr, ex)}${unitNote}${prevSets[done.length] ? ' · Letztes Mal: ' + shortSet(ex, prevSets[done.length]) : ''}</div>
         ${rec.warmup && rec.warmup.length ? `<div class="note">Aufwärmen: ${rec.warmup.map(w => fmt(w.w) + ' kg × ' + w.reps).join(' · ')}</div>` : ''}
         ${rec.notes.map(t => `<div class="note">${esc(t)}</div>`).join('')}
         ${rec.stop && !entry.ignoreStop ? `<div class="row"><button class="btn sm" data-a="ignoreStop" data-i="${idx}">Trotzdem weiter</button></div>` : ''}
         ${rec.harder ? `<div class="row"><button class="btn sm" data-a="switchEx" data-i="${idx}" data-id="${rec.harder}">${I.swap} Schwerer: ${esc(getEx(rec.harder).name)}</button></div>` : ''}
         ${rec.easier ? `<div class="row"><button class="btn sm" data-a="switchEx" data-i="${idx}" data-id="${rec.easier}">${I.swap} Leichter: ${esc(getEx(rec.easier).name)}</button></div>` : ''}
       </div>`;
-    } else {
-      target = `<div class="target"><b style="color:var(--good)">Übung erledigt</b><div class="note">Weiter mit der nächsten Übung oder „+ Satz“ für mehr.</div></div>`;
-    }
-    const cols = isHold ? ['#', 'Sek.', 'Reserve', ''] : showW ? ['#', kind === 'bw' ? '+kg' : 'kg', 'Wdh.', 'Reserve', ''] : ['#', 'Wdh.', 'Reserve', ''];
-    let rows = '';
-    const total = finished ? done.length : planned;
+    } else target = `<div class="target"><b>Übung erledigt ✓</b><div class="note">Tippe unten auf die nächste Übung oder „+ Satz“ für mehr.</div></div>`;
+    const cols = isHold ? ['#', 'Vorher', 'Sek.', 'Res.', ''] : showW ? ['#', 'Vorher', kind === 'bw' ? '+kg' : 'kg', 'Wdh.', 'Res.', ''] : ['#', 'Vorher', 'Wdh.', 'Res.', ''];
+    let rows = ''; const total = finished ? done.length : planned;
     for (let i = 0; i < total; i++) {
-      const s = done[i];
-      if (s) {
-        rows += `<tr class="done"><td class="setno" data-a="editSet" data-i="${idx}" data-s="${i}" style="cursor:pointer">${i + 1}</td>${isHold ? `<td class="num" style="font-size:19px">${fmt(s.sec)}</td>` : `${showW ? `<td class="num" style="font-size:19px">${fmt(s.w || 0)}</td>` : ''}<td class="num" style="font-size:19px">${fmt(s.reps)}</td>`}<td class="rirtag">${rirLabel(s.rir, ex)}</td><td><button class="check" data-a="editSet" data-i="${idx}" data-s="${i}" aria-label="Satz bearbeiten">${I.check}</button></td></tr>`;
-      } else if (i === done.length) {
-        rows += `<tr class="next"><td class="setno">${i + 1}</td>${isHold ? `<td><input id="in-${entry.key}-sec" inputmode="numeric" data-in="draft" data-i="${idx}" data-f="sec" value="${nextS ?? ''}"></td>` : `${showW ? `<td><input id="in-${entry.key}-w" inputmode="decimal" data-in="draft" data-i="${idx}" data-f="w" value="${nextW != null ? fmt(nextW) : ''}"></td>` : ''}<td><input id="in-${entry.key}-reps" inputmode="numeric" data-in="draft" data-i="${idx}" data-f="reps" value="${nextR ?? ''}"></td>`}<td class="muted small">${rirLabel(rec.rir, ex)}</td><td><button class="check" data-a="doneSet" data-i="${idx}" aria-label="Satz abschließen">${I.check}</button></td></tr>`;
-      } else {
-        rows += `<tr><td class="setno">${i + 1}</td>${isHold ? `<td class="muted num">${fmt(rec.sec)}</td>` : `${showW ? `<td class="muted num">${fmt(rec.w)}</td>` : ''}<td class="muted num">${fmt(rec.reps)}</td>`}<td class="muted small">${rirLabel(rec.rir, ex)}</td><td></td></tr>`;
-      }
+      const s = done[i]; const pv = `<td class="prev">${shortSet(ex, prevSets[i])}</td>`;
+      if (s) rows += `<tr class="done"><td class="setno" data-a="editSet" data-i="${idx}" data-s="${i}">${i + 1}</td>${pv}${isHold ? `<td class="num" style="font-size:19px">${fmt(s.sec)}</td>` : `${showW ? `<td class="num" style="font-size:19px">${fmt(s.w || 0)}</td>` : ''}<td class="num" style="font-size:19px">${fmt(s.reps)}</td>`}<td class="rirtag">${rirLabel(s.rir, ex)}</td><td><button class="check" data-a="editSet" data-i="${idx}" data-s="${i}" aria-label="Satz bearbeiten">${I.check}</button></td></tr>`;
+      else if (i === done.length) rows += `<tr class="next"><td class="setno">${i + 1}</td>${pv}${isHold ? `<td><input id="in-${entry.key}-sec" inputmode="numeric" data-in="draft" data-i="${idx}" data-f="sec" value="${nextS ?? ''}"></td>` : `${showW ? `<td><input id="in-${entry.key}-w" inputmode="decimal" data-in="draft" data-i="${idx}" data-f="w" value="${nextW != null ? fmt(nextW) : ''}"></td>` : ''}<td><input id="in-${entry.key}-reps" inputmode="numeric" data-in="draft" data-i="${idx}" data-f="reps" value="${nextR ?? ''}"></td>`}<td class="muted small">${rirLabel(rec.rir, ex)}</td><td><button class="check" data-a="doneSet" data-i="${idx}" aria-label="Satz abschließen">${I.check}</button></td></tr>`;
+      else rows += `<tr><td class="setno">${i + 1}</td>${pv}${isHold ? `<td class="muted num">${fmt(rec.sec)}</td>` : `${showW ? `<td class="muted num">${fmt(rec.w)}</td>` : ''}<td class="muted num">${fmt(rec.reps)}</td>`}<td class="muted small">${rirLabel(rec.rir, ex)}</td><td></td></tr>`;
     }
-    return `<div class="exc ${isCur ? 'cur' : ''}" id="ex-${entry.key}">${head}${target}
+    const isBB = ex.eq.includes('bb') && ex.kind === 'load';
+    return `<div class="stage"><div class="over"><div class="eyebrow">${ROLE[presc.role] ? ROLE[presc.role][1] : ''} · ${ex.prim.map(m => D.MUSCLES[m]).join(', ')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" aria-label="Satz ${done.length} von ${planned}">${pills}<b>${done.length}/${planned}</b></div></div>
+      ${target}
+      ${entry.note || lastNote ? `<div class="card flat small" data-a="noteOpen" data-i="${idx}" style="cursor:pointer">${I.note.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} ${entry.note ? esc(entry.note) : '<span class="muted">Letztes Mal:</span> ' + esc(lastNote)}</div>` : ''}
       <table class="sets"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
       <div class="exfoot">${isHold && !finished && kind === 'hold' ? `<button class="btn sm primary" data-a="holdStart" data-i="${idx}">${I.play} Halten starten</button>` : ''}${kind === 'int' && !finished ? `<button class="btn sm primary" data-a="intStart" data-i="${idx}">${I.play} Intervall</button>` : ''}
         <button class="btn sm" data-a="setPlus" data-i="${idx}">+ Satz</button><button class="btn sm" data-a="setMinus" data-i="${idx}" ${planned <= Math.max(1, done.length) ? 'disabled' : ''}>− Satz</button>
-        <button class="btn sm" data-a="swapWorkout" data-i="${idx}">${I.swap} Tauschen</button><button class="btn sm ghost" data-a="exMenu" data-i="${idx}">Mehr</button></div></div>`;
+        <button class="btn sm" data-a="swapWorkout" data-i="${idx}">${I.swap} Tauschen</button><button class="btn sm" data-a="noteOpen" data-i="${idx}">${I.note} Notiz</button>${isBB ? `<button class="btn sm" data-a="plates" data-i="${idx}">Scheiben</button>` : ''}<button class="btn sm" data-a="exInfo" data-id="${ex.id}">${I.info}</button><button class="btn sm ghost" data-a="exMenu" data-i="${idx}">Mehr</button></div>`;
   }
 
   function commitSet(idx, vals, rir) {
@@ -602,7 +665,7 @@
     const a = st.active; if (!a) return;
     if (save) {
       const bw = E.bodyweight(P());
-      const exs = a.exercises.map(e => { const ex = getEx(e.exId); const sets = e.sets.filter(s => s.done).map(s => { const o = { rir: s.rir }; if (s.w != null) o.w = s.w; if (s.reps != null) o.reps = s.reps; if (s.sec != null) o.sec = s.sec; return o; }); return { exId: e.exId, sets, rirT: e.presc.rir, rr: e.presc.rr, best: ex ? E.sessionBest(ex, { sets: sets.map(s => Object.assign({ done: true }, s)) }, bw) : 0 }; }).filter(e => e.sets.length);
+      const exs = a.exercises.map(e => { const ex = getEx(e.exId); const sets = e.sets.filter(s => s.done).map(s => { const o = { rir: s.rir }; if (s.w != null) o.w = s.w; if (s.reps != null) o.reps = s.reps; if (s.sec != null) o.sec = s.sec; return o; }); return { exId: e.exId, sets, rirT: e.presc.rir, rr: e.presc.rr, note: (e.note || '').trim() || undefined, best: ex ? E.sessionBest(ex, { sets: sets.map(s => Object.assign({ done: true }, s)) }, bw) : 0 }; }).filter(e => e.sets.length);
       const prs = [];
       for (const e of exs) {
         const ex = getEx(e.exId); if (!ex || !e.best) continue;
@@ -705,14 +768,54 @@
       const easier = ex.grp ? E.chainStep(ex, -1, P(), defLoc()) : null, harder = ex.grp ? E.chainStep(ex, 1, P(), defLoc()) : null;
       const chain = ex.grp ? E.allExercises(P()).filter(e => e.grp === ex.grp && e.pat === ex.pat).sort((a, b) => a.rank - b.rank) : [];
       const last = h.slice(-5).reverse();
-      return `<div class="stack"><div><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')} · Level ${ex.lvl}/5</div><h2>${esc(ex.name)}</h2></div>
-        <p style="margin:0">${esc(ex.d)}</p>
-        ${ex.c && ex.c.length ? `<div><div class="eyebrow" style="margin-bottom:6px">Darauf achten</div><ul style="margin:0;padding-left:20px">${ex.c.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
-        <div class="row wrap">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
-        <div class="small ink2">Geräte: ${ex.eq.map(e => D.EQUIP[e]).join(', ')} · ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' + (ex.addw ? ' (+ Zusatzgewicht möglich)' : '') : ex.kind === 'hold' ? 'Haltezeit' : 'Intervall'} · Ziel ${rrText(ex.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div>
-        ${chain.length > 1 ? `<div><div class="eyebrow" style="margin-bottom:6px">Progressionsstufen</div><div class="list">${chain.map(c => `<button class="li" data-a="exInfo" data-id="${c.id}" ${c.id === ex.id ? 'style="background:var(--accent-soft)"' : ''}><span class="num muted" style="width:26px">${fmt(c.rank, 1)}</span><div class="grow">${esc(c.name)}</div>${c.id === harder ? '<span class="chip">nächste</span>' : c.id === easier ? '<span class="chip">leichter</span>' : ''}</button>`).join('')}</div></div>` : ''}
-        ${h.length ? `<div><div class="eyebrow" style="margin-bottom:6px">Deine Leistung</div>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="margin-top:8px">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
-        <div class="row wrap">${st.active ? `<button class="btn grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
+      const bw = E.bodyweight(P());
+      const best = h.reduce((m, x) => Math.max(m, E.sessionBest(ex, x.entry, x.bw || bw)), 0);
+      const pctTable = ex.kind === 'load' && best > 0 ? `<div class="card stack" style="gap:8px"><div class="row between"><b>1RM-Tabelle</b><span class="small muted">geschätztes Maximum ${fmt(best, 1)} kg</span></div><div class="tbl"><table><thead><tr><th>%</th><th class="r">Gewicht</th><th class="r">≈ Wdh.</th></tr></thead><tbody>${[100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => `<tr><td>${p} %</td><td class="r num">${fmt(Math.round(best * p / 100 * 2) / 2)} kg</td><td class="r num">${p === 100 ? 1 : Math.max(1, Math.round(30 * (100 / p - 1)))}</td></tr>`).join('')}</tbody></table></div></div>` : '';
+      return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
+        <div class="row wrap" style="gap:6px">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
+        <div class="card stack" style="gap:10px"><b>Anleitung</b><p style="margin:0" class="ink2">${esc(ex.d)}</p>
+        ${ex.c && ex.c.length ? `<div class="stack" style="gap:6px">${ex.c.map((c, i) => `<div class="row" style="align-items:flex-start"><span class="plate p-main" style="width:22px;height:22px;font-size:11px">${i + 1}</span><span>${esc(c)}</span></div>`).join('')}</div>` : ''}
+        <div class="small muted">${ex.eq.map(e => D.EQUIP[e]).join(' + ')} · ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' + (ex.addw ? ' (+ Zusatzgewicht möglich)' : '') : ex.kind === 'hold' ? 'Haltezeit' : 'Intervall'} · Ziel ${rrText(ex.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div>
+        ${chain.length > 1 ? `<div class="stack" style="gap:8px"><b>Progressionsstufen</b><div class="chips" style="gap:10px">${chain.map(c => `<button class="extile" style="width:92px;flex:none" data-a="exInfo" data-id="${c.id}"><div class="tile" style="${c.id === ex.id ? 'box-shadow:inset 0 0 0 2px var(--lime)' : ''}">${figSVG(c)}</div><span>${c.id === harder ? '▲ ' : c.id === easier ? '▼ ' : ''}${esc(c.name)}</span></button>`).join('')}</div></div>` : ''}
+        ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
+        ${pctTable}
+        <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
+    },
+    day(s) {
+      const p = plan(); const d = p.days[s.i]; const loc = s.loc || st.homeLoc || defLoc();
+      const sl = d.slots.filter(x => x.ex[loc]);
+      return `<div class="stack"><div class="card ${s.i % 2 ? 'lilac' : 'lav'} daycard" style="min-height:150px"><div class="txt"><h2>${esc(d.name)}</h2><span class="tag" style="align-self:flex-start">${sl.length} Übungen</span><div class="small" style="font-weight:800;margin-top:auto">${esc(dayFocus(d, loc))}</div></div><div class="minbadge">${estMinutes(d, loc)}<small>min</small></div><div class="figwrap figdark">${figSVG(heroEx(d, loc), { anim: 2.8 })}</div></div>
+        ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="dayLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
+        <div class="list">${sl.map(x => { const ex = getEx(x.ex[loc]); const pr = E.prescription(x, ex, P(), p); return `<button class="li" data-a="exInfo" data-id="${ex.id}">${thumb(ex)}<div class="grow"><b>${esc(ex.name)}</b><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>`; }).join('')}</div>
+        <button class="btn primary big" data-a="startWorkout" data-d="${s.i}" data-l="${loc}">${I.play} Training starten</button></div>`;
+    },
+    filter(s) {
+      const F = st.libF || {}; let opts = [];
+      if (s.k === 'lvl') opts = LVL.map(([v, n]) => [v, n]);
+      if (s.k === 'group') opts = Object.keys(D.GROUPS).map(g => [g, g]);
+      if (s.k === 'pat') opts = Object.entries(D.PATTERNS).map(([k, v]) => [k, v]);
+      if (s.k === 'eq') opts = Object.entries(D.EQUIP).map(([k, v]) => [k, v]);
+      const title = { lvl: 'Schwierigkeit', group: 'Muskelgruppe', pat: 'Kategorie', eq: 'Ausrüstung' }[s.k];
+      return `<div class="stack"><h2>${title}</h2><div class="chips" style="flex-wrap:wrap"><button class="chip ${F[s.k] == null ? 'on' : ''}" data-a="filterPick" data-v="">Alle</button>${opts.map(([v, n]) => `<button class="chip ${F[s.k] == v ? 'on' : ''}" data-a="filterPick" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div></div>`;
+    },
+    note(s) {
+      const e = st.active.exercises[s.i]; const ex = getEx(e.exId); const prev = prevEntry(ex.id);
+      return `<div class="stack"><h2>Notiz · ${esc(ex.name)}</h2>${prev && prev.entry.note ? `<div class="card flat small"><span class="muted">Letztes Mal:</span> ${esc(prev.entry.note)}</div>` : ''}
+        <textarea class="field" id="noteText" data-in="noteText" rows="4" placeholder="z. B. Griffbreite, Sitzhöhe, Schmerzen, Tempo …">${esc(e.note || '')}</textarea>
+        <button class="btn primary" data-a="closeSheetRender">Speichern</button></div>`;
+    },
+    plates(s) {
+      const bar = s.bar || 20; const w = s.w || 60;
+      const per = Math.max(0, (w - bar) / 2); const PL = [[25, 'var(--rose)'], [20, 'var(--lav)'], [15, 'var(--warn)'], [10, 'var(--good)'], [5, '#fff'], [2.5, '#9C9CA7'], [1.25, '#6E6E78']];
+      let rest = per; const use = [];
+      for (const [p, c] of PL) while (rest >= p - 1e-6) { use.push([p, c]); rest = Math.round((rest - p) * 100) / 100; }
+      const h = p => 34 + p * 3.2;
+      const side = use.map(([p, c]) => `<div class="pl" style="height:${h(p)}px;background:${c}">${fmt(p)}</div>`).join('');
+      return `<div class="stack"><h2>Scheibenrechner</h2><div class="small muted" style="margin-top:-8px">Gesamtgewicht und Stange wählen</div>
+        <div class="stepper"><button data-a="plateStep" data-d="-2.5">−</button><input id="plateW" inputmode="decimal" data-in="plateW" value="${fmt(w)}" aria-label="Zielgewicht"><button data-a="plateStep" data-d="2.5">+</button></div>
+        <div class="seg">${[20, 15, 10].map(b => `<button data-a="plateBar" data-b="${b}" aria-pressed="${bar === b}">${b} kg</button>`).join('')}</div>
+        <div class="card"><div class="platebar"><div class="sleeve"></div>${[...use].reverse().map(([p, c]) => `<div class="pl" style="height:${h(p)}px;background:${c}">${fmt(p)}</div>`).join('')}<div class="bar"></div>${side}<div class="sleeve"></div></div>
+        <div class="small ink2" style="text-align:center">${use.length ? 'Pro Seite: ' + use.map(u => fmt(u[0])).join(' + ') + ' kg' : 'Nur die Stange'}${rest > 0 ? ' · ' + fmt(rest * 2) + ' kg nicht darstellbar' : ''}</div></div></div>`;
     },
     slot(s) {
       const p = plan(); const day = p.days[s.d]; const sl = day.slots[s.s]; const loc = st.planLoc || defLoc();
@@ -814,6 +917,21 @@
 
   /* ================= Aktionen ================= */
   const A = {
+    homeFilter(t) { st.homeFilter = t.dataset.k; render(); },
+    dayOpen(t) { openSheet({ type: 'day', i: +t.dataset.i }); },
+    dayLoc(t) { st.sheet.loc = t.dataset.l; st.homeLoc = t.dataset.l; renderSheet(); render(); },
+    progGo(t) { st.tab = 'fortschritt'; st.progSeg = t.dataset.k; render(); window.scrollTo(0, 0); },
+    libTab(t) { st.libTab = t.dataset.k; render(); },
+    libFilter(t) { openSheet({ type: 'filter', k: t.dataset.k }); },
+    filterPick(t) { const k = st.sheet.k; const v = t.dataset.v; st.libF = Object.assign({}, st.libF, { [k]: v === '' ? null : (k === 'lvl' ? +v : v) }); closeSheet(); render(); },
+    libAvailT() { st.libAvail = !st.libAvail; render(); },
+    libReset() { st.libF = {}; render(); },
+    manualRest() { const ci = curIndex(); const e = ci >= 0 ? st.active.exercises[ci] : null; st.rest = { end: Date.now() + (e ? e.presc.rest : 90) * 1000, total: e ? e.presc.rest : 90, label: '' }; renderRest(); },
+    doneCur() { const ci = curIndex(); if (ci >= 0) A.doneSet({ dataset: { i: ci } }); },
+    noteOpen(t) { openSheet({ type: 'note', i: +t.dataset.i }); setTimeout(() => { const n = $('#noteText'); if (n) n.focus(); }, 80); },
+    plates(t) { const e = st.active.exercises[+t.dataset.i]; const S = exState(e); openSheet({ type: 'plates', w: (e.draft && e.draft.w) ?? S.rec.w ?? 60, bar: 20 }); },
+    plateStep(t) { st.sheet.w = Math.max(0, (st.sheet.w || 0) + +t.dataset.d); renderSheet(); },
+    plateBar(t) { st.sheet.bar = +t.dataset.b; renderSheet(); },
     tab(t) { st.tab = t.dataset.k; if (st.ov && st.ov.type === 'workout') st.ov = null; render(); window.scrollTo(0, 0); },
     scrim(t, e) { if (e.target === t) closeSheet(); },
     closeSheet() { closeSheet(); },
@@ -848,7 +966,7 @@
     homeLoc(t) { st.homeLoc = t.dataset.l; render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
     planLoc(t) { st.planLoc = t.dataset.l; render(); },
-    startWorkout(t) { if (st.active) { openWorkout(); return; } startWorkout(+t.dataset.d, t.dataset.l); },
+    startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; } startWorkout(+t.dataset.d, t.dataset.l); },
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
     wMin() { st.ov = null; keepAwake(false); render(); },
@@ -986,6 +1104,8 @@
 
   /* ================= Eingaben ================= */
   const IN = {
+    noteText(t) { const e = st.active.exercises[st.sheet.i]; e.note = t.value; Store.saveActive(); },
+    plateW(t) { const v = num(t.value); if (v != null) { st.sheet.w = v; const pos = t.selectionStart; renderSheet(); const n = $('#plateW'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } } },
     libQ(t) { st.libQ = t.value; const pos = t.selectionStart; render(); const n = $('#libq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } },
     chartEx(t) { st.chartEx = t.value; render(); },
     quiz(t) { const q = E.Q.find(x => x.id === t.dataset.q); const v = q.type === 'number' ? num(t.value) : t.value; st.ov.answers[q.id] = v; const b = $('[data-a="qNext"]'); if (b) b.disabled = !(q.optional || (v != null && v !== '')); },
@@ -1024,7 +1144,6 @@
 
   setInterval(() => {
     timerTick();
-    if (st.ov && st.ov.type === 'workout' && st.active) { const el = $('#wElapsed'); if (el) el.textContent = mmss((Date.now() - st.active.start) / 1000); }
   }, 250);
 
   /* ================= Start ================= */

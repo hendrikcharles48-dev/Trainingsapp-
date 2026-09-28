@@ -1,6 +1,6 @@
 // Netz zuerst (damit Updates sofort ankommen), offline aus dem Cache
-const CACHE = 'satzwerk-v2';
-const FILES = ['./', './index.html', './exercises.js', './engine.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'satzwerk-v3';
+const FILES = ['./', './index.html', './exercises.js', './engine.js', './figures.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
