@@ -157,6 +157,7 @@
     ul: { 2: ['UA', 'LA'], 3: ['UA', 'LA', 'UB'], 4: ['UA', 'LA', 'UB', 'LB'], 5: ['UA', 'LA', 'UB', 'LB', 'FA'], 6: ['UA', 'LA', 'UB', 'LB', 'UA', 'LA'] },
     ppl: { 2: ['FA', 'FB'], 3: ['PU', 'PL', 'LG'], 4: ['PU', 'PL', 'LG', 'FA'], 5: ['UA', 'LA', 'PU', 'PL', 'LG'], 6: ['PU', 'PL', 'LG', 'PU', 'PL', 'LG'] }
   };
+  const MAX_EX = 7, MIN_EX = 5, PLAN_VERSION = 2;
   const SPLIT_NAMES = { fb: 'Ganzkörper', ul: 'Oberkörper / Unterkörper', ppl: 'Push / Pull / Beine' };
   const PRIO_SLOTS = {
     Rücken: { p: ['hpull', 'latiso'], focus: ['upper', 'full'] }, Brust: { p: ['fly', 'hpush'], focus: ['upper', 'full'] },
@@ -280,7 +281,7 @@
     const restMain = goal === 'strength' ? 180 : goal === 'fit' ? 105 : 150;
     const dur = +a.duration || 60;
 
-    const plan = { id: 'p' + Date.now().toString(36), created: new Date().toISOString(), split, splitName: SPLIT_NAMES[split], goal, days: [], meso: { start: todayISO(), len: 5 } };
+    const plan = { v: PLAN_VERSION, id: 'p' + Date.now().toString(36), created: new Date().toISOString(), split, splitName: SPLIT_NAMES[split], goal, days: [], meso: { start: todayISO(), len: 5 } };
     const usedBy = { home: new Set(), gym: new Set() };
     const nameCount = {};
     keys.forEach((k, di) => {
@@ -309,7 +310,14 @@
         sl.rr = ranges[role] || null;
         sl.id = 's' + Math.random().toString(36).slice(2, 8);
       }
-      // Zeitbudget: erst Sätze kürzen, dann unwichtigste Übungen streichen
+      // Höchstens 7 Übungen pro Einheit: Unwichtigstes zuerst streichen, Grundübungen bleiben
+      const keep = { main: 10, skill: 8, sec: 7, core: 5.5, iso: 4.5, cond: 2 };
+      while (slots.length > MAX_EX) {
+        let worst = -1, wv = Infinity;
+        slots.forEach((sl, i) => { const v = keep[sl.r] + (sl.prio ? 0.8 : 0) - i * 0.01; if (v < wv) { wv = v; worst = i; } });
+        slots.splice(worst, 1);
+      }
+      // Zeitbudget: erst Sätze kürzen, dann unwichtigste Übungen streichen (mindestens 5 Übungen)
       if (dur <= 45) for (const sl of slots) sl.rest = Math.max(sl.r === 'main' ? 90 : 45, Math.round(sl.rest * 0.75 / 15) * 15);
       const prio = { main: 1, skill: 1.5, sec: 2, iso: 3, core: 3.5, cond: 4 };
       const est = () => 6 + slots.reduce((t, sl) => t + sl.sets * (0.75 + sl.rest / 60), 0);
@@ -319,10 +327,10 @@
         const red = order.find(o => o.sl.sets > (o.sl.r === 'main' ? 3 : 2) && o.sl.r !== 'cond');
         if (red) { red.sl.sets -= 1; continue; }
         const rem = order.find(o => o.sl.r !== 'main');
-        if (rem && slots.length > 4) { slots.splice(rem.i, 1); continue; }
+        if (rem && slots.length > MIN_EX) { slots.splice(rem.i, 1); continue; }
         const red2 = order.find(o => o.sl.sets > 2);
         if (red2) { red2.sl.sets -= 1; continue; }
-        if (rem && slots.length > 3) { slots.splice(rem.i, 1); continue; }
+        if (rem && slots.length > MIN_EX - 1) { slots.splice(rem.i, 1); continue; }
         break;
       }
       const day = { id: 'd' + di, key: k, name: T.name + (keys.filter(x => x === k).length > 1 ? ' ' + ['I', 'II', 'III'][nameCount[k] - 1] : ''), focus: T.focus, slots };
@@ -577,6 +585,6 @@
   window.ENGINE = {
     Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
-    estimate1RM, allExercises, effLoad, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
+    estimate1RM, allExercises, effLoad, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

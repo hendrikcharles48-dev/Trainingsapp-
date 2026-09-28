@@ -172,13 +172,13 @@
   function welcomeView() {
     return `<div class="topbar"><h1>Satzwerk</h1></div>
     <div class="stack">
-      <div class="hero stack">
+      <div class="hero grad stack">
         <div class="eyebrow">Dein Trainingsplan · Zuhause & Studio</div>
         <h2>Ein Fragebogen, ein Plan, jeder Satz neu berechnet.</h2>
-        <p class="ink2" style="margin:0">Satzwerk wählt Übungen passend zu deiner Ausrüstung (Klimmzugstange, Ringe, Kurzhantel, Seilzug oder Studio) und deinem Können. Nach jedem Satz rechnet der Algorithmus Gewicht, Wiederholungen und Satzanzahl neu aus.</p>
-        <button class="btn primary big" data-a="quizStart">Fragebogen starten</button>
-        <button class="btn" data-a="quickStart">Mit Beispielprofil ausprobieren</button>
-        <p class="tiny muted" style="margin:0">Der Fragebogen dauert etwa 3 Minuten und hat ${E.Q.length} Fragen.</p>
+        <p style="margin:0;opacity:.92">Satzwerk wählt Übungen passend zu deiner Ausrüstung (Klimmzugstange, Ringe, Kurzhantel, Seilzug oder Studio) und deinem Können. Nach jedem Satz rechnet der Algorithmus Gewicht, Wiederholungen und Satzanzahl neu aus.</p>
+        <button class="btn white big" data-a="quizStart">Fragebogen starten</button>
+        <button class="btn" data-a="quickStart" style="background:rgba(255,255,255,.18);color:#fff;box-shadow:none">Mit Beispielprofil ausprobieren</button>
+        <p class="tiny" style="margin:0;opacity:.85">Der Fragebogen dauert etwa 3 Minuten und hat ${E.Q.length} Fragen.</p>
       </div>
       <div class="list">
         ${[['1', 'Fragebogen', 'Ziele, Ausrüstung, Level-Tests, Beschwerden, Erholung'], ['2', 'Plan mit Begründung', 'Jede Übung zeigt, warum sie für dich gewählt wurde'], ['3', 'Training', 'Empfehlung vor jedem Satz, Reserve eintragen, Pausentimer läuft'], ['4', 'Fortschritt', 'Kraftkurven, Rekorde, Sätze pro Muskel und Woche']].map(x => `<div class="li"><span class="plate p-main">${x[0]}</span><div class="grow"><b>${x[1]}</b><div class="small muted">${x[2]}</div></div></div>`).join('')}
@@ -201,24 +201,30 @@
     const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
     const last = st.workouts[st.workouts.length - 1];
     const slots = day.slots.filter(s => s.ex[loc]);
-    return `<div class="topbar"><h1>${greet}${a.name ? ', ' + esc(a.name) : ''}</h1><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
+    const goal = +a.days || p.days.length; const cnt = weekW.length;
+    const R = 27, C = 2 * Math.PI * R, frac = Math.min(1, cnt / goal);
+    const totalSets = slots.reduce((t, sl) => { const ex = getEx(sl.ex[loc]); return t + (ex ? E.prescription(sl, ex, P(), p).sets : 0); }, 0);
+    const rirMain = E.prescription({ r: 'main', sets: 3, rest: 120 }, { kind: 'load', role: 'c', rr: [6, 10] }, P(), p).rir;
+    return `<div class="topbar"><div class="grow"><div class="eyebrow">${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${greet}${a.name ? ', ' + esc(a.name) : ''}</h1></div><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
     <div class="stack">
-      ${st.active ? `<div class="hero stack" style="border-color:var(--accent)"><div class="eyebrow">Training läuft</div><h2>${esc(st.active.name)}</h2><div class="muted small">Seit ${durTxt((Date.now() - st.active.start) / 1000)} · ${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn primary big" data-a="resume">Weiter trainieren</button></div>` : ''}
+      ${st.active ? `<div class="hero grad stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="opacity:.9">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn white big" data-a="resume">${I.play} Weiter trainieren</button></div>` : ''}
+      ${!st.active ? `<div class="hero grad stack">
+        <div class="row between"><span class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Heute dran'}</span><span class="eyebrow">≈ ${estMinutes(day, loc)} min</span></div>
+        <div><h2 class="xl">${esc(day.name)}</h2><div class="small" style="opacity:.9;margin-top:6px;font-weight:700">${slots.length} Übungen · ${totalSets} Sätze · Woche ${wi.w}${wi.deload ? ' · Deload' : ''}</div></div>
+        ${locs().length > 1 ? `<div class="seg glass">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
+        <button class="btn white big" data-a="startWorkout" data-d="${di}" data-l="${loc}">${I.play} Training starten</button>
+      </div>
+      <div class="chips">${p.days.map((d, i) => `<button class="chip ${i === di ? 'on' : ''}" data-a="homeDay" data-i="${i}">${esc(d.name)}</button>`).join('')}</div>
+      <div class="list">${slots.map(sl => { const ex = getEx(sl.ex[loc]); return ex ? `<button class="li" data-a="exInfo" data-id="${ex.id}">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:700">${esc(ex.name)}</div><div class="small muted">${sl.sets} × ${rrText(E.prescription(sl, ex, P(), p).rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>` : ''; }).join('')}</div>` : ''}
       <div class="card stack">
-        <div class="row between"><div><div class="eyebrow">Woche ${wi.w} von ${wi.len} · ${wi.label}</div><div class="small ink2">${wi.deload ? 'Weniger Sätze, leichtere Gewichte: dein Körper holt auf.' : 'Ziel-Reserve Grundübungen: ' + E.prescription({ r: 'main', sets: 3, rest: 120 }, { kind: 'load', role: 'c', rr: [6, 10] }, P(), p).rir + ' Wdh.'}</div></div>
-        <div class="num" style="font-size:26px;font-weight:700">${weekW.length}<span class="muted" style="font-size:18px">/${a.days || p.days.length}</span></div></div>
+        <div class="row" style="gap:16px">
+          <svg class="ring" width="68" height="68" viewBox="0 0 68 68" aria-label="${cnt} von ${goal} Trainings diese Woche"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A1F"/><stop offset="1" stop-color="#FF2E63"/></linearGradient></defs><circle class="bgc" cx="34" cy="34" r="${R}" fill="none" stroke-width="8"/><circle cx="34" cy="34" r="${R}" fill="none" stroke="url(#rg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 34 34)"/><text x="34" y="39" text-anchor="middle" style="font:800 16px var(--display);fill:var(--ink)">${cnt}/${goal}</text></svg>
+          <div class="grow"><div class="eyebrow">Diese Woche</div><div style="font-weight:800;font-size:17px">Woche ${wi.w} von ${wi.len} · ${wi.label}</div><div class="small muted">${wi.deload ? 'Weniger Sätze, leichtere Gewichte' : 'Ziel-Reserve Grundübungen: ' + rirMain + ' Wdh.'}</div></div>
+        </div>
         <div class="weekdots">${DAYS.map((d, i) => `<span class="${doneDays.has(i) ? 'done' : ''} ${i === todayIdx ? 'today' : ''}">${d}</span>`).join('')}</div>
       </div>
-      ${!st.active ? `<div class="hero stack">
-        <div class="row between"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Als Nächstes'}</div><div class="small muted">≈ ${estMinutes(day, loc)} min</div></div>
-        <h2>${esc(day.name)}</h2>
-        ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        <div class="list">${slots.map(sl => { const ex = getEx(sl.ex[loc]); return ex ? `<button class="li" data-a="exInfo" data-id="${ex.id}">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${sl.sets} × ${rrText(E.prescription(sl, ex, P(), p).rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>` : ''; }).join('')}</div>
-        <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button>
-        <div class="chips">${p.days.map((d, i) => `<button class="chip ${i === di ? 'on' : ''}" data-a="homeDay" data-i="${i}">${esc(d.name)}</button>`).join('')}</div>
-      </div>` : ''}
       <div class="row"><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button><button class="btn grow" data-a="tab" data-k="timer">${I.timer} Timer</button></div>
-      ${last ? `<div class="section"><div class="head"><h3>Letztes Training</h3><button class="btn ghost sm" data-a="tab" data-k="fortschritt">Alle</button></div>${workoutRow(last)}</div>` : ''}
+      ${last ? `<div class="section"><div class="head"><h3>Letztes Training</h3><button class="btn ghost sm" data-a="tab" data-k="fortschritt" style="background:none">Alle</button></div>${workoutRow(last)}</div>` : ''}
       ${bwNudge()}
     </div>`;
   }
@@ -229,7 +235,7 @@
   }
   function workoutRow(w) {
     const sets = w.exercises.reduce((t, e) => t + e.sets.length, 0);
-    return `<button class="li card" style="border:1px solid var(--line)" data-a="wDetail" data-id="${w.id}"><div class="grow"><div style="font-weight:600">${esc(w.name)}</div><div class="small muted">${dateDE(w.date)} · ${LOCN[w.loc] || ''} · ${durTxt(w.dur || 0)} · ${sets} Sätze${w.prs && w.prs.length ? ` · <span class="pr">${w.prs.length} Rekord${w.prs.length > 1 ? 'e' : ''}</span>` : ''}</div></div><span class="chev">${I.chev}</span></button>`;
+    return `<button class="li card" data-a="wDetail" data-id="${w.id}"><div class="grow"><div style="font-weight:600">${esc(w.name)}</div><div class="small muted">${dateDE(w.date)} · ${LOCN[w.loc] || ''} · ${durTxt(w.dur || 0)} · ${sets} Sätze${w.prs && w.prs.length ? ` · <span class="pr">${w.prs.length} Rekord${w.prs.length > 1 ? 'e' : ''}</span>` : ''}</div></div><span class="chev">${I.chev}</span></button>`;
   }
 
   /* ================= Plan ================= */
@@ -250,7 +256,7 @@
         <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><span class="plate p-${sl.r}"></span><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
           return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--accent);font-weight:600">${I.plus.replace('<svg', '<svg width="20" height="20"')} Übung hinzufügen</button></div></div>`).join('')}
-      <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Farben wie bei Hantelscheiben: Blau 20 kg für Grundübungen, Gelb 15 kg Ergänzung, Grün 10 kg Isolation, Rot 25 kg Skills.</p></div>
+      <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
       <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
     </div>`;
   }
@@ -1025,6 +1031,12 @@
   (async function boot() {
     await Store.init();
     registerCustom();
+    if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) {
+      const old = st.profile.plan; const np = E.buildPlan(st.profile);
+      np.meso = old.meso || np.meso; np.next = (old.next || 0) % np.days.length; np.forceDeload = old.forceDeload;
+      st.profile.plan = np; Store.saveProfile(true);
+      setTimeout(() => toast('Plan aktualisiert: jetzt 5–7 Übungen pro Einheit', 4000), 400);
+    }
     if (st.profile && st.profile.plan && st.active) toast('Dein Training läuft noch: tippe auf „Weiter trainieren“', 3500);
     render();
   })();
