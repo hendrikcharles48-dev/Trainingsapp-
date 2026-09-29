@@ -157,7 +157,7 @@
     ul: { 2: ['UA', 'LA'], 3: ['UA', 'LA', 'UB'], 4: ['UA', 'LA', 'UB', 'LB'], 5: ['UA', 'LA', 'UB', 'LB', 'FA'], 6: ['UA', 'LA', 'UB', 'LB', 'UA', 'LA'] },
     ppl: { 2: ['FA', 'FB'], 3: ['PU', 'PL', 'LG'], 4: ['PU', 'PL', 'LG', 'FA'], 5: ['UA', 'LA', 'PU', 'PL', 'LG'], 6: ['PU', 'PL', 'LG', 'PU', 'PL', 'LG'] }
   };
-  const MAX_EX = 7, MIN_EX = 5, PLAN_VERSION = 2;
+  const MAX_EX = 7, MIN_EX = 5, PLAN_VERSION = 3;
   const SPLIT_NAMES = { fb: 'Ganzkörper', ul: 'Oberkörper / Unterkörper', ppl: 'Push / Pull / Beine' };
   const PRIO_SLOTS = {
     Rücken: { p: ['hpull', 'latiso'], focus: ['upper', 'full'] }, Brust: { p: ['fly', 'hpush'], focus: ['upper', 'full'] },
@@ -182,7 +182,7 @@
   /* Bewertet, wie gut eine Übung in einen Slot passt. Liefert Punktzahl und Begründungen. */
   function scoreExercise(ex, slot, ctx) {
     const { profile, loc, eqSet, used, dayUsed } = ctx;
-    const a = profile.answers || {}; const ab = ctx.ab; const reasons = [];
+    const a = profile.answers || {}; const ab = ctx.ab; const reasons = []; let bad = false;
     if (!available(ex, eqSet)) return null;
     if (!slot.p.includes(ex.pat)) return null;
     const patIdx = slot.p.indexOf(ex.pat);
@@ -192,11 +192,11 @@
     else if (r === 'core') { if (ex.role !== 'k') return null; }
     else if (r === 'cond') { if (ex.role !== 'x') return null; }
     else if (ex.role === 's' || ex.role === 'x') return null;
-    if (r === 'main') s += ex.role === 'c' ? 6 : -4;
+    if (r === 'main') { s += ex.role === 'c' ? 6 : -4; if (ex.role !== 'c') bad = true; }
     if (r === 'sec') s += ex.role === 'c' ? 3 : 0;
     if (r === 'iso') s += ex.role === 'i' ? 4 : 0;
     const inj = (ex.inj || []).filter(t => (a.injuries || []).includes(t));
-    if (inj.length) s -= 8 * inj.length; else if ((a.injuries || []).length && ex.pat !== 'core') {
+    if (inj.length) { s -= 8 * inj.length; bad = true; } else if ((a.injuries || []).length && ex.pat !== 'core') {
       const names = { shoulder: 'Schulter', elbow: 'Ellbogen', wrist: 'Handgelenk', lowback: 'unteren Rücken', knee: 'Knie' };
       const spared = (a.injuries || []).filter(t => ['shoulder', 'elbow', 'wrist', 'lowback', 'knee'].includes(t)).map(t => names[t]);
       if (spared.length && (ex.pat === 'dip' || ex.pat === 'vpush' || ex.pat === 'hpush' || ex.pat === 'squat' || ex.pat === 'hinge')) reasons.push('Schont ' + spared.join(' & '));
@@ -211,11 +211,11 @@
     // Progressionskette: passende Stufe zu deinem Können
     if (ex.grp && ab[ex.grp] != null) {
       const d = ex.rank - ab[ex.grp];
-      if (d > 0.05) s -= d * 4;
+      if (d > 0.05) { s -= d * 4; if (d > 0.6) bad = true; }
       else {
         const easy = -d;
         const addOk = ex.addw && canAdd(profile, loc) && (goal === 'muscle' || goal === 'strength');
-        s -= easy * (addOk ? 0.6 : 1.6);
+        s -= easy * (addOk ? 0.6 : 1.6); if (easy > 2.2 && !addOk) bad = true;
         if (easy < 0.6) { s += 1.5; reasons.push(levelReason(ex, ab)); }
         else if (addOk) reasons.push('Mit Zusatzgewicht steigerbar');
       }
@@ -224,7 +224,7 @@
       if (ex.grp === 'hs' && (a.skills || []).includes('hs')) s += 1.5;
     } else {
       const lvl = EXP_LVL[a.exp] || 2;
-      if (ex.lvl > lvl + 1) s -= (ex.lvl - lvl - 1) * 2.5;
+      if (ex.lvl > lvl + 1) { s -= (ex.lvl - lvl - 1) * 2.5; bad = true; }
     }
     // Passt das vorhandene Gewicht?
     if (ex.kind === 'load' && ex.std) {
@@ -232,8 +232,8 @@
       if (opts && opts.length) {
         const need = estimate1RM(ex, profile) / (1 + 12 / 30);
         const max = opts[opts.length - 1], min = opts[0];
-        if (max < need * 0.55) { s -= 5; reasons.push('Deine Hantel ist hierfür eher leicht'); }
-        else if (min > need * 1.45) { s -= 5; }
+        if (max < need * 0.55) { s -= 5; bad = true; reasons.push('Deine Hantel ist hierfür eher leicht'); }
+        else if (min > need * 1.45) { s -= 5; bad = true; }
         else if (loc === 'home') reasons.push('Gewicht passt zu deiner Ausrüstung');
         if (ex.heavy && max < ex.heavy * bodyweight(profile) * (EXP_F[a.exp] || 0.8)) s -= 3;
       }
@@ -244,7 +244,8 @@
     if (dayUsed.has(ex.id)) s -= 40;
     if (used.has(ex.id)) s -= 2.5;
     s += hash(ex.id + ctx.seed) * 0.6;
-    if ((profile.favs || []).includes(ex.id)) { s += 7; reasons.unshift('★ Deine Lieblingsübung'); }
+    // Lieblingsübung: klar bevorzugt, aber nur wenn sie sinnvoll passt und nicht zu oft pro Woche vorkommt
+    if ((profile.favs || []).includes(ex.id) && !bad && !dayUsed.has(ex.id) && ((used.favN || {})[ex.id] || 0) < 2) { s += 5; reasons.unshift('★ Deine Lieblingsübung'); }
     return { s, reasons: [...new Set(reasons)].slice(0, 3) };
   }
   function levelReason(ex, ab) {
@@ -339,7 +340,6 @@
       plan.days.push(day);
     });
     plan.locs = locs;
-    applyFavorites(plan, profile);
     return plan;
   }
 
@@ -353,7 +353,7 @@
       if (sl.ex[loc] && sl.locked && sl.locked[loc]) { dayUsed.add(sl.ex[loc]); continue; }
       const ctx = { profile, loc, eqSet, used, dayUsed, ab, seed: day.id + sl.id };
       const best = rankFor(sl, ctx, 1)[0];
-      if (best) { sl.ex[loc] = best.ex.id; sl.why[loc] = best.reasons; dayUsed.add(best.ex.id); used.add(best.ex.id); }
+      if (best) { sl.ex[loc] = best.ex.id; sl.why[loc] = best.reasons; dayUsed.add(best.ex.id); used.add(best.ex.id); if ((profile.favs || []).includes(best.ex.id)) { used.favN = used.favN || {}; used.favN[best.ex.id] = (used.favN[best.ex.id] || 0) + 1; } }
       else { sl.ex[loc] = null; }
     }
     day.slots = day.slots.filter(sl => Object.values(sl.ex).some(Boolean));
@@ -380,17 +380,20 @@
     return ((diff % len) + len) % len + 1;
   }
   function weekInfo(plan, profile) {
-    const w = plan && plan.forceDeload ? (plan.meso.len || 5) : mesoWeek(plan);
+    const autoDl = plan && plan.deloadUntil && todayISO() < plan.deloadUntil;
+    const w = plan && (plan.forceDeload || autoDl) ? (plan.meso.len || 5) : mesoWeek(plan);
     const len = (plan && plan.meso && plan.meso.len) || 5;
     const deload = w === len;
     const label = deload ? 'Deload-Woche' : ['Einstieg', 'Aufbau', 'Aufbau', 'Peak'][w - 1] || 'Aufbau';
     return { w, len, deload, label, rirShift: deload ? 0 : [1, 0, 0, -1][w - 1] ?? 0 };
   }
+  function adaptNow(profile) { const ad = profile && profile.adapt; if (!ad) return null; const t = todayISO(); return t >= ad.from && t < ad.until ? ad : null; }
   function targetRIR(role, kind, profile, wi) {
     if (wi.deload) return 4;
+    const ad = adaptNow(profile);
     const i = (profile.answers || {}).intensity || 'hard';
     const base = role === 'main' ? { mod: 3, hard: 2, very: 2 }[i] : role === 'sec' ? { mod: 2, hard: 2, very: 1 }[i] : { mod: 2, hard: 1, very: 0 }[i];
-    let r = base + wi.rirShift;
+    let r = base + wi.rirShift + (ad ? ad.rir || 0 : 0);
     const min = role === 'main' ? 1 : 0;
     if (kind === 'hold' || role === 'skill') r = Math.max(1, r);
     return Math.max(min, Math.min(4, r));
@@ -402,6 +405,8 @@
     const exp = (profile.answers || {}).exp;
     if (!wi.deload && (wi.w === 3 || wi.w === 4) && role === 'main' && exp !== 'new') sets += 1;
     if (wi.deload) sets = Math.max(1, Math.ceil(sets / 2));
+    const ad = adaptNow(profile);
+    if (ad && !wi.deload) { if (ad.sets < 0 && (role === 'sec' || role === 'iso' || role === 'core')) sets = Math.max(2, sets + ad.sets); if (ad.sets > 0 && (role === 'main' || role === 'sec')) sets += ad.sets; }
     let rr = ex.rr || [8, 12];
     if (ex.kind === 'load' && ex.role === 'c' && slot && slot.rr && !(ex.rr && ex.rr[0] > slot.rr[1])) rr = slot.rr;
     if (ex.kind === 'load' && ex.role === 'i' && slot && slot.rr) rr = [Math.max(slot.rr[0], ex.rr ? ex.rr[0] : 0), Math.max(slot.rr[1], ex.rr ? ex.rr[1] : 0)];
@@ -584,60 +589,49 @@
   }
   function startOfWeek(d) { d = new Date(d || Date.now()); const day = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - day); return d; }
 
-  /* Lieblingsübungen in einen bestehenden Plan einbauen, ohne ihn neu zu berechnen.
-     Liefert eine Liste mit {exId, loc, day, how: 'replace'|'add'|'present'|'none'}. */
-  function applyFavorites(plan, profile) {
-    const favs = profile.favs || []; const out = [];
-    if (!plan || !favs.length) return out;
-    const locs = plan.locs || ['home'];
-    const keep = { main: 10, skill: 8, sec: 7, core: 5.5, iso: 4.5, cond: 2 };
-    const ranges = goalRanges(plan.goal);
-    const lowerM = ['quads', 'hams', 'glutes', 'calves'];
-    for (const id of favs) {
-      const ex = allExercises(profile).find(e => e.id === id); if (!ex) continue;
-      for (const loc of locs) {
-        if (!available(ex, locEquip(profile, loc))) { out.push({ exId: id, loc, how: 'none' }); continue; }
-        const hit = plan.days.find(d => d.slots.some(sl => sl.ex && sl.ex[loc] === id));
-        if (hit) { out.push({ exId: id, loc, day: hit.name, how: 'present' }); continue; }
-        const role = ex.role === 'c' ? 'sec' : ex.role === 'i' ? 'iso' : ex.role === 's' ? 'skill' : ex.role === 'x' ? 'cond' : 'core';
-        // 1) passenden Platz derselben Bewegung ersetzen (nicht schon ein Favorit, nicht von Hand gewählt)
-        let best = null;
-        plan.days.forEach(d => d.slots.forEach(sl => {
-          if (!sl.p.includes(ex.pat) || (sl.locked && sl.locked[loc])) return;
-          if ((sl.r === 'skill') !== (role === 'skill')) return;
-          if (favs.includes(sl.ex[loc])) return;
-          if (d.slots.some(o => o !== sl && o.ex[loc] === id)) return;
-          const favCount = d.slots.filter(o => favs.includes(o.ex[loc])).length;
-          const score = favCount * 10 + (sl.r === 'main' && ex.role !== 'c' ? 5 : 0);
-          if (!best || score < best.score) best = { d, sl, score };
-        }));
-        const mark = sl => { sl.ex[loc] = id; sl.why = sl.why || {}; sl.why[loc] = ['★ Deine Lieblingsübung']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); };
-        if (best) { mark(best.sl); out.push({ exId: id, loc, day: best.d.name, how: 'replace' }); continue; }
-        // 2) als zusätzliche Übung in einen passenden Tag
-        const lower = ex.prim.some(m => lowerM.includes(m)) && !ex.prim.some(m => !lowerM.includes(m) && m !== 'abs' && m !== 'obliques');
-        const fits = plan.days.filter(d => d.focus === 'full' || (lower ? d.focus === 'lower' : d.focus === 'upper') || ex.pat === 'core' || ex.pat === 'cond');
-        const days = (fits.length ? fits : plan.days).slice().sort((a, b) => a.slots.length - b.slots.length);
-        const d = days[0];
-        const sl = { id: 's' + Math.random().toString(36).slice(2, 8), p: [ex.pat], r: role, sets: role === 'skill' ? 3 : 3, rest: role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'core' ? 60 : role === 'cond' ? 20 : 75, rr: ranges[role] || null, ex: {}, why: {}, locked: {} };
-        for (const l of locs) {
-          if (available(ex, locEquip(profile, l))) { sl.ex[l] = id; sl.why[l] = ['★ Deine Lieblingsübung']; sl.locked[l] = true; }
-          else { const alt = alternatives(sl, l, profile, d.slots.map(o => o.ex[l]))[0]; if (alt) { sl.ex[l] = alt.ex.id; sl.why[l] = alt.reasons; } }
-        }
-        if (d.slots.length >= MAX_EX) {
-          let wi = -1, wv = Infinity;
-          d.slots.forEach((o, i) => { if (o.r === 'main' || favs.includes(o.ex[loc]) || (o.locked && o.locked[loc])) return; const v = keep[o.r] + (o.prio ? 0.8 : 0); if (v < wv) { wv = v; wi = i; } });
-          if (wi < 0) { out.push({ exId: id, loc, how: 'none' }); continue; }
-          d.slots.splice(wi, 1, sl);
-        } else d.slots.push(sl);
-        out.push({ exId: id, loc, day: d.name, how: 'add' });
-      }
+  /* Übungsauswahl eines bestehenden Plans neu bewerten (z. B. nach Favoriten-Änderung).
+     Aufbau, Sätze und von Hand gewählte Übungen bleiben. Liefert die Änderungen. */
+  function refreshSelection(plan, profile) {
+    const ab = abilities(profile.answers || {}); const changes = [];
+    for (const loc of plan.locs || ['home']) {
+      const before = plan.days.map(d => d.slots.map(sl => sl.ex && sl.ex[loc]));
+      const used = new Set();
+      plan.days.forEach((d, di) => {
+        for (const sl of d.slots) if (!(sl.locked && sl.locked[loc]) && sl.ex) delete sl.ex[loc];
+        fillDay(d, loc, profile, ab, used, di);
+      });
+      plan.days.forEach((d, di) => d.slots.forEach((sl, si) => { const old = (before[di] || [])[si]; if (sl.ex[loc] && old !== sl.ex[loc]) changes.push({ day: d.name, loc, from: old, to: sl.ex[loc] }); }));
     }
-    return out;
+    return changes;
+  }
+
+  /* ================= Wochen-Check-in ================= */
+  const CHECKIN = [
+    { id: 'exh', q: 'Wie erschöpft fühlst du dich?', o: [[1, 'Frisch'], [2, 'Gut'], [3, 'Normal'], [4, 'Müde'], [5, 'Platt']] },
+    { id: 'sore', q: 'Wie viel Muskelkater hattest du?', o: [[1, 'Keinen'], [2, 'Leicht'], [3, 'Mittel'], [4, 'Stark'], [5, 'Sehr stark']] },
+    { id: 'fit', q: 'Wie fit und leistungsfähig fühlst du dich?', o: [[5, 'Top'], [4, 'Gut'], [3, 'Okay'], [2, 'Schlapp'], [1, 'Kaputt']] },
+    { id: 'sleep', q: 'Wie hast du geschlafen?', o: [[3, 'Gut'], [2, 'Okay'], [1, 'Schlecht']] },
+    { id: 'pain', q: 'Gelenk- oder Sehnenschmerzen?', o: [[0, 'Keine'], [1, 'Leicht'], [2, 'Deutlich']] },
+    { id: 'sport', q: 'Wie viel anderer Sport (z. B. Baseball)?', o: [[0, 'Keiner'], [1, 'Wenig'], [2, 'Normal'], [3, 'Viel']] },
+    { id: 'diff', q: 'Wie haben sich die Trainings angefühlt?', o: [[-1, 'Zu leicht'], [0, 'Passend'], [1, 'Zu hart']] }
+  ];
+  function applyCheckin(profile, plan, ans, weekStartIso) {
+    const n = k => +(ans[k] ?? 0);
+    const score = (n('exh') - 3) + (n('sore') - 3) * 0.8 + (3 - n('fit')) + (2 - n('sleep')) * 0.8 + n('pain') * 1.5 + Math.max(0, n('sport') - 1) * 0.7 + n('diff') * 1.5;
+    const from = weekStartIso; const until = todayISO(new Date(new Date(weekStartIso + 'T12:00:00').getTime() + 7 * 864e5));
+    let res;
+    if (n('pain') >= 2 || score >= 5) { plan.deloadUntil = until; res = { kind: 'deload', text: 'Diese Woche Deload: halbe Sätze und mehr Reserve, damit du dich richtig erholst.' + (n('pain') >= 2 ? ' Bei anhaltenden Schmerzen bitte ärztlich abklären lassen.' : '') }; profile.adapt = null; }
+    else if (score >= 2.5) { profile.adapt = { from, until, sets: -1, rir: 1 }; res = { kind: 'less', text: 'Etwas weniger Volumen: 1 Satz weniger bei Ergänzung, Isolation und Rumpf, dazu 1 Wiederholung mehr Reserve.' }; }
+    else if (score <= -2.5) { profile.adapt = { from, until, sets: 1, rir: 0 }; res = { kind: 'more', text: 'Du steckst das gut weg: 1 Satz mehr bei Grund- und Ergänzungsübungen.' }; }
+    else { profile.adapt = null; res = { kind: 'same', text: 'Alles im grünen Bereich: Der Plan läuft wie vorgesehen weiter.' }; }
+    profile.checkins = profile.checkins || [];
+    profile.checkins = profile.checkins.filter(c => c.week !== weekStartIso).concat([{ week: weekStartIso, ans, score: Math.round(score * 10) / 10, result: res.kind }]).slice(-52);
+    return Object.assign(res, { score });
   }
 
   window.ENGINE = {
     Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
-    estimate1RM, allExercises, effLoad, applyFavorites, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
+    estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

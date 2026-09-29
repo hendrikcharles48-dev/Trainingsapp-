@@ -239,6 +239,7 @@
     <div class="stack">
       <div class="card" style="padding:14px 10px"><div class="row between" style="padding:0 8px 8px"><b class="num" style="font-size:17px">${new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</b><span class="small muted">${cnt} von ${goal} Trainings</span></div>
         <div class="cal">${DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); return `<div><div class="d">${d}</div><div class="n ${i === todayIdx ? 'today' : ''} ${doneDays.has(i) ? 'done' : ''}">${dt.getDate()}</div></div>`; }).join('')}</div></div>
+      ${checkinDue() ? checkinCard() : ''}
       ${st.active ? `<div class="card lime rings-bg stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="font-weight:800">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn dark big" data-a="resume">${I.play} Weiter trainieren</button></div>` : `
       <div class="card lime rings-bg" style="position:relative;min-height:230px;padding:20px">
         <div style="position:relative;z-index:2;max-width:60%" class="stack">
@@ -271,6 +272,15 @@
     if (lastD && (Date.now() - new Date(lastD).getTime()) < 14 * 864e5) return '';
     return `<div class="card row"><div class="grow"><b>Körpergewicht aktuell?</b><div class="small muted">Klimmzüge, Dips & Co. werden damit berechnet. Aktuell: ${fmt(E.bodyweight(P()), 1)} kg</div></div><button class="btn sm" data-a="bwSheet">Eintragen</button></div>`;
   }
+  function checkinDue() {
+    if (!plan() || st.ciLater) return false;
+    const sow = E.todayISO(E.startOfWeek());
+    if ((P().checkins || []).some(c => c.week === sow)) return false;
+    return st.workouts.some(w => w.date < sow);
+  }
+  function checkinCard() {
+    return `<div class="card lav stack" style="gap:8px"><div class="row between"><b style="font-size:1.15em">Wochen-Check-in</b><span class="tag">1 Minute</span></div><div class="small" style="opacity:.8">7 kurze Fragen zu Erschöpfung, Muskelkater, Fitness und anderem Sport. Danach passe ich das Volumen dieser Woche an.</div><div class="row"><button class="btn dark grow" data-a="ciOpen">Jetzt ausfüllen</button><button class="btn" style="background:rgba(20,20,22,.1);color:var(--on-light)" data-a="ciLater">Später</button></div></div>`;
+  }
   function workoutRow(w) {
     const sets = w.exercises.reduce((t, e) => t + e.sets.length, 0);
     return `<button class="li card" data-a="wDetail" data-id="${w.id}">${thumb(getEx((w.exercises[0] || {}).exId))}<div class="grow"><div style="font-weight:800">${esc(w.name)}</div><div class="small muted">${dateDE(w.date)} · ${LOCN[w.loc] || ''} · ${durTxt(w.dur || 0)} · ${sets} Sätze${w.prs && w.prs.length ? ` · <span class="pr">${w.prs.length} Rekord${w.prs.length > 1 ? 'e' : ''}</span>` : ''}</div></div><span class="chev">${I.chev}</span></button>`;
@@ -288,6 +298,8 @@
         <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
         <div class="meter"><i style="width:${wi.w / wi.len * 100}%"></i></div>
         <div class="small" style="font-weight:700;opacity:.7">Woche 1 locker, Woche 2–3 Aufbau, Woche 4 am härtesten, Woche 5 Deload mit halben Sätzen.</div>
+        ${(() => { const c = (P().checkins || []).slice(-1)[0]; const txt = { deload: 'Deload diese Woche', less: 'Weniger Volumen diese Woche', more: 'Mehr Volumen diese Woche', same: 'Volumen wie geplant' }; return c ? `<div class="small" style="font-weight:800">Letzter Check-in (${dateDE(c.week, { day: 'numeric', month: 'short' })}): ${txt[c.result] || ''}</div>` : ''; })()}
+        <button class="btn dark sm" style="align-self:flex-start" data-a="ciOpen">Wochen-Check-in ausfüllen</button>
       </div>
       ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
       ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span></div>
@@ -316,7 +328,7 @@
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
       <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">★ Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
-      ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen setzt der Plan bevorzugt ein. Sätze, Wiederholungen und Gewicht berechnet weiter der Algorithmus.</div></div>` : ''}
+      ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen wählt der Plan bevorzugt, wenn sie zu Ausrüstung, Level und Beschwerden passen, höchstens 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
       <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
       <div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
@@ -785,6 +797,19 @@
         ${pctTable}
         <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
     },
+    checkin(s) {
+      const done = E.CHECKIN.filter(q => s.ans[q.id] != null).length;
+      return `<div class="stack"><div><h2>Wochen-Check-in</h2><div class="small muted">Wie war die letzte Woche? Daraus passe ich Sätze und Reserve für diese Woche an.</div></div>
+        ${E.CHECKIN.map(q => `<div class="stack" style="gap:8px"><b>${q.q}</b><div class="chips" style="flex-wrap:wrap">${q.o.map(([v, n]) => `<button class="chip ${s.ans[q.id] === v ? 'on' : ''}" data-a="ciPick" data-q="${q.id}" data-v="${v}">${n}</button>`).join('')}</div></div>`).join('')}
+        <button class="btn primary big" data-a="ciSave" ${done < E.CHECKIN.length ? 'disabled' : ''}>Auswerten (${done}/${E.CHECKIN.length})</button></div>`;
+    },
+    checkinDone(s) {
+      const col = { deload: 'lilac', less: 'lav', more: 'lime', same: 'lime' }[s.res.kind];
+      const title = { deload: 'Erholungswoche', less: 'Etwas weniger', more: 'Etwas mehr', same: 'Weiter wie geplant' }[s.res.kind];
+      return `<div class="stack"><div class="card ${col} rings-bg stack" style="gap:8px"><div class="eyebrow">Ergebnis</div><h2 class="xl">${title}</h2><div style="font-weight:700">${esc(s.res.text)}</div></div>
+        <div class="small muted">Gilt für diese Woche. Nächste Woche fragt die App erneut. Die Wochen des Zyklus (Aufbau, Peak, Deload) laufen normal weiter.</div>
+        <button class="btn primary" data-a="closeSheet">Alles klar</button></div>`;
+    },
     day(s) {
       const p = plan(); const d = p.days[s.i]; const loc = s.loc || st.homeLoc || defLoc();
       const sl = d.slots.filter(x => x.ex[loc]);
@@ -924,15 +949,22 @@
   const A = {
     favToggle(t) {
       const id = t.dataset.id; const ex = getEx(id); const f = P().favs = P().favs || [];
-      const i = f.indexOf(id);
-      if (i >= 0) { f.splice(i, 1); Store.saveProfile(); renderSheet(); render(); toast('Favorit entfernt. Die Übung bleibt im Plan, bis du sie tauschst.', 3500); return; }
-      f.push(id);
-      const res = E.applyFavorites(plan(), P()).filter(r => r.exId === id);
+      const i = f.indexOf(id); const on = i < 0;
+      if (on) f.push(id); else f.splice(i, 1);
+      E.refreshSelection(plan(), P());
       Store.saveProfile(); renderSheet(); render();
-      const inPlan = res.filter(r => r.how !== 'none');
-      const where = [...new Set(inPlan.map(r => r.day + (locs().length > 1 ? ' (' + LOCN[r.loc] + ')' : '')))].join(', ');
-      toast(inPlan.length ? '★ ' + ex.name + ' ist jetzt im Plan: ' + where : '★ Favorit gespeichert. Mit deiner Ausrüstung passt sie gerade in keinen Tag.', 4500);
+      const where = []; plan().days.forEach(d => d.slots.forEach(sl => { for (const l of locs()) if (sl.ex[l] === id) where.push(d.name + (locs().length > 1 ? ' (' + LOCN[l] + ')' : '')); }));
+      if (!on) toast('Favorit entfernt. Die Übungsauswahl wurde neu bewertet.', 3500);
+      else toast(where.length ? '★ Favorit. Passt gut und ist jetzt im Plan: ' + [...new Set(where)].join(', ') : '★ Favorit gespeichert. Sie wird bevorzugt, sobald sie sinnvoll passt. Gerade passt eine andere Übung besser (Ausrüstung, Level oder Beschwerden).', 5000);
     },
+    ciOpen() { openSheet({ type: 'checkin', ans: {} }); },
+    ciPick(t) { st.sheet.ans[t.dataset.q] = +t.dataset.v; renderSheet(); },
+    ciSave() {
+      const s2 = st.sheet; if (E.CHECKIN.some(q => s2.ans[q.id] == null)) { toast('Bitte alle Fragen beantworten'); return; }
+      const res = E.applyCheckin(P(), plan(), s2.ans, E.todayISO(E.startOfWeek()));
+      Store.saveProfile(); st.sheet = { type: 'checkinDone', res }; renderSheet(); render();
+    },
+    ciLater() { st.ciLater = true; render(); },
     homeFilter(t) { st.homeFilter = t.dataset.k; render(); },
     dayOpen(t) { openSheet({ type: 'day', i: +t.dataset.i }); },
     dayLoc(t) { st.sheet.loc = t.dataset.l; st.homeLoc = t.dataset.l; renderSheet(); render(); },
