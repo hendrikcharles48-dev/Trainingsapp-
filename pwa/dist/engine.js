@@ -212,7 +212,7 @@
     // Progressionskette: passende Stufe zu deinem Können
     if (ex.grp && ab[ex.grp] != null) {
       const d = ex.rank - ab[ex.grp];
-      if (d > 0.05) { if (!fav) { s -= d * 4; if (d > 0.6) bad = true; } }
+      if (d > 0.05) { if (!fav) { s -= d * 4; if (d > 0.6) bad = true; } else { s -= d * 1.5; if (d > 2) bad = true; } }
       else {
         const easy = -d;
         const addOk = ex.addw && canAdd(profile, loc) && (goal === 'muscle' || goal === 'strength');
@@ -225,7 +225,8 @@
       if (ex.grp === 'hs' && (a.skills || []).includes('hs')) s += 1.5;
     } else {
       const lvl = EXP_LVL[a.exp] || 2;
-      if (ex.lvl > lvl + 1 && !fav) { s -= (ex.lvl - lvl - 1) * 2.5; bad = true; }
+      const tol = fav ? 2 : 1;
+      if (ex.lvl > lvl + tol) { s -= (ex.lvl - lvl - tol) * 2.5; bad = true; }
     }
     // Passt das vorhandene Gewicht?
     if (ex.kind === 'load' && ex.std) {

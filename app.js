@@ -328,7 +328,7 @@
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
       <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">★ Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
-      ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen gelten als „kann ich und vertrage ich“: Der Plan wählt sie bevorzugt, sobald die Ausrüstung da ist und sie an eine passende Stelle passen, höchstens 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
+      ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen gelten als „kann ich und vertrage ich“: Der Plan wählt sie bevorzugt, wenn die Ausrüstung da ist, sie an eine passende Stelle passen und höchstens 2 Stufen über deinem Level liegen. Maximal 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
       <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
       <div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
@@ -955,7 +955,7 @@
       Store.saveProfile(); renderSheet(); render();
       const where = []; plan().days.forEach(d => d.slots.forEach(sl => { for (const l of locs()) if (sl.ex[l] === id) where.push(d.name + (locs().length > 1 ? ' (' + LOCN[l] + ')' : '')); }));
       if (!on) toast('Favorit entfernt. Die Übungsauswahl wurde neu bewertet.', 3500);
-      else toast(where.length ? '★ Favorit. Passt gut und ist jetzt im Plan: ' + [...new Set(where)].join(', ') : '★ Favorit gespeichert. Sie wird bevorzugt, sobald sie sinnvoll passt. Gerade passt sie an keine freie Stelle im Plan oder die Ausrüstung fehlt.', 5000);
+      else toast(where.length ? '★ Favorit. Passt gut und ist jetzt im Plan: ' + [...new Set(where)].join(', ') : '★ Favorit gespeichert. Sie wird bevorzugt, sobald sie sinnvoll passt. Gerade passt sie an keine freie Stelle, die Ausrüstung fehlt oder sie liegt noch zu weit über deinem Level.', 5000);
     },
     ciOpen() { openSheet({ type: 'checkin', ans: {} }); },
     ciPick(t) { st.sheet.ans[t.dataset.q] = +t.dataset.v; renderSheet(); },
