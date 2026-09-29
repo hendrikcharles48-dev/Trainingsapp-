@@ -184,7 +184,7 @@
     if (!st.sheet) { el.innerHTML = ''; return; }
     const fn = SHEETS[st.sheet.type]; if (!fn) { st.sheet = null; el.innerHTML = ''; return; }
     const prev = el.querySelector('.sheet'); const keep = prev ? prev.scrollTop : 0;
-    el.innerHTML = `<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${fn(st.sheet)}</div></div>`;
+    el.innerHTML = `<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="sheettop"><div class="grab"></div><button class="sheetx" data-a="closeSheet" aria-label="Schließen">${I.x}</button></div>${fn(st.sheet)}</div></div>`;
     const s = el.querySelector('.sheet'); if (s && st.sheet.keepScroll) s.scrollTop = keep;
     st.sheet.keepScroll = true;
   }
@@ -1139,6 +1139,26 @@
   });
   document.addEventListener('input', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && t.type !== 'file' && t.tagName !== 'SELECT') IN[t.dataset.in](t); });
   document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && (t.type === 'file' || t.tagName === 'SELECT')) IN[t.dataset.in](t); });
+  // Fenster nach unten wischen zum Schließen
+  let drag = null;
+  document.addEventListener('touchstart', e => {
+    const sh = e.target.closest && e.target.closest('.sheet'); if (!sh) return;
+    const onTop = e.target.closest('.sheettop');
+    if (sh.scrollTop > 0 && !onTop) return;
+    if (e.target.closest('input,textarea,select')) return;
+    drag = { sh, y0: e.touches[0].clientY, dy: 0, top: !!onTop };
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!drag) return;
+    const dy = e.touches[0].clientY - drag.y0;
+    if (dy <= 0 || (!drag.top && drag.sh.scrollTop > 0)) { drag.dy = 0; drag.sh.style.transform = ''; return; }
+    drag.dy = dy; drag.sh.style.transition = 'none'; drag.sh.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    if (!drag) return; const d = drag; drag = null;
+    if (d.dy > 90) { d.sh.style.transition = 'transform .18s ease-in'; d.sh.style.transform = 'translateY(100%)'; setTimeout(closeSheet, 170); }
+    else { d.sh.style.transition = 'transform .2s ease-out'; d.sh.style.transform = ''; }
+  });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && st.sheet) closeSheet();
     if (e.key === 'Enter' && st.ov && st.ov.type === 'quiz' && e.target.tagName === 'INPUT') { const b = $('[data-a="qNext"]'); if (b && !b.disabled) quizNext(); }
