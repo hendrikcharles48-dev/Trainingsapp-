@@ -183,6 +183,7 @@
   function scoreExercise(ex, slot, ctx) {
     const { profile, loc, eqSet, used, dayUsed } = ctx;
     const a = profile.answers || {}; const ab = ctx.ab; const reasons = []; let bad = false;
+    const fav = (profile.favs || []).includes(ex.id); // Favorit = Übung, die du gut kannst und verträgst
     if (!available(ex, eqSet)) return null;
     if (!slot.p.includes(ex.pat)) return null;
     const patIdx = slot.p.indexOf(ex.pat);
@@ -196,7 +197,7 @@
     if (r === 'sec') s += ex.role === 'c' ? 3 : 0;
     if (r === 'iso') s += ex.role === 'i' ? 4 : 0;
     const inj = (ex.inj || []).filter(t => (a.injuries || []).includes(t));
-    if (inj.length) { s -= 8 * inj.length; bad = true; } else if ((a.injuries || []).length && ex.pat !== 'core') {
+    if (inj.length && !fav) { s -= 8 * inj.length; bad = true; } else if (inj.length) { reasons.push('Von dir als gut verträglich markiert'); } else if ((a.injuries || []).length && ex.pat !== 'core') {
       const names = { shoulder: 'Schulter', elbow: 'Ellbogen', wrist: 'Handgelenk', lowback: 'unteren Rücken', knee: 'Knie' };
       const spared = (a.injuries || []).filter(t => ['shoulder', 'elbow', 'wrist', 'lowback', 'knee'].includes(t)).map(t => names[t]);
       if (spared.length && (ex.pat === 'dip' || ex.pat === 'vpush' || ex.pat === 'hpush' || ex.pat === 'squat' || ex.pat === 'hinge')) reasons.push('Schont ' + spared.join(' & '));
@@ -211,7 +212,7 @@
     // Progressionskette: passende Stufe zu deinem Können
     if (ex.grp && ab[ex.grp] != null) {
       const d = ex.rank - ab[ex.grp];
-      if (d > 0.05) { s -= d * 4; if (d > 0.6) bad = true; }
+      if (d > 0.05) { if (!fav) { s -= d * 4; if (d > 0.6) bad = true; } }
       else {
         const easy = -d;
         const addOk = ex.addw && canAdd(profile, loc) && (goal === 'muscle' || goal === 'strength');
@@ -224,7 +225,7 @@
       if (ex.grp === 'hs' && (a.skills || []).includes('hs')) s += 1.5;
     } else {
       const lvl = EXP_LVL[a.exp] || 2;
-      if (ex.lvl > lvl + 1) { s -= (ex.lvl - lvl - 1) * 2.5; bad = true; }
+      if (ex.lvl > lvl + 1 && !fav) { s -= (ex.lvl - lvl - 1) * 2.5; bad = true; }
     }
     // Passt das vorhandene Gewicht?
     if (ex.kind === 'load' && ex.std) {
@@ -245,7 +246,7 @@
     if (used.has(ex.id)) s -= 2.5;
     s += hash(ex.id + ctx.seed) * 0.6;
     // Lieblingsübung: klar bevorzugt, aber nur wenn sie sinnvoll passt und nicht zu oft pro Woche vorkommt
-    if ((profile.favs || []).includes(ex.id) && !bad && !dayUsed.has(ex.id) && ((used.favN || {})[ex.id] || 0) < 2) { s += 5; reasons.unshift('★ Deine Lieblingsübung'); }
+    if (fav && !bad && !dayUsed.has(ex.id) && ((used.favN || {})[ex.id] || 0) < 2) { s += 5; reasons.unshift('★ Deine Lieblingsübung'); }
     return { s, reasons: [...new Set(reasons)].slice(0, 3) };
   }
   function levelReason(ex, ab) {
