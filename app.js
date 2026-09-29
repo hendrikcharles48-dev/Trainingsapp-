@@ -304,8 +304,9 @@
       ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
       ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span></div>
         <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
-          return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${favMark(ex.id)}${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
+          return `<button class="li" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${favMark(ex.id)}${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
+      <div class="card flat small" style="margin-bottom:10px">↕ <b>Tipp:</b> Übung kurz gedrückt halten und nach oben oder unten ziehen, um die Reihenfolge zu ändern.</div>
       <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
       <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
     </div>`;
@@ -1176,6 +1177,7 @@
   };
 
   document.addEventListener('click', e => {
+    if (Date.now() < (st.noClickUntil || 0)) { e.preventDefault(); return; }
     const t = e.target.closest('[data-a]'); if (!t) return;
     if (t.tagName === 'INPUT' && t.type === 'checkbox') { /* Checkbox: Aktion nach Zustandswechsel */ }
     const fn = A[t.dataset.a]; if (!fn) return;
@@ -1185,6 +1187,43 @@
   });
   document.addEventListener('input', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && t.type !== 'file' && t.tagName !== 'SELECT') IN[t.dataset.in](t); });
   document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && (t.type === 'file' || t.tagName === 'SELECT')) IN[t.dataset.in](t); });
+  // Plan: Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern
+  let lp = null;
+  function lpStart(el, y) {
+    lp = { el, y0: y, dy: 0, active: false, d: +el.dataset.d, s: +el.dataset.s };
+    lp.timer = setTimeout(() => {
+      if (!lp) return;
+      lp.active = true; buzz(15);
+      const list = el.parentElement; lp.rows = [...list.querySelectorAll('[data-drag]')];
+      lp.rects = lp.rows.map(r => r.getBoundingClientRect()); lp.to = lp.s;
+      el.classList.add('dragging'); lp.rows.forEach(r => { if (r !== el) r.classList.add('shift'); });
+    }, 380);
+  }
+  function lpMove(y, e) {
+    if (!lp) return; const dy = y - lp.y0;
+    if (!lp.active) { if (Math.abs(dy) > 8) { clearTimeout(lp.timer); lp = null; } return; }
+    if (e && e.cancelable) e.preventDefault();
+    lp.dy = dy; lp.el.style.transform = `translateY(${dy}px) scale(1.02)`;
+    const me = lp.rects[lp.s]; const mid = me.top + me.height / 2 + dy;
+    let to = lp.s; lp.rects.forEach((r, i) => { const c = r.top + r.height / 2; if (i < lp.s && mid < c) to = Math.min(to, i); if (i > lp.s && mid > c) to = Math.max(to, i); });
+    lp.to = to;
+    lp.rows.forEach((r, i) => { if (i === lp.s) return; let sh = 0; if (lp.s < to && i > lp.s && i <= to) sh = -me.height; if (lp.s > to && i < lp.s && i >= to) sh = me.height; r.style.transform = sh ? `translateY(${sh}px)` : ''; });
+  }
+  function lpEnd() {
+    if (!lp) return; clearTimeout(lp.timer); const L = lp; lp = null;
+    if (!L.active) return;
+    st.noClickUntil = Date.now() + 450;
+    if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); Store.saveProfile(); toast('Reihenfolge geändert'); }
+    render();
+  }
+  document.addEventListener('touchstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (el && !st.sheet) lpStart(el, e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('touchmove', e => { if (lp) lpMove(e.touches[0].clientY, e); }, { passive: false });
+  document.addEventListener('touchend', lpEnd); document.addEventListener('touchcancel', lpEnd);
+  document.addEventListener('mousedown', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (el && !st.sheet && e.button === 0) lpStart(el, e.clientY); });
+  document.addEventListener('mousemove', e => { if (lp) lpMove(e.clientY, e); });
+  document.addEventListener('mouseup', lpEnd);
+  document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('[data-drag]')) e.preventDefault(); });
+
   // Fenster nach unten wischen zum Schließen
   let drag = null;
   document.addEventListener('touchstart', e => {
