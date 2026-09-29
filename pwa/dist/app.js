@@ -155,6 +155,7 @@
 
   /* ================= Rendering ================= */
   function render() {
+    document.documentElement.dataset.font = settings().font === 'classic' ? 'classic' : 'hand';
     const app = $('#app');
     if (!P() || !P().plan) { app.innerHTML = welcomeView(); renderTabs(false); renderLayer(); return; }
     const v = { heute: homeView, plan: planView, uebungen: libView, fortschritt: progView, timer: timerView }[st.tab] || homeView;
@@ -885,6 +886,7 @@
       const se = settings();
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
       return `<div class="stack"><h2>Einstellungen</h2>
+        <div class="card stack" style="gap:10px"><b>Schrift</b><div class="seg">${[['hand', 'Handschrift'], ['classic', 'Klassisch']].map(([k, n]) => `<button data-a="setFont" data-k="${k}" aria-pressed="${(se.font === 'classic' ? 'classic' : 'hand') === k}">${n}</button>`).join('')}</div></div>
         <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         <div class="card stack"><b>Studio-Gewichte</b><div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div></div>
         <div class="card stack"><b>Datensicherung</b><div class="small muted">${Store.mode === 'db' ? 'Deine Daten werden in deinem Konto gespeichert und sind auf allen Geräten verfügbar, auf denen du angemeldet bist.' : 'Deine Daten liegen nur in diesem Browser. Mach ab und zu ein Backup.'}</div>
@@ -1043,6 +1045,7 @@
       P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile(); closeSheet(); render(); toast('Übung angelegt');
     },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
+    setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); },
     exportData() { exportData(); },
     reset() { st.sheet.confirm = true; renderSheet(); },

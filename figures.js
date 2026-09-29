@@ -26,13 +26,16 @@
   function joints(P) {
     const hip = P.hip, sh = add(hip, dir(P.t), L.T);
     const head = add(sh, dir(P.t + (P.hd || 0)), L.N + L.HR);
-    const A = [limb(sh, P, 0, 'a'), limb(sh, P, 1, 'a')];
-    const G = [limb(hip, P, 0, 'l'), limb(hip, P, 1, 'l')];
+    const F = P.fr ? 1 : 0, sw = 17 * F, hw = 10 * F;
+    const shs = [[sh[0] + sw, sh[1] + 4 * F], [sh[0] - sw, sh[1] + 4 * F]], hips = [[hip[0] + hw, hip[1]], [hip[0] - hw, hip[1]]];
+    const A = [limb(shs[0], P, 0, 'a'), limb(shs[1], P, 1, 'a')];
+    const G = [limb(hips[0], P, 0, 'l'), limb(hips[1], P, 1, 'l')];
     const toes = G.map(([kn, an], i) => {
       const v = [an[0] - kn[0], an[1] - kn[1]]; const n = Math.hypot(v[0], v[1]) || 1; const u = [v[0] / n, v[1] / n];
+      if (P.fr) return add(an, [i ? -1 : 1, 0], 7);
       const pt = P.tp && P.tp[i]; return add(an, pt ? u : rot(u, -90), pt ? L.FT * 0.8 : L.FT);
     });
-    return { hip, sh, head, el: [A[0][0], A[1][0]], ha: [A[0][1], A[1][1]], kn: [G[0][0], G[1][0]], an: [G[0][1], G[1][1]], to: toes };
+    return { hip, sh, head, shs, hips, el: [A[0][0], A[1][0]], ha: [A[0][1], A[1][1]], kn: [G[0][0], G[1][0]], an: [G[0][1], G[1][1]], to: toes };
   }
   function lerp(a, b, t) {
     if (Array.isArray(a)) return a.map((x, i) => lerp(x, b ? b[i] : x, t));
@@ -75,8 +78,8 @@
   /* ---------------- Vorlagen ---------------- */
   const T = {};
   // Hängen & Ziehen
-  T.hang = { k: [hangK(95), hangK(92)], p: [{ k: 'bar', x: 104, y: BAR }] };
-  T.scap = { k: [hangK(96), hangK(86)], p: [{ k: 'bar', x: 104, y: BAR }] };
+  T.hang = { k: [hangK(99), hangK(97)], p: [{ k: 'bar', x: 104, y: BAR }] };
+  T.scap = { k: [hangK(100), hangK(93)], p: [{ k: 'bar', x: 104, y: BAR }] };
   T.pullup = { k: [hangK(95), hangK(58, { f: [[106, 138], [99, 139]] })], p: [{ k: 'bar', x: 104, y: BAR }] };
   T.ringpull = { k: [hangK(95), hangK(58, { f: [[106, 138], [99, 139]] })], p: [{ k: 'rings', top: -22 }] };
   T.lsitpull = { k: [hangK(95, { f: [[182, 93], [180, 96]] }), hangK(60, { f: [[182, 58], [180, 61]] })], p: [{ k: 'bar', x: 104, y: BAR }] };
@@ -91,14 +94,14 @@
   T.mu = { k: [hangK(95), hangK(58, { f: [[106, 138], [99, 139]] }), { hip: [98, 30], t: 172, h: [[108, BAR], [101, BAR]], f: [[106, 108], [99, 110]], es: [1, 1] }], p: [{ k: 'bar', x: 104, y: BAR }], sc: 0.72 };
   T.ringmu = Object.assign({}, T.mu, { p: [{ k: 'rings', top: -22 }] });
   T.falsegrip = { k: [hangK(95), hangK(93)], p: [{ k: 'rings', top: -22 }] };
-  T.skincat = { k: [hangK(95, { h: [[108, BAR], [101, BAR]] }), hangK(95, { f: [[132, 80], [128, 82]] })], p: [{ k: 'rings', top: -22 }] };
+  T.skincat = { k: [hangK(97), { hip: [64, 38], t: 84, h: [[108, BAR], [101, BAR]], f: [[80, 18], [78, 20]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'rings', top: -22 }] };
   T.backlever = { k: [{ hip: [102, 60], t: 90, h: [[152, 110], [148, 110]], f: [[118, 42], [116, 44]], ks: [1, 1], es: [-1, -1] }], p: [{ k: 'rings', top: -22 }] };
   T.mutrans = { k: [{ hip: [70, 150], t: 150, h: [[140, 100], [136, 100]], f: [[56, 182], [60, 182]], ks: [1, 1] }, { hip: [112, 122], t: 170, h: [[140, 112], [136, 112]], f: [[80, 182], [84, 182]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'rings', top: -22 }] };
 
   // Rudern
   T.ringrow = { k: [lineBody(40, 182, 116, [[142, 58], [138, 58]]), lineBody(40, 182, 136, [[142, 58], [138, 58]])], p: [{ k: 'rings', top: -22 }] };
   T.ringrowinc = { k: [lineBody(50, 182, 146, [[142, 34], [138, 34]]), lineBody(50, 182, 160, [[142, 34], [138, 34]])], p: [{ k: 'rings', top: -22 }] };
-  T.ringrowelev = { k: [{ hip: [96, 132], t: 94, f: [[30, 128], [34, 128]], h: [[150, 64], [146, 64]], ks: [1, 1] }, { hip: [96, 106], t: 96, f: [[30, 128], [34, 128]], h: [[150, 64], [146, 64]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'rings', top: -22 }, { k: 'box', x: 8, y: 132, w: 40 }] };
+  T.ringrowelev = { k: [{ hip: [94, 136], t: 92, f: [[14, 128], [18, 128]], h: [[152, 62], [148, 62]], ks: [-1, -1] }, { hip: [96, 112], t: 98, f: [[14, 128], [18, 128]], h: [[152, 62], [148, 62]], ks: [-1, -1], es: [1, 1] }], p: [{ k: 'rings', top: -22 }, { k: 'box', x: 0, y: 132, w: 36 }] };
   T.ringcurl = { k: [lineBody(40, 182, 128, [[150, 44], [146, 44]]), lineBody(40, 182, 140, [[150, 44], [146, 44]], { a: [[150, 200], [150, 200]] })], p: [{ k: 'rings', top: -22, still: 0 }] };
   T.ringface = { k: [lineBody(40, 182, 130, [[152, 46], [148, 46]]), lineBody(40, 182, 146, [[130, 40], [126, 40]], { es: [-1, -1] })], p: [{ k: 'rings', top: -22 }] };
   T.tablerow = { k: [{ hip: [80, 166], t: 94, f: [[14, 180], [18, 180]], h: [[140, 106], [136, 106]], ks: [1, 1] }, { hip: [80, 142], t: 92, f: [[14, 180], [18, 180]], h: [[140, 106], [136, 106]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'table', x1: 118, x2: 200, y: 104 }] };
@@ -175,7 +178,7 @@
   T.hack = { k: [ST({ t: 170, f: [[118, 176], [108, 176]], h: [[90, 52], [86, 52]] }), { hip: [92, 136], t: 162, f: [[118, 176], [108, 176]], h: [[98, 92], [94, 92]], es: [1, 1] }], p: [{ k: 'bench', x1: 60, y1: 176, x2: 96, y2: 20 }] };
   T.pistol = (box) => ({ k: [ST({ f: [[104, 182], [128, 164]], h: [[150, 60], [146, 60]], ks: [-1, -1] }), { hip: [84, box ? 142 : 152], t: 150, f: [[106, 182], [168, 158]], h: [[156, 104], [152, 104]] }], p: box ? [{ k: 'box', x: 50, y: 148, w: 44 }] : [] });
   T.shrimp = { k: [ST({ f: [[104, 182], [80, 150]], ks: [-1, 1], h: [[150, 60], [146, 60]] }), { hip: [86, 146], t: 150, f: [[106, 182], [52, 178]], ks: [-1, 1], h: [[156, 104], [152, 104]] }], p: [] };
-  T.lunge = (eq) => ({ k: [ST({ f: [[106, 182], [96, 182]] }), { hip: [94, 128], t: 180, f: [[132, 182], [50, 182]], ks: [-1, 1], h: [[98, 140], [94, 140]] }], p: eq ? [eqProp(eq)] : [] });
+  T.lunge = (eq) => ({ k: [{ hip: [100, 99], t: 180, l: [[3, 0], [-3, 0]], tp: [0, 0], h: [[101, 112], [97, 112]] }, { hip: [92, 138], t: 180, l: [[80, 2], [-14, -84]], tp: [0, 1], h: [[98, 150], [94, 150]] }], p: eq ? [eqProp(eq)] : [] });
   T.bss = (eq) => ({ k: [{ hip: [92, 106], t: 178, f: [[126, 182], [42, 132]], ks: [-1, 1], h: eq === 'goblet' ? [[114, 72], [112, 72]] : [[98, 118], [94, 118]], es: [1, 1] }, { hip: [90, 138], t: 172, f: [[126, 182], [42, 132]], ks: [-1, 1], h: eq === 'goblet' ? [[118, 104], [116, 104]] : [[96, 150], [92, 150]], es: [1, 1] }], p: [{ k: 'bench', x1: 16, y1: 138, x2: 60, y2: 138 }].concat(eq ? [eqProp(eq === 'goblet' ? 'db1' : eq)] : []) });
   T.stepup = { k: [{ hip: [96, 104], t: 176, f: [[132, 142], [92, 182]], h: [[100, 118], [96, 118]] }, { hip: [124, 66], t: 180, f: [[134, 142], [118, 150]], h: [[126, 80], [122, 80]], ks: [-1, -1] }], p: [{ k: 'box', x: 110, y: 144, w: 60 }, { k: 'db', h: [0] }] };
   T.cossack = { k: [ST({ f: [[120, 182], [80, 182]] }), { hip: [86, 150], t: 162, f: [[118, 182], [40, 182]], ks: [-1, 1], h: [[150, 110], [146, 110]] }], p: [] };
@@ -185,7 +188,7 @@
   T.swing = { k: [{ hip: [80, 104], t: 118, f: [[110, 182], [100, 182]], h: [[108, 150], [106, 150]] }, ST({ f: [[110, 182], [100, 182]], h: [[160, 60], [158, 60]] })], p: [{ k: 'db', h: [0] }] };
   T.backext = { k: [{ hip: [104, 112], t: 40, f: [[40, 166], [44, 168]], ks: [1, 1], a: [[20, 20], [20, 20]] }, { hip: [104, 112], t: 118, f: [[40, 166], [44, 168]], ks: [1, 1], a: [[80, 60], [80, 60]] }], p: [{ k: 'bench', x1: 100, y1: 124, x2: 120, y2: 110, pad: true }, { k: 'bench', x1: 36, y1: 176, x2: 50, y2: 172 }] };
   T.bridge = { k: [{ hip: [100, 178], t: -88, f: [[140, 182], [136, 182]], ks: [1, 1], h: [[76, 182], [72, 182]] }, { hip: [98, 146], t: -58, f: [[140, 182], [136, 182]], ks: [1, 1], h: [[76, 182], [72, 182]] }], p: [] };
-  T.hipthrust = (eq, single) => ({ k: [{ hip: [96, 176], t: -64, f: [[140, 182], single ? [150, 130] : [136, 182]], ks: [1, 1], h: [[98, 168], [94, 168]] }, { hip: [100, 136], t: -90, f: [[140, 182], single ? [178, 110] : [136, 182]], ks: [1, 1], h: [[102, 128], [98, 128]] }], p: [{ k: 'bench', x1: 14, y1: 146, x2: 60, y2: 146 }].concat(eq ? [{ k: eq === 'bb' ? 'bb' : 'db', h: [0], hipAt: true }] : []) });
+  T.hipthrust = (eq, single) => ({ k: [{ hip: [92, 168], t: -125, f: [[140, 182], single ? [150, 130] : [136, 182]], ks: [1, 1], h: [[98, 168], [94, 168]] }, { hip: [100, 140], t: -90, f: [[140, 182], single ? [178, 110] : [136, 182]], ks: [1, 1], h: [[102, 128], [98, 128]] }], p: [{ k: 'bench', x1: 14, y1: 146, x2: 60, y2: 146 }].concat(eq ? [{ k: eq === 'bb' ? 'bb' : 'db', h: [0], hipAt: true }] : []) });
   T.slide = { k: [{ hip: [110, 150], t: -66, f: [[182, 182], [178, 182]], ks: [1, 1], h: [[86, 182], [82, 182]] }, { hip: [106, 142], t: -60, f: [[146, 182], [142, 182]], ks: [1, 1], h: [[86, 182], [82, 182]] }], p: [] };
   T.ringlegcurl = { k: [{ hip: [110, 150], t: -66, f: [[182, 160], [178, 160]], ks: [1, 1], h: [[86, 182], [82, 182]] }, { hip: [106, 142], t: -60, f: [[146, 160], [142, 160]], ks: [1, 1], h: [[86, 182], [82, 182]] }], p: [{ k: 'rings', top: -22, feet: true }] };
   T.nordic = { k: [{ hip: [100, 138], t: 180, l: [[0, -90], [0, -90]], h: [[110, 110], [106, 110]] }, { hip: [130, 153], t: 130, l: [[-50, -90], [-50, -90]], h: [[176, 160], [172, 160]] }], p: [] };
@@ -210,6 +213,17 @@
   T.thruster = { k: [Object.assign({}, SQ1, { h: [[118, 96], [114, 96]], es: [1, 1] }), ST({ f: [[110, 182], [96, 182]], h: [[106, -10], [102, -10]] })], p: [{ k: 'db', h: [0, 1] }] };
   T.jump = { k: [Object.assign({}, SQ1, { h: [[70, 150], [66, 150]] }), ST({ hip: [100, 80], f: [[106, 166], [96, 168]], tp: [1, 1], h: [[120, 0], [116, 0]] })], p: [] };
 
+  // Frontansicht (fr: 1) für seitliche Bewegungen
+  const FR = (o) => { o = o || {}; const b = { fr: 1, hip: [100, 99], t: 180 }; if (!o.f) b.l = [[4, 0], [-4, 0]]; if (!o.h) b.a = [[8, 4], [-8, -4]]; return Object.assign(b, o); };
+  const FAR = [80, 116];
+  T.latF = (eq) => ({ k: [FR({ a: [[12, 8], [-12, -8]] }), FR({ a: [[86, 80], [-86, -80]] })], p: eq === 'db1' ? [{ k: 'db', h: [0] }] : eq === 'db' ? [{ k: 'db', h: [0, 1] }] : [] });
+  T.latF1 = { k: [FR({ h: [[122, 116], FAR] }), FR({ h: [[179, 56], FAR] })], p: [{ k: 'cable', from: [40, 186], h: 0 }] };
+  T.revflyF = { k: [FR({ h: [[88, 70], FAR], es: [-1, 1] }), FR({ h: [[179, 58], FAR] })], p: [{ k: 'cable', from: [30, 40], h: 0 }] };
+  T.yraiseF = { k: [FR({ h: [[94, 108], FAR], es: [-1, 1] }), FR({ h: [[162, -2], FAR] })], p: [{ k: 'cable', from: [60, 186], h: 0 }] };
+  T.cflyF = { k: [FR({ h: [[165, 12], [35, 12]] }), FR({ h: [[94, 106], [106, 106]], es: [1, -1] })], p: [{ k: 'cable', from: [205, -16], h: 0 }, { k: 'cable', from: [-5, -16], h: 1 }] };
+  T.cfly1F = { k: [FR({ h: [[165, 12], FAR] }), FR({ h: [[92, 108], FAR], es: [1, 1] })], p: [{ k: 'cable', from: [205, -16], h: 0 }] };
+  T.archerF = { k: [FR({ hip: [100, 97], h: [[160, -14], [40, -14]] }), FR({ hip: [132, 62], h: [[160, -14], [40, -14]], es: [-1, 1] })], p: [{ k: 'bar', x: 100, y: -14, w: 80 }] };
+  T.cossackF = { k: [FR({ f: [[150, 182], [50, 182]], ks: [-1, 1], h: [[120, 112], [80, 112]], es: [1, -1] }), FR({ hip: [134, 146], f: [[150, 182], [50, 182]], ks: [-1, 1], h: [[164, 104], [128, 104]], es: [1, -1] })], p: [] };
   function eqProp(eq) {
     if (eq === 'bb') return { k: 'bb', h: 0 };
     if (eq === 'db1') return { k: 'db', h: [0] };
@@ -223,7 +237,7 @@
 
   /* ---------------- Zuordnung Übung → Bild ---------------- */
   const M = {
-    'dead-hang': 'hang', 'scap-pull': 'scap', 'neg-pullup': 'pullup', 'band-pullup': 'pullup', 'chinup': 'pullup', 'pullup': 'pullup', 'ring-pullup': 'ringpull', 'lsit-pullup': 'lsitpull', 'archer-pullup': 'pullup', 'oap-neg': 'pullup',
+    'dead-hang': 'hang', 'scap-pull': 'scap', 'neg-pullup': 'pullup', 'band-pullup': 'pullup', 'chinup': 'pullup', 'pullup': 'pullup', 'ring-pullup': 'ringpull', 'lsit-pullup': 'lsitpull', 'archer-pullup': 'archerF', 'oap-neg': 'pullup',
     'cable-pulldown': 'kneelpd', 'cable-1arm-pulldown': 'kneelpd', 'lat-pulldown': 'latpd',
     'table-row': 'tablerow', 'door-row': 'doorrow', 'ring-row-incline': 'ringrowinc', 'ring-row': 'ringrow', 'ring-row-elev': 'ringrowelev', 'ring-archer-row': 'ringrow', 'tuck-fl-row': 'flrow',
     'db-row': 'dbrow', 'db-row-pair': ['bentrow', 'db'], 'db-chest-row': 'chestrow', 'cable-high-row': 'highrow', 'bb-row': ['bentrow', 'bb'], 'seated-row': 'seatedrow', 'machine-row': 'machinerow', 'inverted-row': 'inverted',
@@ -231,14 +245,14 @@
     'incline-pushup': 'inclinepu', 'pushup': 'pushup', 'diamond-pushup': 'pushup', 'ring-pushup': 'ringpu', 'decline-pushup': 'declinepu', 'archer-pushup': 'pushup', 'pseudo-planche-pu': 'pseudo',
     'db-floor-press': ['floorpress', 'db'], 'db-floor-press-1arm': ['floorpress', 'db1'], 'db-bench': ['bench', 'db'], 'db-incline': ['incline', 'db'], 'bench': ['bench', 'bb'], 'incline-bench': ['incline', 'bb'], 'machine-chest': 'chestpress',
     'dip-support': ['support', 'post'], 'neg-dip': ['dip', 'post'], 'dip': ['dip', 'post'], 'ring-support': ['support', 'rings'], 'ring-dip': ['dip', 'rings'], 'rto-ring-dip': ['dip', 'rings'], 'bench-dip': 'benchdip',
-    'ring-fly': 'ringfly', 'cable-fly-high': 'cfly', 'db-fly': ['fly', 'db'], 'cable-fly': 'cfly', 'pec-deck': 'chestpress',
-    'db-lateral': ['lateral', 'db'], 'lean-lateral': ['lateral', 'db1'], 'cable-lateral': ['lateral', 'cable'], 'machine-lateral': ['lateral', 'mach'], 'cable-y-raise': 'yraise',
-    'face-pull': 'facepull', 'cable-reverse-fly': 'creverse', 'ring-face-pull': 'ringface', 'db-reverse-fly': ['revfly', 'db'], 'band-pull-apart': 'bandapart', 'reverse-pec': ['revfly', 'mach'],
+    'ring-fly': 'ringfly', 'cable-fly-high': 'cfly1F', 'db-fly': ['fly', 'db'], 'cable-fly': 'cflyF', 'pec-deck': 'chestpress',
+    'db-lateral': ['latF', 'db'], 'lean-lateral': ['latF', 'db1'], 'cable-lateral': 'latF1', 'machine-lateral': ['latF', null], 'cable-y-raise': 'yraiseF',
+    'face-pull': 'facepull', 'cable-reverse-fly': 'revflyF', 'ring-face-pull': 'ringface', 'db-reverse-fly': ['revfly', 'db'], 'band-pull-apart': 'bandapart', 'reverse-pec': ['revfly', 'mach'],
     'db-curl': ['curl', 'db'], 'hammer-curl': ['curl', 'db'], 'conc-curl': 'conccurl', 'incline-curl': 'inclinecurl', 'cable-curl-high': 'cablecurl', 'cable-curl-rope': 'bayes', 'ring-curl': 'ringcurl', 'ez-curl': ['curl', 'bb'], 'preacher-machine': ['curl', 'mach'], 'bayesian-curl': 'bayes',
     'rope-pushdown': 'pushdown', 'cable-oh-ext': 'ohext', 'db-oh-ext': 'dbohext', 'db-kickback': 'kickback', 'db-skull': 'skull', 'ring-tri-ext': 'ringtri', 'close-bench': ['bench', 'bb'], 'gym-pushdown': 'pushdown',
     'straight-arm-pd': 'straightpd', 'db-pullover': 'pullover',
     'air-squat': 'squat', 'goblet-squat': 'goblet', 'db-front-squat': ['frontsq', 'db'], 'box-pistol': ['pistol', true], 'pistol': ['pistol', false], 'shrimp-squat': 'shrimp', 'back-squat': 'backsq', 'front-squat': ['frontsq', 'bb'], 'hack-squat': 'hack', 'leg-press': 'legpress',
-    'reverse-lunge': ['lunge', null], 'bss-bw': ['bss', null], 'db-bss': ['bss', 'goblet'], 'db-reverse-lunge': ['lunge', 'db1'], 'db-stepup': 'stepup', 'cossack': 'cossack', 'walking-lunge': ['lunge', 'db'],
+    'reverse-lunge': ['lunge', null], 'bss-bw': ['bss', null], 'db-bss': ['bss', 'goblet'], 'db-reverse-lunge': ['lunge', 'db1'], 'db-stepup': 'stepup', 'cossack': 'cossackF', 'walking-lunge': ['lunge', 'db'],
     'sl-rdl-bw': ['slrdl', null], 'db-rdl': ['rdl', 'db1'], 'db-sl-rdl': ['slrdl', 'db1'], 'db-swing': 'swing', 'deadlift': 'deadlift', 'bb-rdl': ['rdl', 'bb'], 'back-ext': 'backext',
     'glute-bridge': 'bridge', 'sl-hip-thrust': ['hipthrust', null, true], 'db-hip-thrust': ['hipthrust', 'db'], 'bb-hip-thrust': ['hipthrust', 'bb'], 'abduction': 'abduct',
     'sliding-curl': 'slide', 'ring-leg-curl': 'ringlegcurl', 'nordic-neg': 'nordic', 'leg-curl': 'legcurl', 'sissy-squat': 'sissy', 'leg-ext': 'legext',
@@ -271,7 +285,7 @@
     const g = (pts, inner) => `<g transform="translate(${f1(pts[still][0])} ${f1(pts[still][1])})">${tr(pts)}${inner}</g>`;
     const dbShape = '<rect x="-9" y="-3" width="18" height="6" rx="2" class="fp"/><rect x="-11" y="-7" width="6" height="14" rx="2" class="fp2"/><rect x="5" y="-7" width="6" height="14" rx="2" class="fp2"/>';
     switch (pr.k) {
-      case 'bar': out.push(pr.rack ? `<path d="M${pr.x - 30} ${pr.y}V186M${pr.x + 30} ${pr.y}V186" class="fl" stroke-width="4"/>` : `<path d="M${pr.x - 32} ${pr.y}V-30M${pr.x + 32} ${pr.y}V-30" class="fl" stroke-width="3"/>`, `<path d="M${pr.x - 38} ${pr.y}H${pr.x + 38}" class="fp" stroke-width="6" stroke-linecap="round"/>`); break;
+      case 'bar': out.push(pr.rack ? `<path d="M${pr.x - 30} ${pr.y}V186M${pr.x + 30} ${pr.y}V186" class="fl" stroke-width="4"/>` : `<path d="M${pr.x - 32} ${pr.y}V-30M${pr.x + 32} ${pr.y}V-30" class="fl" stroke-width="3"/>`, `<path d="M${pr.x - (pr.w || 38)} ${pr.y}H${pr.x + (pr.w || 38)}" class="fp" stroke-width="6" stroke-linecap="round"/>`); break;
       case 'rings': {
         const idx = pr.feet ? 'an' : 'ha';
         [1, 0].forEach(i => {
@@ -284,7 +298,7 @@
       case 'db': (pr.h || [0]).forEach(i => { const pts = pr.hipAt ? at(j => [j.hip[0], j.hip[1] - 6]) : at(j => j.ha[i]); out.push(g(pts, dbShape)); }); break;
       case 'bb': { const pts = pr.hipAt ? at(j => [j.hip[0], j.hip[1] - 10]) : at(j => j.ha[0]); out.push(g(pts, '<circle r="17" class="fp2"/><circle r="11" class="fp"/><circle r="3" class="fl2"/>')); break; }
       case 'bbsh': { const pts = at(j => [j.sh[0] - 6, j.sh[1] - 2]); out.push(g(pts, '<circle r="17" class="fp2"/><circle r="11" class="fp"/><circle r="3" class="fl2"/>')); break; }
-      case 'cable': { const pts = at(j => j.ha[0]); out.push(`<circle cx="${pr.from[0]}" cy="${pr.from[1]}" r="6" class="fp2"/><line x1="${pr.from[0]}" y1="${pr.from[1]}" x2="${f1(pts[still][0])}" y2="${f1(pts[still][1])}" class="fl" stroke-width="2">${A('x2', pts.map(p => f1(p[0])))}${A('y2', pts.map(p => f1(p[1])))}</line>`); out.push(g(pts, '<rect x="-5" y="-5" width="10" height="10" rx="3" class="fp2"/>')); break; }
+      case 'cable': { const pts = at(j => j.ha[pr.h || 0]); out.push(`<circle cx="${pr.from[0]}" cy="${pr.from[1]}" r="6" class="fp2"/><line x1="${pr.from[0]}" y1="${pr.from[1]}" x2="${f1(pts[still][0])}" y2="${f1(pts[still][1])}" class="fl" stroke-width="2">${A('x2', pts.map(p => f1(p[0])))}${A('y2', pts.map(p => f1(p[1])))}</line>`); out.push(g(pts, '<rect x="-5" y="-5" width="10" height="10" rx="3" class="fp2"/>')); break; }
       case 'bench': { const b = `<path d="M${pr.x1} ${pr.y1}L${pr.x2} ${pr.y2}" class="fp" stroke-width="${pr.pad ? 12 : 9}" stroke-linecap="round"/>`; const legs = pr.pad ? '' : `<path d="M${Math.min(pr.x1, pr.x2) + 6} ${Math.max(pr.y1, pr.y2) + 2}V186M${Math.max(pr.x1, pr.x2) - 6} ${Math.max(pr.y1, pr.y2) + 2}V186" class="fl" stroke-width="4"/>`; out.push(legs + b); break; }
       case 'box': out.push(`<rect x="${pr.x}" y="${pr.y}" width="${pr.w}" height="${186 - pr.y}" rx="5" class="fbox"/>`); break;
       case 'post': out.push(`<path d="M${pr.x} ${pr.y}V186" class="fl" stroke-width="5"/><path d="M${pr.x - 10} ${pr.y}H${pr.x + 10}" class="fp" stroke-width="6" stroke-linecap="round"/>`); break;
@@ -302,12 +316,12 @@
   const cache = {};
   function svg(ex, opts) {
     opts = opts || {};
-    const key = ex.id + '|' + (opts.anim || 0);
+    const key = ex.id + '|' + (opts.anim || 0) + '|' + (opts.frame ?? '');
     if (cache[key]) return cache[key];
     const tpl = resolve(ex);
     const anim = opts.anim && tpl.k.length > 1 ? opts.anim * (tpl.k.length > 2 ? tpl.k.length / 2 : 1) : 0;
     const F = frames(tpl.k, anim ? 7 : 1);
-    const still = anim ? 0 : Math.min(tpl.still ?? 1, tpl.k.length - 1);
+    const still = anim ? 0 : opts.frame != null ? Math.min(opts.frame, tpl.k.length - 1) : Math.min(tpl.still ?? 1, tpl.k.length - 1);
     const SF = anim ? F : tpl.k.map(joints);
     const J = SF[still];
     const A = (attr, vals) => anim ? `<animate attributeName="${attr}" values="${vals.join(';')}" dur="${anim}s" repeatCount="indefinite" calcMode="linear"/>` : '';
@@ -316,13 +330,15 @@
     const props = (tpl.p || []).filter(p => p && p.k !== 'none');
     const back = props.filter(p => ['bar', 'bench', 'box', 'post', 'wall', 'door', 'table', 'seat'].includes(p.k));
     const front = props.filter(p => !back.includes(p));
+    const fr = tpl.k[0].fr, farC = fr ? 'fnear' : 'ffar';
     const body =
-      path(j => [j.hip, j.kn[1], j.an[1], j.to[1]], 'ffar', 11) +
-      path(j => [j.sh, j.el[1], j.ha[1]], 'ffar', 9) +
-      path(j => [j.hip, j.sh], 'fnear', 19) +
+      path(j => [j.hips[1], j.kn[1], j.an[1], j.to[1]], farC, 11) +
+      path(j => [j.shs[1], j.el[1], j.ha[1]], farC, 9) +
+      (fr ? path(j => [j.shs[1], j.shs[0]], 'fnear', 13) + path(j => [j.hips[1], j.hips[0]], 'fnear', 16) : '') +
+      path(j => [j.hip, j.sh], 'fnear', fr ? 26 : 19) +
       circ(j => j.head, L.HR, 'fhead') +
-      path(j => [j.hip, j.kn[0], j.an[0], j.to[0]], 'fnear', 12) +
-      path(j => [j.sh, j.el[0], j.ha[0]], 'fnear', 9.5);
+      path(j => [j.hips[0], j.kn[0], j.an[0], j.to[0]], 'fnear', 12) +
+      path(j => [j.shs[0], j.el[0], j.ha[0]], 'fnear', 9.5);
     const sc = tpl.sc || 1;
     const inner = `${props.length ? propEls({ k: 'none' }, SF, still, anim) : ''}${back.map(p => propEls(p, SF, still, anim)).join('')}${body}${front.map(p => propEls(p, SF, still, anim)).join('')}`;
     const out = `<svg class="fig ${opts.cls || ''}" viewBox="-12 -26 224 224" role="img" aria-label="${ex.name.replace(/"/g, '')}"><ellipse cx="100" cy="190" rx="74" ry="9" class="ffloor"/><g ${sc !== 1 ? `transform="translate(100 186) scale(${sc}) translate(-100 -186)"` : ''} stroke-linecap="round" stroke-linejoin="round" fill="none">${inner}</g></svg>`;

@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#111113">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mouse+Memoirs&family=Oxanium:wght@500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap">
 <style>
 /* Bewusst ein dunkles Design (wie die Vorlage) mit Lime- und Lavendel-Akzenten */
 :root{
@@ -17,8 +17,8 @@
   --accent:var(--lime); --accent-ink:var(--on-light); --accent-soft:rgba(220,242,126,.12);
   --good:#9BE37B; --warn:#F6C85F; --bad:#FF7A8A;
   --r-main:#DCF27E; --r-sec:#B7A5F7; --r-iso:#7FD6E8; --r-skill:#F5A3C7; --r-core:#F6C85F; --r-cond:#FF9C73;
-  --display:"Oxanium","Arial Rounded MT Bold",-apple-system,system-ui,sans-serif;
-  --body:"Manrope",-apple-system,"SF Pro Text",system-ui,sans-serif;
+  --display:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif;
+  --body:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif;
   --r:28px; --tabh:72px;
 }
 *{box-sizing:border-box}
@@ -276,6 +276,42 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .why{font-size:12px;display:flex;gap:6px;flex-wrap:wrap;font-weight:700}
 .why span{background:var(--surface2);color:var(--ink2);border-radius:999px;padding:3px 9px}
 @media (max-width:380px){ h1{font-size:25px} .xl{font-size:26px} .tabs button{width:50px;height:50px} .bar{grid-template-columns:88px 1fr 38px} .sets input{min-height:40px;font-size:17px} .panel .big{font-size:38px} .cal .n{width:36px;height:36px} }
+
+/* Handschrift (Standard): schmale Display-Schrift überall, größer gesetzt, ohne künstliches Fett */
+:root:not([data-font="classic"]) body{font-size:20px;letter-spacing:.025em;line-height:1.3}
+:root:not([data-font="classic"]) *{font-synthesis:none;font-weight:400!important}
+:root:not([data-font="classic"]) h1{font-size:40px}
+:root:not([data-font="classic"]) h2{font-size:30px}
+:root:not([data-font="classic"]) h3{font-size:24px}
+:root:not([data-font="classic"]) .xl{font-size:44px}
+:root:not([data-font="classic"]) .small{font-size:18px}
+:root:not([data-font="classic"]) .tiny{font-size:16px}
+:root:not([data-font="classic"]) .eyebrow{font-size:16px;letter-spacing:.08em}
+:root:not([data-font="classic"]) .btn{font-size:20px}
+:root:not([data-font="classic"]) .btn.big{font-size:24px}
+:root:not([data-font="classic"]) .btn.sm{font-size:17px}
+:root:not([data-font="classic"]) .chip,:root:not([data-font="classic"]) .seg button{font-size:18px}
+:root:not([data-font="classic"]) .tag{font-size:16px}
+:root:not([data-font="classic"]) .toptabs button{font-size:20px}
+:root:not([data-font="classic"]) input.field,:root:not([data-font="classic"]) .search input,:root:not([data-font="classic"]) textarea.field{font-size:21px}
+:root:not([data-font="classic"]) .sets input,:root:not([data-font="classic"]) .num{font-size:inherit}
+:root:not([data-font="classic"]) .sets input{font-size:24px}
+:root:not([data-font="classic"]) .sets th{font-size:15px}
+:root:not([data-font="classic"]) .target b{font-size:40px}
+:root:not([data-font="classic"]) .panel .big{font-size:58px}
+:root:not([data-font="classic"]) .bigtimer{font-size:110px}
+:root:not([data-font="classic"]) .kpi b{font-size:34px}
+:root:not([data-font="classic"]) .extile span{font-size:17px}
+:root:not([data-font="classic"]) .opt small{font-size:17px}
+:root:not([data-font="classic"]) .cal .n{font-size:22px}
+:root:not([data-font="classic"]) .chart text{font-size:14px}
+:root:not([data-font="classic"]) .panel .cols small{font-size:17px}
+:root:not([data-font="classic"]) .panel .cols .v{font-size:26px}
+:root:not([data-font="classic"]) .setpill b,:root:not([data-font="classic"]) .minbadge small,:root:not([data-font="classic"]) .rirgrid button span,:root:not([data-font="classic"]) .badge span,:root:not([data-font="classic"]) .kpi span,:root:not([data-font="classic"]) .cal .d,:root:not([data-font="classic"]) .lbl{font-size:16px}
+:root:not([data-font="classic"]) .minbadge{font-size:24px}
+:root:not([data-font="classic"]) .badge b{font-size:18px}
+:root:not([data-font="classic"]) .rirgrid button b{font-size:36px}
+:root[data-font="classic"]{--display:"Oxanium","Arial Rounded MT Bold",-apple-system,system-ui,sans-serif;--body:"Manrope",-apple-system,"SF Pro Text",system-ui,sans-serif}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
