@@ -116,6 +116,8 @@
     if (ex && ex.kind === 'hold') return r * 3 >= 15 ? '15+ s' : (r * 3) + ' s';
     return settings().rpe ? 'RPE ' + fmt(Math.max(5, 10 - r), 1) : (r >= 5 ? '5+' : String(r));
   }
+  const isFav = id => ((P() && P().favs) || []).includes(id);
+  const favMark = id => isFav(id) ? '<span style="color:var(--lime)">★</span> ' : '';
   const figSVG = (ex, o) => ex ? window.FIG.svg(ex, o) : '';
   const thumb = ex => `<div class="thumb">${figSVG(ex)}</div>`;
   function dayFocus(day, loc) {
@@ -290,7 +292,7 @@
       ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
       ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span></div>
         <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
-          return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
+          return `<button class="li" data-a="slotSheet" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${favMark(ex.id)}${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
       <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
       <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
@@ -305,7 +307,7 @@
     const trained = new Set(st.workouts.flatMap(w => w.exercises.map(e => e.exId)));
     return E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q) || ex.prim.some(m => D.MUSCLES[m].toLowerCase().includes(q)))
       && (!F.group || D.GROUPS[F.group].some(m => ex.prim.includes(m))) && (!F.lvl || ex.lvl === F.lvl) && (!F.pat || ex.pat === F.pat) && (!F.eq || ex.eq.includes(F.eq))
-      && (!st.libAvail || E.available(ex, eqs)) && (st.libTab !== 'mine' || trained.has(ex.id)))
+      && (!st.libAvail || st.libTab === 'fav' || E.available(ex, eqs)) && (st.libTab !== 'mine' || trained.has(ex.id)) && (st.libTab !== 'fav' || isFav(ex.id)))
       .sort((a, b) => a.pat.localeCompare(b.pat) || (a.rank || a.lvl) - (b.rank || b.lvl));
   }
   function libView() {
@@ -313,11 +315,12 @@
     const chip = (k, label, val) => `<button class="chip ${val ? 'set' : ''}" data-a="libFilter" data-k="${k}">${val ? esc(val) : label} ▾</button>`;
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
-      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine'}">Alle Übungen</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
+      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">★ Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
+      ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen setzt der Plan bevorzugt ein. Sätze, Wiederholungen und Gewicht berechnet weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
       <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
       <div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
-      ${list.length ? `<div class="exgrid">${list.map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : 'Keine Übung gefunden.'}</div>`}
+      ${list.length ? `<div class="exgrid">${list.map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}${isFav(ex.id) ? '<span class="star">★</span>' : ''}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}
     </div>`;
   }
 
@@ -772,7 +775,7 @@
       const bw = E.bodyweight(P());
       const best = h.reduce((m, x) => Math.max(m, E.sessionBest(ex, x.entry, x.bw || bw)), 0);
       const pctTable = ex.kind === 'load' && best > 0 ? `<div class="card stack" style="gap:8px"><div class="row between"><b>1RM-Tabelle</b><span class="small muted">geschätztes Maximum ${fmt(best, 1)} kg</span></div><div class="tbl"><table><thead><tr><th>%</th><th class="r">Gewicht</th><th class="r">≈ Wdh.</th></tr></thead><tbody>${[100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => `<tr><td>${p} %</td><td class="r num">${fmt(Math.round(best * p / 100 * 2) / 2)} kg</td><td class="r num">${p === 100 ? 1 : Math.max(1, Math.round(30 * (100 / p - 1)))}</td></tr>`).join('')}</tbody></table></div></div>` : '';
-      return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
+      return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div><button class="favbtn ${isFav(ex.id) ? 'on' : ''}" data-a="favToggle" data-id="${ex.id}" aria-label="${isFav(ex.id) ? 'Favorit entfernen' : 'Als Favorit markieren'}" aria-pressed="${isFav(ex.id)}">★</button>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
         <div class="row wrap" style="gap:6px">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
         <div class="card stack" style="gap:10px"><b>Anleitung</b><p style="margin:0" class="ink2">${esc(ex.d)}</p>
         ${ex.c && ex.c.length ? `<div class="stack" style="gap:6px">${ex.c.map((c, i) => `<div class="row" style="align-items:flex-start"><span class="plate p-main" style="width:22px;height:22px;font-size:11px">${i + 1}</span><span>${esc(c)}</span></div>`).join('')}</div>` : ''}
@@ -780,14 +783,14 @@
         ${chain.length > 1 ? `<div class="stack" style="gap:8px"><b>Progressionsstufen</b><div class="chips" style="gap:10px">${chain.map(c => `<button class="extile" style="width:92px;flex:none" data-a="exInfo" data-id="${c.id}"><div class="tile" style="${c.id === ex.id ? 'box-shadow:inset 0 0 0 2px var(--lime)' : ''}">${figSVG(c)}</div><span>${c.id === harder ? '▲ ' : c.id === easier ? '▼ ' : ''}${esc(c.name)}</span></button>`).join('')}</div></div>` : ''}
         ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
         ${pctTable}
-        <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
+        <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
     },
     day(s) {
       const p = plan(); const d = p.days[s.i]; const loc = s.loc || st.homeLoc || defLoc();
       const sl = d.slots.filter(x => x.ex[loc]);
       return `<div class="stack"><div class="card ${s.i % 2 ? 'lilac' : 'lav'} daycard" style="min-height:150px"><div class="txt"><h2>${esc(d.name)}</h2><span class="tag" style="align-self:flex-start">${sl.length} Übungen</span><div class="small" style="font-weight:800;margin-top:auto">${esc(dayFocus(d, loc))}</div></div><div class="minbadge">${estMinutes(d, loc)}<small>min</small></div><div class="figwrap figdark">${figSVG(heroEx(d, loc), { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="dayLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        <div class="list">${sl.map(x => { const ex = getEx(x.ex[loc]); const pr = E.prescription(x, ex, P(), p); return `<button class="li" data-a="exInfo" data-id="${ex.id}">${thumb(ex)}<div class="grow"><b>${esc(ex.name)}</b><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>`; }).join('')}</div>
+        <div class="list">${sl.map(x => { const ex = getEx(x.ex[loc]); const pr = E.prescription(x, ex, P(), p); return `<button class="li" data-a="exInfo" data-id="${ex.id}">${thumb(ex)}<div class="grow"><b>${favMark(ex.id)}${esc(ex.name)}</b><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div><span class="chev">${I.chev}</span></button>`; }).join('')}</div>
         <button class="btn primary big" data-a="startWorkout" data-d="${s.i}" data-l="${loc}">${I.play} Training starten</button></div>`;
     },
     filter(s) {
@@ -919,6 +922,17 @@
 
   /* ================= Aktionen ================= */
   const A = {
+    favToggle(t) {
+      const id = t.dataset.id; const ex = getEx(id); const f = P().favs = P().favs || [];
+      const i = f.indexOf(id);
+      if (i >= 0) { f.splice(i, 1); Store.saveProfile(); renderSheet(); render(); toast('Favorit entfernt. Die Übung bleibt im Plan, bis du sie tauschst.', 3500); return; }
+      f.push(id);
+      const res = E.applyFavorites(plan(), P()).filter(r => r.exId === id);
+      Store.saveProfile(); renderSheet(); render();
+      const inPlan = res.filter(r => r.how !== 'none');
+      const where = [...new Set(inPlan.map(r => r.day + (locs().length > 1 ? ' (' + LOCN[r.loc] + ')' : '')))].join(', ');
+      toast(inPlan.length ? '★ ' + ex.name + ' ist jetzt im Plan: ' + where : '★ Favorit gespeichert. Mit deiner Ausrüstung passt sie gerade in keinen Tag.', 4500);
+    },
     homeFilter(t) { st.homeFilter = t.dataset.k; render(); },
     dayOpen(t) { openSheet({ type: 'day', i: +t.dataset.i }); },
     dayLoc(t) { st.sheet.loc = t.dataset.l; st.homeLoc = t.dataset.l; renderSheet(); render(); },

@@ -244,6 +244,7 @@
     if (dayUsed.has(ex.id)) s -= 40;
     if (used.has(ex.id)) s -= 2.5;
     s += hash(ex.id + ctx.seed) * 0.6;
+    if ((profile.favs || []).includes(ex.id)) { s += 7; reasons.unshift('★ Deine Lieblingsübung'); }
     return { s, reasons: [...new Set(reasons)].slice(0, 3) };
   }
   function levelReason(ex, ab) {
@@ -338,6 +339,7 @@
       plan.days.push(day);
     });
     plan.locs = locs;
+    applyFavorites(plan, profile);
     return plan;
   }
 
@@ -582,9 +584,60 @@
   }
   function startOfWeek(d) { d = new Date(d || Date.now()); const day = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - day); return d; }
 
+  /* Lieblingsübungen in einen bestehenden Plan einbauen, ohne ihn neu zu berechnen.
+     Liefert eine Liste mit {exId, loc, day, how: 'replace'|'add'|'present'|'none'}. */
+  function applyFavorites(plan, profile) {
+    const favs = profile.favs || []; const out = [];
+    if (!plan || !favs.length) return out;
+    const locs = plan.locs || ['home'];
+    const keep = { main: 10, skill: 8, sec: 7, core: 5.5, iso: 4.5, cond: 2 };
+    const ranges = goalRanges(plan.goal);
+    const lowerM = ['quads', 'hams', 'glutes', 'calves'];
+    for (const id of favs) {
+      const ex = allExercises(profile).find(e => e.id === id); if (!ex) continue;
+      for (const loc of locs) {
+        if (!available(ex, locEquip(profile, loc))) { out.push({ exId: id, loc, how: 'none' }); continue; }
+        const hit = plan.days.find(d => d.slots.some(sl => sl.ex && sl.ex[loc] === id));
+        if (hit) { out.push({ exId: id, loc, day: hit.name, how: 'present' }); continue; }
+        const role = ex.role === 'c' ? 'sec' : ex.role === 'i' ? 'iso' : ex.role === 's' ? 'skill' : ex.role === 'x' ? 'cond' : 'core';
+        // 1) passenden Platz derselben Bewegung ersetzen (nicht schon ein Favorit, nicht von Hand gewählt)
+        let best = null;
+        plan.days.forEach(d => d.slots.forEach(sl => {
+          if (!sl.p.includes(ex.pat) || (sl.locked && sl.locked[loc])) return;
+          if ((sl.r === 'skill') !== (role === 'skill')) return;
+          if (favs.includes(sl.ex[loc])) return;
+          if (d.slots.some(o => o !== sl && o.ex[loc] === id)) return;
+          const favCount = d.slots.filter(o => favs.includes(o.ex[loc])).length;
+          const score = favCount * 10 + (sl.r === 'main' && ex.role !== 'c' ? 5 : 0);
+          if (!best || score < best.score) best = { d, sl, score };
+        }));
+        const mark = sl => { sl.ex[loc] = id; sl.why = sl.why || {}; sl.why[loc] = ['★ Deine Lieblingsübung']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); };
+        if (best) { mark(best.sl); out.push({ exId: id, loc, day: best.d.name, how: 'replace' }); continue; }
+        // 2) als zusätzliche Übung in einen passenden Tag
+        const lower = ex.prim.some(m => lowerM.includes(m)) && !ex.prim.some(m => !lowerM.includes(m) && m !== 'abs' && m !== 'obliques');
+        const fits = plan.days.filter(d => d.focus === 'full' || (lower ? d.focus === 'lower' : d.focus === 'upper') || ex.pat === 'core' || ex.pat === 'cond');
+        const days = (fits.length ? fits : plan.days).slice().sort((a, b) => a.slots.length - b.slots.length);
+        const d = days[0];
+        const sl = { id: 's' + Math.random().toString(36).slice(2, 8), p: [ex.pat], r: role, sets: role === 'skill' ? 3 : 3, rest: role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'core' ? 60 : role === 'cond' ? 20 : 75, rr: ranges[role] || null, ex: {}, why: {}, locked: {} };
+        for (const l of locs) {
+          if (available(ex, locEquip(profile, l))) { sl.ex[l] = id; sl.why[l] = ['★ Deine Lieblingsübung']; sl.locked[l] = true; }
+          else { const alt = alternatives(sl, l, profile, d.slots.map(o => o.ex[l]))[0]; if (alt) { sl.ex[l] = alt.ex.id; sl.why[l] = alt.reasons; } }
+        }
+        if (d.slots.length >= MAX_EX) {
+          let wi = -1, wv = Infinity;
+          d.slots.forEach((o, i) => { if (o.r === 'main' || favs.includes(o.ex[loc]) || (o.locked && o.locked[loc])) return; const v = keep[o.r] + (o.prio ? 0.8 : 0); if (v < wv) { wv = v; wi = i; } });
+          if (wi < 0) { out.push({ exId: id, loc, how: 'none' }); continue; }
+          d.slots.splice(wi, 1, sl);
+        } else d.slots.push(sl);
+        out.push({ exId: id, loc, day: d.name, how: 'add' });
+      }
+    }
+    return out;
+  }
+
   window.ENGINE = {
     Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
-    estimate1RM, allExercises, effLoad, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
+    estimate1RM, allExercises, effLoad, applyFavorites, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();
