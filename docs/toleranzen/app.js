@@ -132,7 +132,7 @@
     }
     view.innerHTML = html;
     view.className = anim ? 'enter-' + anim : '';
-    if (S.tab === 'apply') computeAll();
+    if (S.tab === 'apply') { computeAll(); initSecDrag(); }
     if (CUR && CUR.st.checked) runCheck(false);
     renderTabbar();
     window.scrollTo(0, anim === 'push' ? 0 : (S.scroll[key] || 0));
@@ -573,6 +573,7 @@
     Object.keys(A_DEF).forEach(k => { out[k] = Object.assign({}, A_DEF[k], saved[k] && typeof saved[k] === 'object' ? saved[k] : {}); });
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
     out.sec = typeof sec === 'string' ? sec : 'gen';
+    out.order = Array.isArray(saved.order) ? saved.order.filter(x => typeof x === 'string') : null;
     return out;
   })();
   const saveA = () => store.set('apply', A);
@@ -594,7 +595,12 @@
     { id: 'fit', label: 'Passung', title: 'Passung', card: () => cardFit() },
     { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain() }
   ];
-  const curSection = () => SECTIONS.find(x => x.id === A.sec) || SECTIONS[0];
+  function orderedSections() {
+    const list = (A.order || []).map(id => SECTIONS.find(x => x.id === id)).filter(Boolean);
+    SECTIONS.forEach(x => { if (!list.includes(x)) list.push(x); });
+    return list;
+  }
+  const curSection = () => SECTIONS.find(x => x.id === A.sec) || orderedSections()[0];
 
   function sectionHTML() {
     const sec = curSection();
@@ -604,16 +610,18 @@
     const sec = curSection();
     return `${navbar({ title: 'Anwenden' })}<div class="page">
       <h1 class="large-title">Anwenden</h1>
-      <nav class="sec-bar" id="sec-bar" aria-label="Rechner auswählen">${SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-pressed="${x.id === sec.id}">${x.label}</button>`).join('')}</nav>
+      <nav class="sec-bar" id="sec-bar" aria-label="Rechner auswählen">${orderedSections().map(x => `<button type="button" data-sec="${x.id}" aria-pressed="${x.id === sec.id}">${x.label}</button>`).join('')}</nav>
       <div id="sec-body" class="page">${sectionHTML()}</div>
+      <p class="foot">Zum Wechseln seitlich über den Bildschirm wischen. Reihenfolge ändern: Reiter oben gedrückt halten und verschieben.</p>
     </div>`;
   }
-  function showSection(id) {
+  function showSection(id, dir = 0) {
     A.sec = id; saveA();
     $$('#sec-bar button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sec === id)));
     const body = $('#sec-body');
     body.innerHTML = sectionHTML();
-    body.classList.remove('enter-fade'); void body.offsetWidth; body.classList.add('enter-fade');
+    const anim = dir > 0 ? 'enter-push' : dir < 0 ? 'enter-pop' : 'enter-fade';
+    body.classList.remove('enter-fade', 'enter-push', 'enter-pop'); void body.offsetWidth; body.classList.add(anim);
     computeAll();
     const bar = $('#sec-bar'), nav = $('#nav');
     const barTop = bar.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight : 0);
@@ -621,6 +629,127 @@
     const act = $(`#sec-bar [data-sec="${id}"]`);
     if (act) act.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   }
+  let secClickBlock = 0;
+  function initSecDrag() {
+    const bar = $('#sec-bar');
+    if (!bar) return;
+    let timer = null, drag = null, sx = 0, sy = 0, raf = 0;
+    const pos = x => x - bar.getBoundingClientRect().left + bar.scrollLeft;
+    function begin(btn, x) {
+      drag = { btn, x0: pos(x), x };
+      btn.classList.add('lifting');
+      bar.classList.add('reordering');
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* kein Vibrieren */ }
+      const tick = () => {
+        if (!drag) return;
+        const r = bar.getBoundingClientRect();
+        if (drag.x < r.left + 44) bar.scrollLeft -= 7;
+        else if (drag.x > r.right - 44) bar.scrollLeft += 7;
+        update(drag.x);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    function update(x) {
+      drag.x = x;
+      const btns = $$('button', bar), i = btns.indexOf(drag.btn);
+      const before = drag.btn.offsetLeft;
+      const center = before + drag.btn.offsetWidth / 2 + (pos(x) - drag.x0);
+      const prev = btns[i - 1], next = btns[i + 1];
+      if (next && center > next.offsetLeft + next.offsetWidth / 2) bar.insertBefore(next, drag.btn);
+      else if (prev && center < prev.offsetLeft + prev.offsetWidth / 2) bar.insertBefore(drag.btn, prev);
+      drag.x0 += drag.btn.offsetLeft - before;
+      drag.btn.style.transform = `translateX(${pos(x) - drag.x0}px) scale(1.06)`;
+    }
+    function finish() {
+      clearTimeout(timer);
+      if (!drag) return;
+      cancelAnimationFrame(raf);
+      drag.btn.style.transform = '';
+      drag.btn.classList.remove('lifting');
+      bar.classList.remove('reordering');
+      drag = null;
+      A.order = $$('button', bar).map(b => b.dataset.sec);
+      saveA();
+      secClickBlock = Date.now() + 450;
+    }
+    bar.addEventListener('touchstart', e => {
+      const b = e.target.closest('button');
+      if (!b || e.touches.length > 1) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      clearTimeout(timer);
+      timer = setTimeout(() => begin(b, sx), 380);
+    }, { passive: true });
+    bar.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      if (!drag) { if (Math.hypot(t.clientX - sx, t.clientY - sy) > 8) clearTimeout(timer); return; }
+      e.preventDefault();
+      update(t.clientX);
+    }, { passive: false });
+    bar.addEventListener('touchend', finish);
+    bar.addEventListener('touchcancel', finish);
+    bar.addEventListener('contextmenu', e => e.preventDefault());
+    bar.addEventListener('mousedown', e => {
+      const b = e.target.closest('button');
+      if (!b || e.button !== 0) return;
+      sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(() => begin(b, sx), 380);
+      const mm = ev => { if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) clearTimeout(timer); return; } ev.preventDefault(); update(ev.clientX); };
+      const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); finish(); };
+      window.addEventListener('mousemove', mm);
+      window.addEventListener('mouseup', mu);
+    });
+  }
+
+  // Seitlich wischen wechselt den Rechner
+  (function initSwipe() {
+    let st = null;
+    const skip = el => el.closest('.sec-bar, .tbl-wrap, .zone-wrap, input, select, textarea, .sheet-wrap');
+    view.addEventListener('touchstart', e => {
+      st = null;
+      if (S.tab !== 'apply' || e.touches.length > 1 || skip(e.target)) return;
+      const body = $('#sec-body'), t = e.touches[0];
+      if (!body || !body.contains(e.target) || t.clientX < 18 || t.clientX > window.innerWidth - 18) return;
+      st = { x: t.clientX, y: t.clientY, t: Date.now(), mode: null, dx: 0, body };
+    }, { passive: true });
+    view.addEventListener('touchmove', e => {
+      if (!st) return;
+      const t = e.touches[0], dx = t.clientX - st.x, dy = t.clientY - st.y;
+      if (!st.mode) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        st.mode = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'h' : 'v';
+        if (st.mode === 'h') st.body.style.transition = 'none';
+      }
+      if (st.mode !== 'h') return;
+      e.preventDefault();
+      const list = orderedSections(), i = list.indexOf(curSection());
+      const atEdge = (dx > 0 && i === 0) || (dx < 0 && i === list.length - 1);
+      st.dx = atEdge ? dx * 0.25 : dx;
+      st.body.style.transform = `translateX(${st.dx}px)`;
+      st.body.style.opacity = String(1 - Math.min(0.45, Math.abs(st.dx) / 500));
+    }, { passive: false });
+    const end = () => {
+      const s = st;
+      st = null;
+      if (!s || s.mode !== 'h') return;
+      const list = orderedSections(), i = list.indexOf(curSection());
+      const dir = s.dx < 0 ? 1 : -1, target = list[i + dir];
+      const speed = Math.abs(s.dx) / Math.max(1, Date.now() - s.t);
+      s.body.style.transition = 'transform .17s ease-out, opacity .17s';
+      if (target && (Math.abs(s.dx) > 80 || (speed > 0.5 && Math.abs(s.dx) > 30))) {
+        s.body.style.transform = `translateX(${dir > 0 ? -55 : 55}%)`;
+        s.body.style.opacity = '0';
+        setTimeout(() => { s.body.style.transition = 'none'; s.body.style.transform = ''; s.body.style.opacity = ''; showSection(target.id, dir); }, 160);
+      } else {
+        s.body.style.transform = '';
+        s.body.style.opacity = '';
+        setTimeout(() => { s.body.style.transition = ''; }, 200);
+      }
+    };
+    view.addEventListener('touchend', end);
+    view.addEventListener('touchcancel', end);
+  })();
+
   const cardHead = (title, tables) => `<div class="iso-head"><h3 class="card-title">${title}</h3>${tables ? tblBtn(tables) : ''}</div>`;
 
   // a) Winkel
@@ -781,16 +910,21 @@
       ${segHTML('gen.tab', A.gen.tab, [['alt', 'Alte Tabelle', 'ISO 2768'], ['neu', 'Neue Tabelle', 'ISO 22081']], 'tall')}
       <div id="gen-body" class="result">${genBody()}</div>
       <div class="result" id="res-gen" aria-live="polite"></div>
-    </section>`;
+    </section>
+    ${A.gen.tab === 'alt' ? `<section class="card" id="card-gen2">
+      ${cardHead('Form und Lage', '2768-2')}
+      <p class="small muted">ISO 2768-2, Großbuchstabe im Schriftfeld. Die Werte gelten für das Maß von oben als maßgebende Länge.</p>
+      <div class="field"><span class="lbl">Klasse für Form und Lage</span>${segHTML('gen.hk', A.gen.hk, CLS_HKL, 'tall')}</div>
+      <div class="result" id="res-gen2" aria-live="polite"></div>
+    </section>` : ''}`;
   }
   function genBody() {
     if (A.gen.tab === 'alt') {
-      return `${cardHead('ISO 2768-1 und -2', '2768-1,2768-2')}
+      return `${cardHead('Maße · ISO 2768-1', '2768-1')}
         <div class="fields">
           <div class="field"><label for="d-N">Maß</label>${bindNum('d-N', 'gen.N', 'mm', 'z. B. 120')}</div>
           <div class="field"><span class="lbl">Art des Maßes</span>${segHTML('gen.kind', A.gen.kind, [['len', 'Länge'], ['rad', 'Radius, Fase']], 'big')}</div>
           <div class="field full"><span class="lbl">Toleranzklasse für Maße</span>${segHTML('gen.cls', A.gen.cls, CLS_ML, 'tall')}</div>
-          <div class="field full"><span class="lbl">Klasse für Form und Lage</span>${segHTML('gen.hk', A.gen.hk, CLS_HKL, 'tall')}</div>
         </div>`;
     }
     const prof = A.gen.mode === 'profil';
@@ -805,30 +939,42 @@
            <div class="field"><label for="n-sd">Größenmaßtoleranz aus der Zeichnung</label>${bindNum('n-sd', 'gen.sdev', 'mm', 'z. B. 0,1', { pm: true })}</div>`}
       </div>`;
   }
+  function computeGenGeo(N, ok) {
+    if (!$('#res-gen2')) return;
+    if (!ok) return out('res-gen2', msgHTML('Gib oben ein gültiges Maß ein, dann erscheinen hier die Werte für Form und Lage.'));
+    if (A.gen.kind === 'rad') return out('res-gen2', msgHTML('Für Radien und Fasen gibt es keine Form- und Lagewerte. Stell oben bei „Art des Maßes“ auf „Länge“.'));
+    const hk = A.gen.hk, F3 = x => f(x, 0, 3);
+    const si = T.strIdx(N), pi = T.perpIdx(N), run = T.RUN2768[hk];
+    const lin = T.lin2768(N, A.gen.cls, 'len');
+    const val = (i, tab, rt) => i < 0 ? '–<small>über 3000 mm nicht festgelegt</small>' : `${F3(tab[hk][i])} mm<small>${esc(rt(i))}</small>`;
+    const rund = lin.ok ? Math.min(lin.tol, run) : null;
+    const steps = [
+      { t: 'Toleranzklasse', h: `Im Schriftfeld steht der Großbuchstabe <b>${hk}</b> (${T.CLASS_HKL[hk]}).` },
+      { t: 'Geradheit und Ebenheit', h: si < 0 ? 'Über 3000 mm ist kein Wert festgelegt.' : `${f(N)} mm liegt im Bereich ${T.strRangeText(si)}. Spalte ${hk}: <b>${F3(T.STRAIGHT2768[hk][si])} mm</b>.` },
+      { t: 'Rechtwinkligkeit und Symmetrie', h: pi < 0 ? 'Über 3000 mm ist kein Wert festgelegt.' : `Als kürzeres Element liegt ${f(N)} mm im Bereich ${T.perpRangeText(pi)}. Spalte ${hk}: Rechtwinkligkeit <b>${F3(T.PERP2768[hk][pi])} mm</b>, Symmetrie <b>${F3(T.SYM2768[hk][pi])} mm</b>.` },
+      { t: 'Lauf', h: `Unabhängig von der Größe, Spalte ${hk}: <b>${F3(run)} mm</b>.` }
+    ];
+    if (rund != null) steps.push({ t: 'Rundheit', h: `Durchmessertoleranz bei Ø${f(N)} mm, Klasse ${A.gen.cls}: ±${f(lin.dev)} mm, also ${F3(lin.tol)} mm breit. Rundlauf ${F3(run)} mm. Der kleinere Wert gilt: <b>${F3(rund)} mm</b>.` });
+    out('res-gen2', `<div class="kv">
+        ${kv('Geradheit, Ebenheit', val(si, T.STRAIGHT2768, T.strRangeText))}
+        ${kv('Rechtwinkligkeit', val(pi, T.PERP2768, T.perpRangeText))}
+        ${kv('Symmetrie', val(pi, T.SYM2768, T.perpRangeText))}
+        ${kv('Lauf', F3(run) + ' mm<small>Rundlauf und Planlauf</small>')}
+        ${rund != null ? kv(`Rundheit bei Ø${f(N)} mm`, F3(rund) + ' mm<small>Durchmessertoleranz, höchstens Lauf</small>', true) : ''}
+      </div>
+      <p class="foot">Maßgebende Länge: bei Geradheit die Linie, bei Ebenheit die längere Seite, bei Rechtwinkligkeit und Symmetrie das kürzere Element. Parallelität und andere Fälle rechnest du genauer im Reiter „Form und Lage“.</p>
+      ${calcHTML('gen-geo', steps)}`);
+  }
   function computeGen() {
     if (A.gen.tab === 'alt') {
-      if (!String(A.gen.N).trim()) return out('res-gen', msgHTML('Gib ein Maß ein.'));
+      if (!String(A.gen.N).trim()) { computeGenGeo(0, false); return out('res-gen', msgHTML('Gib ein Maß ein.')); }
       const N = numOf(A.gen.N);
       const r = T.lin2768(N, A.gen.cls, A.gen.kind);
+      computeGenGeo(N, r.ok);
       if (!r.ok) return out('res-gen', msgHTML(esc(r.error), 'warn'));
       const F = x => f(x, r.dec, 4);
-      let geo = '';
-      if (A.gen.kind === 'len') {
-        const hk = A.gen.hk;
-        const si = T.strIdx(N), pi = T.perpIdx(N);
-        const g = i => i < 0 ? '–' : null;
-        geo = `<div class="eyebrow">Form und Lage bei ${f(N)} mm · ISO 2768-2 Klasse ${hk}</div>
-          <div class="kv">
-            ${kv('Geradheit, Ebenheit', g(si) || f(T.STRAIGHT2768[hk][si]) + ' mm')}
-            ${kv('Rechtwinkligkeit', g(pi) || f(T.PERP2768[hk][pi]) + ' mm')}
-            ${kv('Symmetrie', g(pi) || f(T.SYM2768[hk][pi]) + ' mm')}
-            ${kv('Lauf', f(T.RUN2768[hk]) + ' mm')}
-          </div>
-          <p class="foot">Gilt, wenn ${f(N)} mm die maßgebende Länge ist: bei Ebenheit die längere Seite, bei Rechtwinkligkeit und Symmetrie das kürzere Element. Mehr dazu oben bei Form und Lage.</p>`;
-      }
       return out('res-gen', `<div class="res-hero"><div class="res-big">±${f(r.dev)} mm</div><div class="res-sub">Grenzabmaß · ${A.gen.kind === 'rad' ? 'Radius oder Fase' : 'Längenmaß'} · Klasse ${A.gen.cls} (${T.CLASS_ML[A.gen.cls]})</div></div>
         <div class="kv">${kv('Höchstmaß', F(r.max) + ' mm')}${kv('Mindestmaß', F(r.min) + ' mm')}${kv('Toleranz', F(r.tol) + ' mm')}${kv('Nennmaßbereich', esc(r.rangeText))}</div>
-        ${geo}
         ${calcHTML('gen-alt', r.steps)}`);
     }
     if (A.gen.mode === 'profil') {
@@ -938,7 +1084,7 @@
   function onApplyChange(k) {
     const sec = k.split('.')[0];
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (k === 'gen.tab' || k === 'gen.mode') $('#gen-body').innerHTML = genBody();
+    if (k === 'gen.tab' || k === 'gen.mode') $('#sec-body').innerHTML = sectionHTML();
     ({ ang: computeAng, geo: computeGeo, iso: computeIso, fit: computeFit, gen: computeGen })[sec]();
   }
 
@@ -989,7 +1135,7 @@
   document.addEventListener('click', e => {
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.dataset.sec) return showSection(t.dataset.sec);
+    if (t.dataset.sec) { if (Date.now() > secClickBlock) showSection(t.dataset.sec); return; }
     if (t.dataset.tab) return goTab(t.dataset.tab);
     if (t.dataset.topic) return push({ v: 'topic', id: t.dataset.topic, seg: 'erkl' });
     if (t.dataset.task) return push({ v: 'task', id: t.dataset.task });
