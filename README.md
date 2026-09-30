@@ -25,3 +25,24 @@ Trainings-App für Zuhause (Klimmzugstange, Ringe, Kurzhantel, Seilzug) und Stud
 3. iPhone: Safari → Teilen → „Zum Home-Bildschirm“. Android: Chrome → Menü → „App installieren“.
 
 In dieser Version liegen die Daten nur auf dem Gerät. Über Einstellungen → Backup kannst du sie sichern und übertragen.
+
+---
+
+# Toleranzen
+
+Eigenständige Lern- und Rechen-App im iOS-Design (Hell und Dunkel) für Zerspanungsmechaniker, im Ordner `toleranzen/`.
+
+- **Deckblatt** mit den Kacheln „Lernen“ und „Anwenden“
+- **Lernen:** Allgemeintoleranzen, Freimaßtoleranzen und ISO-Toleranzen, jeweils mit Praxisbeispiel aus dem CNC-Fräsen, Fachbegriffen, Merksatz, Eselsbrücken und 24 Aufgabentypen mit immer neuen Zahlen. Du rechnest selbst, die App prüft jeden Schritt, zeigt den Fehler an der richtigen Stelle (auch Folgefehler, Vorzeichen, Einheit, falsche Tabellenzeile) und zeigt den Lösungsweg nur auf Knopfdruck.
+- **Anwenden:** Winkeltoleranz, Form und Lage (ISO 2768-2), Einzeltoleranz nach ISO 286 (1 bis 500 mm, IT01 bis IT18, d, e, f, g, h, js, k, m, n, p, r, s und D, E, F, G, H, JS, K, M, N, P, R, S), Passungen mit Einheitsbohrung/Einheitswelle, Allgemeintoleranzen alt (ISO 2768) und neu (ISO 22081), Maßketten (Worst Case). Überall mit aufklappbarem Rechenweg.
+- Alle Tabellenwerte sind fest in `tables.js` hinterlegt, die App funktioniert offline.
+
+## Dateien
+- `tables.js`: Normtabellen (ISO 286-1, ISO 2768-1, ISO 2768-2)
+- `calc.js`: Rechenkern mit Rechenwegen in ganzen Sätzen
+- `lernen.js`: Lerninhalte und Aufgaben mit Schrittprüfung
+- `app.js`, `style.css`, `index.html`: Oberfläche
+- `test.js`: Prüft den Rechenkern gegen Tabellenbuchwerte und jede Aufgabe gegen ihre Musterlösung (`node toleranzen/test.js`)
+
+## Auf dem iPhone nutzen
+Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js`). Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Toleranzen</title>
+<meta name="description" content="Allgemein-, Freimaß- und ISO-Toleranzen lernen und anwenden: Erklärungen aus der Zerspanung, Übungen zum Selberrechnen, Rechner für ISO 286, Passungen, ISO 2768, ISO 22081 und Maßketten.">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Toleranzen">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+</head>
+<body>
+<main id="view" lang="de"></main>
+<nav class="tabbar" id="tabbar" aria-label="Bereiche"></nav>
+<div class="sheet-wrap" id="sheet" hidden></div>
+<script src="tables.js"></script>
+<script src="calc.js"></script>
+<script src="lernen.js"></script>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) {
+  addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
