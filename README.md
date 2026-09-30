@@ -36,6 +36,7 @@ Eigenständige Lern- und Rechen-App im iOS-Design (Hell und Dunkel) für Zerspan
 - **Lernen:** Allgemeintoleranzen, Freimaßtoleranzen und ISO-Toleranzen, jeweils mit Praxisbeispiel aus dem CNC-Fräsen, Fachbegriffen, Merksatz, Eselsbrücken und 24 Aufgabentypen mit immer neuen Zahlen. Du rechnest selbst, die App prüft jeden Schritt, zeigt den Fehler an der richtigen Stelle (auch Folgefehler, Vorzeichen, Einheit, falsche Tabellenzeile) und zeigt den Lösungsweg nur auf Knopfdruck.
 - **Anwenden:** Winkeltoleranz, Form und Lage (ISO 2768-2), Einzeltoleranz nach ISO 286 (1 bis 500 mm, IT01 bis IT18, d, e, f, g, h, js, k, m, n, p, r, s und D, E, F, G, H, JS, K, M, N, P, R, S), Passungen mit Einheitsbohrung/Einheitswelle, Allgemeintoleranzen alt (ISO 2768) und neu (ISO 22081), Maßketten (Worst Case). Überall mit aufklappbarem Rechenweg.
 - Alle Tabellenwerte sind fest in `tables.js` hinterlegt, die App funktioniert offline.
+- **Foto:** Zeichnung fotografieren, die App erkennt Maße, Toleranzangaben und die Allgemeintoleranz im Schriftfeld (Texterkennung tesseract.js direkt auf dem Gerät) und zeigt zu jedem Maß die Grenzmaße. Unsichere Stellen sind mit „bitte prüfen“ markiert, Maße lassen sich korrigieren oder von Hand ergänzen.
 
 ## Dateien
 - `tables.js`: Normtabellen (ISO 286-1, ISO 2768-1, ISO 2768-2)
@@ -45,4 +46,4 @@ Eigenständige Lern- und Rechen-App im iOS-Design (Hell und Dunkel) für Zerspan
 - `test.js`: Prüft den Rechenkern gegen Tabellenbuchwerte und jede Aufgabe gegen ihre Musterlösung (`node toleranzen/test.js`)
 
 ## Auf dem iPhone nutzen
-Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js`). Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.
+Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js`). Die Texterkennung (`ocr/`, etwa 11 MB) liegt nur in `docs/toleranzen/ocr/`; zum lokalen Testen des Foto-Reiters `docs/toleranzen` ausliefern. Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

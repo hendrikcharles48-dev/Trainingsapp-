@@ -631,5 +631,151 @@
     return { ok: true, N, max, min, tol, es, ei, dec, steps, count: list.length };
   };
 
+  // ---------- Maße aus dem Text einer Zeichnung (Foto oder eingefügter Text) ----------
+  const DIA = '[Øø⌀∅ΦφΘ@]';
+  const NUM = '\\d{1,4}(?:[.,]\\d{1,3})?';
+  const DEV = '\\d{1,2}(?:[.,]\\d{1,3})?';
+  const TITLE_WORDS = /stab\b|maßstab|massstab|datum|blatt|zeichn|nr\.|nummer|gewicht|\bkg\b|werkstoff|material|gepr|bearb|name|index|menge|stück|stueck|format|oberfläche|oberflaeche|kante|teil|benennung/i;
+  const num = x => parseFloat(String(x).replace(',', '.').replace(/\s+/g, ''));
+
+  T.normalizeOcr = s => String(s || '')
+    .replace(/[“”„"'`´\[\]{}|]/g, '')
+    .replace(/\b[1lI|][S5][O0]\b/g, 'ISO')
+    .replace(/\bIS0\b/g, 'ISO')
+    .replace(/[−–—‒]/g, '-')
+    .replace(/[º˚]/g, '°')
+    .replace(/\+\s*\/\s*-/g, '±')
+    .replace(/\+\s*-(?=\s*\d)/g, '±')
+    .replace(/(\d)\s*,\s*(\d)/g, '$1,$2')
+    .replace(/(\d)\s*\.\s*(\d)/g, '$1.$2')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Ein Stück Text durchsuchen; conf = Erkennungssicherheit der Zeile (0 bis 100)
+  T.parseDimText = function (text, conf = 100, minPlainConf = 0) {
+    let s = ' ' + T.normalizeOcr(text) + ' ';
+    const items = [];
+    let general = null, iso22081 = false;
+    const titleLine = TITLE_WORDS.test(s);
+    const take = (re, fn) => {
+      s = s.replace(re, (...m) => {
+        const r = fn(m);
+        if (r === false) return m[0];
+        if (r) items.push(Object.assign({ raw: m[0].trim() }, r));
+        return ' '.repeat(m[0].length);
+      });
+    };
+    const dia = d => d ? 'Ø' : '';
+
+    // Allgemeintoleranz im Schriftfeld
+    take(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–]?\s*([fmcv])\s*([HKL])?(?![a-z])/gi, m => { general = { ml: m[1].toLowerCase(), hk: m[2] ? m[2].toUpperCase() : null }; return null; });
+    take(/ISO\s*22081/gi, () => { iso22081 = true; return null; });
+    take(/\b(?:DIN\s*EN\s*ISO|DIN\s*ISO|DIN\s*EN|ISO|DIN|EN)\s*\d+(?:[-–]\d+)?/gi, () => null);
+    take(/\d{1,2}\.\d{1,2}\.\d{2,4}/g, () => null);                   // Datum
+    take(/\b\d+\s*:\s*\d+\b/g, () => null);                             // Maßstab
+    take(/\bR[az]\s*\d+(?:[.,]\d+)?/g, () => null);                      // Rauheit Ra, Rz
+
+    // Passung: 30H7/g6
+    take(new RegExp(`(${DIA})?\\s*(${NUM})\\s*([A-Za-z]{1,2})\\s*(\\d{1,2})\\s*\\/\\s*([A-Za-z]{1,2})\\s*(\\d{1,2})(?![\\d.,])`, 'g'), m => {
+      const p = T.parseFit(`${m[2]}${m[3]}${m[4]}/${m[5]}${m[6]}`);
+      if (p.error) return false;
+      const r = T.fitCalc(p.N, p.hole, p.shaft);
+      if (!r.ok) return false;
+      return { kind: 'fit', N: p.N, hole: p.hole, shaft: p.shaft, label: `${dia(m[1])}${T.fmt(p.N)} ${p.hole.letter}${p.hole.grade}/${p.shaft.letter}${p.shaft.grade}` };
+    });
+    // Fase: 2x45°
+    take(new RegExp(`(${DEV})\\s*[x×X]\\s*45\\s*°?`, 'g'), m => ({ kind: 'fase', N: num(m[1]), label: `${T.fmt(num(m[1]))} × 45°` }));
+    // „4x 76,6“: nach einer Anzahl steht fast immer Ø, die Erkennung liest es oft als 7, 0 oder 9
+    take(new RegExp(`\\b\\d{1,2}\\s*[x×X]\\s*[709oO](${NUM})(?![\\d.,])(?!\\s*[A-Za-z]{1,2}\\d)`, 'g'), m => {
+      const N = num(m[1]);
+      if (!(N >= 0.5 && N <= 4000)) return false;
+      return { kind: 'lin', N, dia: true, guess: 'Vor der Zahl stand vermutlich das Durchmesserzeichen Ø. Bitte mit der Zeichnung prüfen.', label: `Ø${T.fmt(N)}` };
+    });
+    // Anzahl wie „4x Ø6“ überspringen
+    take(new RegExp(`\\b\\d{1,2}\\s*[x×X]\\s*(?=${DIA}|R|\\d)`, 'g'), () => null);
+    // ISO-Toleranz: Ø30 H7, 25g6
+    take(new RegExp(`(${DIA})?\\s*(${NUM})(\\s*)(JS|Js|js|[A-Za-z])\\s*(\\d{1,2})(?![\\d.,°])`, 'g'), m => {
+      if (m[3] && /^[Rr]$/.test(m[4])) return false;  // „120 R5“ ist ein Maß und ein Radius
+      const c = T.parseClassToken(m[4] + m[5]);
+      if (c.error) return false;
+      const N = num(m[2]);
+      const r = T.isoTol(N, c.letter, c.grade);
+      if (!r.ok) return false;
+      return { kind: 'iso', N, letter: c.letter, grade: c.grade, dia: !!m[1], label: `${dia(m[1])}${T.fmt(N)} ${c.letter}${c.grade}` };
+    });
+    // Gewinde M6, M8x1 überspringen
+    take(/\bM\s?\d{1,2}(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?/g, () => null);
+    // Plus-Minus: 60 ±0,1
+    take(new RegExp(`(${DIA}|R)?\\s*(${NUM})\\s*±\\s*(${DEV})`, 'g'), m => {
+      const N = num(m[2]), d = num(m[3]);
+      if (!(N > 0) || !(d > 0) || d >= N) return false;
+      const pre = m[1] === 'R' ? 'R' : dia(m[1]);
+      return { kind: 'pm', N, up: d, lo: -d, pre, label: `${pre}${T.fmt(N)} ±${T.fmt(d)}` };
+    });
+    // Oberes und unteres Abmaß: 25 +0,1 -0,05 oder 25 +0,1/0
+    take(new RegExp(`(${DIA})?\\s*(${NUM})\\s*([+-]\\s*${DEV})\\s*\\/?\\s*([+-]\\s*${DEV}|0(?![.,\\d]))`, 'g'), m => {
+      const N = num(m[2]);
+      let a = num(m[3].replace(/\s+/g, '')), b = num(m[4].replace(/\s+/g, ''));
+      if (!(N > 0) || a === b) return false;
+      const up = Math.max(a, b), lo = Math.min(a, b);
+      return { kind: 'ul', N, up: r6(up), lo: r6(lo), pre: dia(m[1]), label: `${dia(m[1])}${T.fmt(N)} ${T.fmtS(up) || '0'}/${T.fmtS(lo) || '0'}` };
+    });
+    // Einzelnes „+0,1“ hinter einem Maß: die Erkennung liest ± oft als +
+    take(new RegExp(`(${DIA})?\\s*(${NUM})\\s*\\+\\s*(${DEV})(?![\\d.,])(?!\\s*[/+-])`, 'g'), m => {
+      const N = num(m[2]), d = num(m[3]);
+      if (!(N > 0) || !(d > 0) || d >= N) return false;
+      return { kind: 'pm', N, up: d, lo: -d, pre: dia(m[1]), guess: 'Im Foto stand hier vermutlich ±. Bitte mit der Zeichnung prüfen.', label: `${dia(m[1])}${T.fmt(N)} ±${T.fmt(d)}` };
+    });
+    // Winkel: 90°, 30°15'
+    take(/(\d{1,3}(?:[.,]\d{1,2})?)\s*°(?:\s*(\d{1,2})\s*['′])?/g, m => {
+      const deg = num(m[1]) + (m[2] ? num(m[2]) / 60 : 0);
+      if (!(deg > 0 && deg <= 360)) return false;
+      return { kind: 'ang', deg: r6(deg), label: m[2] ? `${T.fmt(num(m[1]))}° ${m[2]}′` : `${T.fmt(deg)}°` };
+    });
+    // Radius: R5, SR10
+    take(new RegExp(`\\bS?R\\s*(${NUM})(?![\\d.,])`, 'g'), m => {
+      const N = num(m[1]);
+      if (!(N >= 0.5)) return false;
+      return { kind: 'rad', N, label: `R${T.fmt(N)}` };
+    });
+    // Durchmesser ohne Toleranz: Ø20
+    take(new RegExp(`(${DIA})\\s*(${NUM})(?![\\d.,])`, 'g'), m => {
+      const N = num(m[2]);
+      if (!(N >= 0.5 && N <= 4000)) return false;
+      return { kind: 'lin', N, dia: true, label: `Ø${T.fmt(N)}` };
+    });
+    // Einfache Maße ohne Toleranz
+    if (!titleLine && conf >= minPlainConf) {
+      take(new RegExp(`(?<![\\d.,A-Za-z])(${NUM})(?![\\d.,A-Za-z])`, 'g'), m => {
+        const N = num(m[1]);
+        if (!(N >= 0.5 && N <= 4000)) return false;
+        if (m[1].length === 1 && conf < 80) return false;   // einzelne Ziffern sind oft Reste von Maßlinien
+        return { kind: 'lin', N, label: T.fmt(N) };
+      });
+    }
+    return { items, general, iso22081 };
+  };
+
+  // Mehrere erkannte Zeilen zusammenführen, doppelte Maße nur einmal
+  T.parseDrawing = function (lines) {
+    const out = [], seen = new Map();
+    let general = null, iso22081 = false;
+    lines.forEach(line => {
+      const r = T.parseDimText(line.text, line.conf == null ? 100 : line.conf, line.minPlainConf || 0);
+      if (r.general && (!general || (r.general.hk && !general.hk))) general = r.general;
+      if (r.iso22081) iso22081 = true;
+      r.items.forEach(it => {
+        const key = it.kind + '|' + it.label;
+        if (seen.has(key)) { seen.get(key).count++; return; }
+        const item = Object.assign({ count: 1, box: line.box || null }, it);
+        seen.set(key, item);
+        out.push(item);
+      });
+    });
+    const order = { fit: 0, iso: 1, pm: 2, ul: 3, lin: 4, rad: 5, fase: 6, ang: 7 };
+    out.sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.N || a.deg || 0) - (b.N || b.deg || 0)));
+    return { items: out, general, iso22081 };
+  };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = T;
 })(typeof window !== 'undefined' ? window : globalThis);

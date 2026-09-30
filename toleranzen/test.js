@@ -99,6 +99,24 @@ eq('Kette 40±0,1 − 12+0,1/0', [ch2.N, ch2.max, ch2.min, ch2.tol], [28, 28.1, 
 const deltaTable = { 1: [1, 1.5, 1, 3, 4, 6], 5: [1.5, 3, 4, 5, 9, 14], 12: [5, 5, 7, 13, 23, 34] };
 Object.entries(deltaTable).forEach(([ri, vals]) => vals.forEach((v, k) => eq(`Delta IT${k + 3} Bereich ${ri}`, T.delta(String(k + 3), +ri), v)));
 
+// Maße aus Zeichnungstext
+const pd = T.parseDrawing([
+  { text: 'Ø30 H7' }, { text: '120' }, { text: '60 ±0,1' }, { text: 'R5' }, { text: '2x45°' }, { text: '90°' },
+  { text: '25 +0,1 -0,05' }, { text: 'Ø20' }, { text: '4x Ø6,6' }, { text: 'M8x1' }, { text: 'Ra 3,2' }, { text: '30H7/g6' },
+  { text: 'Allgemeintoleranzen ISO 2768-mK' }, { text: 'Maßstab 1:1  Datum 12.03.2026' }, { text: '120 R5' }, { text: '40 +-0.2' }, { text: '120' }
+]);
+const lab = pd.items.map(i => i.kind + ':' + i.label);
+eq('Foto: Allgemeintoleranz erkannt', pd.general, { ml: 'm', hk: 'K' });
+['fit:30 H7/g6', 'iso:Ø30 H7', 'pm:60 ±0,1', 'pm:40 ±0,2', 'ul:25 +0,1/−0,05', 'lin:120', 'lin:Ø20', 'lin:Ø6,6', 'rad:R5', 'fase:2 × 45°', 'ang:90°']
+  .forEach(x => eq('Foto erkennt ' + x, lab.includes(x), true));
+eq('Foto: 120 nur einmal gelistet, dreimal gezählt', pd.items.filter(i => i.label === '120').length === 1 && pd.items.find(i => i.label === '120').count, 3);
+eq('Foto: keine Datums-, Maßstabs-, Gewinde- oder Rauheitszahlen', lab.filter(x => /:(1|12|2026|3,2|8|4)$/.test(x)), []);
+eq('Foto: 120 R5 nicht als ISO', lab.includes('iso:120 R5'), false);
+const pd2 = T.parseDrawing([{ text: 'Allgemeintoleranzen 1SO 2[768-mK' }, { text: '60 +0,1', conf: 72 }, { text: '— 1', conf: 67 }]);
+eq('Foto: verlesenes Schriftfeld', pd2.general, { ml: 'm', hk: 'K' });
+eq('Foto: 4x 76,6 als Ø6,6', T.parseDrawing([{ text: '4x 76,6' }]).items.map(i => i.label + ':' + !!i.guess), ['Ø6,6:true']);
+eq('Foto: + als ± vermutet', pd2.items.map(i => i.kind + ':' + i.label + ':' + !!i.guess), ['pm:60 ±0,1:true']);
+
 if (typeof require !== 'undefined') {
   try { require('./lernen.js'); } catch (e) { console.log('lernen.js fehlt noch'); }
   const L = globalThis.TOL.LEARN;

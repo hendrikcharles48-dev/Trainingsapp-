@@ -35,7 +35,10 @@
     bulb: svg('<path d="M9.2 18h5.6M10.2 21h3.6"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.5 1.1-2.1A6 6 0 0 0 12 3Z"/>'),
     doc: svg('<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 14.6h16M11.4 14.6v5.9M8 7.6h8M8 10.6h5"/>'),
     ruler: svg('<rect x="2.6" y="7.6" width="18.8" height="8.8" rx="1.8"/><path d="M6.2 7.6v3.2M9.4 7.6v2.2M12.6 7.6v3.2M15.8 7.6v2.2M19 7.6v3.2"/>'),
-    dia: svg('<circle cx="12" cy="12" r="7.4"/><path d="M4.6 19.4 19.4 4.6"/>')
+    dia: svg('<circle cx="12" cy="12" r="7.4"/><path d="M4.6 19.4 19.4 4.6"/>'),
+    camera: svg('<path d="M3.5 8.5a2 2 0 0 1 2-2h2.2l1.5-2.2h5.6l1.5 2.2h2.2a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.8"/>'),
+    photos: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17.5 5-5 4 4 2.5-2.5 5 5"/>'),
+    pencil: svg('<path d="M4.5 19.5l1-4L16 5a2.1 2.1 0 0 1 3 3L8.5 18.5Z"/><path d="M14 7l3 3"/>')
   };
   const TOPIC_ICON = { doc: I.doc, ruler: I.ruler, target: I.dia };
 
@@ -564,6 +567,7 @@
     iso: { q: '10H8' },
     fit: { hole: '30H7', shaft: 'g6', sys: 'EB' },
     gen: { tab: 'alt', N: '120', kind: 'len', cls: 'm', hk: 'K', mode: 'profil', pN: '50', t: '0,4', rel: 'bezug', sN: '20', sdev: '0,1' },
+    foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] }
   };
   const A = (() => {
@@ -571,6 +575,7 @@
     const saved = store.get('apply', {}) || {};
     const out = {};
     Object.keys(A_DEF).forEach(k => { out[k] = Object.assign({}, A_DEF[k], saved[k] && typeof saved[k] === 'object' ? saved[k] : {}); });
+    if (!Array.isArray(out.foto.items)) out.foto.items = [];
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
     out.sec = typeof sec === 'string' ? sec : 'gen';
     out.order = Array.isArray(saved.order) ? saved.order.filter(x => typeof x === 'string') : null;
@@ -593,7 +598,8 @@
     { id: 'geo', label: 'Form und Lage', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo() },
     { id: 'iso', label: 'ISO-Toleranz', title: 'Einzeltoleranz', tag: 'ISO 286', card: () => cardIso() },
     { id: 'fit', label: 'Passung', title: 'Passung', card: () => cardFit() },
-    { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain() }
+    { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain() },
+    { id: 'foto', label: 'Foto', title: 'Zeichnung fotografieren', card: () => cardFoto() }
   ];
   function orderedSections() {
     const list = (A.order || []).map(id => SECTIONS.find(x => x.id === id)).filter(Boolean);
@@ -1084,13 +1090,238 @@
   }
   function renderChainRows() { $('#chain-rows').innerHTML = A.chain.rows.map(chainRowHTML).join(''); }
 
+  // f) Foto einer Zeichnung: Maße erkennen und Toleranzen zeigen
+  const FOTO = { url: null, busy: false, status: '', pct: 0, error: '', open: -1, log: null, editIdx: -1 };
+  let OCRW = null;
+  const KIND_NAME = { iso: 'ISO-Toleranz', fit: 'Passung', pm: 'Eigene Toleranz ±', ul: 'Eigene Abmaße', lin: 'Ohne Toleranz', rad: 'Radius ohne Toleranz', fase: 'Fase ohne Toleranz', ang: 'Winkel ohne Toleranz' };
+
+  function cardFoto() {
+    return `<section class="card" id="card-foto">
+      <p class="small muted">Fotografiere eine Zeichnung. Die App sucht die Maße heraus und zeigt dir zu jedem die Toleranz. Die Erkennung läuft nur auf deinem iPhone, das Foto verlässt das Gerät nicht.</p>
+      <div class="btn-row">
+        <label class="btn primary file-btn">${I.camera}Foto aufnehmen<input type="file" accept="image/*" capture="environment" id="foto-cam" class="visually-hidden"></label>
+        <label class="btn soft file-btn">${I.photos}Aus Fotos<input type="file" accept="image/*" id="foto-lib" class="visually-hidden"></label>
+      </div>
+      <div id="foto-stage"></div>
+      <div class="field"><span class="lbl">Allgemeintoleranz der Zeichnung: <span class="tb-line">ISO 2768-<b id="foto-code">${A.foto.ml}</b></span> <span id="foto-det"></span></span>${segHTML('foto.ml', A.foto.ml, CLS_ML, 'tall')}
+        <span class="hint-line">Gilt für alle Maße ohne eigene Toleranz. Wird im Schriftfeld „ISO 2768“ erkannt, stellt die App die Klasse selbst ein.</span></div>
+      <div id="foto-list" aria-live="polite"></div>
+      <div class="field"><label for="foto-add" id="foto-add-lbl">Maß von Hand hinzufügen</label>
+        <div class="foto-add-row"><div class="inp"><input id="foto-add" placeholder="z. B. Ø30 H7, 120, R5, 60 ±0,1" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div><button type="button" class="btn soft" data-act="foto-add" id="foto-add-btn">Dazu</button></div>
+        <span class="hint-line" id="foto-add-msg"></span></div>
+      <details class="calc" data-calc="foto-text"${OPEN.has('foto-text') ? ' open' : ''}><summary><span>Text aus Live Text einfügen</span>${I.chevR}</summary>
+        <div class="calc-steps" style="display:flex;flex-direction:column;gap:10px">
+          <p class="small muted">Das iPhone erkennt Text in Fotos oft noch besser: Öffne das Foto in der Fotos-App, halte den Finger auf einen Text, tippe auf „Alles auswählen“ und dann „Kopieren“. Füge den Text hier ein.</p>
+          <textarea id="foto-text" class="textarea" rows="5" placeholder="Hier einfügen"></textarea>
+          <button type="button" class="btn soft" data-act="foto-text">Maße im Text suchen</button>
+        </div></details>
+    </section>`;
+  }
+
+  function evalDim(it) {
+    const ml = A.foto.ml;
+    const lin = (N, kind) => {
+      const r = T.lin2768(N, ml, kind);
+      if (!r.ok) return { err: r.error };
+      const F = x => f(x, r.dec, 4);
+      return { sum: `±${f(r.dev)} mm · ${F(r.min)} bis ${F(r.max)} mm`, rows: [['Grenzabmaß', `±${f(r.dev)} mm`], ['Nennmaßbereich', esc(r.rangeText)], ['Höchstmaß', F(r.max) + ' mm'], ['Mindestmaß', F(r.min) + ' mm']], steps: r.steps, calc: () => { Object.assign(A.gen, { tab: 'alt', N: T.fmt(N), kind, cls: ml }); return 'gen'; } };
+    };
+    if (it.kind === 'iso') {
+      const r = T.isoTol(it.N, it.letter, it.grade);
+      if (!r.ok) return { err: r.error };
+      return { sub: r.isHole ? 'Bohrung' : 'Welle', sum: `${T.mm(r.min)} bis ${T.mm(r.max)} mm`, rows: [['Oberes Abmaß', T.umS(r.upper) + ' µm'], ['Unteres Abmaß', T.umS(r.lower) + ' µm'], ['Höchstmaß', T.mm(r.max) + ' mm'], ['Mindestmaß', T.mm(r.min) + ' mm'], ['Toleranzmitte fürs Programm', T.fmt(r.mid, 3, 4) + ' mm', true]], steps: r.steps, calc: () => { A.iso.q = `${f(it.N)}${r.cls}`; return 'iso'; } };
+    }
+    if (it.kind === 'fit') {
+      const r = T.fitCalc(it.N, it.hole, it.shaft);
+      if (!r.ok) return { err: r.error };
+      const name = { spiel: 'Spielpassung', uebergang: 'Übergangspassung', press: 'Presspassung' }[r.type];
+      return { sub: name, fit: r.type, sum: `${name} · ${r.la} ${T.mm(r.a)} mm`, rows: [[r.la, T.mm(r.a) + ' mm'], [r.lb, T.mm(r.b) + ' mm'], [`Bohrung ${r.H.cls}`, `${T.mm(r.H.min)} bis ${T.mm(r.H.max)} mm`], [`Welle ${r.S.cls}`, `${T.mm(r.S.min)} bis ${T.mm(r.S.max)} mm`]], steps: r.steps, calc: () => { A.fit.hole = `${f(it.N)}${r.H.cls}`; A.fit.shaft = r.S.cls; return 'fit'; } };
+    }
+    if (it.kind === 'pm' || it.kind === 'ul') {
+      const dec = Math.max(T.decimals(it.up), T.decimals(it.lo), T.decimals(it.N));
+      const F = x => f(x, dec, 4);
+      const max = T.r6(it.N + it.up), min = T.r6(it.N + it.lo), mid = T.r6((max + min) / 2);
+      return { sum: `${F(min)} bis ${F(max)} mm`, rows: [['Höchstmaß', F(max) + ' mm'], ['Mindestmaß', F(min) + ' mm'], ['Toleranz', F(T.r6(max - min)) + ' mm'], ['Toleranzmitte', f(mid, dec, 4) + ' mm']],
+        steps: [{ t: 'Eigene Toleranz am Maß', h: 'Die Toleranz steht direkt am Maß. Die Allgemeintoleranz gilt dafür nicht.' }, { t: 'Grenzmaße', h: `Höchstmaß: ${F(it.N)} mm ${it.up < 0 ? '−' : '+'} ${F(Math.abs(it.up))} mm = <b>${F(max)} mm</b><br>Mindestmaß: ${F(it.N)} mm ${it.lo < 0 ? '−' : '+'} ${F(Math.abs(it.lo))} mm = <b>${F(min)} mm</b>` }] };
+    }
+    if (it.kind === 'lin') return lin(it.N, 'len');
+    if (it.kind === 'rad' || it.kind === 'fase') return lin(it.N, 'rad');
+    if (it.kind === 'ang') {
+      const rows = T.ANG2768.ranges.map((r, i) => [`Schenkel ${T.angRangeText(i)}`, T.devText(T.ANG2768[ml][i])]);
+      return { sum: `${T.devText(T.ANG2768[ml][4])} bis ${T.devText(T.ANG2768[ml][0])}, je nach Schenkellänge`, rows, steps: [{ t: 'Winkel ohne Toleranz', h: `Die zulässige Abweichung hängt von der Länge des kürzeren Schenkels ab. Die Tabelle zeigt die Werte für Klasse ${ml}. Den genauen Wert bekommst du im Rechner „Winkel“ mit der Schenkellänge.` }], calc: () => { Object.assign(A.ang, { nom: T.fmt(it.deg), cls: ml }); return 'ang'; } };
+    }
+    return { err: 'Unbekannte Art.' };
+  }
+
+  function renderFotoStage() {
+    const el = $('#foto-stage');
+    if (!el) return;
+    let html = '';
+    if (FOTO.url) {
+      const boxes = A.foto.items.map((it, i) => it.box ? `<button type="button" class="foto-box${FOTO.open === i ? ' on' : ''}" data-act="foto-open" data-i="${i}" aria-label="${esc(it.label)}" style="left:${(it.box.x * 100).toFixed(2)}%;top:${(it.box.y * 100).toFixed(2)}%;width:${(it.box.w * 100).toFixed(2)}%;height:${(it.box.h * 100).toFixed(2)}%"></button>` : '').join('');
+      html += `<div class="foto-wrap"><img src="${FOTO.url}" alt="Foto der Zeichnung"><div class="foto-boxes">${boxes}</div></div>`;
+    }
+    if (FOTO.busy) html += `<div class="ocr-progress"><div class="bar"><i style="width:${Math.round(FOTO.pct * 100)}%"></i></div><span>${esc(FOTO.status)}</span></div>`;
+    if (FOTO.error) html += msgHTML(esc(FOTO.error), 'warn');
+    el.innerHTML = html;
+  }
+
+  function renderFotoList() {
+    const el = $('#foto-list');
+    if (!el) return;
+    const code = $('#foto-code');
+    if (code) code.textContent = A.foto.ml + (A.foto.detected && A.foto.detected.hk ? A.foto.detected.hk : '');
+    const det = $('#foto-det');
+    if (det) det.innerHTML = A.foto.detected ? `<span class="badge">im Foto erkannt</span>` : '';
+    const items = A.foto.items;
+    if (!items.length) {
+      el.innerHTML = FOTO.busy ? '' : msgHTML('Noch keine Maße. Mach ein Foto oder füge Maße von Hand hinzu.');
+      return;
+    }
+    el.innerHTML = `<div class="foto-head"><span class="eyebrow">${items.length} Maße gefunden</span><button type="button" class="link-btn" data-act="foto-clear">Liste leeren</button></div>
+      <div class="list foto-items">${items.map((it, i) => {
+        const r = evalDim(it), open = FOTO.open === i;
+        return `<div class="dim-row${open ? ' open' : ''}" id="dim-${i}">
+          <button type="button" class="dim-main" data-act="foto-open" data-i="${i}" aria-expanded="${open}">
+            <span class="dim-label">${esc(it.label)}${it.count > 1 ? ` <small>${it.count}×</small>` : ''}</span>
+            <span class="dim-kind${r.fit ? ' ' + r.fit : ''}">${esc(r.sub || KIND_NAME[it.kind])}</span>
+            <span class="dim-sum">${r.err ? esc(r.err) : esc(r.sum)}${it.guess ? ' · <b class="guess">bitte prüfen</b>' : ''}</span>${I.chevR}</button>
+          ${open ? `<div class="dim-detail">
+            ${it.guess ? msgHTML(esc(it.guess), 'warn') : ''}
+            ${r.err ? msgHTML(esc(r.err), 'warn') : `<div class="kv">${r.rows.map(([k, v, full]) => kv(esc(k), v, full)).join('')}</div>`}
+            <div class="btn-row">${r.calc ? `<button type="button" class="btn soft" data-act="foto-calc" data-i="${i}">Im Rechner öffnen</button>` : ''}<button type="button" class="btn plain" data-act="foto-edit" data-i="${i}">${I.pencil}Korrigieren</button></div>
+            <button type="button" class="link-btn danger" data-act="foto-del" data-i="${i}">${I.x}Aus der Liste entfernen</button>
+            ${r.steps ? calcHTML('foto-steps', r.steps) : ''}
+          </div>` : ''}
+        </div>`;
+      }).join('')}</div>
+      <p class="foot">Prüfe die Liste mit der Zeichnung. Senkrechte, schräge und handschriftliche Maße sowie kleine hochgestellte Toleranzen erkennt die App nicht immer. Fehlt etwas oder stimmt ein Wert nicht, tippe auf „Korrigieren“ oder füge es unten von Hand hinzu.</p>`;
+  }
+  function computeFoto() { renderFotoStage(); renderFotoList(); }
+
+  function mergeFotoItems(list) {
+    const seen = new Map(A.foto.items.map(it => [it.kind + '|' + it.label, it]));
+    list.forEach(it => { const k = it.kind + '|' + it.label; if (seen.has(k)) seen.get(k).count = (seen.get(k).count || 1) + (it.count || 1); else { A.foto.items.push(it); seen.set(k, it); } });
+  }
+
+  function loadScript(src) {
+    return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('script')); document.head.appendChild(sc); });
+  }
+  async function getOcr() {
+    if (!window.Tesseract) await loadScript('ocr/tesseract.min.js');
+    if (!OCRW) {
+      const base = new URL('ocr/', location.href).href;
+      OCRW = await window.Tesseract.createWorker('eng', 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base, gzip: true, logger: m => { if (FOTO.log) FOTO.log(m); } });
+      await OCRW.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
+    }
+    return OCRW;
+  }
+  function loadImage(file) {
+    return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => rej(new Error('bild')); img.src = URL.createObjectURL(file); });
+  }
+  // Graustufen, Kontrast strecken, bei rot = 90 im Uhrzeigersinn gedreht (für senkrechte Maße)
+  function prepCanvas(img, rot) {
+    const w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
+    const sc = long > 2400 ? 2400 / long : long < 1400 ? 1400 / long : 1;
+    const W = Math.round(w * sc), H = Math.round(h * sc);
+    const c = document.createElement('canvas');
+    c.width = rot ? H : W; c.height = rot ? W : H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    if (rot) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
+    ctx.drawImage(img, 0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height), px = d.data, hist = new Uint32Array(256);
+    for (let i = 0; i < px.length; i += 4) { const g = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0; px[i] = g; hist[g]++; }
+    const n = px.length / 4;
+    let lo = 0, hi = 255, acc = 0;
+    for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc > n * 0.02) { lo = i; break; } }
+    acc = 0;
+    for (let i = 255; i >= 0; i--) { acc += hist[i]; if (acc > n * 0.02) { hi = i; break; } }
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < px.length; i += 4) { const v = Math.max(0, Math.min(255, (px[i] - lo) * 255 / span)); px[i] = px[i + 1] = px[i + 2] = v; }
+    ctx.putImageData(d, 0, 0);
+    return { canvas: c, W, H };
+  }
+  function linesFrom(data, rot, W, H) {
+    const out = [];
+    (data.blocks || []).forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => {
+      const bb = l.bbox;
+      const x0 = rot ? bb.y0 : bb.x0, x1 = rot ? bb.y1 : bb.x1, y0 = rot ? H - bb.x1 : bb.y0, y1 = rot ? H - bb.x0 : bb.y1;
+      out.push({ text: l.text, conf: l.confidence, minPlainConf: rot ? 70 : 50, box: { x: x0 / W, y: y0 / H, w: (x1 - x0) / W, h: (y1 - y0) / H } });
+    })));
+    return out;
+  }
+  async function handleFoto(file) {
+    if (FOTO.busy) return;
+    FOTO.busy = true; FOTO.error = ''; FOTO.pct = 0; FOTO.open = -1;
+    FOTO.status = 'Foto wird vorbereitet …';
+    if (FOTO.url) URL.revokeObjectURL(FOTO.url);
+    A.foto.items = []; A.foto.detected = null; saveA();
+    computeFoto();
+    try {
+      const img = await loadImage(file);
+      FOTO.url = img.src;
+      computeFoto();
+      let pass = 1;
+      FOTO.log = m => {
+        if (m.status === 'recognizing text') { FOTO.status = `Maße werden gesucht, Durchgang ${pass} von 2 (${pass === 1 ? 'waagrechte' : 'senkrechte'} Schrift) …`; FOTO.pct = (pass - 1 + (m.progress || 0)) / 2; }
+        else { FOTO.status = 'Texterkennung wird geladen …' + (OCRW ? '' : ' Beim ersten Mal braucht das etwas Zeit und Internet.'); }
+        renderFotoStage();
+      };
+      const worker = await getOcr();
+      const a = prepCanvas(img, false);
+      const r0 = await worker.recognize(a.canvas, {}, { blocks: true, text: true });
+      pass = 2;
+      const b = prepCanvas(img, true);
+      const r1 = await worker.recognize(b.canvas, {}, { blocks: true, text: true });
+      const lines = linesFrom(r0.data, false, a.W, a.H).concat(linesFrom(r1.data, true, a.W, a.H));
+      FOTO.lines = lines;
+      const parsed = T.parseDrawing(lines);
+      A.foto.items = parsed.items;
+      if (parsed.general) { A.foto.detected = parsed.general; A.foto.ml = parsed.general.ml; if (parsed.general.hk) A.foto.hk = parsed.general.hk; }
+      saveA();
+      if (!parsed.items.length) FOTO.error = 'Im Foto habe ich keine Maße gefunden. Fotografiere möglichst gerade von oben, mit gutem Licht und so nah, dass die Zahlen gut lesbar sind. Oder füge die Maße unten von Hand ein.';
+      if (parsed.iso22081) FOTO.error = (FOTO.error ? FOTO.error + ' ' : '') + 'Auf der Zeichnung steht ISO 22081. Die Maße ohne Toleranz werden dort über die Profiltoleranz geregelt, nicht über ISO 2768. Nutze dafür den Rechner „Allgemeintoleranz“, Neue Tabelle.';
+    } catch (e) {
+      FOTO.error = window.top !== window ? 'Im Vorschau-Link funktioniert die Texterkennung nicht. Nutze die App vom Home-Bildschirm oder die Adresse auf github.io. Maße kannst du hier trotzdem von Hand eintragen.' : 'Die Texterkennung hat nicht geklappt. Beim ersten Mal braucht die App Internet, um sie zu laden (etwa 7 MB). Versuch es noch einmal oder füge die Maße unten von Hand ein.';
+    }
+    FOTO.busy = false; FOTO.log = null;
+    if (S.tab === 'apply' && A.sec === 'foto') {
+      const seg = $('#card-foto [data-k="foto.ml"]');
+      if (seg) $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === A.foto.ml)));
+      computeFoto();
+    }
+  }
+  function fotoAddFromInput() {
+    const inp = $('#foto-add'), msg = $('#foto-add-msg');
+    const text = inp.value.trim();
+    if (!text) return;
+    const r = T.parseDrawing(text.split(/[\n;]/).map(t => ({ text: t })));
+    if (!r.items.length) { msg.textContent = 'Darin habe ich kein Maß erkannt. Schreib es zum Beispiel so: Ø30 H7, 120, R5, 60 ±0,1 oder 25 +0,1 -0,05.'; return; }
+    if (FOTO.editIdx >= 0 && A.foto.items[FOTO.editIdx]) {
+      const old = A.foto.items[FOTO.editIdx];
+      A.foto.items.splice(FOTO.editIdx, 1, Object.assign(r.items[0], { box: old.box, count: old.count || 1 }));
+      FOTO.open = FOTO.editIdx;
+      if (r.items.length > 1) mergeFotoItems(r.items.slice(1));
+    } else {
+      mergeFotoItems(r.items);
+      FOTO.open = A.foto.items.findIndex(it => it.label === r.items[0].label && it.kind === r.items[0].kind);
+    }
+    if (r.general) { A.foto.ml = r.general.ml; A.foto.detected = r.general; }
+    FOTO.editIdx = -1;
+    inp.value = ''; msg.textContent = '';
+    $('#foto-add-lbl').textContent = 'Maß von Hand hinzufügen';
+    $('#foto-add-btn').textContent = 'Dazu';
+    saveA(); computeFoto();
+  }
+
   function out(id, html) { const el = $('#' + id); if (el) el.innerHTML = html; }
-  function computeAll() { computeAng(); computeGeo(); computeIso(); computeFit(); computeGen(); computeChain(); }
+  function computeAll() { computeAng(); computeGeo(); computeIso(); computeFit(); computeGen(); computeChain(); computeFoto(); }
   function onApplyChange(k) {
     const sec = k.split('.')[0];
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
     if (k === 'gen.tab' || k === 'gen.mode') $('#sec-body').innerHTML = sectionHTML();
-    ({ ang: computeAng, geo: computeGeo, iso: computeIso, fit: computeFit, gen: computeGen })[sec]();
+    ({ ang: computeAng, geo: computeGeo, iso: computeIso, fit: computeFit, gen: computeGen, foto: computeFoto })[sec]();
   }
 
   // ================================================================
@@ -1129,6 +1360,36 @@
       const inp = $(`#c${A.chain.rows.length - 1}-N`);
       if (inp) inp.focus();
     },
+    'foto-open': t => {
+      const i = +t.dataset.i;
+      FOTO.open = FOTO.open === i ? -1 : i;
+      computeFoto();
+      if (FOTO.open >= 0 && t.classList.contains('foto-box')) { const row = $('#dim-' + i); if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    },
+    'foto-del': t => { A.foto.items.splice(+t.dataset.i, 1); FOTO.open = -1; saveA(); computeFoto(); },
+    'foto-clear': () => { A.foto.items = []; A.foto.detected = null; FOTO.open = -1; FOTO.error = ''; saveA(); computeFoto(); },
+    'foto-edit': t => {
+      const i = +t.dataset.i, it = A.foto.items[i];
+      FOTO.editIdx = i;
+      const inp = $('#foto-add');
+      inp.value = it.raw || it.label;
+      $('#foto-add-lbl').textContent = `„${it.label}“ korrigieren`;
+      $('#foto-add-btn').textContent = 'Übernehmen';
+      inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      inp.focus();
+    },
+    'foto-add': () => fotoAddFromInput(),
+    'foto-text': () => {
+      const ta = $('#foto-text');
+      const r = T.parseDrawing(ta.value.split(/\n/).map(t => ({ text: t })));
+      if (r.general) { A.foto.ml = r.general.ml; A.foto.detected = r.general; }
+      mergeFotoItems(r.items);
+      FOTO.error = r.items.length ? '' : 'Im eingefügten Text habe ich keine Maße gefunden.';
+      saveA(); computeFoto();
+      const seg = $('#card-foto [data-k="foto.ml"]');
+      if (seg) $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === A.foto.ml)));
+    },
+    'foto-calc': t => { const sec = evalDim(A.foto.items[+t.dataset.i]).calc(); saveA(); showSection(sec, 0); },
     'chain-del': t => { A.chain.rows.splice(+t.dataset.i, 1); saveA(); renderChainRows(); computeChain(); },
     'chain-example': () => {
       A.chain.rows = [{ op: 1, N: '40', mode: 'pm', pm: '0,1', up: '', lo: '', iso: '' }, { op: -1, N: '12', mode: 'ul', pm: '', up: '0,1', lo: '0', iso: '' }];
@@ -1207,13 +1468,17 @@
     }
   }
   document.addEventListener('input', onInput);
-  document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
+  document.addEventListener('change', e => {
+    if (e.target.tagName === 'SELECT') onInput(e);
+    if (e.target.matches && e.target.matches('#foto-cam, #foto-lib') && e.target.files && e.target.files[0]) { handleFoto(e.target.files[0]); e.target.value = ''; }
+  });
 
   // Eingabetaste springt zum nächsten Feld, wie „Weiter“ auf der iPhone-Tastatur
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !$('#sheet').hidden) { closeSheet(); return; }
     if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
     e.preventDefault();
+    if (e.target.id === 'foto-add') { fotoAddFromInput(); return; }
     const scope = e.target.closest('.steps, .card') || document;
     const inputs = $$('input', scope);
     const i = inputs.indexOf(e.target);
