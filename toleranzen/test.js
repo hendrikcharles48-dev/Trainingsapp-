@@ -114,6 +114,12 @@ eq('Foto: keine Datums-, Maßstabs-, Gewinde- oder Rauheitszahlen', lab.filter(x
 eq('Foto: 120 R5 nicht als ISO', lab.includes('iso:120 R5'), false);
 const pd2 = T.parseDrawing([{ text: 'Allgemeintoleranzen 1SO 2[768-mK' }, { text: '60 +0,1', conf: 72 }, { text: '— 1', conf: 67 }]);
 eq('Foto: verlesenes Schriftfeld', pd2.general, { ml: 'm', hk: 'K' });
+eq('Foto: B10 HY als Ø10 H7', T.parseDrawing([{ text: 'B10 HY' }, { text: 'P12 H7' }]).items.map(i => i.label), ['Ø10 H7', 'Ø12 H7']);
+eq('Foto: Hilfsmaß in Klammern bleibt', T.parseDrawing([{ text: '(120)' }]).items.map(i => i.label), ['120']);
+eq('Foto: Schriftfeld ohne Maße', T.parseDrawing([{ text: 'Datum Ø2.09.2026' }, { text: 'Blatt Ø/2' }]).items.length, 0);
+eq('Foto: X 26,6 als Ø6,6', T.parseDrawing([{ text: 'X 26,6' }]).items.map(i => i.label + ':' + !!i.guess), ['Ø6,6:true']);
+eq('Foto: -03 als -0,3', T.parseDrawing([{ text: '60 -0,1 -03' }]).items.map(i => i.label), ['60 −0,1/−0,3']);
+eq('Foto: Schriftfeld 2768-mi', T.parseDrawing([{ text: 'Allgemeintoleranzen ISO 2768-mi' }]).general, { ml: 'm', hk: null });
 eq('Foto: 4x 76,6 als Ø6,6', T.parseDrawing([{ text: '4x 76,6' }]).items.map(i => i.label + ':' + !!i.guess), ['Ø6,6:true']);
 eq('Foto: + als ± vermutet', pd2.items.map(i => i.kind + ':' + i.label + ':' + !!i.guess), ['pm:60 ±0,1:true']);
 

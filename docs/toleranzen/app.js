@@ -1092,6 +1092,7 @@
 
   // f) Foto einer Zeichnung: Maße erkennen und Toleranzen zeigen
   const FOTO = { url: null, busy: false, status: '', pct: 0, error: '', open: -1, log: null, editIdx: -1 };
+  if (/[?&]debug\b/.test(location.search)) window.__FOTO = FOTO; // nur für Tests
   let OCRW = null;
   const KIND_NAME = { iso: 'ISO-Toleranz', fit: 'Passung', pm: 'Eigene Toleranz ±', ul: 'Eigene Abmaße', lin: 'Ohne Toleranz', rad: 'Radius ohne Toleranz', fase: 'Fase ohne Toleranz', ang: 'Winkel ohne Toleranz' };
 
@@ -1212,17 +1213,18 @@
     if (!OCRW) {
       const base = new URL('ocr/', location.href).href;
       OCRW = await window.Tesseract.createWorker('eng', 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base, gzip: true, logger: m => { if (FOTO.log) FOTO.log(m); } });
-      await OCRW.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
+      const psm = (window.__FOTO && (location.search.match(/psm=(\d+)/) || [])[1]) || '11';
+      await OCRW.setParameters({ tessedit_pageseg_mode: psm, preserve_interword_spaces: '1' });
     }
     return OCRW;
   }
   function loadImage(file) {
     return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => rej(new Error('bild')); img.src = URL.createObjectURL(file); });
   }
-  // Graustufen, Kontrast strecken, bei rot = 90 im Uhrzeigersinn gedreht (für senkrechte Maße)
+  // Graustufen und örtliche Schwelle (gegen Schatten und graues Papier), bei rot gedreht um 90° im Uhrzeigersinn
   function prepCanvas(img, rot) {
     const w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
-    const sc = long > 2400 ? 2400 / long : long < 1400 ? 1400 / long : 1;
+    const sc = long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
     const W = Math.round(w * sc), H = Math.round(h * sc);
     const c = document.createElement('canvas');
     c.width = rot ? H : W; c.height = rot ? W : H;
@@ -1230,26 +1232,115 @@
     if (rot) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
     ctx.drawImage(img, 0, 0, W, H);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const d = ctx.getImageData(0, 0, c.width, c.height), px = d.data, hist = new Uint32Array(256);
-    for (let i = 0; i < px.length; i += 4) { const g = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0; px[i] = g; hist[g]++; }
-    const n = px.length / 4;
-    let lo = 0, hi = 255, acc = 0;
-    for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc > n * 0.02) { lo = i; break; } }
-    acc = 0;
-    for (let i = 255; i >= 0; i--) { acc += hist[i]; if (acc > n * 0.02) { hi = i; break; } }
-    const span = Math.max(1, hi - lo);
-    for (let i = 0; i < px.length; i += 4) { const v = Math.max(0, Math.min(255, (px[i] - lo) * 255 / span)); px[i] = px[i + 1] = px[i + 2] = v; }
-    ctx.putImageData(d, 0, 0);
-    return { canvas: c, W, H };
+    const cw = c.width, ch = c.height;
+    const d = ctx.getImageData(0, 0, cw, ch), px = d.data;
+    const g = new Float32Array(cw * ch);
+    for (let i = 0, k = 0; i < px.length; i += 4, k++) { g[k] = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000; px[i] = px[i + 1] = px[i + 2] = g[k]; }
+    ctx.putImageData(d, 0, 0);   // erste Fassung: nur Graustufen
+    // Summenbild für schnelle Mittelwerte im Fenster
+    const S = new Float64Array((cw + 1) * (ch + 1)), Q = new Float64Array((cw + 1) * (ch + 1));
+    for (let y = 0; y < ch; y++) {
+      let rs = 0, rq = 0;
+      for (let x = 0; x < cw; x++) {
+        const v = g[y * cw + x];
+        rs += v; rq += v * v;
+        const o = (y + 1) * (cw + 1) + x + 1;
+        S[o] = S[o - cw - 1] + rs; Q[o] = Q[o - cw - 1] + rq;
+      }
+    }
+    const r = Math.max(12, Math.round(Math.min(cw, ch) / 40));
+    for (let y = 0; y < ch; y++) {
+      const y0 = Math.max(0, y - r), y1 = Math.min(ch, y + r + 1);
+      for (let x = 0; x < cw; x++) {
+        const x0 = Math.max(0, x - r), x1 = Math.min(cw, x + r + 1);
+        const n = (y1 - y0) * (x1 - x0);
+        const a = y1 * (cw + 1) + x1, b = y0 * (cw + 1) + x1, e = y1 * (cw + 1) + x0, f0 = y0 * (cw + 1) + x0;
+        const mean = (S[a] - S[b] - S[e] + S[f0]) / n;
+        const sd = Math.sqrt(Math.max(0, (Q[a] - Q[b] - Q[e] + Q[f0]) / n - mean * mean));
+        // Sauvola: dunkler als der örtliche Hintergrund heißt Schrift oder Linie
+        const t = mean * (1 + 0.2 * (sd / 128 - 1));
+        const k = (y * cw + x) * 4;
+        const v = g[y * cw + x] < t && g[y * cw + x] < 215 ? 0 : 255;
+        px[k] = px[k + 1] = px[k + 2] = v;
+      }
+    }
+    const cb = document.createElement('canvas');
+    cb.width = cw; cb.height = ch;
+    cb.getContext('2d').putImageData(d, 0, 0);   // zweite Fassung: Schwarzweiß
+    // Dritte Fassung: lange waagrechte und senkrechte Linien (Kanten, Maßlinien, Rahmen) entfernt, damit Schrift frei steht
+    const c2 = document.createElement('canvas');
+    c2.width = cw; c2.height = ch;
+    const ctx2 = c2.getContext('2d');
+    const Lmin = Math.max(70, Math.round(Math.min(cw, ch) * 0.06));
+    const blk = new Uint8Array(cw * ch);
+    for (let k = 0; k < blk.length; k++) blk[k] = px[k * 4] === 0 ? 1 : 0;
+    const kill = new Uint8Array(cw * ch);
+    for (let y = 0; y < ch; y++) {
+      let x = 0;
+      while (x < cw) {
+        if (!blk[y * cw + x]) { x++; continue; }
+        let e = x;
+        while (e < cw && blk[y * cw + e]) e++;
+        if (e - x >= Lmin) for (let q = x; q < e; q++) kill[y * cw + q] = 1;
+        x = e;
+      }
+    }
+    for (let x = 0; x < cw; x++) {
+      let y = 0;
+      while (y < ch) {
+        if (!blk[y * cw + x]) { y++; continue; }
+        let e = y;
+        while (e < ch && blk[e * cw + x]) e++;
+        if (e - y >= Lmin) for (let q = y; q < e; q++) kill[q * cw + x] = 1;
+        y = e;
+      }
+    }
+    for (let k = 0; k < kill.length; k++) if (kill[k]) { const o = k * 4; px[o] = px[o + 1] = px[o + 2] = 255; }
+    ctx2.putImageData(d, 0, 0);
+    return { canvas: c, bin: cb, clean: c2, W, H };
   }
+  // Ein Wort nachbessern: Das Durchmesserzeichen Ø wird oft als 2, 0 oder @ gelesen, ist aber deutlich breiter als eine Ziffer
+  function fixWord(w) {
+    const sy = w.symbols || [];
+    let t = w.text || '';
+    const bw = s => s.bbox.x1 - s.bbox.x0;
+    if (sy.length >= 2 && /^[0-9@?Oo]$/.test(sy[0].text) && !/\d\.\d\d\./.test(t)) {
+      const rest = sy.slice(1).filter(x => /\d/.test(x.text));
+      if (rest.length) {
+        const mw = rest.map(bw).sort((a, b) => a - b)[rest.length >> 1];
+        if (bw(sy[0]) >= 1.3 * mw) t = 'Ø' + t.slice(sy[0].text.length);
+      }
+    }
+    if (/^0(\d{2}|\d[.,]\d)/.test(t)) t = 'Ø' + t.slice(1);   // eine führende 0 vor einer Ziffer gibt es bei Maßen nicht
+    return t;
+  }
+  // Zeilen aus der Erkennung holen; kleine hochgestellte Abmaße rechts neben einem Maß werden angehängt
   function linesFrom(data, rot, W, H) {
-    const out = [];
+    const raw = [];
     (data.blocks || []).forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => {
-      const bb = l.bbox;
-      const x0 = rot ? bb.y0 : bb.x0, x1 = rot ? bb.y1 : bb.x1, y0 = rot ? H - bb.x1 : bb.y0, y1 = rot ? H - bb.x0 : bb.y1;
-      out.push({ text: l.text, conf: l.confidence, minPlainConf: rot ? 70 : 50, box: { x: x0 / W, y: y0 / H, w: (x1 - x0) / W, h: (y1 - y0) / H } });
+      const text = (l.words && l.words.length) ? l.words.map(fixWord).join(' ') : l.text;
+      raw.push({ text: text.trim(), conf: l.confidence, bb: Object.assign({}, l.bbox) });
     })));
-    return out;
+    const hgt = r => r.bb.y1 - r.bb.y0;
+    raw.forEach(a => {
+      if (a.used || !/\d\s*$/.test(a.text) || /[±+\-−–]\s*\d/.test(a.text)) return;
+      const ha = hgt(a);
+      const small = raw.filter(b => b !== a && !b.used && /^[+±\-−–]?\s*[0-9Oo]/.test(b.text) && hgt(b) <= 0.9 * ha &&
+        b.bb.x0 >= a.bb.x1 - 3 && b.bb.x0 - a.bb.x1 <= 1.2 * ha &&
+        (b.bb.y0 + b.bb.y1) / 2 >= a.bb.y0 - 0.7 * ha && (b.bb.y0 + b.bb.y1) / 2 <= a.bb.y1 + 0.4 * ha);
+      if (!small.length || !small.some(b => /^[+±\-−–]/.test(b.text))) return;
+      small.sort((x, y) => x.bb.y0 - y.bb.y0).slice(0, 2).forEach(b => {
+        b.used = true;
+        a.text += ' ' + b.text;
+        a.bb = { x0: Math.min(a.bb.x0, b.bb.x0), y0: Math.min(a.bb.y0, b.bb.y0), x1: Math.max(a.bb.x1, b.bb.x1), y1: Math.max(a.bb.y1, b.bb.y1) };
+      });
+      if (small.length === 1 && /^[+]/.test(small[0].text)) a.text += ' 0';   // nur ein Abmaß oben: unten steht 0
+    });
+    return raw.filter(r => !r.used).map(r => {
+      const bb = r.bb;
+      const x0 = rot ? bb.y0 : bb.x0, x1 = rot ? bb.y1 : bb.x1, y0 = rot ? H - bb.x1 : bb.y0, y1 = rot ? H - bb.x0 : bb.y1;
+      return { text: r.text, conf: r.conf, minPlainConf: rot ? 70 : 50, box: { x: x0 / W, y: y0 / H, w: (x1 - x0) / W, h: (y1 - y0) / H } };
+    });
   }
   async function handleFoto(file) {
     if (FOTO.busy) return;
@@ -1263,19 +1354,27 @@
       FOTO.url = img.src;
       computeFoto();
       let pass = 1;
+      const PASSES = 6;
       FOTO.log = m => {
-        if (m.status === 'recognizing text') { FOTO.status = `Maße werden gesucht, Durchgang ${pass} von 2 (${pass === 1 ? 'waagrechte' : 'senkrechte'} Schrift) …`; FOTO.pct = (pass - 1 + (m.progress || 0)) / 2; }
+        if (m.status === 'recognizing text') { FOTO.status = `Maße werden gesucht, Durchgang ${pass} von ${PASSES} …`; FOTO.pct = (pass - 1 + (m.progress || 0)) / PASSES; }
         else { FOTO.status = 'Texterkennung wird geladen …' + (OCRW ? '' : ' Beim ersten Mal braucht das etwas Zeit und Internet.'); }
         renderFotoStage();
       };
       const worker = await getOcr();
-      const a = prepCanvas(img, false);
-      const r0 = await worker.recognize(a.canvas, {}, { blocks: true, text: true });
-      pass = 2;
-      const b = prepCanvas(img, true);
-      const r1 = await worker.recognize(b.canvas, {}, { blocks: true, text: true });
-      const lines = linesFrom(r0.data, false, a.W, a.H).concat(linesFrom(r1.data, true, a.W, a.H));
+      // Sechs Durchgänge: waagrecht und senkrecht, jeweils als Graubild, als Schwarzweißbild und ohne lange Linien
+      const a = prepCanvas(img, false), b = prepCanvas(img, true);
+      const runs = [[a.canvas, false], [b.canvas, true], [a.bin, false], [b.bin, true], [a.clean, false], [b.clean, true]];
+      const datas = [];
+      let lines = [];
+      for (const [cv, rot] of runs) {
+        const r = await worker.recognize(cv, {}, { blocks: true, text: true });
+        datas.push(r.data);
+        lines = lines.concat(linesFrom(r.data, rot, a.W, a.H));
+        pass++;
+      }
+      const r0 = { data: datas[0] }, r1 = { data: datas[1] };
       FOTO.lines = lines;
+      if (window.__FOTO) { FOTO.raw = [r0.data, r1.data]; FOTO.canvas = a.canvas.toDataURL('image/png'); }
       const parsed = T.parseDrawing(lines);
       A.foto.items = parsed.items;
       if (parsed.general) { A.foto.detected = parsed.general; A.foto.ml = parsed.general.ml; if (parsed.general.hk) A.foto.hk = parsed.general.hk; }

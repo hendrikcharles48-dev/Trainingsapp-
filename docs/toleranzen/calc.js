@@ -642,11 +642,14 @@
     .replace(/[“”„"'`´\[\]{}|]/g, '')
     .replace(/\b[1lI|][S5][O0]\b/g, 'ISO')
     .replace(/\bIS0\b/g, 'ISO')
+    .replace(/(^|\s)\[?[BPDQ@](?=\d)/g, '$1Ø')                 // Ø als B, P, D oder Q gelesen
+    .replace(/(\d\s*[A-HJ-NP-Za-hj-np-z]{1,2})[Yy](?![A-Za-z])/g, '$17')   // H7 als HY gelesen
     .replace(/[−–—‒]/g, '-')
     .replace(/[º˚]/g, '°')
     .replace(/\+\s*\/\s*-/g, '±')
     .replace(/\+\s*-(?=\s*\d)/g, '±')
     .replace(/(\d)\s*,\s*(\d)/g, '$1,$2')
+    .replace(/([+±-]\s*)0(\d{1,3})(?![\d.,])/g, '$10,$2')
     .replace(/(\d)\s*\.\s*(\d)/g, '$1.$2')
     .replace(/\s+/g, ' ')
     .trim();
@@ -666,9 +669,14 @@
       });
     };
     const dia = d => d ? 'Ø' : '';
+    if (titleLine) {   // Schriftfeld: nur die Allgemeintoleranz, keine Maße
+      s.replace(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:]?\s*([fmcv])\s*([HKL](?![a-z]))?/i, (m0, a, b) => { general = { ml: a.toLowerCase(), hk: b ? b.toUpperCase() : null }; });
+      if (/ISO\s*22081/i.test(s)) iso22081 = true;
+      return { items, general, iso22081 };
+    }
 
     // Allgemeintoleranz im Schriftfeld
-    take(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–]?\s*([fmcv])\s*([HKL])?(?![a-z])/gi, m => { general = { ml: m[1].toLowerCase(), hk: m[2] ? m[2].toUpperCase() : null }; return null; });
+    take(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:]?\s*([fmcv])\s*([HKL](?![a-z]))?/gi, m => { general = { ml: m[1].toLowerCase(), hk: m[2] ? m[2].toUpperCase() : null }; return null; });
     take(/ISO\s*22081/gi, () => { iso22081 = true; return null; });
     take(/\b(?:DIN\s*EN\s*ISO|DIN\s*ISO|DIN\s*EN|ISO|DIN|EN)\s*\d+(?:[-–]\d+)?/gi, () => null);
     take(/\d{1,2}\.\d{1,2}\.\d{2,4}/g, () => null);                   // Datum
@@ -686,7 +694,7 @@
     // Fase: 2x45°
     take(new RegExp(`(${DEV})\\s*[x×X]\\s*45\\s*°?`, 'g'), m => ({ kind: 'fase', N: num(m[1]), label: `${T.fmt(num(m[1]))} × 45°` }));
     // „4x 76,6“: nach einer Anzahl steht fast immer Ø, die Erkennung liest es oft als 7, 0 oder 9
-    take(new RegExp(`\\b\\d{1,2}\\s*[x×X]\\s*[709oO](${NUM})(?![\\d.,])(?!\\s*[A-Za-z]{1,2}\\d)`, 'g'), m => {
+    take(new RegExp(`(?:\\b\\d{1,2}\\s*[x×X]|^\\s*[x×X])\\s*[2709oO](${NUM})(?![\\d.,])(?!\\s*[A-Za-z]{1,2}\\d)`, 'g'), m => {
       const N = num(m[1]);
       if (!(N >= 0.5 && N <= 4000)) return false;
       return { kind: 'lin', N, dia: true, guess: 'Vor der Zahl stand vermutlich das Durchmesserzeichen Ø. Bitte mit der Zeichnung prüfen.', label: `Ø${T.fmt(N)}` };
@@ -749,28 +757,65 @@
       take(new RegExp(`(?<![\\d.,A-Za-z])(${NUM})(?![\\d.,A-Za-z])`, 'g'), m => {
         const N = num(m[1]);
         if (!(N >= 0.5 && N <= 4000)) return false;
-        if (m[1].length === 1 && conf < 80) return false;   // einzelne Ziffern sind oft Reste von Maßlinien
+        if (m[1].length === 1 && conf < 80) return false;
+        if (/^0\d/.test(m[1])) return false;               // Maße haben keine führende Null   // einzelne Ziffern sind oft Reste von Maßlinien
         return { kind: 'lin', N, label: T.fmt(N) };
       });
     }
     return { items, general, iso22081 };
   };
 
-  // Mehrere erkannte Zeilen zusammenführen, doppelte Maße nur einmal
+  // Mehrere erkannte Zeilen zusammenführen. Dasselbe Maß an derselben Stelle (aus mehreren Durchgängen) zählt einmal.
+  const near = (a, b) => {
+    if (!a || !b) return false;
+    const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    const tol = Math.max(a.h, b.h, a.w * 0.3, b.w * 0.3, 0.01);
+    return Math.abs(ax - bx) <= tol * 1.5 && Math.abs(ay - by) <= tol * 1.5;
+  };
   T.parseDrawing = function (lines) {
-    const out = [], seen = new Map();
+    let out = [];
     let general = null, iso22081 = false;
     lines.forEach(line => {
-      const r = T.parseDimText(line.text, line.conf == null ? 100 : line.conf, line.minPlainConf || 0);
+      const conf = line.conf == null ? 100 : line.conf;
+      const r = T.parseDimText(line.text, conf, line.minPlainConf || 0);
       if (r.general && (!general || (r.general.hk && !general.hk))) general = r.general;
       if (r.iso22081) iso22081 = true;
       r.items.forEach(it => {
-        const key = it.kind + '|' + it.label;
-        if (seen.has(key)) { seen.get(key).count++; return; }
-        const item = Object.assign({ count: 1, box: line.box || null }, it);
-        seen.set(key, item);
-        out.push(item);
+        const same = line.box && out.find(o => o.kind === it.kind && o.label === it.label && o.boxes.some(b => near(b, line.box)));
+        if (same) { same.hits++; same.conf = Math.max(same.conf, conf); return; }
+        out.push(Object.assign({ hits: 1, conf, box: line.box || null, boxes: line.box ? [line.box] : [] }, it));
       });
+    });
+    // Gleiches Maß an verschiedenen Stellen: einmal auflisten, Stellen zählen
+    const merged = [];
+    out.forEach(it => {
+      const m = merged.find(o => o.kind === it.kind && o.label === it.label);
+      if (m) { m.count += 1; m.hits += it.hits; m.conf = Math.max(m.conf, it.conf); m.boxes = m.boxes.concat(it.boxes); return; }
+      merged.push(Object.assign(it, { count: 1 }));
+    });
+    out = merged;
+    // Halb gelesene Doppelungen an derselben Stelle entfernen
+    const sameSpot = (a, b) => a.boxes.some(x => b.boxes.some(y => near(x, y)));
+    const lostDigit = (short, long) => short.length < long.length && long.endsWith(short);
+    const drop = new Set();
+    out.forEach(a => out.forEach(b => {
+      if (a === b || drop.has(b) || !sameSpot(a, b)) return;
+      if (a.kind === 'iso' && b.kind === 'iso' && a.letter === b.letter && a.grade === b.grade) {
+        const as = String(a.N), bs = String(b.N);
+        if ((as === bs && b.dia && !a.dia) || lostDigit(as, bs)) drop.add(a);
+      }
+      if (a.kind === 'iso' && b.kind === 'fit' && a.N === b.N && a.letter === b.hole.letter && a.grade === b.hole.grade) drop.add(a);
+      if (a.kind === 'ul' && b.kind === 'ul' && a.N === b.N && a.up === b.up && a.lo === 0 && b.lo !== 0) drop.add(a);
+      if (a.kind === 'lin' && ['fit', 'iso', 'pm', 'ul'].includes(b.kind) && a.N === b.N) drop.add(a);
+      if (a.kind === 'lin' && b.kind === 'lin' && a.dia === b.dia && lostDigit(String(a.N), String(b.N)) && a.hits <= b.hits) drop.add(a);
+      if (a.kind === 'lin' && b.kind === 'lin' && !a.dia && b.dia && a.N === b.N) drop.add(a);
+    }));
+    out = out.filter(it => !drop.has(it));
+    // Einmal und unsicher gelesen: Maße ohne Toleranz weglassen (meist Bruchstücke), andere zum Prüfen markieren
+    out = out.filter(it => !(it.kind === 'lin' && it.hits === 1 && it.conf < 60 && it.boxes.length));
+    out.forEach(it => {
+      if (it.boxes.length && it.hits === 1 && it.conf < 60 && !it.guess) it.guess = 'Diese Angabe war im Foto schlecht zu lesen. Bitte mit der Zeichnung prüfen.';
+      delete it.boxes;
     });
     const order = { fit: 0, iso: 1, pm: 2, ul: 3, lin: 4, rad: 5, fase: 6, ang: 7 };
     out.sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.N || a.deg || 0) - (b.N || b.deg || 0)));
