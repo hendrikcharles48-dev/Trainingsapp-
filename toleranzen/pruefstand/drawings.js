@@ -137,4 +137,7 @@ const iso22081 = () => svg(`<rect x="300" y="300" width="800" height="350" strok
   txt(1010, 968, '0,4', { size: 26 }) + txt(1110, 968, 'A', { size: 26 }) + txt(1172, 968, 'B', { size: 26 }) + txt(1238, 968, 'C', { size: 26 }));
 D.push({ id: 15, name: 'ISO 22081 statt ISO 2768', html: iso22081(), expect: ['50', '30', 'Ø12 H7'], general: null, iso22081: true });
 
+// 16, 17: Blatt schräg auf dunklem Tisch (Zuschneiden und Entzerren)
+D.push({ id: 16, name: 'Platte auf dem Tisch, schräg', html: plate(), fx: { table: { rx: 18, ry: -10, rz: -4 }, jpeg: 70 }, shotCrop: true, expect: D[0].expect, general: 'mK' });
+D.push({ id: 17, name: 'Passungen auf dem Tisch, gedreht', html: fits(), fx: { table: { rx: 8, ry: 12, rz: 7 }, blur: 0.4, jpeg: 70 }, expect: D[9].expect, general: 'cL' });
 module.exports = D;

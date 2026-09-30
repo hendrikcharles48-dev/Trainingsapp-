@@ -8,6 +8,11 @@ const only = process.argv[2] ? process.argv[2].split(',').map(Number) : null;
 
 function page(d) {
   const fx = d.fx || {};
+  if (fx.table) {
+    return `<html><body style="margin:0;width:2000px;height:1500px;overflow:hidden;background:radial-gradient(circle at 30% 30%,#6b5641,#3a2e22);position:relative">
+      <div style="position:absolute;left:200px;top:200px;width:1600px;height:1100px;background:#fff;box-shadow:0 20px 50px rgba(0,0,0,.6);transform:perspective(2200px) rotateX(${fx.table.rx}deg) rotateY(${fx.table.ry}deg) rotate(${fx.table.rz}deg);filter:blur(${fx.blur || 0}px)">${d.html}</div>
+    </body></html>`;
+  }
   const sc = fx.scale || 1;
   let html = d.html;
   if (fx.paper) html = html.replace('background:#fff', 'background:transparent');
@@ -42,14 +47,17 @@ function page(d) {
     if (only && !only.includes(d.id)) continue;
     const fx = d.fx || {};
     const sc = fx.scale || 1;
-    await render.setViewportSize({ width: Math.round(1600 * sc), height: Math.round(1100 * sc) });
+    await render.setViewportSize(fx.table ? { width: 2000, height: 1500 } : { width: Math.round(1600 * sc), height: Math.round(1100 * sc) });
     await render.setContent(page(d));
     await render.waitForTimeout(150);
     const file = `${OUT}/d${d.id}.${fx.jpeg ? 'jpg' : 'png'}`;
     await render.screenshot(fx.jpeg ? { path: file, type: 'jpeg', quality: fx.jpeg } : { path: file });
     const t0 = Date.now();
     await app.setInputFiles('#foto-lib', file);
-    await app.waitForTimeout(100);
+    await app.waitForSelector('[data-act="foto-go"]', { timeout: 20000 });
+    if (d.shotCrop) await (await app.$('#crop-wrap')).screenshot({ path: OUT + '/crop-d' + d.id + '.png' });
+    await app.click('[data-act="foto-go"]');
+    await app.waitForTimeout(150);
     await app.waitForFunction(() => !document.querySelector('.ocr-progress'), null, { timeout: 180000 });
     const sec = (Date.now() - t0) / 1000;
     const st = await app.evaluate(() => {

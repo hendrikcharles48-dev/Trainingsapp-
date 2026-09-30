@@ -337,6 +337,21 @@ svg.zone { display: block; width: 100%; max-width: 440px; height: auto; margin: 
 .textarea { width: 100%; border: 0; border-radius: var(--r-ctl); background: var(--fill); padding: 12px 14px; font-size: 16px; resize: vertical; outline: none; }
 .textarea:focus { box-shadow: 0 0 0 2px var(--tint); background: var(--card); }
 
+.crop-wrap { position: relative; margin: 14px auto 18px; border-radius: 14px; overflow: visible; background: var(--fill); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.crop-wrap img { display: block; width: 100%; height: 100%; border-radius: 14px; pointer-events: none; }
+.crop-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; border-radius: 14px; }
+.crop-shade { fill: rgba(0, 0, 0, .5); }
+.crop-poly { fill: none; stroke: var(--tint); stroke-width: .6; vector-effect: non-scaling-stroke; stroke-width: 2.5; }
+.crop-h { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; touch-action: none; cursor: grab; z-index: 2; display: grid; place-items: center; }
+.crop-h::after { content: ""; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--tint), 0 2px 8px rgba(0, 0, 0, .35); }
+.loupe { position: absolute; width: 96px; height: 96px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, .4); background-repeat: no-repeat; background-color: #fff; pointer-events: none; z-index: 3; }
+.loupe::after { content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--tint); }
+.foto-wrap img { -webkit-user-select: none; user-select: none; pointer-events: none; }
+.foto-wrap.selecting { touch-action: none; box-shadow: 0 0 0 3px var(--tint); cursor: crosshair; }
+.foto-wrap.selecting .foto-box { pointer-events: none; opacity: .45; }
+.sel-box { position: absolute; border: 2.5px solid var(--orange); background: rgba(255, 149, 0, .16); border-radius: 4px; pointer-events: none; }
+.btn[disabled] { opacity: .45; pointer-events: none; }
+
 /* Maßkette */
 .chain { display: flex; flex-direction: column; gap: 10px; }
 .chain-row { background: var(--card-2); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: inset 0 0 0 .5px var(--sep); }

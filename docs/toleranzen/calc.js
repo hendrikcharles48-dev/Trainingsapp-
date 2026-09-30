@@ -640,15 +640,25 @@
 
   T.normalizeOcr = s => String(s || '')
     .replace(/[“”„"'`´\[\]{}|]/g, '')
-    .replace(/\b[1lI|][S5][O0]\b/g, 'ISO')
-    .replace(/\bIS0\b/g, 'ISO')
-    .replace(/(^|\s)\[?[BPDQ@](?=\d)/g, '$1Ø')                 // Ø als B, P, D oder Q gelesen
-    .replace(/(\d\s*[A-HJ-NP-Za-hj-np-z]{1,2})[Yy](?![A-Za-z])/g, '$17')   // H7 als HY gelesen
     .replace(/[−–—‒]/g, '-')
+    .replace(/(^|\s)[-_~=]+(?=[A-Za-zØ])/g, '$1')                     // Reste der Maßlinie vor und hinter dem Text
+    .replace(/([A-Za-z0-9°])[-_~=]+(?=\s|$)/g, '$1')
+    // „1SO“ oder „IS0“ ist ISO; die Zahl 150 aber nur, wenn eine Normnummer folgt
+    .replace(/\b([1lI][S5][O0])\b/g, (m, a, off, str) => /^\d+$/.test(a) && !/^\s*\d{3,5}\b/.test(str.slice(off + 3)) ? a : 'ISO')
+    .replace(/(^|\s)\[?[BPDQ@](?=\d)/g, '$1Ø')                 // Ø als B, P, D oder Q gelesen
+    .replace(/Ø\s*[BPDQ@Ø](?=\d)/g, 'Ø')                           // Ø doppelt gelesen („ØD40“)
+    .replace(/(\d)-(?=(?:js|JS|[A-Za-z]{1,2})\d)/g, '$1 ')           // „32-H7“: Maßlinie zwischen Zahl und Klasse
+    .replace(/(^|\s)(\d{1,2})\s*%(?=\s*[\dØ])/g, '$1$2x')           // „2% Ø6“: das x als % gelesen
+    .replace(/£(?=\s*0[.,]\d)/g, '±')
+    .replace(/(\d\s*[A-HJ-NP-Za-hj-np-z]{1,2})[Yy](?![A-Za-z])/g, '$17')   // H7 als HY gelesen
+    .replace(/(^|\s)R(?=[\dSB])([\dSOB]{1,3})(?=[\s,]|$)/g, (m, a, b) => a + 'R' + b.replace(/S/g, '5').replace(/O/g, '0').replace(/B/g, '8'))   // R5 als RS gelesen
+    .replace(/(\d\s*)(js|JS|[a-hj-zA-HJ-Z])b(?![A-Za-z\d])/g, '$1$26')  // g6 als gb gelesen
+    .replace(/(^|\s)[0Oo](?=\d{1,3}(?:[.,]\d+)?\s*(?:js|JS|[A-Za-z])\d{1,2}(?![\d.,]))/g, '$1Ø')   // „020 g6“: die Null vorne war das Ø
     .replace(/[º˚]/g, '°')
     .replace(/\+\s*\/\s*-/g, '±')
     .replace(/\+\s*-(?=\s*\d)/g, '±')
     .replace(/(\d)\s*,\s*(\d)/g, '$1,$2')
+    .replace(/(^|\s)(\d{1,4})\s+1(0[.,]\d{1,3})(?=\s|$)/g, '$1$2 ±$3')   // „45 10,2“: das ± als 1 gelesen
     .replace(/([+±-]\s*)0(\d{1,3})(?![\d.,])/g, '$10,$2')
     .replace(/(\d)\s*\.\s*(\d)/g, '$1.$2')
     .replace(/\s+/g, ' ')
@@ -670,13 +680,13 @@
     };
     const dia = d => d ? 'Ø' : '';
     if (titleLine) {   // Schriftfeld: nur die Allgemeintoleranz, keine Maße
-      s.replace(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:]?\s*([fmcv])\s*([HKL](?![a-z]))?/i, (m0, a, b) => { general = { ml: a.toLowerCase(), hk: b ? b.toUpperCase() : null }; });
+      s.replace(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:.]?\s*([fmcv])\s*([HKL](?![a-z]))?/i, (m0, a, b) => { general = { ml: a.toLowerCase(), hk: b ? b.toUpperCase() : null }; });
       if (/ISO\s*22081/i.test(s)) iso22081 = true;
       return { items, general, iso22081 };
     }
 
     // Allgemeintoleranz im Schriftfeld
-    take(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:]?\s*([fmcv])\s*([HKL](?![a-z]))?/gi, m => { general = { ml: m[1].toLowerCase(), hk: m[2] ? m[2].toUpperCase() : null }; return null; });
+    take(/(?:DIN\s*)?(?:ISO\s*)?2768\s*[-–:.]?\s*([fmcv])\s*([HKL](?![a-z]))?/gi, m => { general = { ml: m[1].toLowerCase(), hk: m[2] ? m[2].toUpperCase() : null }; return null; });
     take(/ISO\s*22081/gi, () => { iso22081 = true; return null; });
     take(/\b(?:DIN\s*EN\s*ISO|DIN\s*ISO|DIN\s*EN|ISO|DIN|EN)\s*\d+(?:[-–]\d+)?/gi, () => null);
     take(/\d{1,2}\.\d{1,2}\.\d{2,4}/g, () => null);                   // Datum
@@ -694,8 +704,8 @@
     // Fase: 2x45°
     take(new RegExp(`(${DEV})\\s*[x×X]\\s*45\\s*°?`, 'g'), m => ({ kind: 'fase', N: num(m[1]), label: `${T.fmt(num(m[1]))} × 45°` }));
     // „4x 76,6“: nach einer Anzahl steht fast immer Ø, die Erkennung liest es oft als 7, 0 oder 9
-    take(new RegExp(`(?:\\b\\d{1,2}\\s*[x×X]|^\\s*[x×X])\\s*[2709oO](${NUM})(?![\\d.,])(?!\\s*[A-Za-z]{1,2}\\d)`, 'g'), m => {
-      const N = num(m[1]);
+    take(new RegExp(`(?:\\b\\d{1,2}\\s*[x×X]|^\\s*[x×X])\\s*(?:[2709oO](${NUM})|[3568](\\d{1,2}[.,]\\d{1,2}))(?![\\d.,])(?!\\s*[A-Za-z]{1,2}\\d)`, 'g'), m => {
+      const N = num(m[1] || m[2]);
       if (!(N >= 0.5 && N <= 4000)) return false;
       return { kind: 'lin', N, dia: true, guess: 'Vor der Zahl stand vermutlich das Durchmesserzeichen Ø. Bitte mit der Zeichnung prüfen.', label: `Ø${T.fmt(N)}` };
     });

@@ -710,7 +710,7 @@
   // Seitlich wischen wechselt den Rechner
   (function initSwipe() {
     let st = null;
-    const skip = el => el.closest('.sec-bar, .tbl-wrap, .zone-wrap, input, select, textarea, .sheet-wrap');
+    const skip = el => el.closest('.sec-bar, .tbl-wrap, .zone-wrap, input, select, textarea, .sheet-wrap, .crop-wrap, .foto-wrap.selecting');
     view.addEventListener('touchstart', e => {
       st = null;
       if (S.tab !== 'apply' || e.touches.length > 1 || skip(e.target)) return;
@@ -1091,8 +1091,9 @@
   function renderChainRows() { $('#chain-rows').innerHTML = A.chain.rows.map(chainRowHTML).join(''); }
 
   // f) Foto einer Zeichnung: Maße erkennen und Toleranzen zeigen
-  const FOTO = { url: null, busy: false, status: '', pct: 0, error: '', open: -1, log: null, editIdx: -1 };
+  const FOTO = { phase: 'empty', src: null, srcUrl: '', quad: null, work: null, url: null, busy: false, status: '', pct: 0, error: '', regionMsg: '', regionOk: true, regionAlts: [], regionSwap: '', open: -1, log: null, editIdx: -1, sel: null, selMode: false, drag: null, selDrag: null };
   if (/[?&]debug\b/.test(location.search)) window.__FOTO = FOTO; // nur für Tests
+  FOTO.regionSearch = () => regionSearch();
   let OCRW = null;
   const KIND_NAME = { iso: 'ISO-Toleranz', fit: 'Passung', pm: 'Eigene Toleranz ±', ul: 'Eigene Abmaße', lin: 'Ohne Toleranz', rad: 'Radius ohne Toleranz', fase: 'Fase ohne Toleranz', ang: 'Winkel ohne Toleranz' };
 
@@ -1154,18 +1155,117 @@
     return { err: 'Unbekannte Art.' };
   }
 
+  const pct = v => (v * 100).toFixed(3) + '%';
   function renderFotoStage() {
     const el = $('#foto-stage');
     if (!el) return;
     let html = '';
-    if (FOTO.url) {
-      const boxes = A.foto.items.map((it, i) => it.box ? `<button type="button" class="foto-box${FOTO.open === i ? ' on' : ''}" data-act="foto-open" data-i="${i}" aria-label="${esc(it.label)}" style="left:${(it.box.x * 100).toFixed(2)}%;top:${(it.box.y * 100).toFixed(2)}%;width:${(it.box.w * 100).toFixed(2)}%;height:${(it.box.h * 100).toFixed(2)}%"></button>` : '').join('');
-      html += `<div class="foto-wrap"><img src="${FOTO.url}" alt="Foto der Zeichnung"><div class="foto-boxes">${boxes}</div></div>`;
+    if (FOTO.phase === 'crop' && FOTO.src) {
+      const W = FOTO.src.width, H = FOTO.src.height;
+      html += `<p class="small muted">Zieh die vier Ecken an den Rand der Zeichnung. Die App schneidet den Hintergrund weg und richtet die Zeichnung gerade aus.</p>
+        <div class="crop-wrap" id="crop-wrap" style="aspect-ratio:${W} / ${H};width:min(calc(100% - 28px), calc(68vh * ${(W / H).toFixed(4)}))">
+          <img src="${FOTO.srcUrl}" alt="Foto zum Zuschneiden" draggable="false">
+          <svg class="crop-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path id="crop-shade" class="crop-shade" fill-rule="evenodd" d=""/><polygon id="crop-poly" class="crop-poly" points=""/></svg>
+          ${[0, 1, 2, 3].map(i => `<div class="crop-h" data-c="${i}" aria-label="Ecke ${['oben links', 'oben rechts', 'unten rechts', 'unten links'][i]} verschieben"></div>`).join('')}
+          <div class="loupe" id="loupe" hidden></div>
+        </div>
+        <div class="btn-row"><button type="button" class="btn plain" data-act="foto-rot">Drehen</button><button type="button" class="btn plain" data-act="foto-full">Ganzes Bild</button></div>
+        <button type="button" class="btn primary" data-act="foto-go">Zuschneiden und Maße suchen</button>`;
+    } else if (FOTO.url) {
+      const boxes = A.foto.items.map((it, i) => it.box ? `<button type="button" class="foto-box${FOTO.open === i ? ' on' : ''}" data-act="foto-open" data-i="${i}" aria-label="${esc(it.label)}" style="left:${pct(it.box.x)};top:${pct(it.box.y)};width:${pct(it.box.w)};height:${pct(it.box.h)}"></button>` : '').join('');
+      const sel = FOTO.sel ? `<div class="sel-box" id="sel-box" style="left:${pct(FOTO.sel.x)};top:${pct(FOTO.sel.y)};width:${pct(FOTO.sel.w)};height:${pct(FOTO.sel.h)}"></div>` : '';
+      html += `<div class="foto-wrap${FOTO.selMode ? ' selecting' : ''}" id="foto-wrap"><img src="${FOTO.url}" alt="Foto der Zeichnung" draggable="false"><div class="foto-boxes">${boxes}</div>${sel}</div>`;
+      if (!FOTO.busy) {
+        if (FOTO.selMode) {
+          html += `<p class="small muted">${FOTO.sel ? 'Passt der Rahmen? Du kannst ihn neu ziehen. Dann tippe auf „Hier genauer suchen“.' : 'Tippe im Bild auf die Stelle mit dem Maß oder zieh mit dem Finger einen Rahmen darum.'}</p>
+            <div class="btn-row"><button type="button" class="btn primary" data-act="foto-sel-go"${FOTO.sel ? '' : ' disabled'}>Hier genauer suchen</button><button type="button" class="btn plain" data-act="foto-sel-cancel">Fertig</button></div>`;
+        } else {
+          html += `<div class="btn-row"><button type="button" class="btn soft" data-act="foto-sel">Stelle genauer ansehen</button><button type="button" class="btn plain" data-act="foto-recrop">Neu zuschneiden</button></div>`;
+        }
+      }
     }
     if (FOTO.busy) html += `<div class="ocr-progress"><div class="bar"><i style="width:${Math.round(FOTO.pct * 100)}%"></i></div><span>${esc(FOTO.status)}</span></div>`;
+    if (FOTO.regionMsg) html += msgHTML(FOTO.regionMsg, FOTO.regionOk ? 'info' : 'warn');
+    if (!FOTO.busy && FOTO.regionAlts && FOTO.regionAlts.length) html += `<p class="small muted alt-lbl">${FOTO.regionSwap ? 'Falsch gelesen? Stattdessen:' : 'Vielleicht steht hier:'}</p><div class="chips alt-chips">${FOTO.regionAlts.map((it, i) => `<button type="button" class="chip" data-act="foto-alt" data-i="${i}">${esc(it.label)}</button>`).join('')}</div>`;
     if (FOTO.error) html += msgHTML(esc(FOTO.error), 'warn');
     el.innerHTML = html;
+    if (FOTO.phase === 'crop') updateCrop();
   }
+  function updateCrop() {
+    const W = FOTO.src.width, H = FOTO.src.height, q = FOTO.quad;
+    const P = q.map(p => [p[0] / W * 100, p[1] / H * 100]);
+    const poly = $('#crop-poly'), shade = $('#crop-shade');
+    if (!poly) return;
+    poly.setAttribute('points', P.map(p => p.join(',')).join(' '));
+    shade.setAttribute('d', `M0 0H100V100H0Z M${P.map(p => p.join(' ')).join(' L')} Z`);
+    $$('#crop-wrap .crop-h').forEach(h => { const p = P[+h.dataset.c]; h.style.left = p[0] + '%'; h.style.top = p[1] + '%'; });
+  }
+  // Ecken ziehen (Zuschneiden) und Rahmen ziehen (Stelle genauer ansehen)
+  function moveCorner(e) {
+    const wrap = $('#crop-wrap');
+    if (!wrap) return;
+    const r = wrap.getBoundingClientRect();
+    const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    FOTO.quad[FOTO.drag.c] = [nx * FOTO.src.width, ny * FOTO.src.height];
+    updateCrop();
+    const lp = $('#loupe');
+    if (lp) {
+      const z = 2.6, size = 96;
+      lp.hidden = false;
+      lp.style.left = (nx * r.width - size / 2) + 'px';
+      lp.style.top = (ny * r.height < 140 ? ny * r.height + 40 : ny * r.height - size - 40) + 'px';
+      lp.style.backgroundImage = `url(${FOTO.srcUrl})`;
+      lp.style.backgroundSize = `${r.width * z}px ${r.height * z}px`;
+      lp.style.backgroundPosition = `${-(nx * r.width * z - size / 2)}px ${-(ny * r.height * z - size / 2)}px`;
+    }
+  }
+  function selFromDrag(e) {
+    const wrap = $('#foto-wrap'), r = wrap.getBoundingClientRect();
+    const x1 = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y1 = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const d = FOTO.selDrag;
+    return { x: Math.min(d.x0, x1), y: Math.min(d.y0, y1), w: Math.abs(x1 - d.x0), h: Math.abs(y1 - d.y0), tapX: x1, tapY: y1 };
+  }
+  document.addEventListener('pointerdown', e => {
+    const h = e.target.closest && e.target.closest('.crop-h');
+    if (h && FOTO.phase === 'crop') {
+      e.preventDefault();
+      FOTO.drag = { c: +h.dataset.c };
+      try { h.setPointerCapture(e.pointerId); } catch (x) { /* ohne Capture */ }
+      moveCorner(e);
+      return;
+    }
+    const wrap = e.target.closest && e.target.closest('#foto-wrap.selecting');
+    if (wrap) {
+      e.preventDefault();
+      const r = wrap.getBoundingClientRect();
+      FOTO.selDrag = { x0: (e.clientX - r.left) / r.width, y0: (e.clientY - r.top) / r.height };
+      try { wrap.setPointerCapture(e.pointerId); } catch (x) { /* ohne Capture */ }
+    }
+  });
+  document.addEventListener('pointermove', e => {
+    if (FOTO.drag) { e.preventDefault(); moveCorner(e); return; }
+    if (FOTO.selDrag) {
+      const b = selFromDrag(e);
+      let box = $('#sel-box');
+      if (!box) { box = document.createElement('div'); box.className = 'sel-box'; box.id = 'sel-box'; $('#foto-wrap').appendChild(box); }
+      Object.assign(box.style, { left: pct(b.x), top: pct(b.y), width: pct(b.w), height: pct(b.h) });
+    }
+  });
+  const endDrag = e => {
+    if (FOTO.drag) { FOTO.drag = null; const lp = $('#loupe'); if (lp) lp.hidden = true; return; }
+    if (FOTO.selDrag) {
+      let b = selFromDrag(e);
+      if (b.w < 0.03 && b.h < 0.03) {   // nur getippt: Rahmen um die Stelle legen
+        const w = 0.3, h = 0.12;
+        b = { x: Math.min(1 - w, Math.max(0, b.tapX - w / 2)), y: Math.min(1 - h, Math.max(0, b.tapY - h / 2)), w, h };
+      }
+      FOTO.sel = { x: b.x, y: b.y, w: b.w, h: b.h };
+      FOTO.selDrag = null;
+      renderFotoStage();
+    }
+  };
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
 
   function renderFotoList() {
     const el = $('#foto-list');
@@ -1221,15 +1321,109 @@
   function loadImage(file) {
     return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => rej(new Error('bild')); img.src = URL.createObjectURL(file); });
   }
+  function setSource(c) { FOTO.src = c; FOTO.srcUrl = c.toDataURL('image/jpeg', 0.85); }
+  const fullQuad = c => [[0, 0], [c.width, 0], [c.width, c.height], [0, c.height]];
+  // Helles Blatt auf dunklerem Untergrund finden: größte helle Fläche, ihre vier äußersten Ecken
+  function detectPaper(src) {
+    const s = 320 / Math.max(src.width, src.height), w = Math.max(8, Math.round(src.width * s)), h = Math.max(8, Math.round(src.height * s));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(src, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data, g = new Uint8Array(w * h), hist = new Float64Array(256);
+    for (let k = 0; k < w * h; k++) { g[k] = (px[k * 4] * 299 + px[k * 4 + 1] * 587 + px[k * 4 + 2] * 114) / 1000; hist[g[k]]++; }
+    let sum = 0, sumB = 0, wB = 0, best = 0, t = 128;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    for (let i = 0; i < 256; i++) {
+      wB += hist[i]; if (!wB) continue;
+      const wF = w * h - wB; if (!wF) break;
+      sumB += i * hist[i];
+      const mB = sumB / wB, mF = (sum - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; t = i; }
+    }
+    const lab = new Int32Array(w * h), stack = [];
+    let top = null;
+    for (let k = 0; k < w * h; k++) {
+      if (lab[k] || g[k] <= t) continue;
+      const comp = { area: 0, edge: 0, tl: [0, 0, Infinity], tr: [0, 0, -Infinity], br: [0, 0, -Infinity], bl: [0, 0, Infinity] };
+      lab[k] = 1; stack.push(k);
+      while (stack.length) {
+        const q = stack.pop(), x = q % w, y = (q - x) / w;
+        comp.area++;
+        if (!x || !y || x === w - 1 || y === h - 1) comp.edge++;
+        if (x + y < comp.tl[2]) comp.tl = [x, y, x + y];
+        if (x + y > comp.br[2]) comp.br = [x, y, x + y];
+        if (x - y > comp.tr[2]) comp.tr = [x, y, x - y];
+        if (x - y < comp.bl[2]) comp.bl = [x, y, x - y];
+        const nb = [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, y > 0 ? q - w : -1, y < h - 1 ? q + w : -1];
+        for (const n of nb) if (n >= 0 && !lab[n] && g[n] > t) { lab[n] = 1; stack.push(n); }
+      }
+      if (!top || comp.area > top.area) top = comp;
+    }
+    // Das Blatt muss sich vom Untergrund abheben: läuft die Fläche lange am Bildrand entlang, ist es kein Blatt auf dem Tisch
+    if (!top || top.area < 0.2 * w * h || top.area > 0.96 * w * h || top.edge > 0.25 * (2 * (w + h) - 4)) return fullQuad(src);
+    const q = [top.tl, top.tr, top.br, top.bl].map(p => [(p[0] + 0.5) / s, (p[1] + 0.5) / s]), full = fullQuad(src), tol = 0.03 * Math.max(src.width, src.height);
+    // Liegt der Vorschlag fast auf den Bildecken, nicht entzerren (das würde nur unscharf machen)
+    if (q.every((p, i) => Math.hypot(p[0] - full[i][0], p[1] - full[i][1]) < tol)) return full;
+    return q;
+  }
+  // Viereck auf ein gerades Rechteck ziehen (Perspektive entzerren)
+  function warp(src, q) {
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    let Wd = Math.max(d(q[0], q[1]), d(q[3], q[2])), Hd = Math.max(d(q[0], q[3]), d(q[1], q[2]));
+    const sc = Math.min(1, 2600 / Math.max(Wd, Hd));
+    Wd = Math.max(16, Math.round(Wd * sc)); Hd = Math.max(16, Math.round(Hd * sc));
+    const out = document.createElement('canvas');
+    out.width = Wd; out.height = Hd;
+    const full = fullQuad(src);
+    if (q.every((p, i) => Math.abs(p[0] - full[i][0]) < 1 && Math.abs(p[1] - full[i][1]) < 1)) {
+      out.getContext('2d').drawImage(src, 0, 0, Wd, Hd);
+      return out;
+    }
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    const den = dx1 * dy2 - dx2 * dy1;
+    const G = Math.abs(den) < 1e-9 ? 0 : (dx3 * dy2 - dx2 * dy3) / den, Hh = Math.abs(den) < 1e-9 ? 0 : (dx1 * dy3 - dx3 * dy1) / den;
+    const a = x1 - x0 + G * x1, b = x3 - x0 + Hh * x3, c = x0, dd = y1 - y0 + G * y1, e = y3 - y0 + Hh * y3, f = y0;
+    const sw = src.width, sh = src.height;
+    const sp = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
+    const octx = out.getContext('2d'), od = octx.createImageData(Wd, Hd), op = od.data;
+    for (let j = 0; j < Hd; j++) {
+      const v = (j + 0.5) / Hd;
+      for (let i = 0; i < Wd; i++) {
+        const u = (i + 0.5) / Wd, z = G * u + Hh * v + 1;
+        let x = (a * u + b * v + c) / z - 0.5, y = (dd * u + e * v + f) / z - 0.5;
+        x = Math.min(sw - 1.001, Math.max(0, x)); y = Math.min(sh - 1.001, Math.max(0, y));
+        const xi = x | 0, yi = y | 0, fx = x - xi, fy = y - yi, k = (yi * sw + xi) * 4, o = (j * Wd + i) * 4;
+        for (let ch = 0; ch < 3; ch++) {
+          const p00 = sp[k + ch], p10 = sp[k + 4 + ch], p01 = sp[k + sw * 4 + ch], p11 = sp[k + sw * 4 + 4 + ch];
+          op[o + ch] = (p00 * (1 - fx) + p10 * fx) * (1 - fy) + (p01 * (1 - fx) + p11 * fx) * fy;
+        }
+        op[o + 3] = 255;
+      }
+    }
+    octx.putImageData(od, 0, 0);
+    return out;
+  }
+  function rotateSource() {
+    const s0 = FOTO.src, c = document.createElement('canvas');
+    c.width = s0.height; c.height = s0.width;
+    const ctx = c.getContext('2d');
+    ctx.translate(s0.height, 0); ctx.rotate(Math.PI / 2); ctx.drawImage(s0, 0, 0);
+    const H0 = s0.height, q = FOTO.quad.map(p => [H0 - p[1], p[0]]);
+    FOTO.quad = [q[3], q[0], q[1], q[2]];
+    setSource(c);
+  }
   // Graustufen und örtliche Schwelle (gegen Schatten und graues Papier), bei rot gedreht um 90° im Uhrzeigersinn
-  function prepCanvas(img, rot) {
-    const w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
-    const sc = long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
+  function prepCanvas(img, rot, fixed) {
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, long = Math.max(w, h);
+    const sc = fixed ? 1 : long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
     const W = Math.round(w * sc), H = Math.round(h * sc);
     const c = document.createElement('canvas');
     c.width = rot ? H : W; c.height = rot ? W : H;
     const ctx = c.getContext('2d', { willReadFrequently: true });
-    if (rot) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
+    if (rot === 90) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
+    if (rot === 270) { ctx.translate(0, W); ctx.rotate(-Math.PI / 2); }
     ctx.drawImage(img, 0, 0, W, H);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const cw = c.width, ch = c.height;
@@ -1315,7 +1509,7 @@
     return t;
   }
   // Zeilen aus der Erkennung holen; kleine hochgestellte Abmaße rechts neben einem Maß werden angehängt
-  function linesFrom(data, rot, W, H) {
+  function linesFrom(data, rot, W, H, fixedBox, plainConf) {
     const raw = [];
     (data.blocks || []).forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => {
       const text = (l.words && l.words.length) ? l.words.map(fixWord).join(' ') : l.text;
@@ -1338,20 +1532,52 @@
     });
     return raw.filter(r => !r.used).map(r => {
       const bb = r.bb;
-      const x0 = rot ? bb.y0 : bb.x0, x1 = rot ? bb.y1 : bb.x1, y0 = rot ? H - bb.x1 : bb.y0, y1 = rot ? H - bb.x0 : bb.y1;
+      if (fixedBox) return { text: r.text, conf: r.conf, minPlainConf: plainConf || 40, box: fixedBox };
+      const q = rot === 90;
+      const x0 = q ? bb.y0 : bb.x0, x1 = q ? bb.y1 : bb.x1, y0 = q ? H - bb.x1 : bb.y0, y1 = q ? H - bb.x0 : bb.y1;
       return { text: r.text, conf: r.conf, minPlainConf: rot ? 70 : 50, box: { x: x0 / W, y: y0 / H, w: (x1 - x0) / W, h: (y1 - y0) / H } };
     });
   }
+  // Foto gewählt: auf höchstens 3000 Pixel verkleinern, Blatt suchen, Zuschneiden anbieten
   async function handleFoto(file) {
     if (FOTO.busy) return;
-    FOTO.busy = true; FOTO.error = ''; FOTO.pct = 0; FOTO.open = -1;
-    FOTO.status = 'Foto wird vorbereitet …';
-    if (FOTO.url) URL.revokeObjectURL(FOTO.url);
-    A.foto.items = []; A.foto.detected = null; saveA();
-    computeFoto();
+    FOTO.error = ''; FOTO.regionMsg = ''; FOTO.regionAlts = []; FOTO.open = -1; FOTO.sel = null; FOTO.selMode = false;
     try {
       const img = await loadImage(file);
-      FOTO.url = img.src;
+      const w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 3000 / Math.max(w, h));
+      const c = document.createElement('canvas');
+      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      setSource(c);
+      FOTO.quad = detectPaper(c);
+      FOTO.phase = 'crop';
+    } catch (e) {
+      FOTO.error = 'Das Foto konnte ich nicht öffnen. Versuch es bitte noch einmal.';
+    }
+    computeFoto();
+    const cw = $('#crop-wrap');
+    if (cw) cw.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  function ocrFailText() {
+    return window.top !== window ? 'Im Vorschau-Link funktioniert die Texterkennung nicht. Nutze die App vom Home-Bildschirm oder die Adresse auf github.io. Maße kannst du hier trotzdem von Hand eintragen.' : 'Die Texterkennung hat nicht geklappt. Beim ersten Mal braucht die App Internet, um sie zu laden (etwa 7 MB). Versuch es noch einmal oder füge die Maße unten von Hand ein.';
+  }
+  function refreshFotoMl() {
+    const seg = $('#card-foto [data-k="foto.ml"]');
+    if (seg) $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === A.foto.ml)));
+  }
+  // Zugeschnittenes Bild durchsuchen: sechs Durchgänge
+  async function runMain() {
+    if (FOTO.busy || !FOTO.src) return;
+    FOTO.busy = true; FOTO.error = ''; FOTO.regionMsg = ''; FOTO.regionAlts = []; FOTO.pct = 0; FOTO.open = -1; FOTO.sel = null; FOTO.selMode = false;
+    FOTO.status = 'Zeichnung wird zugeschnitten …';
+    A.foto.items = []; A.foto.detected = null; saveA();
+    FOTO.phase = 'done'; FOTO.url = FOTO.srcUrl;
+    computeFoto();
+    await new Promise(r => setTimeout(r, 30));
+    try {
+      const work = warp(FOTO.src, FOTO.quad);
+      FOTO.work = work; FOTO.url = work.toDataURL('image/jpeg', 0.88);
       computeFoto();
       let pass = 1;
       const PASSES = 6;
@@ -1362,8 +1588,8 @@
       };
       const worker = await getOcr();
       // Sechs Durchgänge: waagrecht und senkrecht, jeweils als Graubild, als Schwarzweißbild und ohne lange Linien
-      const a = prepCanvas(img, false), b = prepCanvas(img, true);
-      const runs = [[a.canvas, false], [b.canvas, true], [a.bin, false], [b.bin, true], [a.clean, false], [b.clean, true]];
+      const a = prepCanvas(work, 0), b = prepCanvas(work, 90);
+      const runs = [[a.canvas, 0], [b.canvas, 90], [a.bin, 0], [b.bin, 90], [a.clean, 0], [b.clean, 90]];
       const datas = [];
       let lines = [];
       for (const [cv, rot] of runs) {
@@ -1372,24 +1598,173 @@
         lines = lines.concat(linesFrom(r.data, rot, a.W, a.H));
         pass++;
       }
-      const r0 = { data: datas[0] }, r1 = { data: datas[1] };
       FOTO.lines = lines;
-      if (window.__FOTO) { FOTO.raw = [r0.data, r1.data]; FOTO.canvas = a.canvas.toDataURL('image/png'); }
+      if (window.__FOTO) { FOTO.raw = [datas[0], datas[1]]; FOTO.canvas = a.canvas.toDataURL('image/png'); }
       const parsed = T.parseDrawing(lines);
       A.foto.items = parsed.items;
       if (parsed.general) { A.foto.detected = parsed.general; A.foto.ml = parsed.general.ml; if (parsed.general.hk) A.foto.hk = parsed.general.hk; }
       saveA();
-      if (!parsed.items.length) FOTO.error = 'Im Foto habe ich keine Maße gefunden. Fotografiere möglichst gerade von oben, mit gutem Licht und so nah, dass die Zahlen gut lesbar sind. Oder füge die Maße unten von Hand ein.';
+      if (!parsed.items.length) FOTO.error = 'Im Foto habe ich keine Maße gefunden. Fotografiere möglichst gerade von oben, mit gutem Licht und so nah, dass die Zahlen gut lesbar sind. Mit „Stelle genauer ansehen“ kannst du einzelne Stellen noch einmal lesen lassen.';
       if (parsed.iso22081) FOTO.error = (FOTO.error ? FOTO.error + ' ' : '') + 'Auf der Zeichnung steht ISO 22081. Die Maße ohne Toleranz werden dort über die Profiltoleranz geregelt, nicht über ISO 2768. Nutze dafür den Rechner „Allgemeintoleranz“, Neue Tabelle.';
     } catch (e) {
-      FOTO.error = window.top !== window ? 'Im Vorschau-Link funktioniert die Texterkennung nicht. Nutze die App vom Home-Bildschirm oder die Adresse auf github.io. Maße kannst du hier trotzdem von Hand eintragen.' : 'Die Texterkennung hat nicht geklappt. Beim ersten Mal braucht die App Internet, um sie zu laden (etwa 7 MB). Versuch es noch einmal oder füge die Maße unten von Hand ein.';
+      FOTO.error = ocrFailText();
     }
     FOTO.busy = false; FOTO.log = null;
-    if (S.tab === 'apply' && A.sec === 'foto') {
-      const seg = $('#card-foto [data-k="foto.ml"]');
-      if (seg) $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === A.foto.ml)));
-      computeFoto();
+    if (S.tab === 'apply' && A.sec === 'foto') { refreshFotoMl(); computeFoto(); }
+  }
+  // Eine markierte Stelle vergrößert und auf mehrere Arten lesen
+  // Ausschnitt für die Nachsuche: so vergrößert, dass der Rahmen quer zur Schrift etwa th Pixel hoch ist, mit weißem Rand
+  function regionCanvas(r, th, rot, stretch) {
+    const vert = rot === 90 || rot === 270, across = vert ? r.w : r.h;
+    const sc = Math.min(6, 2400 / Math.max(r.w, r.h), Math.max(0.5, th / across));
+    const cw = Math.max(8, Math.round(r.w * sc)), ch = Math.max(8, Math.round(r.h * sc)), pad = Math.round(0.1 * across * sc);
+    const c = document.createElement('canvas');
+    c.width = (vert ? ch : cw) + 2 * pad; c.height = (vert ? cw : ch) + 2 * pad;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.imageSmoothingQuality = 'high';
+    g.translate(c.width / 2, c.height / 2); g.rotate(rot * Math.PI / 180);
+    g.drawImage(FOTO.work, r.x, r.y, r.w, r.h, -cw / 2, -ch / 2, cw, ch);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data, n = c.width * c.height, gr = new Uint8ClampedArray(n);
+    for (let i = 0; i < n; i++) gr[i] = (p[i * 4] * 299 + p[i * 4 + 1] * 587 + p[i * 4 + 2] * 114) / 1000;
+    let lo = 0, hi = 255;
+    if (stretch) {   // Kontrast strecken: dunkelste Schrift wird schwarz, Papier weiß (hilft bei grauem Papier und Schatten)
+      const h = new Uint32Array(256);
+      let m = 0;
+      for (let y = pad; y < c.height - pad; y++) for (let x = pad; x < c.width - pad; x++) { h[gr[y * c.width + x]]++; m++; }
+      let acc = 0; lo = -1;
+      for (let v = 0; v < 256; v++) { acc += h[v]; if (lo < 0 && acc >= m * 0.02) lo = v; if (acc >= m * 0.9) { hi = v; break; } }
+      if (hi - lo < 20) { lo = 0; hi = 255; }
     }
+    for (let i = 0; i < n; i++) { const v = (gr[i] - lo) / (hi - lo) * 255; p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v; }
+    g.putImageData(d, 0, 0);
+    return c;
+  }
+  // Nachsuche in einem Rahmen: viele Lesarten, die häufigste gewinnt, die anderen werden zur Auswahl angeboten
+  async function regionSearch() {
+    if (FOTO.busy || !FOTO.work || !FOTO.sel) return;
+    const sel = FOTO.sel, W = FOTO.work.width, H = FOTO.work.height;
+    let x = sel.x * W, y = sel.y * H, w = sel.w * W, h = sel.h * H;
+    x = Math.max(0, x - w * 0.04); y = Math.max(0, y - h * 0.08);
+    w = Math.min(W - x, w * 1.08); h = Math.min(H - y, h * 1.16);
+    const r = { x, y, w, h }, box = { x: x / W, y: y / H, w: w / W, h: h / H };
+    FOTO.busy = true; FOTO.regionMsg = ''; FOTO.regionAlts = []; FOTO.error = ''; FOTO.pct = 0;
+    FOTO.status = 'Die Stelle wird genauer gelesen …';
+    renderFotoStage();
+    // [Drehung, Rahmenhöhe in Pixel, Aufbereitung (0 grau, 1 Kontrast gestreckt, 2 lange Linien entfernt), Seitenaufteilung]
+    const flat = [[0, 90, 0, '6'], [0, 90, 0, '7'], [0, 60, 0, '6'], [0, 130, 0, '7'], [0, 90, 1, '6'], [0, 90, 0, '11'], [0, 90, 2, '6']];
+    const tall = [[90, 90, 0, '6'], [270, 90, 0, '6'], [90, 90, 0, '7'], [270, 90, 0, '7'], [90, 60, 1, '6'], [270, 60, 1, '6'], [90, 130, 0, '7'], [270, 130, 0, '7']];
+    const ratio = h / w;
+    const runs = ratio > 1.3 ? tall : ratio < 0.77 ? flat : flat.slice(0, 5).concat(tall.slice(0, 4));
+    const votes = new Map();
+    let lines = [], general = null;
+    try {
+      const worker = await getOcr();
+      let n = 0;
+      FOTO.log = m => { if (m.status === 'recognizing text') { FOTO.pct = (n + (m.progress || 0)) / runs.length; renderFotoStage(); } };
+      for (const [rot, th, mode, psm] of runs) {
+        let cv = regionCanvas(r, th, rot, mode === 1);
+        if (mode === 2) cv = prepCanvas(cv, 0, true).clean;
+        await worker.setParameters({ tessedit_pageseg_mode: psm });
+        const res = await worker.recognize(cv, {}, { blocks: true, text: true });
+        const ls = linesFrom(res.data, 0, 1, 1, box, 30).map(l => Object.assign(l, { run: n }));
+        lines = lines.concat(ls);
+        const p = T.parseDrawing(ls.map(l => ({ text: l.text, conf: l.conf, minPlainConf: l.minPlainConf })));   // ohne Ort: jede Lesart zählt für sich
+        if (p.general && !general) general = p.general;
+        new Set(p.items.map(it => it.label)).forEach(lab => {
+          const it = p.items.find(q => q.label === lab), v = votes.get(lab) || { it, n: 0, conf: 0 };
+          v.n++; v.conf = Math.max(v.conf, it.conf || 0);
+          votes.set(lab, v);
+        });
+        n++;
+      }
+      await worker.setParameters({ tessedit_pageseg_mode: '11' });
+      FOTO.rlines = lines;
+      if (general && !A.foto.detected) { A.foto.detected = general; A.foto.ml = general.ml; refreshFotoMl(); }
+      const core = l => l.replace(/[Ø\s]/g, '');
+      // Bruchstücke (z. B. „45“ neben „45 ±0,2“) zählen für die vollständigere Lesart mit
+      // Ein Ø wird oft als 2, 0, 7 oder 9 gelesen: „210 H7“ kann auch „Ø10 H7“ sein, das kommt als Vorschlag dazu
+      [...votes.values()].forEach(v => {
+        const m = /^[2079](\d.*)$/.exec(v.it.label);
+        if (!m || v.it.dia || v.it.pre) return;
+        const q = T.parseDrawing([{ text: 'Ø' + m[1] }]).items[0];
+        if (!q) return;
+        if (!votes.has(q.label)) votes.set(q.label, { it: q, n: 0, conf: 0, extra: v });
+        else votes.get(q.label).from = v;
+      });
+      const cand = [...votes.values()];
+      // Vollständige Angaben (Toleranzklasse, Abmaße, Winkel, Radius) sind wahrscheinlicher als eine einzelne Ziffer aus Linienresten
+      const plain = it => it.kind === 'lin' && !it.dia;
+      cand.forEach(a => { a.score = a.n + a.conf / 1000 + (plain(a.it) ? (a.it.N < 10 && !/[,.]/.test(a.it.label) ? -0.5 : 0) : a.it.kind === 'lin' ? 0.2 : 0.6); });
+      // a ist ein Bruchstück von b: gleich ohne Ø, oder b hat hinten noch Toleranz oder Passung („45“ → „45 ±0,2“)
+      const noD = l => l.replace(/Ø/g, '');
+      const isFrag = (a, b) => noD(a) === noD(b) ? b.length >= a.length : noD(b).startsWith(noD(a)) && /^[\s/]/.test(noD(b).slice(noD(a).length));
+      cand.forEach(a => cand.forEach(b => { if (a !== b && noD(a.it.label) !== noD(b.it.label) && isFrag(a.it.label, b.it.label)) b.score += a.n * 0.9; }));
+      const inBox = b => b && b.x + b.w / 2 >= box.x && b.x + b.w / 2 <= box.x + box.w && b.y + b.h / 2 >= box.y && b.y + b.h / 2 <= box.y + box.h;
+      const here = A.foto.items.filter(it => inBox(it.box));
+      cand.forEach(a => {
+        const src = a.extra || a.from;
+        if (!src) return;
+        // „210 H7“ gelesen und „10 H7“ steht auch da: dann war die 2 das Ø
+        const rest = core(a.it.label), twin = cand.find(c => c !== a && !c.extra && core(c.it.label) === rest) || here.find(it => core(it.label) === rest);
+        if (twin) { a.score = Math.max(a.score, src.score + (twin.n || 1)); a.extra = null; } else if (a.extra) a.score = src.score - 0.01;   // sonst Vorschlag direkt hinter seiner Lesart
+      });
+      cand.sort((a, b) => b.score - a.score);
+      const best = [];
+      // Zwei Lesarten derselben Stelle („156“ und „3156“, „10 H7“ und „210 H7“): nur die bessere nehmen
+      const clash = (a, b) => core(a).includes(core(b)) || core(b).includes(core(a));
+      cand.forEach(c => { if (c.extra) return; if (!best.length || (c.n >= 2 && c.score >= 0.6 * best[0].score)) { if (!best.some(b => clash(c.it.label, b.it.label))) best.push(c); } });
+      // Unsicher (nur einmal gelesen ohne Toleranz, oder eine einzelne Ziffer): nicht selbst eintragen, nur vorschlagen
+      if (best.length === 1 && plain(best[0].it) && ((best[0].n < 2 && best[0].conf < 60) || (best[0].it.N < 10 && best[0].n < 3))) best.length = 0;
+      const known = new Set(A.foto.items.map(it => it.label));
+      const alts = cand.filter(c => !best.includes(c) && !known.has(c.it.label) && !best.some(b => isFrag(c.it.label, b.it.label) || isFrag(b.it.label, c.it.label) && c.n < 2)).slice(0, 4).map(c => c.it);
+      const fresh = best.map(c => c.it).filter(it => !known.has(it.label) && !A.foto.items.some(old => inBox(old.box) && isFrag(it.label, old.label)));
+      fresh.forEach(it => { it.box = box; it.count = 1; delete it.guess; });
+      // Unvollständige Treffer an dieser Stelle durch das vollständige Maß ersetzen
+      A.foto.items = A.foto.items.filter(old => !(inBox(old.box) && fresh.some(it => isFrag(old.label, it.label))));
+      A.foto.items = A.foto.items.concat(fresh);
+      saveA();
+      FOTO.regionAlts = alts.map(it => Object.assign(it, { box, count: 1 }));
+      FOTO.regionSwap = fresh.length === 1 ? fresh[0].label : '';
+      if (fresh.length) {
+        FOTO.regionOk = true;
+        FOTO.regionMsg = `${fresh.length === 1 ? 'Neu erkannt' : fresh.length + ' Maße neu erkannt'}: <b>${fresh.map(it => esc(it.label)).join(', ')}</b>. Prüfe ${fresh.length === 1 ? 'es' : 'sie'} unten in der Liste.`;
+        FOTO.open = A.foto.items.indexOf(fresh[0]);
+        FOTO.sel = null;
+      } else if (best.length) {
+        FOTO.regionOk = true;
+        FOTO.regionMsg = `Hier steht ${best.length === 1 ? 'ein Maß, das' : 'nur, was'} schon in der Liste ${best.length === 1 ? 'ist' : 'steht'}: <b>${best.map(c => esc(c.it.label)).join(', ')}</b>.`;
+      } else {
+        const seen = lines.map(l => T.normalizeOcr(l.text)).filter(t => /\d/.test(t)).sort((p, q) => q.length - p.length)[0] || '';
+        FOTO.regionOk = false;
+        FOTO.regionMsg = seen
+          ? `Hier habe ich kein vollständiges Maß erkannt. Gelesen habe ich „${esc(seen)}“. Ich habe es unten ins Feld geschrieben: Korrigiere es und tippe auf „Dazu“.`
+          : 'Hier habe ich nichts lesen können. Zieh den Rahmen etwas größer um das Maß oder trag es unten von Hand ein.';
+        const inp = $('#foto-add');
+        if (inp && seen) inp.value = seen;
+      }
+    } catch (e) {
+      FOTO.error = ocrFailText();
+    }
+    FOTO.busy = false; FOTO.log = null;
+    if (S.tab === 'apply' && A.sec === 'foto') computeFoto();
+  }
+  // Andere Lesart aus der Nachsuche übernehmen: ersetzt das eben erkannte Maß
+  function takeRegionAlt(i) {
+    const alt = FOTO.regionAlts[i];
+    if (!alt) return;
+    const at = FOTO.regionSwap ? A.foto.items.findIndex(it => it.label === FOTO.regionSwap) : -1;
+    if (A.foto.items.some(it => it.label === alt.label)) { FOTO.open = A.foto.items.findIndex(it => it.label === alt.label); }
+    else if (at >= 0) {
+      FOTO.regionAlts.splice(i, 1, A.foto.items[at]);
+      A.foto.items.splice(at, 1, alt);
+      FOTO.open = at;
+    } else { A.foto.items.push(alt); FOTO.open = A.foto.items.length - 1; FOTO.regionAlts.splice(i, 1); }
+    FOTO.regionSwap = alt.label;
+    FOTO.regionOk = true;
+    FOTO.regionMsg = `Übernommen: <b>${esc(alt.label)}</b>. Prüfe es unten in der Liste.`;
+    saveA(); computeFoto();
   }
   function fotoAddFromInput() {
     const inp = $('#foto-add'), msg = $('#foto-add-msg');
@@ -1478,6 +1853,14 @@
       inp.focus();
     },
     'foto-add': () => fotoAddFromInput(),
+    'foto-go': () => runMain(),
+    'foto-rot': () => { rotateSource(); renderFotoStage(); },
+    'foto-full': () => { FOTO.quad = fullQuad(FOTO.src); updateCrop(); },
+    'foto-recrop': () => { FOTO.phase = 'crop'; FOTO.selMode = false; FOTO.sel = null; FOTO.regionMsg = ''; FOTO.regionAlts = []; renderFotoStage(); const cw = $('#crop-wrap'); if (cw) cw.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
+    'foto-sel': () => { FOTO.selMode = true; FOTO.sel = null; FOTO.regionMsg = ''; FOTO.regionAlts = []; renderFotoStage(); const fw = $('#foto-wrap'); if (fw) fw.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
+    'foto-sel-go': () => regionSearch(),
+    'foto-alt': t => takeRegionAlt(+t.dataset.i),
+    'foto-sel-cancel': () => { FOTO.selMode = false; FOTO.sel = null; renderFotoStage(); },
     'foto-text': () => {
       const ta = $('#foto-text');
       const r = T.parseDrawing(ta.value.split(/\n/).map(t => ({ text: t })));

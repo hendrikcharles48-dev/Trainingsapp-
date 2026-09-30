@@ -121,6 +121,19 @@ eq('Foto: X 26,6 als Ø6,6', T.parseDrawing([{ text: 'X 26,6' }]).items.map(i =>
 eq('Foto: -03 als -0,3', T.parseDrawing([{ text: '60 -0,1 -03' }]).items.map(i => i.label), ['60 −0,1/−0,3']);
 eq('Foto: Schriftfeld 2768-mi', T.parseDrawing([{ text: 'Allgemeintoleranzen ISO 2768-mi' }]).general, { ml: 'm', hk: null });
 eq('Foto: 4x 76,6 als Ø6,6', T.parseDrawing([{ text: '4x 76,6' }]).items.map(i => i.label + ':' + !!i.guess), ['Ø6,6:true']);
+const fl = t => T.parseDrawing([{ text: t, conf: 90 }]).items.map(i => i.label);
+eq('Foto: 150 bleibt ein Maß', fl('150'), ['150']);
+eq('Foto: 150 2768 ist ISO 2768', T.parseDrawing([{ text: 'Allgemeintoleranzen 150 2768-m' }]).general, { ml: 'm', hk: null });
+eq('Foto: 2768.mK mit Punkt', T.parseDrawing([{ text: 'Allgemeintoleranzen 1SO 2768.mk' }]).general, { ml: 'm', hk: 'K' });
+eq('Foto: Maßlinie am Text', fl('—R8-'), ['R8']);
+eq('Foto: Maßlinie zwischen Zahl und Klasse', fl('—B32-H7—'), ['Ø32 H7']);
+eq('Foto: RS als R5', fl('RS'), ['R5']);
+eq('Foto: gb als g6, 020 als Ø20', fl('020 gb'), ['Ø20 g6']);
+eq('Foto: Ø doppelt gelesen', fl('ØD40 H8/f7'), ['Ø40 H8/f7']);
+eq('Foto: x als % gelesen', fl('2% D6,6'), ['Ø6,6']);
+eq('Foto: 2x 36,6 als Ø6,6', fl('2X 36,6'), ['Ø6,6']);
+eq('Foto: ± als 1 gelesen', fl('45 10,2'), ['45 ±0,2']);
+eq('Foto: Abmaße mit Minus bleiben', fl('60 -0,1 -0,3'), ['60 −0,1/−0,3']);
 eq('Foto: + als ± vermutet', pd2.items.map(i => i.kind + ':' + i.label + ':' + !!i.guess), ['pm:60 ±0,1:true']);
 
 if (typeof require !== 'undefined') {
