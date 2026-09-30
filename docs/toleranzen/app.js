@@ -567,10 +567,12 @@
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] }
   };
   const A = (() => {
+    const sec = (store.get('apply', {}) || {}).sec;
     const saved = store.get('apply', {}) || {};
     const out = {};
     Object.keys(A_DEF).forEach(k => { out[k] = Object.assign({}, A_DEF[k], saved[k] && typeof saved[k] === 'object' ? saved[k] : {}); });
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
+    out.sec = typeof sec === 'string' ? sec : 'gen';
     return out;
   })();
   const saveA = () => store.set('apply', A);
@@ -583,32 +585,48 @@
   const CLS_ML = [['f', 'f', 'fein'], ['m', 'm', 'mittel'], ['c', 'c', 'grob'], ['v', 'v', 'sehr grob']];
   const CLS_HKL = [['H', 'H', 'fein'], ['K', 'K', 'mittel'], ['L', 'L', 'grob']];
 
+  // Reihenfolge nach Wichtigkeit: oberster Eintrag steht in der Auswahl vorne
+  const SECTIONS = [
+    { id: 'gen', label: 'Allgemeintoleranz', title: 'Allgemeintoleranzen', card: () => cardGen() },
+    { id: 'ang', label: 'Winkel', title: 'Winkeltoleranz', tag: 'ISO 2768-1', card: () => cardAngle() },
+    { id: 'geo', label: 'Form und Lage', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo() },
+    { id: 'iso', label: 'ISO-Toleranz', title: 'Einzeltoleranz', tag: 'ISO 286', card: () => cardIso() },
+    { id: 'fit', label: 'Passung', title: 'Passung', card: () => cardFit() },
+    { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain() }
+  ];
+  const curSection = () => SECTIONS.find(x => x.id === A.sec) || SECTIONS[0];
+
+  function sectionHTML() {
+    const sec = curSection();
+    return `<h2 class="section-h">${sec.title}${sec.tag ? ` <span class="tag">${sec.tag}</span>` : ''}</h2>${sec.card()}`;
+  }
   function viewApply() {
-    const secs = [['sec-wfl', 'Winkel, Form, Lage'], ['sec-iso', 'ISO-Toleranz'], ['sec-fit', 'Passung'], ['sec-gen', 'Allgemeintoleranz'], ['sec-chain', 'Maßkette']];
+    const sec = curSection();
     return `${navbar({ title: 'Anwenden' })}<div class="page">
       <h1 class="large-title">Anwenden</h1>
-      <p class="lead">Werte eingeben, Ergebnis sofort ablesen. Unter jedem Ergebnis steht der Rechenweg zum Aufklappen.</p>
-      <nav class="jump" aria-label="Abschnitte">${secs.map(([id, l]) => `<a href="#${id}" data-jump="${id}">${l}</a>`).join('')}</nav>
-
-      <h2 class="section-h" id="sec-wfl">Winkel, Form und Lage</h2>
-      ${cardAngle()}
-      ${cardGeo()}
-      <h2 class="section-h" id="sec-iso">Einzeltoleranz <span class="tag">ISO 286</span></h2>
-      ${cardIso()}
-      <h2 class="section-h" id="sec-fit">Passung</h2>
-      ${cardFit()}
-      <h2 class="section-h" id="sec-gen">Allgemeintoleranzen</h2>
-      ${cardGen()}
-      <h2 class="section-h" id="sec-chain">Maßkette <span class="tag">arithmetisch, Worst Case</span></h2>
-      ${cardChain()}
+      <nav class="sec-bar" id="sec-bar" aria-label="Rechner auswählen">${SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-pressed="${x.id === sec.id}">${x.label}</button>`).join('')}</nav>
+      <div id="sec-body" class="page">${sectionHTML()}</div>
     </div>`;
+  }
+  function showSection(id) {
+    A.sec = id; saveA();
+    $$('#sec-bar button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sec === id)));
+    const body = $('#sec-body');
+    body.innerHTML = sectionHTML();
+    body.classList.remove('enter-fade'); void body.offsetWidth; body.classList.add('enter-fade');
+    computeAll();
+    const bar = $('#sec-bar'), nav = $('#nav');
+    const barTop = bar.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight : 0);
+    if (window.scrollY > barTop) window.scrollTo(0, barTop);
+    const act = $(`#sec-bar [data-sec="${id}"]`);
+    if (act) act.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   }
   const cardHead = (title, tables) => `<div class="iso-head"><h3 class="card-title">${title}</h3>${tables ? tblBtn(tables) : ''}</div>`;
 
   // a) Winkel
   function cardAngle() {
     return `<section class="card" id="card-ang">
-      ${cardHead('Winkeltoleranz', '2768-1')}
+      ${cardHead('Winkel ohne eigene Toleranz', '2768-1')}
       <div class="fields">
         <div class="field"><label for="a-L">Kürzerer Schenkel</label>${bindNum('a-L', 'ang.L', 'mm', 'z. B. 40')}</div>
         <div class="field"><label for="a-nom">Nennwinkel, freiwillig</label>${bindNum('a-nom', 'ang.nom', '°', 'z. B. 90')}</div>
@@ -634,7 +652,7 @@
   function cardGeo() {
     const btn = p => `<button type="button" class="geo-btn" data-geo="${p}" aria-pressed="${A.geo.prop === p}">${SYM[p]}<span>${GEO_SHORT[p]}</span></button>`;
     return `<section class="card" id="card-geo">
-      ${cardHead('Form- und Lagetoleranz', '2768-2,2768-1')}
+      ${cardHead('Allgemeintoleranz für Form und Lage', '2768-2,2768-1')}
       <div class="field"><span class="lbl">Allgemeintoleranz im Schriftfeld: <span class="tb-line">ISO 2768-<b id="geo-code">${A.geo.ml}${A.geo.hk}</b></span></span>
         <div class="fields">
           <div class="field">${segHTML('geo.ml', A.geo.ml, CLS_ML.map(o => [o[0], o[1]]))}<span class="hint-line">Maße, ISO 2768-1</span></div>
@@ -683,13 +701,11 @@
   }
 
   // b) ISO-Toleranz
-  const ISO_EX = ['10H8', '30k5', '25g6', '40JS7', '60P7', '8H7', '120f7', '50s6', '300M6', '20N9'];
   function cardIso() {
     return `<section class="card" id="card-iso">
       ${cardHead('ISO-Toleranz berechnen', 'it,grund')}
       <div class="field"><label for="i-q">Angabe</label><div class="inp big"><input id="i-q" data-k="iso.q" value="${esc(A.iso.q)}" placeholder="z. B. 10H8" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div>
         <span class="hint-line">Nennmaß 1 bis 500 mm. Großbuchstabe heißt Bohrung, Kleinbuchstabe heißt Welle.</span></div>
-      <div class="chips">${ISO_EX.map(c => `<button type="button" class="chip" data-chip="iso.q" data-v="${c}">${c}</button>`).join('')}</div>
       <div class="result" id="res-iso" aria-live="polite"></div>
     </section>`;
   }
@@ -717,19 +733,12 @@
   }
 
   // c) Passung
-  const FIT_EX = { EB: ['H7/g6', 'H7/h6', 'H7/k6', 'H7/n6', 'H7/p6', 'H7/s6', 'H8/f7', 'H11/d9'], EW: ['G7/h6', 'F8/h7', 'JS7/h6', 'K7/h6', 'N7/h6', 'P7/h6', 'S7/h6', 'D10/h9'] };
-  function fitChips() {
-    const m = /\d+(?:[.,]\d+)?/.exec(A.fit.q || '');
-    const N = m ? m[0] : '30';
-    return FIT_EX[A.fit.sys].map(c => `<button type="button" class="chip" data-chip="fit.q" data-v="${N}${c}">${c}</button>`).join('');
-  }
   function cardFit() {
     return `<section class="card" id="card-fit">
       ${cardHead('Passung berechnen', 'it,grund')}
       ${segHTML('fit.sys', A.fit.sys, [['EB', 'Einheitsbohrung'], ['EW', 'Einheitswelle']], 'big')}
       <div class="field"><label for="p-q">Passung</label><div class="inp big"><input id="p-q" data-k="fit.q" value="${esc(A.fit.q)}" placeholder="z. B. 30H7/g6" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div>
         <span class="hint-line">Nennmaß, Bohrung und Welle, zum Beispiel 30H7/g6.</span></div>
-      <div class="chips" id="fit-chips">${fitChips()}</div>
       <div class="result" id="res-fit" aria-live="polite"></div>
     </section>`;
   }
@@ -929,7 +938,6 @@
   function onApplyChange(k) {
     const sec = k.split('.')[0];
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (k === 'fit.sys' || k === 'fit.q') { const c = $('#fit-chips'); if (c) c.innerHTML = fitChips(); }
     if (k === 'gen.tab' || k === 'gen.mode') $('#gen-body').innerHTML = genBody();
     ({ ang: computeAng, geo: computeGeo, iso: computeIso, fit: computeFit, gen: computeGen })[sec]();
   }
@@ -963,14 +971,7 @@
       window.scrollTo(0, 0);
     },
     'fit-equiv': t => { setK('fit.q', t.dataset.v); $('#p-q').value = t.dataset.v; onApplyChange('fit.q'); },
-    'iso-from': t => {
-      setK('iso.q', t.dataset.v);
-      $('#i-q').value = t.dataset.v;
-      computeIso();
-      const c = $('#card-iso');
-      c.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
-    },
+    'iso-from': t => { setK('iso.q', t.dataset.v); showSection('iso'); },
     'chain-add': () => {
       A.chain.rows.push({ op: 1, N: '', mode: 'pm', pm: '', up: '', lo: '', iso: '' });
       saveA(); renderChainRows(); computeChain();
@@ -986,17 +987,12 @@
   };
 
   document.addEventListener('click', e => {
-    const t = e.target.closest('button, a[data-jump]');
+    const t = e.target.closest('button');
     if (!t) return;
+    if (t.dataset.sec) return showSection(t.dataset.sec);
     if (t.dataset.tab) return goTab(t.dataset.tab);
     if (t.dataset.topic) return push({ v: 'topic', id: t.dataset.topic, seg: 'erkl' });
     if (t.dataset.task) return push({ v: 'task', id: t.dataset.task });
-    if (t.dataset.jump) {
-      e.preventDefault();
-      const el = $('#' + t.dataset.jump);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
     if (t.classList.contains('sign')) {
       t.textContent = t.textContent === '−' ? '+' : '−';
       t.setAttribute('aria-label', `Vorzeichen: ${t.textContent === '−' ? 'minus' : 'plus'}. Tippen zum Wechseln`);
