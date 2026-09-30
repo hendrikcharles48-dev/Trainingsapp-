@@ -562,7 +562,7 @@
     ang: { L: '40', nom: '90', cls: 'm' },
     geo: { prop: 'ebenheit', ml: 'm', hk: 'K', len: '120', dia: '30', dist: '20', own: '', x: '45', y: '25' },
     iso: { q: '10H8' },
-    fit: { q: '30H7/g6', sys: 'EB' },
+    fit: { hole: '30H7', shaft: 'g6', sys: 'EB' },
     gen: { tab: 'alt', N: '120', kind: 'len', cls: 'm', hk: 'K', mode: 'profil', pN: '50', t: '0,4', rel: 'bezug', sN: '20', sdev: '0,1' },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] }
   };
@@ -866,14 +866,17 @@
     return `<section class="card" id="card-fit">
       ${cardHead('Passung berechnen', 'it,grund')}
       ${segHTML('fit.sys', A.fit.sys, [['EB', 'Einheitsbohrung'], ['EW', 'Einheitswelle']], 'big')}
-      <div class="field"><label for="p-q">Passung</label><div class="inp big"><input id="p-q" data-k="fit.q" value="${esc(A.fit.q)}" placeholder="z. B. 30H7/g6" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div>
-        <span class="hint-line">Nennmaß, Bohrung und Welle, zum Beispiel 30H7/g6.</span></div>
+      <div class="fields fit-fields">
+        <div class="field"><label for="p-h">Bohrung</label><div class="inp big"><input id="p-h" data-k="fit.hole" value="${esc(A.fit.hole)}" placeholder="30H7" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="next"></div></div>
+        <div class="field"><label for="p-s">Welle</label><div class="inp big"><input id="p-s" data-k="fit.shaft" value="${esc(A.fit.shaft)}" placeholder="g6" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div></div>
+      </div>
+      <span class="hint-line">Das Nennmaß reicht in einem der beiden Felder, zum Beispiel 30H7 und g6.</span>
       <div class="result" id="res-fit" aria-live="polite"></div>
     </section>`;
   }
   function computeFit() {
-    if (!A.fit.q.trim()) return out('res-fit', msgHTML('Gib eine Passung ein, zum Beispiel 30H7/g6.'));
-    const r = T.fitFromString(A.fit.q);
+    if (!String(A.fit.hole).trim() && !String(A.fit.shaft).trim()) return out('res-fit', msgHTML('Trag Bohrung und Welle ein, zum Beispiel 30H7 und g6.'));
+    const r = T.fitFromParts(A.fit.hole, A.fit.shaft);
     if (!r.ok) return out('res-fit', msgHTML(esc(r.error), 'warn'));
     const { H, S, N } = r;
     const name = { spiel: 'Spielpassung', uebergang: 'Übergangspassung', press: 'Presspassung' }[r.type];
@@ -884,9 +887,10 @@
     }[r.type];
     const sysName = { EB: 'Einheitsbohrung', EW: 'Einheitswelle', beide: 'beide Systeme (H und h)', keins: 'keins von beiden' }[r.system];
     let sysMsg = '';
-    const eq = r.equiv ? `${f(N)}${r.equiv.hole.letter}${r.equiv.hole.grade}/${r.equiv.shaft.letter}${r.equiv.shaft.grade}` : '';
-    if (A.fit.sys === 'EB' && r.system === 'EW') sysMsg = msgHTML(`Diese Passung gehört zum System Einheitswelle, denn die Welle hat h. Gleichwertig im System Einheitsbohrung ist <b>${esc(eq)}</b>.<button class="btn soft" data-act="fit-equiv" data-v="${esc(eq)}">${esc(eq)} übernehmen</button>`, 'warn');
-    else if (A.fit.sys === 'EW' && r.system === 'EB') sysMsg = msgHTML(`Diese Passung gehört zum System Einheitsbohrung, denn die Bohrung hat H. Gleichwertig im System Einheitswelle ist <b>${esc(eq)}</b>.<button class="btn soft" data-act="fit-equiv" data-v="${esc(eq)}">${esc(eq)} übernehmen</button>`, 'warn');
+    const eqH = r.equiv ? `${f(N)}${r.equiv.hole.letter}${r.equiv.hole.grade}` : '', eqS = r.equiv ? `${r.equiv.shaft.letter}${r.equiv.shaft.grade}` : '';
+    const eq = r.equiv ? `${eqH}/${eqS}` : '';
+    if (A.fit.sys === 'EB' && r.system === 'EW') sysMsg = msgHTML(`Diese Passung gehört zum System Einheitswelle, denn die Welle hat h. Gleichwertig im System Einheitsbohrung ist <b>${esc(eq)}</b>.<button class="btn soft" data-act="fit-equiv" data-h="${esc(eqH)}" data-s="${esc(eqS)}">${esc(eq)} übernehmen</button>`, 'warn');
+    else if (A.fit.sys === 'EW' && r.system === 'EB') sysMsg = msgHTML(`Diese Passung gehört zum System Einheitsbohrung, denn die Bohrung hat H. Gleichwertig im System Einheitswelle ist <b>${esc(eq)}</b>.<button class="btn soft" data-act="fit-equiv" data-h="${esc(eqH)}" data-s="${esc(eqS)}">${esc(eq)} übernehmen</button>`, 'warn');
     else if (r.system === 'keins') sysMsg = msgHTML('Weder hat die Bohrung H noch die Welle h. Die Passung gehört zu keinem der beiden Systeme und ist unüblich.', 'warn');
     out('res-fit', `<div class="fit-hero ${r.type}"><div class="fit-type"><span class="fit-dot"></span>${name}</div>
         <div class="fit-vals"><div><span>${r.la}</span><b>${T.mm(r.a)} <small>mm</small></b></div><div><span>${r.lb}</span><b>${T.mm(r.b)} <small>mm</small></b></div></div>
@@ -1117,7 +1121,7 @@
       render('fade');
       window.scrollTo(0, 0);
     },
-    'fit-equiv': t => { setK('fit.q', t.dataset.v); $('#p-q').value = t.dataset.v; onApplyChange('fit.q'); },
+    'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },
     'iso-from': t => { setK('iso.q', t.dataset.v); showSection('iso'); },
     'chain-add': () => {
       A.chain.rows.push({ op: 1, N: '', mode: 'pm', pm: '', up: '', lo: '', iso: '' });

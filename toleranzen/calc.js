@@ -307,6 +307,37 @@
     return { ok: true, N, H, S, maxC, minC, type, system, equiv, la, a, lb, b, steps, passTol: pt };
   };
 
+  // Zwei getrennte Felder: Bohrung und Welle. Das Nennmaß reicht in einem Feld.
+  T.parseFitParts = function (holeStr, shaftStr) {
+    const one = (str, isHole) => {
+      const s = cleanInput(str);
+      if (!s) return { empty: true };
+      const m = /^(\d+(?:\.\d+)?)?([a-z]{1,2})(\d{1,2})$/i.exec(s);
+      if (!m) return { error: isHole ? 'Die Bohrung verstehe ich nicht. Schreib zum Beispiel 30H7 oder H7.' : 'Die Welle verstehe ich nicht. Schreib zum Beispiel 30g6 oder g6.' };
+      const typed = m[2];
+      const L = isHole ? typed.toUpperCase() : typed.toLowerCase();
+      const c = T.parseClassToken(L + m[3]);
+      if (c.error) return c;
+      const note = typed !== L ? `Im Feld ${isHole ? 'Bohrung' : 'Welle'} habe ich ${typed}${m[3]} als ${L}${c.grade} gelesen, weil ${isHole ? 'Bohrungen Großbuchstaben' : 'Wellen Kleinbuchstaben'} haben.` : '';
+      return Object.assign({ N: m[1] ? parseFloat(m[1]) : null, note }, c);
+    };
+    const h = one(holeStr, true), w = one(shaftStr, false);
+    if (h.empty) return { error: 'Trag die Bohrung ein, zum Beispiel 30H7.' };
+    if (w.empty) return { error: 'Trag die Welle ein, zum Beispiel g6.' };
+    if (h.error) return h;
+    if (w.error) return w;
+    if (h.N == null && w.N == null) return { error: 'Es fehlt das Nennmaß. Schreib es in eines der beiden Felder, zum Beispiel 30H7.' };
+    if (h.N != null && w.N != null && h.N !== w.N) return { error: `Bohrung und Welle haben verschiedene Nennmaße (${T.fmt(h.N)} mm und ${T.fmt(w.N)} mm). Bei einer Passung ist das Nennmaß gleich.` };
+    return { N: h.N != null ? h.N : w.N, hole: { letter: h.letter, grade: h.grade }, shaft: { letter: w.letter, grade: w.grade }, note: [h.note, w.note].filter(Boolean).join(' ') };
+  };
+  T.fitFromParts = function (holeStr, shaftStr) {
+    const p = T.parseFitParts(holeStr, shaftStr);
+    if (p.error) return { ok: false, error: p.error };
+    const r = T.fitCalc(p.N, p.hole, p.shaft);
+    if (r.ok) r.note = p.note;
+    return r;
+  };
+
   T.fitFromString = function (str) {
     const p = T.parseFit(str);
     if (p.error) return { ok: false, error: p.error };

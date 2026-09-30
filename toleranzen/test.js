@@ -53,6 +53,12 @@ eq('25H7/k6', fit('25H7/k6'), ['uebergang', 19, -15]);
 eq('25K7/h6', fit('25K7/h6'), ['uebergang', 19, -15]);
 eq('25H7/s6', fit('25H7/s6'), ['press', -14, -48]);
 eq('25H7/h6', fit('25H7/h6'), ['spiel', 34, 0]);
+const fp = (h, w) => { const r = T.fitFromParts(h, w); return r.ok ? [r.type, r.maxC, r.minC] : 'Fehler'; };
+eq('Felder 30H7 + g6', fp('30H7', 'g6'), ['spiel', 41, 7]);
+eq('Felder H7 + 30g6', fp('H7', '30g6'), ['spiel', 41, 7]);
+eq('Felder 30h7 + 30G6 (Schreibweise)', fp('30h7', '30G6'), ['spiel', 41, 7]);
+eq('Felder ohne Nennmaß', fp('H7', 'g6'), 'Fehler');
+eq('Felder verschiedene Nennmaße', fp('30H7', '32g6'), 'Fehler');
 eq('System EB', T.fitFromString('30H7/g6').system, 'EB');
 eq('Gegenstück', T.fitFromString('30H7/g6').equiv, { hole: { letter: 'G', grade: '7' }, shaft: { letter: 'h', grade: '6' } });
 
