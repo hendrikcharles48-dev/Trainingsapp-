@@ -262,7 +262,7 @@ Die App zeigt zusätzlich die seitliche Abweichung am Schenkelende = Schenkellä
 | 25D10 | über 18 bis 30 mm | 84 | +149 | +65 | 25,149 | 25,065 |
 | 40JS7 | über 30 bis 50 mm | 25 | +12 | −12 | 40,012 | 39,988 |
 | 500h6 | über 400 bis 500 mm | 40 | 0 | −40 | 500,000 | 499,960 |
-| 1h18 | bis 3 mm | 1400 | 0 | −1400 | 1,000 | −0,400 |
+| 2h18 | bis 3 mm | 1400 | 0 | −1400 | 2,000 | 0,600 |
 | 30h01 | über 18 bis 30 mm | 0,6 | 0 | −0,6 | 30,000 | 29,9994 |
 
 ### Passungen
@@ -411,6 +411,6 @@ Die App zeigt zusätzlich die seitliche Abweichung am Schenkelende = Schenkellä
 ### ISO 22081, Profiltoleranz 0,4 mm, Maß 50 mm vom Bezug
 1. Angabe lesen: Die Zeichnung verlangt eine allgemeine Profiltoleranz von 0,4 mm. Das ist die Breite der Zone, in der jede Fläche ohne eigene Angabe liegen muss.
 2. Zone halbieren: Die Zone liegt mittig um die Sollfläche aus Zeichnung oder CAD-Modell: 0,4 mm geteilt durch 2 = 0,2 mm nach jeder Seite.
-3. Maß vom Bezug aus: Das Maß geht von einem Bezug aus. Der Bezug liegt fest, nur die tolerierte Fläche darf wandern: ±0,2 mm.
+3. Abstand vom Bezug: Jeder Punkt der Fläche muss in dieser Zone liegen. Gemessen vom Bezug aus darf also jeder Punkt höchstens ±0,2 mm von seiner Sollposition abweichen. Das gilt nur für den Abstand zu einem Bezug der Angabe, nicht für beliebige Maße auf der Zeichnung.
 4. Grenzmaße ausrechnen: Höchstmaß: 50,0 mm + 0,2 mm = 50,2 mm
    Mindestmaß: 50,0 mm − 0,2 mm = 49,8 mm

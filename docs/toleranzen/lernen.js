@@ -182,7 +182,7 @@
           'H, K, L: H wie hochgenau, K wie klassisch (der Normalfall), L wie locker.',
           'Der Längere ist der Chef: Bei Rechtwinkligkeit und Parallelität ist ohne andere Angabe immer das längere Element der Bezug.',
           'Einzelangabe schlägt Allgemeintoleranz: Steht eine Toleranz am Maß, gilt nur diese.',
-          'ISO 22081: Profilwert halbieren, dann hast du dein Plus und Minus.'
+          'ISO 22081: Profilwert halbieren, dann weißt du, wie weit jeder Punkt der Fläche von seiner Sollposition abweichen darf.'
         ]
       },
       {
@@ -438,7 +438,7 @@
           { t: 'Welche Norm?', h: 'ISO 2768-2 hat keine Tabelle für die Position. Es gelten die Freimaßtoleranzen der beiden Abstandsmaße nach ISO 2768-1, also der <b>Kleinbuchstabe</b>.' },
           { t: 'Abstand links', h: `${f(x)} mm liegt im Bereich ${rx.rangeText}, Klasse ${ml}: <b>±${f(rx.dev)} mm</b>.` },
           { t: 'Abstand unten', h: `${f(y)} mm liegt im Bereich ${ry.rangeText}, Klasse ${ml}: <b>±${f(ry.dev)} mm</b>.` },
-          { t: 'Form der Zone', h: `Die Bohrungsmitte darf in einem Rechteck von <b>${f3(2 * rx.dev)} mm</b> mal <b>${f3(2 * ry.dev)} mm</b> liegen. Mit einer echten Positionstoleranz wäre die Zone ein Kreis.` }
+          { t: 'Form der Zone', h: `Die Bohrungsmitte darf in einem Rechteck von <b>${f3(2 * rx.dev)} mm</b> mal <b>${f3(2 * ry.dev)} mm</b> liegen. Das ist keine echte Positionstoleranz, sondern nur die Folge der beiden Freimaße. Mit einer Positionstoleranz auf der Zeichnung wäre die Zone ein Kreis um die genaue Sollposition.` }
         ]
       };
     }

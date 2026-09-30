@@ -818,7 +818,7 @@
     const frame = p === 'position'
       ? `<span class="fcf"><span>${SYM.position}</span></span>`
       : fcf([SYM[p], f(r.value, 0, 3), ...(lage ? ['A'] : [])]);
-    const sub = p === 'position' ? `je Abstandsmaß nach ISO 2768-1 · Klasse ${A.geo.ml}` : `${info.name} · ${info.art} · Klasse ${A.geo.hk}`;
+    const sub = p === 'position' ? `keine Positionstoleranz, nur die Freimaßtoleranz der Abstandsmaße (ISO 2768-1, Klasse ${A.geo.ml})` : `${info.name} · ${info.art} · Klasse ${A.geo.hk}`;
     out('res-geo', `<div class="res-hero"><div class="geo-res">${frame}<div><div class="res-big">${r.valueText}</div><div class="res-sub">${sub}</div></div></div></div>
       ${p === 'position' ? '' : `<p class="foot">So sähe der Wert als eigene Angabe im Toleranzrahmen auf der Zeichnung aus${lage ? ', mit A als Bezug' : ''}.</p>`}
       <div class="info-list">
@@ -983,7 +983,8 @@
       const r = T.profile22081(numOf(A.gen.pN), t, A.gen.rel);
       if (!r.ok) return out('res-gen', msgHTML(esc(r.error), 'warn'));
       const F = x => f(x, r.dec, 4);
-      return out('res-gen', `<div class="res-hero"><div class="res-big">±${f(r.dev)} mm</div><div class="res-sub">${A.gen.rel === 'bezug' ? 'Abweichung des Maßes vom Bezug aus' : 'Abweichung des Maßes zwischen zwei Flächen'}</div></div>
+      return out('res-gen', `<div class="res-hero"><div class="res-big">±${f(r.dev)} mm</div><div class="res-sub">${A.gen.rel === 'bezug' ? 'je Flächenpunkt, gemessen vom Bezug' : 'Abstand zweier Flächen, ungünstigster Fall'}</div></div>
+        ${msgHTML('Das ist keine Maßtoleranz im klassischen Sinn. Die Profiltoleranz legt fest, wo jeder Punkt einer Fläche liegen darf, bezogen auf die Bezüge. Die Plus-Minus-Werte gelten für den Abstand eines Flächenpunkts zum Bezug, nicht für beliebige Maße auf der Zeichnung.')}
         <div class="kv">${kv('Höchstmaß', F(r.max) + ' mm')}${kv('Mindestmaß', F(r.min) + ' mm')}${kv('Zonenbreite', f(t) + ' mm')}${kv('Je Fläche', '±' + f(r.half) + ' mm')}</div>
         <div class="card-2-block">
           <div class="eyebrow">So liest du die Angabe auf der Zeichnung</div>

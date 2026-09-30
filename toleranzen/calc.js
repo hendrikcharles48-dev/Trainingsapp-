@@ -126,6 +126,8 @@
     if (!(N >= 1 && N <= 500)) return { ok: false, error: 'Das Nennmaß muss zwischen 1 und 500 mm liegen.' };
     const ri = T.rangeIdx(N);
     const g = T.gradeNum(grade);
+    if (N <= 1 && g >= 14) return { ok: false, error: 'Nach ISO 286-1 sind IT14 bis IT18 für Nennmaße bis 1 mm nicht vorgesehen. Die Toleranz wäre größer als das Teil selbst.' };
+    if (N <= 1 && letter === 'N' && g > 8) return { ok: false, error: 'Nach ISO 286-1 ist N über IT8 für Nennmaße bis 1 mm nicht vorgesehen.' };
     const it = T.IT[grade][ri];
     const isHole = letter[0] === letter[0].toUpperCase();
     const l = letter.toLowerCase();
@@ -252,8 +254,6 @@
     const cls = letter + grade;
     const common = T.COMMON_CLASSES.includes(cls);
     if (!common) notes.push(`Die Klasse ${cls} steht in vielen Tabellenbüchern nicht fertig ausgerechnet drin. Mit dem Rechenweg bekommst du sie trotzdem aus den Grundtabellen.`);
-    if (N <= 1 && g >= 14) notes.push('Nach ISO 286 werden IT14 bis IT18 für Nennmaße bis 1 mm nicht verwendet.');
-    if (N <= 1 && letter === 'N' && g > 8) notes.push('Nach ISO 286 wird N über IT8 für Nennmaße bis 1 mm nicht verwendet.');
 
     return {
       ok: true, N, letter, grade, cls, isHole, ri, rangeText: rt, subText, it, g,
@@ -440,7 +440,7 @@
       name: 'Position', art: 'Ortstoleranz (Lagetoleranz)',
       bedeutung: 'Die Mitte oder Achse eines Elements, zum Beispiel einer Bohrung, muss in einer Zone um die genaue Sollposition liegen. Mit Positionstoleranz ist das meist ein Kreis mit dem Toleranzwert als Durchmesser.',
       bezug: 'Braucht Bezüge, meist zwei oder drei Flächen, von denen aus die Sollposition bemaßt ist. In der Praxis sind das oft die Kanten, an denen du das Teil antastest.',
-      praxis: 'Die Lage einer Bohrung, gemessen von zwei Anlagekanten. Ohne eigene Positionstoleranz gelten die Freimaßtoleranzen der beiden Abstandsmaße.'
+      praxis: 'Die Lage einer Bohrung, gemessen von zwei Anlagekanten. Steht keine Positionstoleranz auf der Zeichnung, begrenzen in der Werkstattpraxis nur die Freimaßtoleranzen der beiden Abstandsmaße die Lage. Das ist keine echte Positionstoleranz. Kommt es auf die Lage an, gehört eine Positionstoleranz auf die Zeichnung.'
     },
     rundlauf: {
       name: 'Rundlauf', art: 'Lauftoleranz (Lagetoleranz)',
@@ -515,7 +515,7 @@
       if (!rx.ok) return { ok: false, error: rx.error };
       let ry = null;
       if (inp.y > 0) { ry = T.lin2768(inp.y, cls, 'len'); if (!ry.ok) return { ok: false, error: ry.error }; }
-      steps.push({ t: 'Regel', h: 'ISO 2768-2 hat keine Tabelle für die Position. Die Lage ergibt sich aus den Freimaßtoleranzen der Abstandsmaße nach ISO 2768-1 (Kleinbuchstabe im Schriftfeld).' });
+      steps.push({ t: 'Regel', h: 'ISO 2768-2 legt keine Positionstoleranz fest. Ohne Positionstoleranz auf der Zeichnung begrenzen in der Werkstattpraxis die Freimaßtoleranzen der Abstandsmaße nach ISO 2768-1 die Lage (Kleinbuchstabe im Schriftfeld). Streng genommen ist das keine Positionstoleranz: Nach ISO 14405-2 sind Plus-Minus-Toleranzen an Abständen nicht eindeutig. Die Werte unten sind deshalb eine Orientierung, keine Positionstoleranz.' });
       steps.push({ t: 'Abstand 1', h: `${T.fmt(inp.x)} mm, Bereich ${rx.rangeText}, Klasse ${cls}: <b>±${T.fmt(rx.dev)} mm</b>.` });
       if (ry) steps.push({ t: 'Abstand 2', h: `${T.fmt(inp.y)} mm, Bereich ${ry.rangeText}, Klasse ${cls}: <b>±${T.fmt(ry.dev)} mm</b>.` });
       const w1 = r6(2 * rx.dev), w2 = ry ? r6(2 * ry.dev) : null;
@@ -545,9 +545,9 @@
       { t: 'Zone halbieren', h: `Die Zone liegt mittig um die Sollfläche aus Zeichnung oder CAD-Modell: ${T.fmt(t)} mm geteilt durch 2 = <b>${T.fmt(half)} mm</b> nach jeder Seite.` }
     ];
     if (mode === 'zwischen') {
-      steps.push({ t: 'Zwei Flächen ohne Bezug', h: `Beide Flächen dürfen je ${T.fmt(half)} mm wandern, im ungünstigsten Fall in entgegengesetzte Richtungen. Das Maß zwischen ihnen kann sich also um ${T.fmt(half)} mm + ${T.fmt(half)} mm = <b>${T.fmt(dev)} mm</b> ändern.` });
+      steps.push({ t: 'Zwei Flächen ohne Bezug', h: `Beide Flächen dürfen je ${T.fmt(half)} mm wandern, im ungünstigsten Fall in entgegengesetzte Richtungen. Der Abstand zwischen ihnen kann sich also um ${T.fmt(half)} mm + ${T.fmt(half)} mm = <b>${T.fmt(dev)} mm</b> ändern. Das ist eine Abschätzung für den ungünstigsten Fall. Ist der Abstand ein Größenmaß wie eine Wanddicke und steht eine allgemeine Größenmaßtoleranz auf der Zeichnung, gilt für das Maß selbst diese.` });
     } else {
-      steps.push({ t: 'Maß vom Bezug aus', h: `Das Maß geht von einem Bezug aus. Der Bezug liegt fest, nur die tolerierte Fläche darf wandern: <b>±${T.fmt(dev)} mm</b>.` });
+      steps.push({ t: 'Abstand vom Bezug', h: `Jeder Punkt der Fläche muss in dieser Zone liegen. Gemessen vom Bezug aus darf also jeder Punkt höchstens <b>±${T.fmt(dev)} mm</b> von seiner Sollposition abweichen. Das gilt nur für den Abstand zu einem Bezug der Angabe, nicht für beliebige Maße auf der Zeichnung.` });
     }
     steps.push({ t: 'Grenzmaße ausrechnen', h: `Höchstmaß: ${F(N)} mm + ${F(dev)} mm = <b>${F(max)} mm</b><br>Mindestmaß: ${F(N)} mm − ${F(dev)} mm = <b>${F(min)} mm</b>` });
     return { ok: true, N, t, half, dev, max, min, mode, steps, dec };

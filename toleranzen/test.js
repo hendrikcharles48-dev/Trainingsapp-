@@ -22,7 +22,7 @@ const iso = [
   ['25F8', 53, 20], ['25G7', 28, 7], ['25E9', 92, 40], ['25D10', 149, 65], ['25JS7', 10, -10],
   ['2K7', 0, -10], ['2M7', -2, -12], ['2N7', -4, -14], ['2P7', -6, -16], ['2N9', -4, -29], ['25N9', 0, -52],
   ['25K9', 0, -52], ['25M9', -8, -60], ['25P8', -22, -55], ['2k6', 6, 0], ['25k8', 33, 0], ['25k3', 4, 0],
-  ['500h6', 0, -40], ['1h18', 0, -1400], ['400H7', 57, 0], ['401H7', 63, 0], ['30h01', 0, -0.6],
+  ['500h6', 0, -40], ['2h18', 0, -1400], ['400H7', 57, 0], ['401H7', 63, 0], ['30h01', 0, -0.6],
   ['120g6', -12, -34], ['120f7', -36, -71], ['80m6', 30, 11], ['80n6', 39, 20], ['80p6', 51, 32]
 ];
 iso.forEach(([s, up, lo]) => {
@@ -39,6 +39,9 @@ eq('parse IT19', !!T.parseIso('20h19').error, true);
 eq('parse ohne Nennmaß', !!T.parseIso('H7').error, true);
 eq('Nennmaß 600', T.isoFromString('600H7').ok, false);
 eq('K2 nicht genormt', T.isoFromString('25K2').ok, false);
+eq('1h18 gesperrt', T.isoFromString('1h18').ok, false);
+eq('1h13 erlaubt', T.isoFromString('1h13').ok, true);
+eq('Toleranzmitte 4 Stellen', T.fmt(T.isoFromString('25f7').mid, 3, 4), '24,9695');
 eq('parseNum', [T.parseNum('0,5'), T.parseNum(' -0,013 '), T.parseNum('−2'), T.parseNum('12 mm'), T.parseNum('abc')].map(String), ['0.5', '-0.013', '-2', '12', 'NaN']);
 
 // Passungen
