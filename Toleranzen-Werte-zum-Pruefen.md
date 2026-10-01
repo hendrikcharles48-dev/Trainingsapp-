@@ -26,52 +26,107 @@ Hinweis der App: IT14 bis IT18 werden für Nennmaße bis 1 mm nicht verwendet. D
 
 ## 2. ISO 286-1: Grundabmaße der Wellen in µm
 
-d, e, f, g, h: Grundabmaß = oberes Abmaß (es). k, m, n, p, r, s: Grundabmaß = unteres Abmaß (ei).
+a bis g: Grundabmaß = oberes Abmaß (es), h: es = 0. j, k, m, n, p, r bis zc: Grundabmaß = unteres Abmaß (ei). Ein Strich heißt: in der Norm kein Wert, die App lehnt die Angabe ab.
 
-| Nennmaß mm | d (es) | e (es) | f (es) | g (es) | h (es) | k (ei, nur IT4 bis IT7) | m (ei) | n (ei) | p (ei) |
-|---|---|---|---|---|---|---|---|---|---|
-| bis 3 | −20 | −14 | −6 | −2 | 0 | 0 | +2 | +4 | +6 |
-| über 3 bis 6 | −30 | −20 | −10 | −4 | 0 | +1 | +4 | +8 | +12 |
-| über 6 bis 10 | −40 | −25 | −13 | −5 | 0 | +1 | +6 | +10 | +15 |
-| über 10 bis 18 | −50 | −32 | −16 | −6 | 0 | +1 | +7 | +12 | +18 |
-| über 18 bis 30 | −65 | −40 | −20 | −7 | 0 | +2 | +8 | +15 | +22 |
-| über 30 bis 50 | −80 | −50 | −25 | −9 | 0 | +2 | +9 | +17 | +26 |
-| über 50 bis 80 | −100 | −60 | −30 | −10 | 0 | +2 | +11 | +20 | +32 |
-| über 80 bis 120 | −120 | −72 | −36 | −12 | 0 | +3 | +13 | +23 | +37 |
-| über 120 bis 180 | −145 | −85 | −43 | −14 | 0 | +3 | +15 | +27 | +43 |
-| über 180 bis 250 | −170 | −100 | −50 | −15 | 0 | +4 | +17 | +31 | +50 |
-| über 250 bis 315 | −190 | −110 | −56 | −17 | 0 | +4 | +20 | +34 | +56 |
-| über 315 bis 400 | −210 | −125 | −62 | −18 | 0 | +4 | +21 | +37 | +62 |
-| über 400 bis 500 | −230 | −135 | −68 | −20 | 0 | +5 | +23 | +40 | +68 |
+### Wellen a bis g, oberes Abmaß es (feine Bereiche)
 
-k: Für IT3 und feiner sowie ab IT8 ist ei = 0.
+| Nennmaß mm | a | b | c | cd | d | e | ef | f | fg | g |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bis 3 | −270 | −140 | −60 | −34 | −20 | −14 | −10 | −6 | −4 | −2 |
+| über 3 bis 6 | −270 | −140 | −70 | −46 | −30 | −20 | −14 | −10 | −6 | −4 |
+| über 6 bis 10 | −280 | −150 | −80 | −56 | −40 | −25 | −18 | −13 | −8 | −5 |
+| über 10 bis 14 | −290 | −150 | −95 | – | −50 | −32 | – | −16 | – | −6 |
+| über 14 bis 18 | −290 | −150 | −95 | – | −50 | −32 | – | −16 | – | −6 |
+| über 18 bis 24 | −300 | −160 | −110 | – | −65 | −40 | – | −20 | – | −7 |
+| über 24 bis 30 | −300 | −160 | −110 | – | −65 | −40 | – | −20 | – | −7 |
+| über 30 bis 40 | −310 | −170 | −120 | – | −80 | −50 | – | −25 | – | −9 |
+| über 40 bis 50 | −320 | −180 | −130 | – | −80 | −50 | – | −25 | – | −9 |
+| über 50 bis 65 | −340 | −190 | −140 | – | −100 | −60 | – | −30 | – | −10 |
+| über 65 bis 80 | −360 | −200 | −150 | – | −100 | −60 | – | −30 | – | −10 |
+| über 80 bis 100 | −380 | −220 | −170 | – | −120 | −72 | – | −36 | – | −12 |
+| über 100 bis 120 | −410 | −240 | −180 | – | −120 | −72 | – | −36 | – | −12 |
+| über 120 bis 140 | −460 | −260 | −200 | – | −145 | −85 | – | −43 | – | −14 |
+| über 140 bis 160 | −520 | −280 | −210 | – | −145 | −85 | – | −43 | – | −14 |
+| über 160 bis 180 | −580 | −310 | −230 | – | −145 | −85 | – | −43 | – | −14 |
+| über 180 bis 200 | −660 | −340 | −240 | – | −170 | −100 | – | −50 | – | −15 |
+| über 200 bis 225 | −740 | −380 | −260 | – | −170 | −100 | – | −50 | – | −15 |
+| über 225 bis 250 | −820 | −420 | −280 | – | −170 | −100 | – | −50 | – | −15 |
+| über 250 bis 280 | −920 | −480 | −300 | – | −190 | −110 | – | −56 | – | −17 |
+| über 280 bis 315 | −1050 | −540 | −330 | – | −190 | −110 | – | −56 | – | −17 |
+| über 315 bis 355 | −1200 | −600 | −360 | – | −210 | −125 | – | −62 | – | −18 |
+| über 355 bis 400 | −1350 | −680 | −400 | – | −210 | −125 | – | −62 | – | −18 |
+| über 400 bis 450 | −1500 | −760 | −440 | – | −230 | −135 | – | −68 | – | −20 |
+| über 450 bis 500 | −1650 | −840 | −480 | – | −230 | −135 | – | −68 | – | −20 |
 
-### Wellen r und s, unteres Abmaß ei in µm (über 50 mm Unterbereiche)
+a und b: nicht für Nennmaße bis 1 mm. cd, ef, fg: nur bis 10 mm festgelegt.
 
-| Nennmaß mm | r | s |
-|---|---|---|
-| bis 3 | +10 | +14 |
-| über 3 bis 6 | +15 | +19 |
-| über 6 bis 10 | +19 | +23 |
-| über 10 bis 18 | +23 | +28 |
-| über 18 bis 30 | +28 | +35 |
-| über 30 bis 50 | +34 | +43 |
-| über 50 bis 65 | +41 | +53 |
-| über 65 bis 80 | +43 | +59 |
-| über 80 bis 100 | +51 | +71 |
-| über 100 bis 120 | +54 | +79 |
-| über 120 bis 140 | +63 | +92 |
-| über 140 bis 160 | +65 | +100 |
-| über 160 bis 180 | +68 | +108 |
-| über 180 bis 200 | +77 | +122 |
-| über 200 bis 225 | +80 | +130 |
-| über 225 bis 250 | +84 | +140 |
-| über 250 bis 280 | +94 | +158 |
-| über 280 bis 315 | +98 | +170 |
-| über 315 bis 355 | +108 | +190 |
-| über 355 bis 400 | +114 | +208 |
-| über 400 bis 450 | +126 | +232 |
-| über 450 bis 500 | +132 | +252 |
+### Wellen j, k, m, n, p, unteres Abmaß ei
+
+| Nennmaß mm | j (IT5 und IT6) | j (IT7) | j (IT8) | k (nur IT4 bis IT7) | m | n | p |
+|---|---|---|---|---|---|---|---|
+| bis 3 | −2 | −4 | −6 | 0 | +2 | +4 | +6 |
+| über 3 bis 6 | −2 | −4 | – | +1 | +4 | +8 | +12 |
+| über 6 bis 10 | −2 | −5 | – | +1 | +6 | +10 | +15 |
+| über 10 bis 18 | −3 | −6 | – | +1 | +7 | +12 | +18 |
+| über 18 bis 30 | −4 | −8 | – | +2 | +8 | +15 | +22 |
+| über 30 bis 50 | −5 | −10 | – | +2 | +9 | +17 | +26 |
+| über 50 bis 80 | −7 | −12 | – | +2 | +11 | +20 | +32 |
+| über 80 bis 120 | −9 | −15 | – | +3 | +13 | +23 | +37 |
+| über 120 bis 180 | −11 | −18 | – | +3 | +15 | +27 | +43 |
+| über 180 bis 250 | −13 | −21 | – | +4 | +17 | +31 | +50 |
+| über 250 bis 315 | −16 | −26 | – | +4 | +20 | +34 | +56 |
+| über 315 bis 400 | −18 | −28 | – | +4 | +21 | +37 | +62 |
+| über 400 bis 500 | −20 | −32 | – | +5 | +23 | +40 | +68 |
+
+k: Für IT3 und feiner sowie ab IT8 ist ei = 0. j gibt es nur für IT5 bis IT8, j8 nur bis 3 mm.
+
+### Wellen r bis zc, unteres Abmaß ei (feine Bereiche)
+
+| Nennmaß mm | r | s | t | u | v | x | y | z | za | zb | zc |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| bis 3 | +10 | +14 | – | +18 | – | +20 | – | +26 | +32 | +40 | +60 |
+| über 3 bis 6 | +15 | +19 | – | +23 | – | +28 | – | +35 | +42 | +50 | +80 |
+| über 6 bis 10 | +19 | +23 | – | +28 | – | +34 | – | +42 | +52 | +67 | +97 |
+| über 10 bis 14 | +23 | +28 | – | +33 | – | +40 | – | +50 | +64 | +90 | +130 |
+| über 14 bis 18 | +23 | +28 | – | +33 | +39 | +45 | – | +60 | +77 | +108 | +150 |
+| über 18 bis 24 | +28 | +35 | – | +41 | +47 | +54 | +63 | +73 | +98 | +136 | +188 |
+| über 24 bis 30 | +28 | +35 | +41 | +48 | +55 | +64 | +75 | +88 | +118 | +160 | +218 |
+| über 30 bis 40 | +34 | +43 | +48 | +60 | +68 | +80 | +94 | +112 | +148 | +200 | +274 |
+| über 40 bis 50 | +34 | +43 | +54 | +70 | +81 | +97 | +114 | +136 | +180 | +242 | +325 |
+| über 50 bis 65 | +41 | +53 | +66 | +87 | +102 | +122 | +144 | +172 | +226 | +300 | +405 |
+| über 65 bis 80 | +43 | +59 | +75 | +102 | +120 | +146 | +174 | +210 | +274 | +360 | +480 |
+| über 80 bis 100 | +51 | +71 | +91 | +124 | +146 | +178 | +214 | +258 | +335 | +445 | +585 |
+| über 100 bis 120 | +54 | +79 | +104 | +144 | +172 | +210 | +254 | +310 | +400 | +525 | +690 |
+| über 120 bis 140 | +63 | +92 | +122 | +170 | +202 | +248 | +300 | +365 | +470 | +620 | +800 |
+| über 140 bis 160 | +65 | +100 | +134 | +190 | +228 | +280 | +340 | +415 | +535 | +700 | +900 |
+| über 160 bis 180 | +68 | +108 | +146 | +210 | +252 | +310 | +380 | +465 | +600 | +780 | +1000 |
+| über 180 bis 200 | +77 | +122 | +166 | +236 | +284 | +350 | +425 | +520 | +670 | +880 | +1150 |
+| über 200 bis 225 | +80 | +130 | +180 | +258 | +310 | +385 | +470 | +575 | +740 | +960 | +1250 |
+| über 225 bis 250 | +84 | +140 | +196 | +284 | +340 | +425 | +520 | +640 | +820 | +1050 | +1350 |
+| über 250 bis 280 | +94 | +158 | +218 | +315 | +385 | +475 | +580 | +710 | +920 | +1200 | +1550 |
+| über 280 bis 315 | +98 | +170 | +240 | +350 | +425 | +525 | +650 | +790 | +1000 | +1300 | +1700 |
+| über 315 bis 355 | +108 | +190 | +268 | +390 | +475 | +590 | +730 | +900 | +1150 | +1500 | +1900 |
+| über 355 bis 400 | +114 | +208 | +294 | +435 | +530 | +660 | +820 | +1000 | +1300 | +1650 | +2100 |
+| über 400 bis 450 | +126 | +232 | +330 | +490 | +595 | +740 | +920 | +1100 | +1450 | +1850 | +2400 |
+| über 450 bis 500 | +132 | +252 | +360 | +540 | +660 | +820 | +1000 | +1250 | +1600 | +2100 | +2600 |
+
+### Bohrung J, oberes Abmaß ES (eigene Tabelle, nur IT6 bis IT8)
+
+| Nennmaß mm | J6 | J7 | J8 |
+|---|---|---|---|
+| bis 3 | +2 | +4 | +6 |
+| über 3 bis 6 | +5 | +6 | +10 |
+| über 6 bis 10 | +5 | +8 | +12 |
+| über 10 bis 18 | +6 | +10 | +15 |
+| über 18 bis 30 | +8 | +12 | +20 |
+| über 30 bis 50 | +10 | +14 | +24 |
+| über 50 bis 80 | +13 | +18 | +28 |
+| über 80 bis 120 | +16 | +22 | +34 |
+| über 120 bis 180 | +18 | +26 | +41 |
+| über 180 bis 250 | +22 | +30 | +47 |
+| über 250 bis 315 | +25 | +36 | +55 |
+| über 315 bis 400 | +29 | +39 | +60 |
+| über 400 bis 500 | +33 | +43 | +66 |
 
 ## 3. Zuschlag (Delta) für Bohrungen in µm
 
@@ -95,15 +150,17 @@ Die App rechnet Delta als IT-Wert des Grades minus IT-Wert des nächstfeineren G
 
 ## 4. Rechenregeln ISO 286
 
-- Wellen d bis h: es = Tabellenwert, ei = es − IT.
-- Wellen k bis s: ei = Tabellenwert (bei k nur für IT4 bis IT7, sonst 0), es = ei + IT.
+- Wellen a bis h: es = Tabellenwert, ei = es − IT.
+- Wellen j und k bis zc: ei = Tabellenwert (bei k nur für IT4 bis IT7, sonst 0; bei j je nach Grad eigene Spalte), es = ei + IT.
 - js und JS: ±IT/2. Bei IT7 bis IT11 wird ein ungerader IT-Wert vorher auf die nächste gerade Zahl abgerundet (z. B. IT7 = 21 µm → ±10 µm). Sonst exakt IT/2 (z. B. js6 bei 18–30 mm = ±6,5 µm).
-- Bohrungen D bis H: EI = −es der gleichnamigen Welle, ES = EI + IT.
+- Bohrungen A bis H: EI = −es der gleichnamigen Welle, ES = EI + IT.
+- Bohrung J (nur IT6 bis IT8): ES aus eigener Tabelle, EI = ES − IT.
 - Bohrungen K, M, N bis einschließlich IT8: ES = −ei der gleichnamigen Welle + Delta (bei K wird der k-Wert aus der Spalte IT4 bis IT7 genommen). EI = ES − IT.
 - K ab IT9: ES = 0. M ab IT9: ES = −ei(m). N ab IT9: ES = 0, im Bereich bis 3 mm ES = −4 µm.
-- Bohrungen P, R, S bis einschließlich IT7: ES = −ei der gleichnamigen Welle + Delta. Ab IT8: ES = −ei. EI = ES − IT.
+- Bohrungen P bis ZC bis einschließlich IT7: ES = −ei der gleichnamigen Welle + Delta. Ab IT8: ES = −ei. EI = ES − IT.
 - Sonderfall: M6 im Bereich über 250 bis 315 mm: ES = −9 µm.
-- K, M, N, P, R, S mit IT01, IT0, IT1, IT2: in der App nicht berechnet (in der Norm nicht vorgesehen).
+- K bis ZC mit IT01, IT0, IT1, IT2: in der App nicht berechnet (in der Norm nicht vorgesehen).
+- Nicht festgelegt und abgelehnt: a, b, A, B bis 1 mm; cd, ef, fg, CD, EF, FG über 10 mm; t und T bis 24 mm; v und V bis 14 mm; y und Y bis 18 mm; j außer IT5 bis IT8, j8 über 3 mm; J außer IT6 bis IT8.
 - Höchstmaß = Nennmaß + oberes Abmaß, Mindestmaß = Nennmaß + unteres Abmaß, Toleranzmitte = Nennmaß + (oberes + unteres Abmaß) / 2.
 
 ## 5. Passungen
@@ -264,11 +321,42 @@ Die App zeigt zusätzlich die seitliche Abweichung am Schenkelende = Schenkellä
 | 500h6 | über 400 bis 500 mm | 40 | 0 | −40 | 500,000 | 499,960 |
 | 2h18 | bis 3 mm | 1400 | 0 | −1400 | 2,000 | 0,600 |
 | 30h01 | über 18 bis 30 mm | 0,6 | 0 | −0,6 | 30,000 | 29,9994 |
+| 50a11 | über 30 bis 50 mm (über 40 bis 50 mm) | 160 | −320 | −480 | 49,680 | 49,520 |
+| 25b11 | über 18 bis 30 mm | 130 | −160 | −290 | 24,840 | 24,710 |
+| 45c11 | über 30 bis 50 mm (über 40 bis 50 mm) | 160 | −130 | −290 | 44,870 | 44,710 |
+| 5cd7 | über 3 bis 6 mm | 12 | −46 | −58 | 4,954 | 4,942 |
+| 8ef6 | über 6 bis 10 mm | 9 | −18 | −27 | 7,982 | 7,973 |
+| 4fg5 | über 3 bis 6 mm | 5 | −6 | −11 | 3,994 | 3,989 |
+| 25j6 | über 18 bis 30 mm | 13 | +9 | −4 | 25,009 | 24,996 |
+| 40j7 | über 30 bis 50 mm | 25 | +15 | −10 | 40,015 | 39,990 |
+| 2j8 | bis 3 mm | 14 | +8 | −6 | 2,008 | 1,994 |
+| 25t6 | über 18 bis 30 mm (über 24 bis 30 mm) | 13 | +54 | +41 | 25,054 | 25,041 |
+| 20u6 | über 18 bis 30 mm (über 18 bis 24 mm) | 13 | +54 | +41 | 20,054 | 20,041 |
+| 35u6 | über 30 bis 50 mm (über 30 bis 40 mm) | 16 | +76 | +60 | 35,076 | 35,060 |
+| 16v6 | über 10 bis 18 mm (über 14 bis 18 mm) | 11 | +50 | +39 | 16,050 | 16,039 |
+| 12x6 | über 10 bis 18 mm (über 10 bis 14 mm) | 11 | +51 | +40 | 12,051 | 12,040 |
+| 30y6 | über 18 bis 30 mm (über 24 bis 30 mm) | 13 | +88 | +75 | 30,088 | 30,075 |
+| 30z7 | über 18 bis 30 mm (über 24 bis 30 mm) | 21 | +109 | +88 | 30,109 | 30,088 |
+| 30za7 | über 18 bis 30 mm (über 24 bis 30 mm) | 21 | +139 | +118 | 30,139 | 30,118 |
+| 30zb8 | über 18 bis 30 mm (über 24 bis 30 mm) | 33 | +193 | +160 | 30,193 | 30,160 |
+| 30zc9 | über 18 bis 30 mm (über 24 bis 30 mm) | 52 | +270 | +218 | 30,270 | 30,218 |
+| 25J7 | über 18 bis 30 mm | 21 | +12 | −9 | 25,012 | 24,991 |
+| 100J8 | über 80 bis 120 mm | 54 | +34 | −20 | 100,034 | 99,980 |
+| 40C11 | über 30 bis 50 mm (über 30 bis 40 mm) | 160 | +280 | +120 | 40,280 | 40,120 |
+| 60A11 | über 50 bis 80 mm (über 50 bis 65 mm) | 190 | +530 | +340 | 60,530 | 60,340 |
+| 20B11 | über 18 bis 30 mm | 130 | +290 | +160 | 20,290 | 20,160 |
+| 20U7 | über 18 bis 30 mm (über 18 bis 24 mm) | 21 | −33 | −54 | 19,967 | 19,946 |
+| 50T7 | über 30 bis 50 mm (über 40 bis 50 mm) | 25 | −45 | −70 | 49,955 | 49,930 |
+| 30ZA7 | über 18 bis 30 mm (über 24 bis 30 mm) | 21 | −110 | −131 | 29,890 | 29,869 |
+| 100X8 | über 80 bis 120 mm (über 80 bis 100 mm) | 54 | −178 | −232 | 99,822 | 99,768 |
 
 ### Passungen
 
 | Passung | Art | Wert 1 | Wert 2 | Passtoleranz mm |
 |---|---|---|---|---|
+| 40C11/c11 | Spielpassung | Höchstspiel 0,560 mm | Mindestspiel 0,240 mm | 0,320 |
+| 30H7/u6 | Übermaßpassung | Höchstübermaß 0,061 mm | Mindestübermaß 0,027 mm | 0,034 |
+| 50H8/x8 | Übermaßpassung | Höchstübermaß 0,136 mm | Mindestübermaß 0,058 mm | 0,078 |
 | 30H7/g6 | Spielpassung | Höchstspiel 0,041 mm | Mindestspiel 0,007 mm | 0,034 |
 | 30H7/f7 | Spielpassung | Höchstspiel 0,062 mm | Mindestspiel 0,020 mm | 0,042 |
 | 25H7/h6 | Spielpassung | Höchstspiel 0,034 mm | Mindestspiel 0,000 mm | 0,034 |
@@ -361,9 +449,9 @@ Die App zeigt zusätzlich die seitliche Abweichung am Schenkelende = Schenkellä
 6. Toleranzmitte fürs CNC-Programm: Wenn du auf die Mitte des Toleranzfelds zielen willst: Die Mitte zwischen +10 µm und −10 µm liegt bei 0 µm. Programmiermaß: 25,000 mm + 0,000 mm = 25,000 mm.
 
 ### 60s6
-1. Nennmaßbereich bestimmen: Das Nennmaß 60 mm liegt im Bereich über 50 bis 80 mm. Für s ist der Bereich über 50 mm feiner unterteilt: Für das Grundabmaß zählt der Unterbereich über 50 bis 65 mm.
+1. Nennmaßbereich bestimmen: Das Nennmaß 60 mm liegt im Bereich über 50 bis 80 mm. Für s ist dieser Bereich in der Tabelle der Grundabmaße feiner unterteilt: Für das Grundabmaß zählt der Unterbereich über 50 bis 65 mm.
 2. IT-Wert ablesen: In der Tabelle der Grundtoleranzen steht in der Zeile über 50 bis 80 mm und der Spalte IT6 der Wert 19 µm. So breit ist das Toleranzfeld. 19 µm sind 0,019 mm.
-3. Grundabmaß ablesen: Der Kleinbuchstabe s steht für eine Welle. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß. In der Tabelle der Grundabmaße für Wellen steht bei s im Bereich über 50 bis 65 mm: +53 µm.
+3. Grundabmaß ablesen: Der Kleinbuchstabe s steht für eine Welle. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei s im Bereich über 50 bis 65 mm: +53 µm.
 4. Zweites Abmaß über den IT-Wert: Das obere Abmaß liegt um den IT-Wert höher: +53 µm + 19 µm = +72 µm.
 5. Grenzmaße ausrechnen: Die Abmaße in Millimeter umrechnen (1000 µm sind 1 mm): +72 µm sind +0,072 mm, +53 µm sind +0,053 mm.
    Höchstmaß: Nennmaß plus oberes Abmaß: 60,000 mm + 0,072 mm = 60,072 mm
@@ -382,6 +470,39 @@ Die App zeigt zusätzlich die seitliche Abweichung am Schenkelende = Schenkellä
    Höchstmaß: Nennmaß plus oberes Abmaß: 300,000 mm − 0,009 mm = 299,991 mm
    Mindestmaß: Nennmaß plus unteres Abmaß: 300,000 mm − 0,041 mm = 299,959 mm
 6. Toleranzmitte fürs CNC-Programm: Wenn du auf die Mitte des Toleranzfelds zielen willst: Die Mitte zwischen −9 µm und −41 µm liegt bei −25 µm. Programmiermaß: 300,000 mm − 0,025 mm = 299,975 mm.
+
+### 45c11
+1. Nennmaßbereich bestimmen: Das Nennmaß 45 mm liegt im Bereich über 30 bis 50 mm. Für c ist dieser Bereich in der Tabelle der Grundabmaße feiner unterteilt: Für das Grundabmaß zählt der Unterbereich über 40 bis 50 mm.
+2. IT-Wert ablesen: In der Tabelle der Grundtoleranzen steht in der Zeile über 30 bis 50 mm und der Spalte IT11 der Wert 160 µm. So breit ist das Toleranzfeld. 160 µm sind 0,160 mm.
+3. Grundabmaß ablesen: Der Kleinbuchstabe c steht für eine Welle. Bei den Wellen a bis h ist das Grundabmaß das obere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei c im Bereich über 40 bis 50 mm: −130 µm. Das ist das obere Abmaß.
+4. Zweites Abmaß über den IT-Wert: Das untere Abmaß liegt um den IT-Wert tiefer: −130 µm − 160 µm = −290 µm.
+5. Grenzmaße ausrechnen: Die Abmaße in Millimeter umrechnen (1000 µm sind 1 mm): −130 µm sind −0,130 mm, −290 µm sind −0,290 mm.
+   Höchstmaß: Nennmaß plus oberes Abmaß: 45,000 mm − 0,130 mm = 44,870 mm
+   Mindestmaß: Nennmaß plus unteres Abmaß: 45,000 mm − 0,290 mm = 44,710 mm
+6. Toleranzmitte fürs CNC-Programm: Wenn du auf die Mitte des Toleranzfelds zielen willst: Die Mitte zwischen −130 µm und −290 µm liegt bei −210 µm. Programmiermaß: 45,000 mm − 0,210 mm = 44,790 mm.
+
+### 25J7
+1. Nennmaßbereich bestimmen: Das Nennmaß 25 mm liegt im Bereich über 18 bis 30 mm.
+2. IT-Wert ablesen: In der Tabelle der Grundtoleranzen steht in der Zeile über 18 bis 30 mm und der Spalte IT7 der Wert 21 µm. So breit ist das Toleranzfeld. 21 µm sind 0,021 mm.
+3. Grundabmaß ablesen: Der Großbuchstabe J steht für eine Bohrung. Bei J ist das Grundabmaß das obere Abmaß. J hat eine eigene Spalte je Grad (IT6, IT7, IT8) in der Tabelle für Bohrungen, der Wert ist nicht einfach der von j mit umgedrehtem Vorzeichen. In der Spalte IT7 steht im Bereich über 18 bis 30 mm: +12 µm.
+4. Zweites Abmaß über den IT-Wert: Das untere Abmaß liegt um den IT-Wert tiefer: +12 µm − 21 µm = −9 µm.
+5. Grenzmaße ausrechnen: Die Abmaße in Millimeter umrechnen (1000 µm sind 1 mm): +12 µm sind +0,012 mm, −9 µm sind −0,009 mm.
+   Höchstmaß: Nennmaß plus oberes Abmaß: 25,000 mm + 0,012 mm = 25,012 mm
+   Mindestmaß: Nennmaß plus unteres Abmaß: 25,000 mm − 0,009 mm = 24,991 mm
+6. Toleranzmitte fürs CNC-Programm: Wenn du auf die Mitte des Toleranzfelds zielen willst: Die Mitte zwischen +12 µm und −9 µm liegt bei +1,5 µm. Programmiermaß: 25,000 mm + 0,0015 mm = 25,0015 mm.
+
+### 30ZA7
+1. Nennmaßbereich bestimmen: Das Nennmaß 30 mm liegt im Bereich über 18 bis 30 mm. 30 mm liegt genau auf der Grenze. Bei „über … bis …“ gehört die obere Zahl noch dazu, deshalb gehört 30 mm in diesen Bereich und nicht in den nächsten. Für ZA ist dieser Bereich in der Tabelle der Grundabmaße feiner unterteilt: Für das Grundabmaß zählt der Unterbereich über 24 bis 30 mm.
+2. IT-Wert ablesen: In der Tabelle der Grundtoleranzen steht in der Zeile über 18 bis 30 mm und der Spalte IT7 der Wert 21 µm. So breit ist das Toleranzfeld. 21 µm sind 0,021 mm.
+3. Grundabmaß ablesen: Der Großbuchstabe ZA steht für eine Bohrung. Für P bis ZC bis IT7 gilt eine Sonderregel: Du nimmst das Grundabmaß der Welle za mit umgedrehtem Vorzeichen und rechnest einen Zuschlag dazu. Das Ergebnis ist das obere Abmaß.
+   Die Welle za hat im Bereich über 24 bis 30 mm ein unteres Abmaß von +118 µm. Mit umgedrehtem Vorzeichen: −118 µm.
+   Zuschlag: IT7 minus IT6 im selben Bereich: 21 µm − 13 µm = 8 µm. In vielen Tabellenbüchern steht dieser Zuschlag als Delta in einer eigenen Spalte.
+   Oberes Abmaß: −118 µm + 8 µm = −110 µm.
+4. Zweites Abmaß über den IT-Wert: Das untere Abmaß liegt um den IT-Wert tiefer: −110 µm − 21 µm = −131 µm.
+5. Grenzmaße ausrechnen: Die Abmaße in Millimeter umrechnen (1000 µm sind 1 mm): −110 µm sind −0,110 mm, −131 µm sind −0,131 mm.
+   Höchstmaß: Nennmaß plus oberes Abmaß: 30,000 mm − 0,110 mm = 29,890 mm
+   Mindestmaß: Nennmaß plus unteres Abmaß: 30,000 mm − 0,131 mm = 29,869 mm
+6. Toleranzmitte fürs CNC-Programm: Wenn du auf die Mitte des Toleranzfelds zielen willst: Die Mitte zwischen −110 µm und −131 µm liegt bei −120,5 µm. Programmiermaß: 30,000 mm − 0,1205 mm = 29,8795 mm.
 
 ### Passung 30H7/g6
 1. Bohrung 30 H7: Oberes Abmaß +21 µm, unteres Abmaß 0 µm. Höchstmaß 30,021 mm, Mindestmaß 30,000 mm. Den ausführlichen Weg siehst du, wenn du H7 einzeln rechnest.

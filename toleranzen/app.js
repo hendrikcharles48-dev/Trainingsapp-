@@ -249,17 +249,27 @@
     grund: {
       t: 'Grundabmaße in µm',
       h: () => {
-        const rows = T.RANGES.map((r, i) => [T.rangeText(i).replace(' mm', ''), ...['d', 'e', 'f', 'g'].map(l => T.fmtS(T.SHAFT_UPPER[l][i])), '0', T.fmtS(T.SHAFT_K[i]), ...['m', 'n', 'p'].map(l => T.fmtS(T.SHAFT_LOWER[l][i]))]);
-        const rsRows = T.RANGES.slice(0, 6).map((r, i) => [T.rangeText(i).replace(' mm', ''), T.fmtS(T.SHAFT_RS.r.main[i]), T.fmtS(T.SHAFT_RS.s.main[i])])
-          .concat(T.SUBRANGES.map((r, i) => [T.subText(i).replace(' mm', ''), T.fmtS(T.SHAFT_RS.r.sub[i]), T.fmtS(T.SHAFT_RS.s.sub[i])]));
+        const v = x => x == null ? '–' : T.fmtS(x);
+        const fineRow = i => T.fineText(i).replace(' mm', '');
+        const up = ['a', 'b', 'c', 'cd', 'd', 'e', 'ef', 'f', 'fg', 'g'];
+        const upRows = T.FINE.map((r, i) => [fineRow(i), ...up.map(l => v(T.SHAFT_FUND[l][i])), '0']);
+        const midRows = T.RANGES.map((r, i) => [T.rangeText(i).replace(' mm', ''), v(T.SHAFT_J['5'][i]), v(T.SHAFT_J['7'][i]), v(T.SHAFT_J['8'][i]), T.fmtS(T.SHAFT_K[i]), ...['m', 'n', 'p'].map(l => T.fmtS(T.SHAFT_LOWER[l][i]))]);
+        const lo = ['r', 's', 't', 'u', 'v', 'x', 'y', 'z', 'za', 'zb', 'zc'];
+        const loRows = T.FINE.map((r, i) => [fineRow(i), ...lo.map(l => v(T.SHAFT_FUND[l][i]))]);
+        const jRows = T.RANGES.map((r, i) => [T.rangeText(i).replace(' mm', ''), ...['6', '7', '8'].map(g => T.fmtS(T.HOLE_J[g][i]))]);
         const dRows = T.RANGES.map((r, i) => [T.rangeText(i).replace(' mm', ''), ...['3', '4', '5', '6', '7', '8'].map(g => f(T.delta(g, i)))]);
-        return table(['Nennmaß in mm', 'd', 'e', 'f', 'g', 'h', 'k*', 'm', 'n', 'p'], rows, 'Wellen: d bis h oberes Abmaß, k bis p unteres Abmaß') +
-          '<p class="tbl-note">* k: Der Wert gilt nur für IT4 bis IT7. Bei IT3 und feiner sowie ab IT8 ist das untere Abmaß 0.</p>' +
-          table(['Nennmaß in mm', 'r', 's'], rsRows, 'Wellen r und s: unteres Abmaß, über 50 mm feiner unterteilt') +
+        return table(['Nennmaß in mm', ...up, 'h'], upRows, 'Wellen a bis h: oberes Abmaß es') +
+          '<p class="tbl-note">a und b gibt es nicht für Nennmaße bis 1 mm. cd, ef und fg sind nur bis 10 mm festgelegt (Feinwerktechnik). d bis g ändern sich nur an den groben Bereichsgrenzen.</p>' +
+          table(['Nennmaß in mm', 'j IT5/6', 'j IT7', 'j IT8', 'k*', 'm', 'n', 'p'], midRows, 'Wellen j bis p: unteres Abmaß ei') +
+          '<p class="tbl-note">* k: Der Wert gilt nur für IT4 bis IT7. Bei IT3 und feiner sowie ab IT8 ist das untere Abmaß 0. j gibt es nur für IT5 bis IT8, j8 nur bis 3 mm.</p>' +
+          table(['Nennmaß in mm', ...lo], loRows, 'Wellen r bis zc: unteres Abmaß ei') +
+          '<p class="tbl-note">Ein Strich heißt: in der Norm kein Wert. t beginnt über 24 mm, v über 14 mm, y über 18 mm.</p>' +
+          table(['Nennmaß in mm', 'J IT6', 'J IT7', 'J IT8'], jRows, 'Bohrung J: oberes Abmaß ES') +
           table(['Nennmaß in mm', 'IT3', 'IT4', 'IT5', 'IT6', 'IT7', 'IT8'], dRows, 'Zuschlag (Delta) für Bohrungen') +
-          `<div class="tbl-note"><p><b>Bohrungen D bis H:</b> Das untere Abmaß ist das obere Abmaß der gleichnamigen Welle mit umgedrehtem Vorzeichen. Beispiel F bei 18 bis 30 mm: Welle f hat −20 µm, Bohrung F hat +20 µm.</p>
-          <p><b>Bohrungen K, M, N bis IT8 sowie P, R, S bis IT7:</b> Das obere Abmaß ist das Grundabmaß der gleichnamigen Welle mit umgedrehtem Vorzeichen plus Zuschlag. Bei K nimmst du den Wert von k aus der Spalte IT4 bis IT7.</p>
-          <p><b>Darüber:</b> K ab IT9 oben 0. M ab IT9 wie Welle m mit umgedrehtem Vorzeichen. N ab IT9 oben 0, bis 3 mm −4 µm. P, R, S ab IT8 ohne Zuschlag. Sonderfall M6 über 250 bis 315 mm: oben −9 µm.</p>
+          `<div class="tbl-note"><p><b>Bohrungen A bis H:</b> Das untere Abmaß ist das obere Abmaß der gleichnamigen Welle mit umgedrehtem Vorzeichen. Beispiel F bei 18 bis 30 mm: Welle f hat −20 µm, Bohrung F hat +20 µm.</p>
+          <p><b>Bohrung J:</b> eigene Tabelle oben, nur IT6 bis IT8.</p>
+          <p><b>Bohrungen K, M, N bis IT8 sowie P bis ZC bis IT7:</b> Das obere Abmaß ist das Grundabmaß der gleichnamigen Welle mit umgedrehtem Vorzeichen plus Zuschlag. Bei K nimmst du den Wert von k aus der Spalte IT4 bis IT7.</p>
+          <p><b>Darüber:</b> K ab IT9 oben 0. M ab IT9 wie Welle m mit umgedrehtem Vorzeichen. N ab IT9 oben 0, bis 3 mm −4 µm. P bis ZC ab IT8 ohne Zuschlag. Sonderfall M6 über 250 bis 315 mm: oben −9 µm.</p>
           <p><b>js und JS:</b> halber IT-Wert nach oben und unten. Bei IT7 bis IT11 wird ein ungerader IT-Wert vorher auf die nächste gerade Zahl abgerundet.</p></div>`;
       }
     }
@@ -840,7 +850,7 @@
     return `<section class="card" id="card-iso">
       ${cardHead('ISO-Toleranz berechnen', 'it,grund')}
       <div class="field"><label for="i-q">Angabe</label><div class="inp big"><input id="i-q" data-k="iso.q" value="${esc(A.iso.q)}" placeholder="z. B. 10H8" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div>
-        <span class="hint-line">Nennmaß 1 bis 500 mm. Großbuchstabe heißt Bohrung, Kleinbuchstabe heißt Welle.</span></div>
+        <span class="hint-line">Nennmaß 1 bis 500 mm, alle Grundabmaße von a bis zc. Großbuchstabe heißt Bohrung, Kleinbuchstabe heißt Welle.</span></div>
       <div class="result" id="res-iso" aria-live="polite"></div>
     </section>`;
   }

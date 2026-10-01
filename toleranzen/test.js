@@ -34,7 +34,15 @@ iso.forEach(([s, up, lo]) => {
 eq('parse Ø 30 k5', T.parseIso('Ø 30 k5').letter, 'k');
 eq('parse 20,5 JS 6', [T.parseIso('20,5 JS 6').N, T.parseIso('20,5 JS 6').letter], [20.5, 'JS']);
 eq('parse Js6 ist Bohrung', T.parseIso('20Js6').letter, 'JS');
-eq('parse falscher Buchstabe', !!T.parseIso('20c6').error, true);
+eq('parse falscher Buchstabe', !!T.parseIso('20w6').error, true);
+eq('parse zwei Buchstaben', [T.parseIso('8 cd7').letter, T.parseIso('30ZA7').letter, T.parseIso('30Zc7').letter], ['cd', 'ZA', 'ZC']);
+// Alle Grundabmaße a bis zc: Werte aus ISO 286-2 [Angabe, oben, unten] in µm
+[['50a11', -320, -480], ['25b11', -160, -290], ['30c11', -110, -240], ['45c11', -130, -290], ['5cd7', -46, -58], ['8ef6', -18, -27], ['4fg5', -6, -11],
+ ['25j6', 9, -4], ['40j7', 15, -10], ['2j8', 8, -6], ['300j5', 7, -16], ['25t6', 54, 41], ['45t6', 70, 54], ['20u6', 54, 41], ['35u6', 76, 60], ['16v6', 50, 39], ['12x6', 51, 40],
+ ['25J7', 12, -9], ['100J8', 34, -20], ['2J6', 2, -4], ['40C11', 280, 120], ['60A11', 530, 340], ['20B11', 290, 160], ['20U7', -33, -54], ['30T7', -33, -54], ['50T7', -45, -70],
+ ['450zc9', 2555, 2400], ['2za7', 42, 32], ['2ZA7', -32, -42], ['100X8', -178, -232]
+].forEach(([s, up, lo]) => { const r = T.isoFromString(s); eq('ISO ' + s, r.ok ? [r.upper, r.lower] : r.error, [up, lo]); });
+['20t6', '1a11', '1B11', '20cd6', '20j9', '20j8', '20J9', '10v6', '15y6', '2ZA2'].forEach(x => eq('nicht festgelegt ' + x, T.isoFromString(x).ok, false));
 eq('parse IT19', !!T.parseIso('20h19').error, true);
 eq('parse ohne Nennmaß', !!T.parseIso('H7').error, true);
 eq('Nennmaß 600', T.isoFromString('600H7').ok, false);

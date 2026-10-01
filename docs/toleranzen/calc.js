@@ -48,6 +48,17 @@
     return -1;
   };
   T.subText = i => `über ${T.SUBRANGES[i][0]} bis ${T.SUBRANGES[i][1]} mm`;
+  T.fineIdx = function (N) {
+    for (let i = 0; i < T.FINE.length; i++) if (N > T.FINE[i][0] && N <= T.FINE[i][1]) return i;
+    return -1;
+  };
+  T.fineText = i => i === 0 ? 'bis 3 mm' : `über ${T.FINE[i][0]} bis ${T.FINE[i][1]} mm`;
+  // Ist der Hauptbereich für diesen Buchstaben feiner unterteilt (verschiedene Werte in den Unterbereichen)?
+  T.fineMatters = function (l, ri) {
+    const a = T.SHAFT_FUND[l];
+    if (!a) return false;
+    return new Set(T.FINE.map((f, i) => i).filter(i => T.MAIN_OF_FINE[i] === ri).map(i => a[i])).size > 1;
+  };
   T.gradeNum = g => g === '01' ? -1 : parseInt(g, 10);
   T.itText = g => 'IT' + g;
 
@@ -65,10 +76,10 @@
     if (!m) return { error: 'Schreib die Toleranzklasse als Buchstabe und Zahl, zum Beispiel H7 oder g6.' };
     let L = m[1];
     const isHole = L[0] === L[0].toUpperCase();
-    if (L.toLowerCase() === 'js') L = isHole ? 'JS' : 'js';
+    L = isHole ? L.toUpperCase() : L.toLowerCase();
     const list = isHole ? T.HOLE_LETTERS : T.SHAFT_LETTERS;
     if (!list.includes(L)) {
-      return { error: `Das Grundabmaß „${m[1]}“ ist in der App nicht hinterlegt. Möglich sind bei Bohrungen ${T.HOLE_LETTERS.join(', ')} und bei Wellen ${T.SHAFT_LETTERS.join(', ')}.` };
+      return { error: `Das Grundabmaß „${m[1]}“ gibt es in ISO 286 nicht. Es gibt ${T.SHAFT_LETTERS.join(', ')}. Großbuchstaben für Bohrungen, Kleinbuchstaben für Wellen.` };
     }
     let g = m[2];
     if (g !== '01' && g !== '0') g = String(parseInt(g, 10));
@@ -128,21 +139,33 @@
     const g = T.gradeNum(grade);
     if (N <= 1 && g >= 14) return { ok: false, error: 'Nach ISO 286-1 sind IT14 bis IT18 für Nennmaße bis 1 mm nicht vorgesehen. Die Toleranz wäre größer als das Teil selbst.' };
     if (N <= 1 && letter === 'N' && g > 8) return { ok: false, error: 'Nach ISO 286-1 ist N über IT8 für Nennmaße bis 1 mm nicht vorgesehen.' };
-    const it = T.IT[grade][ri];
     const isHole = letter[0] === letter[0].toUpperCase();
     const l = letter.toLowerCase();
+    const fi = T.fineIdx(N);
+    if ((l === 'a' || l === 'b') && N <= 1) return { ok: false, error: `Nach ISO 286-1 werden die Grundabmaße ${isHole ? 'A und B' : 'a und b'} für Nennmaße bis 1 mm nicht verwendet.` };
+    if (['cd', 'ef', 'fg'].includes(l) && N > 10) return { ok: false, error: `Das Grundabmaß ${letter} ist in ISO 286-1 nur für Nennmaße bis 10 mm festgelegt. Es ist für die Feinwerktechnik und für Uhren gedacht.` };
+    if (T.SHAFT_FUND[l] && T.SHAFT_FUND[l][fi] == null) {
+      const from = T.FINE[T.SHAFT_FUND[l].findIndex(v => v != null)][0];
+      return { ok: false, error: `Für ${letter} gibt es in ISO 286-1 erst über ${from} mm einen Wert. Bei kleineren Nennmaßen ist ${letter} nicht festgelegt.` };
+    }
+    if (l === 'j' && !isHole && !(g >= 5 && g <= 8)) return { ok: false, error: 'Die Welle j gibt es in ISO 286-1 nur für IT5 bis IT8. Für andere Grade nimm js.' };
+    if (l === 'j' && !isHole && g === 8 && N > 3) return { ok: false, error: 'j8 ist in ISO 286-1 nur bis 3 mm festgelegt. Für größere Nennmaße nimm js8.' };
+    if (letter === 'J' && !(g >= 6 && g <= 8)) return { ok: false, error: 'Die Bohrung J gibt es in ISO 286-1 nur für IT6, IT7 und IT8. Für andere Grade nimm JS.' };
+    const it = T.IT[grade][ri];
     const rt = T.rangeText(ri);
     const steps = [], notes = [];
     let upper, lower, fund, fundSide, subText = '';
     const f = T.fmt, uS = T.umS, u = T.um;
+    const fineHere = T.fineMatters(l, ri);
+    const where = fineHere ? T.fineText(fi) : rt;   // Zeile in der Tabelle der Grundabmaße
+    const fundTab = T.SHAFT_FUND[l] ? T.SHAFT_FUND[l][fi] : null;
 
     // Schritt 1: Bereich
     let s1 = `Das Nennmaß ${f(N)} mm liegt im Bereich <b>${rt}</b>.`;
     if (N === T.RANGES[ri][1] && ri < T.RANGES.length - 1) s1 += ` ${f(N)} mm liegt genau auf der Grenze. Bei „über … bis …“ gehört die obere Zahl noch dazu, deshalb gehört ${f(N)} mm in diesen Bereich und nicht in den nächsten.`;
-    if ((l === 'r' || l === 's') && N > 50) {
-      const si = T.subIdx(N);
-      subText = T.subText(si);
-      s1 += ` Für ${letter} ist der Bereich über 50 mm feiner unterteilt: Für das Grundabmaß zählt der Unterbereich <b>${subText}</b>.`;
+    if (fineHere) {
+      subText = T.fineText(fi);
+      s1 += ` Für ${letter} ist dieser Bereich in der Tabelle der Grundabmaße feiner unterteilt: Für das Grundabmaß zählt der Unterbereich <b>${subText}</b>.`;
     }
     steps.push({ t: 'Nennmaßbereich bestimmen', h: s1 });
 
@@ -159,50 +182,53 @@
       s3 = `${letter} bedeutet: Das Toleranzfeld liegt symmetrisch zur Nulllinie, halb darüber und halb darunter. Ein Grundabmaß aus der Tabelle brauchst du nicht. Beide Abmaße sind halb so groß wie der IT-Wert: ${u(it)} µm geteilt durch 2 = ${u(it / 2)} µm.`;
       if (half !== it / 2) s3 += ` Bei IT7 bis IT11 rundet die Norm einen ungeraden IT-Wert auf die nächste gerade Zahl ab, damit ganze Mikrometer herauskommen: ${u(it - 1)} µm geteilt durch 2 = <b>${u(half)} µm</b>. So steht es auch in den Tabellenbüchern.`;
       s4 = `Oberes Abmaß <b>+${u(half)} µm</b>, unteres Abmaß <b>−${u(half)} µm</b>.`;
-    } else if (!isHole && ['d', 'e', 'f', 'g', 'h'].includes(l)) {
+    } else if (!isHole && (l === 'h' || T.SHAFT_UPPER_LETTERS.includes(l))) {
       fundSide = 'upper';
-      upper = T.SHAFT_UPPER[l][ri]; lower = r6(upper - it); fund = upper;
+      upper = l === 'h' ? 0 : fundTab; lower = r6(upper - it); fund = upper;
       s3 = l === 'h'
         ? `Der Kleinbuchstabe h steht für eine ${tableWord}. Bei h ist das obere Abmaß immer <b>0 µm</b>. Die Welle wird also nie größer als das Nennmaß.`
-        : `Der Kleinbuchstabe ${l} steht für eine ${tableWord}. Bei den Wellen a bis h ist das Grundabmaß das obere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei ${l} im Bereich ${rt}: <b>${uS(upper)} µm</b>. Das ist das obere Abmaß.`;
+        : `Der Kleinbuchstabe ${l} steht für eine ${tableWord}. Bei den Wellen a bis h ist das Grundabmaß das obere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei ${l} im Bereich ${where}: <b>${uS(upper)} µm</b>. Das ist das obere Abmaß.`;
       s4 = `Das untere Abmaß liegt um den IT-Wert tiefer: ${uS(upper)} µm − ${u(it)} µm = <b>${uS(lower)} µm</b>.`;
     } else if (!isHole) {
       fundSide = 'lower';
-      if (l === 'k') {
+      if (l === 'j') {
+        const col = g <= 6 ? '5' : String(g);
+        lower = T.SHAFT_J[col][ri];
+        s3 = `Der Kleinbuchstabe j steht für eine ${tableWord}. Bei j ist das Grundabmaß das untere Abmaß. Die Tabelle hat für j eigene Spalten: IT5 und IT6 gemeinsam, IT7 und IT8. In der Spalte ${col === '5' ? 'IT5 und IT6' : 'IT' + col} steht im Bereich ${rt}: <b>${uS(lower)} µm</b>. Das Toleranzfeld liegt dadurch fast mittig, aber nicht ganz symmetrisch wie bei js.`;
+      } else if (l === 'k') {
         const kv = T.SHAFT_K[ri];
         lower = (g >= 4 && g <= 7) ? kv : 0;
         s3 = `Der Kleinbuchstabe k steht für eine ${tableWord}. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß. Für k steht in der Tabelle nur für IT4 bis IT7 ein Wert, im Bereich ${rt} sind das ${uS(kv)} µm. `;
         s3 += (g >= 4 && g <= 7)
           ? `Dein Grad IT${grade} liegt in diesem Band, also ist das untere Abmaß <b>${uS(lower)} µm</b>.`
           : `Dein Grad IT${grade} liegt außerhalb von IT4 bis IT7. Dann ist das untere Abmaß <b>0 µm</b>.`;
-      } else if (l === 'r' || l === 's') {
-        lower = N > 50 ? T.SHAFT_RS[l].sub[T.subIdx(N)] : T.SHAFT_RS[l].main[ri];
-        s3 = `Der Kleinbuchstabe ${l} steht für eine ${tableWord}. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß. In der Tabelle der Grundabmaße für Wellen steht bei ${l} im Bereich ${N > 50 ? subText : rt}: <b>${uS(lower)} µm</b>.`;
       } else {
-        lower = T.SHAFT_LOWER[l][ri];
-        s3 = `Der Kleinbuchstabe ${l} steht für eine ${tableWord}. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei ${l} im Bereich ${rt}: <b>${uS(lower)} µm</b>.`;
+        lower = fundTab;
+        s3 = `Der Kleinbuchstabe ${l} steht für eine ${tableWord}. Bei den Wellen k bis zc ist das Grundabmaß das untere Abmaß, denn es liegt der Nulllinie am nächsten. In der Tabelle der Grundabmaße für Wellen steht bei ${l} im Bereich ${where}: <b>${uS(lower)} µm</b>.`;
       }
       fund = lower; upper = r6(lower + it);
       s4 = `Das obere Abmaß liegt um den IT-Wert höher: ${uS(lower)} µm + ${u(it)} µm = <b>${uS(upper)} µm</b>.`;
-    } else if (['D', 'E', 'F', 'G', 'H'].includes(letter)) {
+    } else if (l === 'h' || T.SHAFT_UPPER_LETTERS.includes(l)) {
       fundSide = 'lower';
-      const es = T.SHAFT_UPPER[l][ri];
+      const es = l === 'h' ? 0 : fundTab;
       lower = r6(-es); fund = lower; upper = r6(lower + it);
       s3 = letter === 'H'
         ? `Der Großbuchstabe H steht für eine Bohrung. Bei H ist das untere Abmaß immer <b>0 µm</b>. Die Bohrung wird also nie kleiner als das Nennmaß.`
-        : `Der Großbuchstabe ${letter} steht für eine Bohrung. Bei den Bohrungen A bis H ist das Grundabmaß das untere Abmaß. Es ist genauso groß wie das obere Abmaß der Welle ${l}, nur mit umgedrehtem Vorzeichen. Die Welle ${l} hat im Bereich ${rt} ${uS(es)} µm, also hat die Bohrung ${letter} ein unteres Abmaß von <b>${uS(lower)} µm</b>. Viele Tabellenbücher haben den Wert für ${letter} auch direkt in der Tabelle für Bohrungen.`;
+        : `Der Großbuchstabe ${letter} steht für eine Bohrung. Bei den Bohrungen A bis H ist das Grundabmaß das untere Abmaß. Es ist genauso groß wie das obere Abmaß der Welle ${l}, nur mit umgedrehtem Vorzeichen. Die Welle ${l} hat im Bereich ${where} ${uS(es)} µm, also hat die Bohrung ${letter} ein unteres Abmaß von <b>${uS(lower)} µm</b>. Viele Tabellenbücher haben den Wert für ${letter} auch direkt in der Tabelle für Bohrungen.`;
       s4 = `Das obere Abmaß liegt um den IT-Wert höher: ${uS(lower)} µm + ${u(it)} µm = <b>${uS(upper)} µm</b>.`;
+    } else if (letter === 'J') {
+      fundSide = 'upper';
+      upper = T.HOLE_J[String(g)][ri]; fund = upper; lower = r6(upper - it);
+      s3 = `Der Großbuchstabe J steht für eine Bohrung. Bei J ist das Grundabmaß das obere Abmaß. J hat eine eigene Spalte je Grad (IT6, IT7, IT8) in der Tabelle für Bohrungen, der Wert ist nicht einfach der von j mit umgedrehtem Vorzeichen. In der Spalte IT${g} steht im Bereich ${rt}: <b>${uS(upper)} µm</b>.`;
+      s4 = `Das untere Abmaß liegt um den IT-Wert tiefer: ${uS(upper)} µm − ${u(it)} µm = <b>${uS(lower)} µm</b>.`;
     } else {
-      // K, M, N, P, R, S
+      // K bis ZC
       fundSide = 'upper';
       if (g < 3) return { ok: false, error: `Für ${letter} ist IT${grade} in der Norm nicht vorgesehen. Die Tabellen für ${letter} beginnen bei IT3.` };
-      let base; // Grundabmaß der gleichnamigen Welle
-      if (l === 'k') base = T.SHAFT_K[ri];
-      else if (l === 'r' || l === 's') base = N > 50 ? T.SHAFT_RS[l].sub[T.subIdx(N)] : T.SHAFT_RS[l].main[ri];
-      else base = T.SHAFT_LOWER[l][ri];
-      const withDelta = (['K', 'M', 'N'].includes(letter) && g <= 8) || (['P', 'R', 'S'].includes(letter) && g <= 7);
+      const base = l === 'k' ? T.SHAFT_K[ri] : fundTab; // Grundabmaß der gleichnamigen Welle
+      const withDelta = (['K', 'M', 'N'].includes(letter) && g <= 8) || (!['K', 'M', 'N'].includes(letter) && g <= 7);
       const d = T.delta(grade, ri);
-      const baseWhere = (l === 'r' || l === 's') && N > 50 ? subText : rt;
+      const baseWhere = where;
       const baseText = `Die Welle ${l} hat im Bereich ${baseWhere}${l === 'k' ? ' (Spalte IT4 bis IT7)' : ''} ein unteres Abmaß von ${uS(base)} µm. Mit umgedrehtem Vorzeichen: ${uS(-base)} µm.`;
       if (withDelta) {
         const group = ['K', 'M', 'N'].includes(letter) ? 'K, M und N bis IT8' : 'P bis ZC bis IT7';
@@ -711,8 +737,8 @@
     });
     // Anzahl wie „4x Ø6“ überspringen
     take(new RegExp(`\\b\\d{1,2}\\s*[x×X]\\s*(?=${DIA}|R|\\d)`, 'g'), () => null);
-    // ISO-Toleranz: Ø30 H7, 25g6
-    take(new RegExp(`(${DIA})?\\s*(${NUM})(\\s*)(JS|Js|js|[A-Za-z])\\s*(\\d{1,2})(?![\\d.,°])`, 'g'), m => {
+    // ISO-Toleranz: Ø30 H7, 25g6, 40 za7 (x nicht: das ist auf Zeichnungen das Malzeichen)
+    take(new RegExp(`(${DIA})?\\s*(${NUM})(\\s*)(JS|Js|js|CD|cd|EF|ef|FG|fg|Z[ABC]|z[abc]|[A-WYZa-wyz])\\s*(\\d{1,2})(?![\\d.,°])`, 'g'), m => {
       if (m[3] && /^[Rr]$/.test(m[4])) return false;  // „120 R5“ ist ein Maß und ein Radius
       const c = T.parseClassToken(m[4] + m[5]);
       if (c.error) return false;

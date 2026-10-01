@@ -1,5 +1,5 @@
 /* Toleranzen – alle Tabellenwerte fest hinterlegt, keine externen Abfragen.
-   ISO 286-1 (Grundtoleranzen und Grundabmaße, Nennmaße bis 500 mm),
+   ISO 286-1 (Grundtoleranzen und alle Grundabmaße a bis zc und A bis ZC, Nennmaße bis 500 mm),
    ISO 2768-1 (Längen, Radien/Fasen, Winkel), ISO 2768-2 (Form und Lage). */
 (function (root) {
   'use strict';
@@ -60,11 +60,58 @@
     s: { main: [14, 19, 23, 28, 35, 43], sub: [53, 59, 71, 79, 92, 100, 108, 122, 130, 140, 158, 170, 190, 208, 232, 252] }
   };
 
-  T.SHAFT_LETTERS = ['d', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p', 'r', 's'];
-  T.HOLE_LETTERS = ['D', 'E', 'F', 'G', 'H', 'JS', 'K', 'M', 'N', 'P', 'R', 'S'];
+  // Feine Nennmaßbereiche: Bei a, b, c und r bis zc sind die Bereiche ab 10 mm weiter unterteilt
+  T.FINE = [[0, 3], [3, 6], [6, 10], [10, 14], [14, 18], [18, 24], [24, 30], [30, 40], [40, 50], [50, 65], [65, 80], [80, 100], [100, 120], [120, 140], [140, 160], [160, 180], [180, 200], [200, 225], [225, 250], [250, 280], [280, 315], [315, 355], [355, 400], [400, 450], [450, 500]];
+
+  // Weitere Grundabmaße der Wellen in µm, ein Wert je feinem Bereich (null: in der Norm kein Wert)
+  // a, b, c, cd, ef, fg: oberes Abmaß. t bis zc: unteres Abmaß.
+  // a und b gibt es nicht für Nennmaße bis 1 mm. cd, ef und fg sind nur bis 10 mm festgelegt (Feinwerktechnik).
+  const _ = null;
+  T.SHAFT_FINE = {
+    a: [-270, -270, -280, -290, -290, -300, -300, -310, -320, -340, -360, -380, -410, -460, -520, -580, -660, -740, -820, -920, -1050, -1200, -1350, -1500, -1650],
+    b: [-140, -140, -150, -150, -150, -160, -160, -170, -180, -190, -200, -220, -240, -260, -280, -310, -340, -380, -420, -480, -540, -600, -680, -760, -840],
+    c: [-60, -70, -80, -95, -95, -110, -110, -120, -130, -140, -150, -170, -180, -200, -210, -230, -240, -260, -280, -300, -330, -360, -400, -440, -480],
+    cd: [-34, -46, -56, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    ef: [-10, -14, -18, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    fg: [-4, -6, -8, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    t: [_, _, _, _, _, _, 41, 48, 54, 66, 75, 91, 104, 122, 134, 146, 166, 180, 196, 218, 240, 268, 294, 330, 360],
+    u: [18, 23, 28, 33, 33, 41, 48, 60, 70, 87, 102, 124, 144, 170, 190, 210, 236, 258, 284, 315, 350, 390, 435, 490, 540],
+    v: [_, _, _, _, 39, 47, 55, 68, 81, 102, 120, 146, 172, 202, 228, 252, 284, 310, 340, 385, 425, 475, 530, 595, 660],
+    x: [20, 28, 34, 40, 45, 54, 64, 80, 97, 122, 146, 178, 210, 248, 280, 310, 350, 385, 425, 475, 525, 590, 660, 740, 820],
+    y: [_, _, _, _, _, 63, 75, 94, 114, 144, 174, 214, 254, 300, 340, 380, 425, 470, 520, 580, 650, 730, 820, 920, 1000],
+    z: [26, 35, 42, 50, 60, 73, 88, 112, 136, 172, 210, 258, 310, 365, 415, 465, 520, 575, 640, 710, 790, 900, 1000, 1100, 1250],
+    za: [32, 42, 52, 64, 77, 98, 118, 148, 180, 226, 274, 335, 400, 470, 535, 600, 670, 740, 820, 920, 1000, 1150, 1300, 1450, 1600],
+    zb: [40, 50, 67, 90, 108, 136, 160, 200, 242, 300, 360, 445, 525, 620, 700, 780, 880, 960, 1050, 1200, 1300, 1500, 1650, 1850, 2100],
+    zc: [60, 80, 97, 130, 150, 188, 218, 274, 325, 405, 480, 585, 690, 800, 900, 1000, 1150, 1250, 1350, 1550, 1700, 1900, 2100, 2400, 2600]
+  };
+
+  // Welle j: unteres Abmaß in µm. Eigene Spalten für IT5 und IT6 (gemeinsam), IT7 und IT8 (IT8 nur bis 3 mm)
+  T.SHAFT_J = {
+    '5': [-2, -2, -2, -3, -4, -5, -7, -9, -11, -13, -16, -18, -20],
+    '7': [-4, -4, -5, -6, -8, -10, -12, -15, -18, -21, -26, -28, -32],
+    '8': [-6, _, _, _, _, _, _, _, _, _, _, _, _]
+  };
+  // Bohrung J: oberes Abmaß in µm, nur für IT6, IT7 und IT8
+  T.HOLE_J = {
+    '6': [2, 5, 5, 6, 8, 10, 13, 16, 18, 22, 25, 29, 33],
+    '7': [4, 6, 8, 10, 12, 14, 18, 22, 26, 30, 36, 39, 43],
+    '8': [6, 10, 12, 15, 20, 24, 28, 34, 41, 47, 55, 60, 66]
+  };
+
+  // Alle Grundabmaße der Wellen (außer h, j, js, k) in einer Tabelle je feinem Bereich
+  T.MAIN_OF_FINE = T.FINE.map(f => T.RANGES.findIndex(r => f[0] >= r[0] && f[1] <= r[1]));
+  const byMain = arr => T.MAIN_OF_FINE.map(i => arr[i]);
+  T.SHAFT_FUND = Object.assign({}, T.SHAFT_FINE);
+  ['d', 'e', 'f', 'g'].forEach(l => { T.SHAFT_FUND[l] = byMain(T.SHAFT_UPPER[l]); });
+  ['m', 'n', 'p'].forEach(l => { T.SHAFT_FUND[l] = byMain(T.SHAFT_LOWER[l]); });
+  ['r', 's'].forEach(l => { T.SHAFT_FUND[l] = T.FINE.map((f, i) => f[1] <= 50 ? T.SHAFT_RS[l].main[T.MAIN_OF_FINE[i]] : T.SHAFT_RS[l].sub[i - 9]); });
+  T.SHAFT_UPPER_LETTERS = ['a', 'b', 'c', 'cd', 'd', 'e', 'ef', 'f', 'fg', 'g'];
+
+  T.SHAFT_LETTERS = ['a', 'b', 'c', 'cd', 'd', 'e', 'ef', 'f', 'fg', 'g', 'h', 'j', 'js', 'k', 'm', 'n', 'p', 'r', 's', 't', 'u', 'v', 'x', 'y', 'z', 'za', 'zb', 'zc'];
+  T.HOLE_LETTERS = T.SHAFT_LETTERS.map(l => l.toUpperCase());
 
   // Toleranzklassen, die in fast jedem Tabellenbuch fertig ausgerechnet stehen
-  T.COMMON_CLASSES = ['D10', 'E8', 'E9', 'F7', 'F8', 'G6', 'G7', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'JS6', 'JS7', 'K6', 'K7', 'M6', 'M7', 'N6', 'N7', 'P6', 'P7', 'R7', 'S7',
+  T.COMMON_CLASSES = ['A11', 'C11', 'J7', 'a11', 'c11', 'j6', 'u6', 'D10', 'E8', 'E9', 'F7', 'F8', 'G6', 'G7', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'JS6', 'JS7', 'K6', 'K7', 'M6', 'M7', 'N6', 'N7', 'P6', 'P7', 'R7', 'S7',
     'd9', 'd10', 'e7', 'e8', 'f6', 'f7', 'g5', 'g6', 'h5', 'h6', 'h7', 'h8', 'h9', 'h11', 'js5', 'js6', 'js7', 'k5', 'k6', 'm5', 'm6', 'n5', 'n6', 'p6', 'r6', 's6'];
 
   // ISO 2768-1: Grenzabmaße für Längenmaße in mm (null = kein Wert festgelegt)
