@@ -387,18 +387,27 @@
     const len = (plan && plan.meso && plan.meso.len) || 5;
     const deload = w === len;
     const label = deload ? 'Deload-Woche' : ['Einstieg', 'Aufbau', 'Aufbau', 'Peak'][w - 1] || 'Aufbau';
-    return { w, len, deload, label, rirShift: deload ? 0 : [1, 0, 0, -1][w - 1] ?? 0 };
+    return { w, len, deload, label, rirShift: 0 };
   }
   function adaptNow(profile) { const ad = profile && profile.adapt; if (!ad) return null; const t = todayISO(); return t >= ad.from && t < ad.until ? ad : null; }
+  /* Reserve (RIR) pro Mesozyklus-Woche. Hypertrophie-Studien (z. B. Refalo 2023, Robinson 2024):
+     0–2 Wdh. vor dem Versagen bauen am meisten Muskeln auf, mehr Reserve kostet Wachstum,
+     echtes Versagen bei Grundübungen kostet viel Erholung. Darum Grundübungen 2→1, Isolation 1. */
+  const RIR_PLAN = {
+    mod: { main: [3, 2, 2, 2], sec: [2, 2, 2, 1], iso: [2, 2, 1, 1] },
+    hard: { main: [2, 2, 1, 1], sec: [2, 1, 1, 1], iso: [1, 1, 1, 1] },
+    very: { main: [2, 1, 1, 1], sec: [1, 1, 1, 0], iso: [1, 1, 0, 0] }
+  };
   function targetRIR(role, kind, profile, wi) {
-    if (wi.deload) return 4;
+    if (wi.deload) return 3;
     const ad = adaptNow(profile);
     const i = (profile.answers || {}).intensity || 'hard';
-    const base = role === 'main' ? { mod: 3, hard: 2, very: 2 }[i] : role === 'sec' ? { mod: 2, hard: 2, very: 1 }[i] : { mod: 2, hard: 1, very: 0 }[i];
-    let r = base + wi.rirShift + (ad ? ad.rir || 0 : 0);
+    const tbl = RIR_PLAN[i] || RIR_PLAN.hard;
+    const row = role === 'main' ? tbl.main : role === 'sec' ? tbl.sec : tbl.iso;
+    let r = row[Math.min(row.length, Math.max(1, wi.w)) - 1] + (ad ? ad.rir || 0 : 0);
     const min = role === 'main' ? 1 : 0;
     if (kind === 'hold' || role === 'skill') r = Math.max(1, r);
-    return Math.max(min, Math.min(4, r));
+    return Math.max(min, Math.min(3, r));
   }
   function prescription(slot, ex, profile, plan) {
     const wi = weekInfo(plan, profile);

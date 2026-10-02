@@ -100,6 +100,36 @@
   const settings = () => Object.assign({ sound: true, vib: true, autoRest: true, bbStep: 2.5, stackStep: 2.5, rpe: false }, (st.profile && st.profile.settings) || {});
   function getEx(id) { return D.byId[id] || ((P() && P().custom) || []).find(e => e.id === id) || null; }
   function registerCustom() { for (const c of (P() && P().custom) || []) D.byId[c.id] = c; }
+  /* Eigene Übungen ↔ eingebaute Übungen: gleiche Wörter (ohne Füllwörter, Plural-Endungen) oder Alias = gleiche Übung */
+  const STOP = new Set(['an', 'am', 'mit', 'der', 'die', 'das', 'den', 'auf', 'im', 'in', 'zur', 'zum', 'und', 'von', 'kh', 'lh']);
+  function nameKey(n) {
+    return String(n || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+      .filter(w => w && !STOP.has(w)).map(w => w.length > 4 ? w.replace(/(en|e|n|s)$/, '') : w).sort().join(' ');
+  }
+  function findBuiltin(name) {
+    const k = nameKey(name); if (!k) return null;
+    return D.list.find(e => nameKey(e.name) === k || (e.alias || []).some(a => nameKey(a) === k)) || null;
+  }
+  // Wenn ein Update eine eigene Übung als richtige Übung nachliefert: Verlauf, Plan und Favoriten übernehmen
+  function upgradeCustom() {
+    const pr = P(); if (!pr || !(pr.custom || []).length) return [];
+    const done = [];
+    for (const c of pr.custom.slice()) {
+      const b = findBuiltin(c.name); if (!b) continue;
+      const from = JSON.stringify(c.id), to = JSON.stringify(b.id);
+      const swap = o => o == null ? o : JSON.parse(JSON.stringify(o).split(from).join(to));
+      pr.plan = swap(pr.plan); pr.favs = swap(pr.favs);
+      if (st.active) { st.active = swap(st.active); Store.saveActive(true); }
+      st.workouts = st.workouts.map(w => { if (!JSON.stringify(w).includes(from)) return w; const nw = swap(w); Store.saveWorkout(nw); return nw; });
+      pr.custom = pr.custom.filter(x => x.id !== c.id); delete D.byId[c.id];
+      done.push(b.name);
+    }
+    if (done.length) Store.saveProfile(true);
+    return done;
+  }
+  function customReport(ex) {
+    return `Satzwerk – neue eigene Übung, bitte mit allen Daten einbauen:\nName: ${ex.name}\nBewegung: ${D.PATTERNS[ex.pat] || ex.pat}\nArt: ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' : 'Halten'}\nMuskeln: ${ex.prim.map(m => D.MUSCLES[m]).join(', ') || '–'}\nGeräte: ${ex.eq.map(e => D.EQUIP[e]).join(', ')}\nZiel: ${ex.rr[0]}–${ex.rr[1]}`;
+  }
   function defLoc() { const a = (P() && P().answers) || {}; return a.location === 'gym' ? 'gym' : 'home'; }
   function locs() { const a = (P() && P().answers) || {}; return a.location === 'both' ? ['home', 'gym'] : [defLoc()]; }
   const LOCN = { home: 'Zuhause', gym: 'Studio' };
@@ -508,7 +538,7 @@
     const m = T.mode, now = Date.now();
     if (m === 'rest') {
       const left = T.restEnd ? Math.max(0, (T.restEnd - now) / 1000) : (T.restDur || 90);
-      return `<div class="bigtimer">${mmss(left)}</div>
+      return `<div class="bigtimer">${mmss(left)}</div>${T.restEnd ? `<div class="restof">von ${mmss(T.restDur || 90)} Pause</div>` : ''}
         <div class="chips" style="justify-content:center;flex-wrap:wrap">${[45, 60, 90, 120, 180, 240].map(s => `<button class="chip ${(T.restDur || 90) === s ? 'on' : ''}" data-a="restPreset" data-s="${s}">${mmss(s)}</button>`).join('')}</div>
         <button class="btn primary big" data-a="restToggle">${T.restEnd ? 'Stopp' : 'Start'}</button>`;
     }
@@ -554,7 +584,7 @@
   }
 
   /* ================= Pausentimer im Training ================= */
-  function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, label: label || '' }; renderRest(); }
+  function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, len: sec, label: label || '' }; renderRest(); }
   function renderRest() {
     const el = layerEl('rb');
     if (!st.ov || st.ov.type !== 'workout' || !st.active) { el.innerHTML = st.hold ? holdPanel() : ''; return; }
@@ -563,7 +593,7 @@
     const left = st.rest ? (st.rest.end - Date.now()) / 1000 : 0;
     const resting = st.rest && left > -4;
     el.innerHTML = `<div class="panel"><div class="cols"><div><small>Dauer</small><div class="v" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</div></div>
-      <div><small style="text-align:center" id="restLbl">${resting ? (left > 0 ? 'Pause' : 'Los geht’s') : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${resting ? mmss(Math.max(0, left)) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div></div>
+      <div><small style="text-align:center" id="restLbl">${resting ? (left > 0 ? 'Pause' : 'Los geht’s') : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${resting ? mmss(Math.max(0, left)) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div>${resting ? `<div class="restof" id="restOf">von ${mmss(st.rest.len ?? st.rest.total)} Pause</div>` : ''}</div>
       <div style="text-align:right"><small>Satz</small><div class="v">${S ? Math.min(S.done.length + 1, S.planned) + '/' + S.planned : '–'}</div></div></div>
       ${resting ? `<div class="prog"><i id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></i></div>` : ''}
       <div class="ctrl">${resting ? `<button data-a="restAdj" data-s="-15">−15 s</button><button data-a="restAdj" data-s="15">+15 s</button><button class="go" data-a="restSkip">Weiter</button>` : S ? `<button data-a="manualRest">${I.timer.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Pause</button><button class="go" data-a="doneCur">Satz fertig ✓</button>` : `<button class="go" data-a="finishAsk">Training beenden</button>`}</div></div>`;
@@ -617,7 +647,8 @@
       <div class="stack">
         ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>`}
         <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
-          ${a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''}" data-a="focusEx" data-i="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join('')}
+          <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
+          ${a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join('')}
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
   }
@@ -827,7 +858,8 @@
         ${chain.length > 1 ? `<div class="stack" style="gap:8px"><b>Progressionsstufen</b><div class="chips" style="gap:10px">${chain.map(c => `<button class="extile" style="width:92px;flex:none" data-a="exInfo" data-id="${c.id}"><div class="tile" style="${c.id === ex.id ? 'box-shadow:inset 0 0 0 2px var(--lime)' : ''}">${figSVG(c)}</div><span>${c.id === harder ? '▲ ' : c.id === easier ? '▼ ' : ''}${esc(c.name)}</span></button>`).join('')}</div></div>` : ''}
         ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
         ${pctTable}
-        <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div></div>`;
+        <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div>
+        ${ex.custom ? `<div class="card flat stack" style="gap:8px"><b>Bild & Anleitung ergänzen lassen</b><div class="small muted">Eigene Übungen liegen nur auf deinem Handy. Schick sie Claude – beim nächsten Update kommt die Übung mit Bild, Anleitung und allen Daten zurück, dein Verlauf bleibt erhalten.</div><button class="btn" data-a="shareCustom" data-id="${ex.id}">An Claude schicken</button></div>` : ''}</div>`;
     },
     checkin(s) {
       const done = E.CHECKIN.filter(q => s.ans[q.id] != null).length;
@@ -965,7 +997,7 @@
     custom(s) {
       const c = s.c || (s.c = { name: '', pat: 'biceps', kind: 'load', prim: [], eq: ['bw'], lo: 8, hi: 12 });
       return `<div class="stack"><h2>Eigene Übung</h2>
-        <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"></div>
+        <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"><div id="cx-hit">${cxHit(c.name)}</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-pat">Bewegung</label><select class="field" id="cx-pat" data-in="cx" data-k="pat">${Object.entries(D.PATTERNS).map(([k, v]) => `<option value="${k}" ${c.pat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
         <div class="grow"><label class="lbl" for="cx-kind">Art</label><select class="field" id="cx-kind" data-in="cx" data-k="kind">${[['load', 'Mit Gewicht'], ['bw', 'Körpergewicht'], ['hold', 'Halten (Sekunden)']].map(([k, v]) => `<option value="${k}" ${c.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
         <div><div class="lbl">Muskeln</div><div class="row wrap">${Object.entries(D.MUSCLES).map(([k, v]) => `<button class="chip ${c.prim.includes(k) ? 'on' : ''}" data-a="cxMuscle" data-k="${k}">${v}</button>`).join('')}</div></div>
@@ -974,6 +1006,7 @@
         <button class="btn primary" data-a="cxSave">Speichern</button></div>`;
     }
   };
+  function cxHit(name) { const b = name && name.trim().length > 3 ? findBuiltin(name) : null; return b ? `<button class="card flat row" style="margin-top:8px;width:100%;text-align:left;gap:10px" data-a="exInfo" data-id="${b.id}">${thumb(b)}<div class="grow small"><b>Gibt es schon:</b> ${esc(b.name)}<div class="muted">Mit Bild, Anleitung und Empfehlungen – antippen</div></div></button>` : ''; }
   function wStep(ex) { const o = E.loadOptions(ex, st.active.loc, P()); if (o && o.length > 1) { let m = Infinity; for (let i = 1; i < o.length; i++) m = Math.min(m, o[i] - o[i - 1]); return isFinite(m) && m > 0 ? m : 2.5; } return ex.kind === 'bw' ? 2.5 : 1; }
   function findSlot(entry) { const p = plan(); if (!p || !entry.slotId) return null; for (const d of p.days) for (const s of d.slots) if (s.id === entry.slotId) return s; return null; }
 
@@ -1007,7 +1040,7 @@
     filterPick(t) { const k = st.sheet.k; const v = t.dataset.v; st.libF = Object.assign({}, st.libF, { [k]: v === '' ? null : (k === 'lvl' ? +v : v) }); closeSheet(); render(); },
     libAvailT() { st.libAvail = !st.libAvail; render(); },
     libReset() { st.libF = {}; render(); },
-    manualRest() { const ci = curIndex(); const e = ci >= 0 ? st.active.exercises[ci] : null; st.rest = { end: Date.now() + (e ? e.presc.rest : 90) * 1000, total: e ? e.presc.rest : 90, label: '' }; renderRest(); },
+    manualRest() { const ci = curIndex(); const e = ci >= 0 ? st.active.exercises[ci] : null; const sec = e ? e.presc.rest : 90; st.rest = { end: Date.now() + sec * 1000, total: sec, len: sec, label: '' }; renderRest(); },
     doneCur() { const ci = curIndex(); if (ci >= 0) A.doneSet({ dataset: { i: ci } }); },
     noteOpen(t) { openSheet({ type: 'note', i: +t.dataset.i }); setTimeout(() => { const n = $('#noteText'); if (n) n.focus(); }, 80); },
     plates(t) { const e = st.active.exercises[+t.dataset.i]; const S = exState(e); openSheet({ type: 'plates', w: (e.draft && e.draft.w) ?? S.rec.w ?? 60, bar: 20 }); },
@@ -1116,12 +1149,17 @@
     libGroup(t) { st.libGroup = t.dataset.g; render(); },
     libAvail(t) { st.libAvail = t.checked; render(); },
     customEx() { openSheet({ type: 'custom' }); },
+    async shareCustom(t) {
+      const ex = getEx(t.dataset.id); if (!ex) return; const text = customReport(ex);
+      try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(text); toast('Kopiert – füge es im Chat mit Claude ein'); } catch (e) { toast('Teilen hier nicht möglich'); }
+    },
     cxMuscle(t) { const c = st.sheet.c; const k = t.dataset.k; const i = c.prim.indexOf(k); if (i >= 0) c.prim.splice(i, 1); else c.prim.push(k); renderSheet(); },
     cxEq(t) { const c = st.sheet.c; const k = t.dataset.k; const i = c.eq.indexOf(k); if (i >= 0) c.eq.splice(i, 1); else c.eq.push(k); if (!c.eq.length) c.eq = ['bw']; renderSheet(); },
     cxSave() {
       const c = st.sheet.c; if (!c.name.trim()) { toast('Bitte einen Namen eingeben'); return; } if (!c.prim.length) { toast('Bitte mindestens einen Muskel wählen'); return; }
       const ex = { id: 'c-' + uid(), custom: true, name: c.name.trim(), pat: c.pat, role: ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i', kind: c.kind, eq: c.eq.length ? c.eq : ['bw'], prim: c.prim, sec: [], lvl: 2, rr: [+c.lo || 8, +c.hi || 12], d: 'Eigene Übung.', c: [], std: 0.3, bwf: c.kind === 'bw' ? 0.6 : undefined };
-      P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile(); closeSheet(); render(); toast('Übung angelegt');
+      P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile(); render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung angelegt');
     },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
@@ -1138,7 +1176,7 @@
     swToggle() { const sw = T.sw; if (sw.start) { sw.acc += Date.now() - sw.start; sw.start = null; } else sw.start = Date.now(); render(); },
     swLap() { const sw = T.sw; sw.laps.unshift(sw.acc + (Date.now() - sw.start)); render(); },
     swReset() { T.sw = { start: null, acc: 0, laps: [] }; render(); },
-    restAdj(t) { if (!st.rest) return; st.rest.end += +t.dataset.s * 1000; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
+    restAdj(t) { if (!st.rest) return; st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
     restSkip() { st.rest = null; renderRest(); }
   };
   function addToWorkout(id) {
@@ -1205,7 +1243,7 @@
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
-    cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); }
+    cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value); } }
   };
 
   document.addEventListener('click', e => {
@@ -1245,7 +1283,12 @@
     if (!lp) return; clearTimeout(lp.timer); const L = lp; lp = null;
     if (!L.active) return;
     st.noClickUntil = Date.now() + 450;
-    if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); Store.saveProfile(); toast('Reihenfolge geändert'); }
+    if (L.to !== L.s && L.el.dataset.drag === 'wo' && st.active) {
+      const a = st.active; const curKey = a.cur != null && a.exercises[a.cur] ? a.exercises[a.cur].key : null;
+      const [m] = a.exercises.splice(L.s, 1); a.exercises.splice(L.to, 0, m);
+      if (curKey) a.cur = a.exercises.findIndex(e => e.key === curKey);
+      Store.saveActive(); toast('Reihenfolge geändert');
+    } else if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); Store.saveProfile(); toast('Reihenfolge geändert'); }
     render();
   }
   document.addEventListener('touchstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (el && !st.sheet) lpStart(el, e.touches[0].clientY); }, { passive: true });
@@ -1302,6 +1345,7 @@
   (async function boot() {
     await Store.init();
     registerCustom();
+    const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
     if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) {
       const old = st.profile.plan; const np = E.buildPlan(st.profile);
       np.meso = old.meso || np.meso; np.next = (old.next || 0) % np.days.length; np.forceDeload = old.forceDeload;
