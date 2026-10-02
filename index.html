@@ -162,8 +162,8 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .overlay{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .overlay .inner{max-width:620px;margin:0 auto;padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 8px) calc(env(safe-area-inset-bottom,0px) + 190px)}
 .ohead{position:sticky;top:0;z-index:3;background:linear-gradient(var(--bg) 75%,transparent);display:flex;align-items:center;gap:12px;padding-block:10px 14px}
-.scrim{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--bg);width:100%;max-width:620px;border-radius:32px 32px 0 0;max-height:92vh;overflow-y:auto;padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 24px);border-top:1px solid var(--line)}
+.scrim{overscroll-behavior:contain;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
+.sheet{overscroll-behavior:contain;background:var(--bg);width:100%;max-width:620px;border-radius:32px 32px 0 0;max-height:92vh;overflow-y:auto;padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 24px);border-top:1px solid var(--line)}
 .sheettop{position:sticky;top:-10px;z-index:5;margin:-10px -18px 6px;padding:10px 18px 6px;background:var(--bg);touch-action:none}
 .sheet .grab{width:44px;height:5px;border-radius:9px;background:rgba(255,255,255,.25);margin:4px auto 6px}
 .sheetx{position:absolute;right:12px;top:8px;width:38px;height:38px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);display:grid;place-items:center}
@@ -319,12 +319,20 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 :root:not([data-font="classic"]) .badge b{font-size:18px}
 :root:not([data-font="classic"]) .rirgrid button b{font-size:36px}
 :root[data-font="classic"]{--display:"Oxanium","Arial Rounded MT Bold",-apple-system,system-ui,sans-serif;--body:"Manrope",-apple-system,"SF Pro Text",system-ui,sans-serif}
+.howsec{display:flex;flex-direction:column;gap:8px}.howh{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.howsteps{list-style:none;margin:0;padding:0;counter-reset:hs;display:flex;flex-direction:column;gap:8px}.howsteps li{counter-increment:hs;display:flex;gap:10px;align-items:flex-start;line-height:1.35}
+.howsteps li::before{content:counter(hs);flex:none;width:24px;height:24px;border-radius:50%;background:var(--lime);color:#111;font-weight:800;font-size:13px;display:grid;place-items:center;margin-top:-1px}
+.howlist{display:flex;flex-direction:column;gap:7px}.howtip{display:flex;gap:10px;align-items:flex-start;line-height:1.35}.howtip.bad{background:rgba(255,107,107,.1);border-radius:12px;padding:9px 10px}
+.hk{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:900}.hk.ok{background:rgba(200,240,100,.16);color:var(--lime)}.hk.no{background:rgba(255,107,107,.18);color:#FF6B6B}
+.howtgl{all:unset;box-sizing:border-box;width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;font-weight:700}.howtgl span:first-child{display:flex;align-items:center;gap:8px;min-width:0}.howtgl svg{width:18px;height:18px;flex:none}
+html.sheet-open .overlay{overflow:hidden}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
 <div id="layer"></div>
 
 <script src="exercises.js"></script>
+<script src="howto.js"></script>
 <script src="engine.js"></script>
 <script src="figures.js"></script>
 <script src="app.js"></script>

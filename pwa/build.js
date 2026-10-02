@@ -9,6 +9,6 @@ const head = `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta n
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>`;
 const tail = `<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));</script></body></html>`;
 fs.writeFileSync(path.join(out, 'index.html'), head + page + tail);
-for (const f of ['exercises.js', 'engine.js', 'figures.js', 'app.js']) fs.copyFileSync(path.join(root, f), path.join(out, f));
+for (const f of ['exercises.js', 'howto.js', 'engine.js', 'figures.js', 'app.js']) fs.copyFileSync(path.join(root, f), path.join(out, f));
 for (const f of ['sw.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(__dirname, f), path.join(out, f));
 console.log('PWA gebaut in', out);

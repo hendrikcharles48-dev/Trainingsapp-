@@ -181,8 +181,24 @@
     el.className = 'overlay'; el.innerHTML = '<div class="inner">' + html + '</div>'; el.scrollTop = keep;
     document.body.style.overflow = 'hidden';
   }
+  // Hintergrund sperren, solange ein Fenster offen ist (sonst scrollt iOS die Seite dahinter mit)
+  let bgLock = null;
+  function lockBg(on) {
+    const b = document.body;
+    if (on && !bgLock) {
+      bgLock = { y: window.scrollY };
+      document.documentElement.classList.add('sheet-open');
+      Object.assign(b.style, { position: 'fixed', top: -bgLock.y + 'px', left: '0', right: '0', width: '100%' });
+    } else if (!on && bgLock) {
+      const y = bgLock.y; bgLock = null;
+      document.documentElement.classList.remove('sheet-open');
+      Object.assign(b.style, { position: '', top: '', left: '', right: '', width: '' });
+      window.scrollTo(0, y);
+    }
+  }
   function renderSheet() {
     const el = layerEl('sh');
+    lockBg(!!st.sheet && !!SHEETS[st.sheet.type]);
     if (!st.sheet) { el.innerHTML = ''; return; }
     const fn = SHEETS[st.sheet.type]; if (!fn) { st.sheet = null; el.innerHTML = ''; return; }
     const prev = el.querySelector('.sheet'); const keep = prev ? prev.scrollTop : 0;
@@ -605,6 +621,21 @@
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
   }
+  const UNIT_RX = /^(Kilo|Wdh\.|Sekunden|Gesamtgewicht)/;
+  function howtoHTML(ex, compact) {
+    const h = (window.HOWTO || {})[ex.id];
+    const units = (ex.c || []).filter(c => UNIT_RX.test(c));
+    if (!h) {
+      const cues = (ex.c || []).filter(c => !UNIT_RX.test(c));
+      return `<p style="margin:0" class="ink2">${esc(ex.d)}</p>${cues.length ? `<div class="howlist">${cues.map(c => `<div class="howtip"><span class="hk ok">✓</span><span>${esc(c)}</span></div>`).join('')}</div>` : ''}`;
+    }
+    const tips = h.w.filter(c => !UNIT_RX.test(c));
+    return `${compact ? '' : `<p style="margin:0" class="ink2">${esc(ex.d)}</p>`}
+      <div class="howsec"><div class="howh">So geht's</div><ol class="howsteps">${h.s.map(x => `<li><span>${esc(x)}</span></li>`).join('')}</ol></div>
+      <div class="howsec"><div class="howh">Darauf achten</div><div class="howlist">${tips.map(c => `<div class="howtip"><span class="hk ok">✓</span><span>${esc(c)}</span></div>`).join('')}
+      ${h.f ? `<div class="howtip bad"><span class="hk no">✗</span><span><b>Häufiger Fehler:</b> ${esc(h.f)}</span></div>` : ''}</div></div>
+      ${units.length && !compact ? `<div class="small muted">${units.map(esc).join(' · ')}</div>` : ''}`;
+  }
   function focusCard(entry, idx) {
     const S = exState(entry); const { ex, presc, done, rec, planned, finished } = S;
     if (!ex) return '';
@@ -640,6 +671,7 @@
     const isBB = ex.eq.includes('bb') && ex.kind === 'load';
     return `<div class="stage"><div class="over"><div class="eyebrow">${ROLE[presc.role] ? ROLE[presc.role][1] : ''} · ${ex.prim.map(m => D.MUSCLES[m]).join(', ')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" aria-label="Satz ${done.length} von ${planned}">${pills}<b>${done.length}/${planned}</b></div></div>
       ${target}
+      <div class="card flat howcard"><button class="howtgl" data-a="howToggle" aria-expanded="${!!st.howOpen}"><span>${I.info} So geht's: ${esc(ex.name)}</span><span class="chev" style="transform:rotate(${st.howOpen ? -90 : 90}deg)">${I.chev}</span></button>${st.howOpen ? `<div class="stack" style="gap:12px;margin-top:10px">${howtoHTML(ex, true)}</div>` : ''}</div>
       ${entry.note || lastNote ? `<div class="card flat small" data-a="noteOpen" data-i="${idx}" style="cursor:pointer">${I.note.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} ${entry.note ? esc(entry.note) : '<span class="muted">Letztes Mal:</span> ' + esc(lastNote)}</div>` : ''}
       <table class="sets"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
       <div class="exfoot">${isHold && !finished && kind === 'hold' ? `<button class="btn sm primary" data-a="holdStart" data-i="${idx}">${I.play} Halten starten</button>` : ''}${kind === 'int' && !finished ? `<button class="btn sm primary" data-a="intStart" data-i="${idx}">${I.play} Intervall</button>` : ''}
@@ -790,8 +822,7 @@
       const pctTable = ex.kind === 'load' && best > 0 ? `<div class="card stack" style="gap:8px"><div class="row between"><b>1RM-Tabelle</b><span class="small muted">geschätztes Maximum ${fmt(best, 1)} kg</span></div><div class="tbl"><table><thead><tr><th>%</th><th class="r">Gewicht</th><th class="r">≈ Wdh.</th></tr></thead><tbody>${[100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => `<tr><td>${p} %</td><td class="r num">${fmt(Math.round(best * p / 100 * 2) / 2)} kg</td><td class="r num">${p === 100 ? 1 : Math.max(1, Math.round(30 * (100 / p - 1)))}</td></tr>`).join('')}</tbody></table></div></div>` : '';
       return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div><button class="favbtn ${isFav(ex.id) ? 'on' : ''}" data-a="favToggle" data-id="${ex.id}" aria-label="${isFav(ex.id) ? 'Favorit entfernen' : 'Als Favorit markieren'}" aria-pressed="${isFav(ex.id)}">★</button>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
         <div class="row wrap" style="gap:6px">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
-        <div class="card stack" style="gap:10px"><b>Anleitung</b><p style="margin:0" class="ink2">${esc(ex.d)}</p>
-        ${ex.c && ex.c.length ? `<div class="stack" style="gap:6px">${ex.c.map((c, i) => `<div class="row" style="align-items:flex-start"><span class="plate p-main" style="width:22px;height:22px;font-size:11px">${i + 1}</span><span>${esc(c)}</span></div>`).join('')}</div>` : ''}
+        <div class="card stack" style="gap:12px"><b>Anleitung</b>${howtoHTML(ex)}
         <div class="small muted">${ex.eq.map(e => D.EQUIP[e]).join(' + ')} · ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' + (ex.addw ? ' (+ Zusatzgewicht möglich)' : '') : ex.kind === 'hold' ? 'Haltezeit' : 'Intervall'} · Ziel ${rrText(ex.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div>
         ${chain.length > 1 ? `<div class="stack" style="gap:8px"><b>Progressionsstufen</b><div class="chips" style="gap:10px">${chain.map(c => `<button class="extile" style="width:92px;flex:none" data-a="exInfo" data-id="${c.id}"><div class="tile" style="${c.id === ex.id ? 'box-shadow:inset 0 0 0 2px var(--lime)' : ''}">${figSVG(c)}</div><span>${c.id === harder ? '▲ ' : c.id === easier ? '▼ ' : ''}${esc(c.name)}</span></button>`).join('')}</div></div>` : ''}
         ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
@@ -948,6 +979,7 @@
 
   /* ================= Aktionen ================= */
   const A = {
+    howToggle() { st.howOpen = !st.howOpen; render(); },
     favToggle(t) {
       const id = t.dataset.id; const ex = getEx(id); const f = P().favs = P().favs || [];
       const i = f.indexOf(id); const on = i < 0;
@@ -1233,12 +1265,24 @@
     if (e.target.closest('input,textarea,select')) return;
     drag = { sh, y0: e.touches[0].clientY, dy: 0, top: !!onTop };
   }, { passive: true });
+  let tch = null;
+  document.addEventListener('touchstart', e => { tch = st.sheet ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
   document.addEventListener('touchmove', e => {
-    if (!drag) return;
-    const dy = e.touches[0].clientY - drag.y0;
-    if (dy <= 0 || (!drag.top && drag.sh.scrollTop > 0)) { drag.dy = 0; drag.sh.style.transform = ''; return; }
-    drag.dy = dy; drag.sh.style.transition = 'none'; drag.sh.style.transform = `translateY(${dy}px)`;
-  }, { passive: true });
+    if (drag) {
+      const dy = e.touches[0].clientY - drag.y0;
+      if (dy <= 0 || (!drag.top && drag.sh.scrollTop > 0)) { drag.dy = 0; drag.sh.style.transform = ''; }
+      else { drag.dy = dy; drag.sh.style.transition = 'none'; drag.sh.style.transform = `translateY(${dy}px)`; if (e.cancelable) e.preventDefault(); return; }
+    }
+    // Wischen im offenen Fenster darf nie die Seite dahinter bewegen
+    if (!st.sheet || !tch || !e.cancelable) return;
+    const t = e.touches[0]; const vertical = Math.abs(t.clientY - tch.y) > Math.abs(t.clientX - tch.x);
+    if (!vertical || (e.target.closest && e.target.closest('input,textarea,select'))) return;
+    const sh = e.target.closest && e.target.closest('.sheet');
+    if (!sh) { e.preventDefault(); return; }
+    if (sh.scrollHeight <= sh.clientHeight + 1) { e.preventDefault(); return; }
+    const down = t.clientY > tch.y;
+    if ((down && sh.scrollTop <= 0) || (!down && sh.scrollTop + sh.clientHeight >= sh.scrollHeight - 1)) e.preventDefault();
+  }, { passive: false });
   document.addEventListener('touchend', () => {
     if (!drag) return; const d = drag; drag = null;
     if (d.dy > 90) { d.sh.style.transition = 'transform .18s ease-in'; d.sh.style.transform = 'translateY(100%)'; setTimeout(closeSheet, 170); }
