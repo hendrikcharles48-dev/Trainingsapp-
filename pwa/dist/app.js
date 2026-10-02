@@ -97,7 +97,7 @@
   /* ================= Hilfen ================= */
   const P = () => st.profile;
   const plan = () => st.profile && st.profile.plan;
-  const settings = () => Object.assign({ sound: true, vib: true, autoRest: true, bbStep: 2.5, stackStep: 2.5, rpe: false, garmin: true }, (st.profile && st.profile.settings) || {});
+  const settings = () => Object.assign({ sound: true, vib: true, autoRest: true, bbStep: 2.5, stackStep: 2.5, rpe: false }, (st.profile && st.profile.settings) || {});
   function getEx(id) { return D.byId[id] || ((P() && P().custom) || []).find(e => e.id === id) || null; }
   function registerCustom() { for (const c of (P() && P().custom) || []) D.byId[c.id] = c; }
   /* Eigene Übungen ↔ eingebaute Übungen: gleiche Wörter (ohne Füllwörter, Plural-Endungen) oder Alias = gleiche Übung */
@@ -285,7 +285,6 @@
     <div class="stack">
       <div class="card" style="padding:14px 10px"><div class="row between" style="padding:0 8px 8px"><b class="num" style="font-size:17px">${new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</b><span class="small muted">${cnt} von ${goal} Trainings</span></div>
         <div class="cal">${DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); return `<div><div class="d">${d}</div><div class="n ${i === todayIdx ? 'today' : ''} ${doneDays.has(i) ? 'done' : ''}">${dt.getDate()}</div></div>`; }).join('')}</div></div>
-      ${formCard()}
       ${checkinDue() ? checkinCard() : ''}
       ${st.active ? `<div class="card lime rings-bg stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="font-weight:800">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn dark big" data-a="resume">${I.play} Weiter trainieren</button></div>` : `
       <div class="card lime rings-bg" style="position:relative;min-height:230px;padding:20px">
@@ -324,33 +323,6 @@
     const sow = E.todayISO(E.startOfWeek());
     if ((P().checkins || []).some(c => c.week === sow)) return false;
     return st.workouts.some(w => w.date < sow);
-  }
-  function formCard() {
-    const p = P(); if (!p || !p.plan || !settings().garmin) return '';
-    const rd = E.readiness(p);
-    if (!rd) return `<button class="card flat row" style="width:100%;text-align:left;gap:12px" data-a="formOpen"><span class="plate p-main" style="width:34px;height:34px">⌚</span><div class="grow"><b>Tagesform von Garmin</b><div class="small muted">Trainingsbereitschaft, Schlaf & Co. eintragen – das Training passt sich an</div></div><span class="chev">${I.chev}</span></button>`;
-    const col = { low: '#FF6B6B', reduced: '#F5C26B', ok: 'var(--lav)', high: 'var(--lime)' }[rd.level];
-    return `<button class="card flat row" style="width:100%;text-align:left;gap:12px" data-a="formOpen"><div class="formring" style="--c:${col}">${rd.score}</div><div class="grow"><b>Tagesform</b><div class="small">${esc(rd.text)}</div>${rd.why.length ? `<div class="tiny muted">${esc(rd.why.join(' · '))}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`;
-  }
-  function parseHealth(txt) {
-    const o = {}; const t = String(txt || '').toLowerCase().replace(/,/g, '.');
-    const num = re => { const m = t.match(re); return m ? parseFloat(m[1]) : undefined; };
-    o.tr = num(/(?:tr|bereitschaft|readiness)\D{0,25}?(\d{1,3})/); o.bb = num(/(?:bb|body ?battery)\D{0,15}?(\d{1,3})/);
-    o.sleep = num(/(?:sleep|schlaf)\D{0,15}?(\d{1,2}(?:\.\d+)?)/); o.rhr = num(/(?:rhr|ruhepuls|resting)\D{0,25}?(\d{2,3})/); o.hrv = num(/(?:hrv|herzfrequenzvariabilit\S*)\D{0,15}?(\d{1,3})/);
-    if (o.sleep > 24) o.sleep = Math.round(o.sleep / 60 * 10) / 10; // Minuten -> Stunden
-    for (const k in o) if (o[k] == null || isNaN(o[k])) delete o[k];
-    return o;
-  }
-  // Text vom Kurzbefehl in die Felder der Tagesform übernehmen
-  function applyHealthText(txt) {
-    const o = parseHealth(txt); const keys = Object.keys(o);
-    if (!keys.length || !st.sheet || st.sheet.type !== 'form') return false;
-    Object.assign(st.sheet.v, o);
-    for (const k of keys) { const el = $('#hf-' + k); if (el) el.value = String(o[k]).replace('.', ','); }
-    const names = { tr: 'Bereitschaft', bb: 'Body Battery', sleep: 'Schlaf', rhr: 'Ruhepuls', hrv: 'HRV' };
-    const msg = 'Übernommen: ' + keys.map(k => names[k] + ' ' + String(o[k]).replace('.', ',')).join(' · ');
-    const m = $('#hf-msg'); if (m) { m.textContent = msg + ' – jetzt „Speichern“ tippen.'; m.style.color = 'var(--lime)'; }
-    toast(msg); return true;
   }
   function checkinCard() {
     return `<div class="card lav stack" style="gap:8px"><div class="row between"><b style="font-size:1.15em">Wochen-Check-in</b><span class="tag">1 Minute</span></div><div class="small" style="opacity:.8">7 kurze Fragen zu Erschöpfung, Muskelkater, Fitness und anderem Sport. Danach passe ich das Volumen dieser Woche an.</div><div class="row"><button class="btn dark grow" data-a="ciOpen">Jetzt ausfüllen</button><button class="btn" style="background:rgba(20,20,22,.1);color:var(--on-light)" data-a="ciLater">Später</button></div></div>`;
@@ -719,7 +691,6 @@
     if (r.easier && nb.easier) return 'easier';
     if (nb.harder && (r.notes || []).some(n => /Schwerstes verfügbares Gewicht|Mehr Wdh\. als geplant|Zu leicht/.test(n))) return 'harder';
     if (nb.easier && r.dayForm != null && r.dayForm <= -0.08) return 'easier';
-    const rd = E.readiness(P()); if (nb.easier && rd && rd.level === 'low') return 'easier';
     return 'cur';
   }
   function focusCard(entry, idx) {
@@ -985,19 +956,6 @@
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
     },
-    form(s) {
-      const p = P(); const today = E.todayISO(); const cur = s.v || (s.v = Object.assign({}, ((p.health || []).find(x => x.d === today)) || {}));
-      const f = (k, l, ph, mode) => `<div><label class="lbl" for="hf-${k}">${l}</label><input class="field" id="hf-${k}" inputmode="${mode || 'numeric'}" data-in="hf" data-k="${k}" value="${cur[k] ?? ''}" placeholder="${ph}"></div>`;
-      const rd = E.readiness(p);
-      return `<div class="stack"><div><div class="eyebrow">Garmin</div><h2>Tagesform heute</h2><div class="small muted">Werte aus der Garmin-Connect-App (Startseite / „Mein Tag“). Alles optional – je mehr, desto genauer.</div></div>
-        <div class="pastebox"><label class="lbl" for="hf-paste">Text vom Kurzbefehl</label><textarea class="field" id="hf-paste" rows="1" data-in="hfPaste" placeholder="Hier gedrückt halten → „Einfügen“" autocomplete="off" autocorrect="off" spellcheck="false"></textarea><div class="tiny muted" id="hf-msg">Ins Feld tippen oder gedrückt halten, dann „Einfügen“ wählen. Die Werte werden automatisch übernommen.</div></div>
-        <div class="row">${f('tr', 'Trainingsbereitschaft', '0–100')}${f('bb', 'Body Battery', '0–100')}</div>
-        <div class="row">${f('sleep', 'Schlaf (Std.)', 'z. B. 7,5', 'decimal')}${f('rhr', 'Ruhepuls', 'z. B. 52')}</div>
-        <div class="row">${f('hrv', 'HRV (ms, Nacht)', 'z. B. 60')}<div></div></div>
-        <button class="btn primary" data-a="formSave">Speichern</button>
-        ${rd ? `<div class="small muted">Aktuell: ${rd.score}/100 – ${esc(rd.text)}</div>` : ''}
-        <div class="tiny muted">So wirkt es: unter 30 Punkte → 1 Satz weniger pro Übung und 1 Wdh. mehr Reserve; 30–49 → 1 Satz weniger bei Ergänzung, Isolation und Rumpf; ab 50 → wie geplant. Ruhepuls und HRV werden mit deinem 14-Tage-Schnitt verglichen.</div></div>`;
-    },
     level(s) {
       const entry = st.active.exercises[s.i]; const S = exState(entry); const ex = S.ex; const nb = levelNeighbors(entry); const rc = levelRec(entry, S, nb);
       const [lo, hi] = S.presc.rr; const u = ex.kind === 'hold' ? ' s' : ' Wdh.';
@@ -1056,7 +1014,7 @@
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
       return `<div class="stack"><h2>Einstellungen</h2>
         <div class="card stack" style="gap:10px"><b>Schrift</b><div class="seg">${[['hand', 'Handschrift'], ['classic', 'Klassisch']].map(([k, n]) => `<button data-a="setFont" data-k="${k}" aria-pressed="${(se.font === 'classic' ? 'classic' : 'hand') === k}">${n}</button>`).join('')}</div></div>
-        <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}${tog('garmin', 'Garmin-Tagesform', 'Karte auf der Startseite, Training passt sich an')}</div>
+        <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         <div class="card stack"><b>Studio-Gewichte</b><div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div></div>
         <div class="card stack"><b>Datensicherung</b><div class="small muted">${Store.mode === 'db' ? 'Deine Daten werden in deinem Konto gespeichert und sind auf allen Geräten verfügbar, auf denen du angemeldet bist.' : 'Deine Daten liegen nur in diesem Browser. Mach ab und zu ein Backup.'}</div>
           <div class="row wrap"><button class="btn grow" data-a="exportData">Backup exportieren</button><label class="btn grow" for="importFile" style="cursor:pointer">Backup importieren</label><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden></div></div>
@@ -1179,19 +1137,6 @@
     setMinus(t) { const e = st.active.exercises[+t.dataset.i]; e.extra = (e.extra || 0) - 1; Store.saveActive(); renderOverlay(); },
     ignoreStop(t) { st.active.exercises[+t.dataset.i].ignoreStop = true; Store.saveActive(); renderOverlay(); },
     switchEx(t) { doSwapWorkout(+t.dataset.i, t.dataset.id, false); },
-    formOpen() { openSheet({ type: 'form' }); },
-    async formPaste() {
-      try { const t = await navigator.clipboard.readText(); if (!applyHealthText(t)) toast('Keine Werte in der Zwischenablage gefunden'); }
-      catch (e) { const b = $('#hf-paste'); if (b) b.focus(); toast('Tippe ins Feld und wähle „Einfügen“'); }
-    },
-    formSave() {
-      const p = P(); const v = st.sheet.v || {}; const o = { d: E.todayISO() };
-      for (const k of ['tr', 'bb', 'sleep', 'rhr', 'hrv']) { const n = parseFloat(String(v[k] ?? '').replace(',', '.')); if (n >= 0) o[k] = n; }
-      p.health = (p.health || []).filter(x => x.d !== o.d); if (Object.keys(o).length > 1) p.health.push(o);
-      p.health.sort((a, b) => a.d < b.d ? -1 : 1); p.health = p.health.slice(-60);
-      if (st.active) for (const e of st.active.exercises) if (!e.sets.some(x => x.done)) { const ex = getEx(e.exId); if (ex) e.presc = E.prescription(findSlot(e), ex, p, plan()); }
-      Store.saveProfile(); if (st.active) Store.saveActive(); closeSheet(); render(); const rd = E.readiness(p); toast(rd ? 'Tagesform ' + rd.score + '/100' : 'Gespeichert');
-    },
     levelOpen(t) { openSheet({ type: 'level', i: +t.dataset.i }); },
     levelPick(t) { const i = st.sheet.i; closeSheet(); doSwapWorkout(i, t.dataset.id, false); },
     swapWorkout(t) { openSheet({ type: 'swapWorkout', i: +t.dataset.i, plan: false }); },
@@ -1335,8 +1280,6 @@
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
-    hf(t) { st.sheet.v[t.dataset.k] = t.value; },
-    hfPaste(t) { if (applyHealthText(t.value)) { t.value = ''; t.blur(); } },
     cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value); } }
   };
 
@@ -1439,6 +1382,7 @@
   (async function boot() {
     await Store.init();
     registerCustom();
+    if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }
     const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
     if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) {
       const old = st.profile.plan; const np = E.buildPlan(st.profile);

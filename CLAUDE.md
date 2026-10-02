@@ -42,6 +42,7 @@ Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`).
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an.
 
 ## Garmin
-Keine direkte Garmin-Schnittstelle möglich (Garmin-API nur für Firmen mit Server). Stattdessen
-Karte „Tagesform“: Werte eintippen oder per iOS-Kurzbefehl (Apple Health) in die Zwischenablage
-und „Aus Kurzbefehl einfügen“. Logik: `readiness()` in `engine.js`, Daten in `profile.health`.
+Tagesform aus Garmin-Werten wurde gebaut und auf Wunsch des Nutzers wieder entfernt: Garmin gibt
+Trainingsbereitschaft, Body Battery und (wahrscheinlich) HRV nicht an Apple Health weiter, nur
+Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`dayForm` in
+`recommend`) und dem Wochen-Check-in. Nur wieder einbauen, wenn der Nutzer es ausdrücklich will.
