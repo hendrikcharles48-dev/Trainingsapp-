@@ -11,6 +11,11 @@ Achtung: `docs/toleranzen/` gehört zu einer anderen App – nie löschen oder �
 Bevor ein Update hochgeladen wird, nachsehen, ob der Nutzer neue eigene Übungen angelegt hat.
 Für jede gefundene Übung herausfinden, was genau gemeint ist, und sie als vollwertige Übung einbauen:
 
+Was der Nutzer pro Übung will: Ausführung, worauf achten, häufiger Fehler – und die Übung nach
+Schwierigkeit einsortieren (`lvl` 1–5 und, wenn es eine Progressionskette gibt, `grp`/`rank`
+zwischen die passenden Stufen). Darüber findet der Knopf „Leichter / Schwerer“ im Training die
+Nachbarn (Auswahlfenster mit empfohlener Variante).
+
 1. `exercises.js`: Eintrag mit `X(...)` – passendes Muster, Rolle, Art, Geräte, Muskeln, Level,
    Wiederholungsbereich, ggf. `grp`/`rank` in der Progressionskette, `bwf`, `uni`, `inj`, `d`, `c`.
    Den Namen, den der Nutzer benutzt hat, als `alias` eintragen.
@@ -35,3 +40,8 @@ Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`).
 ## Trainingslogik
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an.
+
+## Garmin
+Keine direkte Garmin-Schnittstelle möglich (Garmin-API nur für Firmen mit Server). Stattdessen
+Karte „Tagesform“: Werte eintippen oder per iOS-Kurzbefehl (Apple Health) in die Zwischenablage
+und „Aus Kurzbefehl einfügen“. Logik: `readiness()` in `engine.js`, Daten in `profile.health`.

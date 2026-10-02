@@ -409,6 +409,25 @@
     if (kind === 'hold' || role === 'skill') r = Math.max(1, r);
     return Math.max(min, Math.min(3, r));
   }
+  /* Tagesform aus Garmin-Werten (Trainingsbereitschaft, Body Battery, Schlaf, Ruhepuls, HRV).
+     Ruhepuls und HRV werden mit deinem eigenen 14-Tage-Schnitt verglichen. */
+  function readiness(profile, date) {
+    const log = (profile && profile.health) || []; const d = date || todayISO();
+    const t = log.find(x => x.d === d); if (!t) return null;
+    const past = log.filter(x => x.d < d).slice(-14);
+    const avg = k => { const v = past.map(x => +x[k]).filter(x => x > 0); return v.length >= 3 ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const parts = [], why = [];
+    if (t.tr > 0 || t.tr === 0) { parts.push([+t.tr, 3]); why.push(`Trainingsbereitschaft ${t.tr}`); }
+    if (t.bb > 0) { parts.push([+t.bb, 1.5]); why.push(`Body Battery ${t.bb}`); }
+    if (t.sleep > 0) { const v = Math.max(0, Math.min(100, (t.sleep - 4.5) / 3.5 * 100)); parts.push([v, 1.5]); why.push(`Schlaf ${String(t.sleep).replace('.', ',')} h`); }
+    const rb = avg('rhr'); if (t.rhr > 0 && rb) { const dlt = t.rhr - rb; parts.push([Math.max(0, Math.min(100, 70 - dlt * 8)), 1]); if (Math.abs(dlt) >= 3) why.push(`Ruhepuls ${dlt > 0 ? '+' : ''}${Math.round(dlt)} zum Schnitt`); }
+    const hb = avg('hrv'); if (t.hrv > 0 && hb) { const rel = t.hrv / hb - 1; parts.push([Math.max(0, Math.min(100, 70 + rel * 200)), 1.5]); if (Math.abs(rel) >= 0.08) why.push(`HRV ${rel > 0 ? '+' : ''}${Math.round(rel * 100)} % zum Schnitt`); }
+    if (!parts.length) return null;
+    const score = Math.round(parts.reduce((a, [v, w]) => a + v * w, 0) / parts.reduce((a, [, w]) => a + w, 0));
+    const level = score < 30 ? 'low' : score < 50 ? 'reduced' : score >= 75 ? 'high' : 'ok';
+    const text = { low: 'Niedrige Tagesform: 1 Satz weniger pro Übung und 1 Wdh. mehr Reserve.', reduced: 'Etwas angeschlagen: 1 Satz weniger bei Ergänzung, Isolation und Rumpf.', ok: 'Normale Tagesform: Training wie geplant.', high: 'Top-Tagesform: Training wie geplant – nutze sie für saubere, schwere Sätze.' }[level];
+    return { score, level, text, why };
+  }
   function prescription(slot, ex, profile, plan) {
     const wi = weekInfo(plan, profile);
     const role = slot ? slot.r : (ex.role === 'c' ? 'sec' : ex.role === 'i' ? 'iso' : ex.role === 's' ? 'skill' : ex.role === 'x' ? 'cond' : 'core');
@@ -417,13 +436,15 @@
     if (!wi.deload && (wi.w === 3 || wi.w === 4) && role === 'main' && exp !== 'new') sets += 1;
     if (wi.deload) sets = Math.max(1, Math.ceil(sets / 2));
     const ad = adaptNow(profile);
+    const rd = readiness(profile);
+    if (rd && !wi.deload && slot) { if (rd.level === 'low') sets = Math.max(2, sets - 1); else if (rd.level === 'reduced' && (role === 'sec' || role === 'iso' || role === 'core')) sets = Math.max(2, sets - 1); }
     if (ad && !wi.deload) { if (ad.sets < 0 && (role === 'sec' || role === 'iso' || role === 'core')) sets = Math.max(2, sets + ad.sets); if (ad.sets > 0 && (role === 'main' || role === 'sec')) sets += ad.sets; }
     let rr = ex.rr || [8, 12];
     if (ex.kind === 'load' && ex.role === 'c' && slot && slot.rr && !(ex.rr && ex.rr[0] > slot.rr[1])) rr = slot.rr;
     if (ex.kind === 'load' && ex.role === 'i' && slot && slot.rr) rr = [Math.max(slot.rr[0], ex.rr ? ex.rr[0] : 0), Math.max(slot.rr[1], ex.rr ? ex.rr[1] : 0)];
     if (slot && slot.custRR) rr = slot.custRR;
     const rest = slot ? slot.rest : (role === 'iso' ? 75 : 120);
-    return { sets, rr, rir: targetRIR(role, ex.kind, profile, wi), rest, role, deload: wi.deload };
+    return { sets, rr, rir: Math.min(3, targetRIR(role, ex.kind, profile, wi) + (rd && rd.level === 'low' && !wi.deload ? 1 : 0)), rest, role, deload: wi.deload };
   }
 
   /* ================= Der Algorithmus hinter jedem Satz ================= */
@@ -641,7 +662,7 @@
   }
 
   window.ENGINE = {
-    Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
+    Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, readiness, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };

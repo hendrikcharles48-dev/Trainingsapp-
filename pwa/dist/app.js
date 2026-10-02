@@ -97,7 +97,7 @@
   /* ================= Hilfen ================= */
   const P = () => st.profile;
   const plan = () => st.profile && st.profile.plan;
-  const settings = () => Object.assign({ sound: true, vib: true, autoRest: true, bbStep: 2.5, stackStep: 2.5, rpe: false }, (st.profile && st.profile.settings) || {});
+  const settings = () => Object.assign({ sound: true, vib: true, autoRest: true, bbStep: 2.5, stackStep: 2.5, rpe: false, garmin: true }, (st.profile && st.profile.settings) || {});
   function getEx(id) { return D.byId[id] || ((P() && P().custom) || []).find(e => e.id === id) || null; }
   function registerCustom() { for (const c of (P() && P().custom) || []) D.byId[c.id] = c; }
   /* Eigene Übungen ↔ eingebaute Übungen: gleiche Wörter (ohne Füllwörter, Plural-Endungen) oder Alias = gleiche Übung */
@@ -285,6 +285,7 @@
     <div class="stack">
       <div class="card" style="padding:14px 10px"><div class="row between" style="padding:0 8px 8px"><b class="num" style="font-size:17px">${new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</b><span class="small muted">${cnt} von ${goal} Trainings</span></div>
         <div class="cal">${DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); return `<div><div class="d">${d}</div><div class="n ${i === todayIdx ? 'today' : ''} ${doneDays.has(i) ? 'done' : ''}">${dt.getDate()}</div></div>`; }).join('')}</div></div>
+      ${formCard()}
       ${checkinDue() ? checkinCard() : ''}
       ${st.active ? `<div class="card lime rings-bg stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="font-weight:800">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn dark big" data-a="resume">${I.play} Weiter trainieren</button></div>` : `
       <div class="card lime rings-bg" style="position:relative;min-height:230px;padding:20px">
@@ -323,6 +324,22 @@
     const sow = E.todayISO(E.startOfWeek());
     if ((P().checkins || []).some(c => c.week === sow)) return false;
     return st.workouts.some(w => w.date < sow);
+  }
+  function formCard() {
+    const p = P(); if (!p || !p.plan || !settings().garmin) return '';
+    const rd = E.readiness(p);
+    if (!rd) return `<button class="card flat row" style="width:100%;text-align:left;gap:12px" data-a="formOpen"><span class="plate p-main" style="width:34px;height:34px">⌚</span><div class="grow"><b>Tagesform von Garmin</b><div class="small muted">Trainingsbereitschaft, Schlaf & Co. eintragen – das Training passt sich an</div></div><span class="chev">${I.chev}</span></button>`;
+    const col = { low: '#FF6B6B', reduced: '#F5C26B', ok: 'var(--lav)', high: 'var(--lime)' }[rd.level];
+    return `<button class="card flat row" style="width:100%;text-align:left;gap:12px" data-a="formOpen"><div class="formring" style="--c:${col}">${rd.score}</div><div class="grow"><b>Tagesform</b><div class="small">${esc(rd.text)}</div>${rd.why.length ? `<div class="tiny muted">${esc(rd.why.join(' · '))}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`;
+  }
+  function parseHealth(txt) {
+    const o = {}; const t = String(txt || '').toLowerCase().replace(/,/g, '.');
+    const num = re => { const m = t.match(re); return m ? parseFloat(m[1]) : undefined; };
+    o.tr = num(/(?:tr|bereitschaft|readiness)\D{0,25}?(\d{1,3})/); o.bb = num(/(?:bb|body ?battery)\D{0,15}?(\d{1,3})/);
+    o.sleep = num(/(?:sleep|schlaf)\D{0,15}?(\d{1,2}(?:\.\d+)?)/); o.rhr = num(/(?:rhr|ruhepuls|resting)\D{0,25}?(\d{2,3})/); o.hrv = num(/(?:hrv|herzfrequenzvariabilit\S*)\D{0,15}?(\d{1,3})/);
+    if (o.sleep > 24) o.sleep = Math.round(o.sleep / 60 * 10) / 10; // Minuten -> Stunden
+    for (const k in o) if (o[k] == null || isNaN(o[k])) delete o[k];
+    return o;
   }
   function checkinCard() {
     return `<div class="card lav stack" style="gap:8px"><div class="row between"><b style="font-size:1.15em">Wochen-Check-in</b><span class="tag">1 Minute</span></div><div class="small" style="opacity:.8">7 kurze Fragen zu Erschöpfung, Muskelkater, Fitness und anderem Sport. Danach passe ich das Volumen dieser Woche an.</div><div class="row"><button class="btn dark grow" data-a="ciOpen">Jetzt ausfüllen</button><button class="btn" style="background:rgba(20,20,22,.1);color:var(--on-light)" data-a="ciLater">Später</button></div></div>`;
@@ -631,6 +648,7 @@
     const rec = E.recommend(ex, presc, done, hist, { profile: P(), loc: st.active.loc });
     let planned = Math.max(1, rec.setsRec + (entry.extra || 0));
     if (rec.stop && !entry.ignoreStop) planned = Math.max(done.length, 1);
+    if (entry.closed && done.length) planned = done.length;
     planned = Math.max(planned, done.length);
     return { ex, presc, done, rec, planned, finished: done.length >= planned && done.length > 0, hist };
   }
@@ -667,6 +685,32 @@
       ${h.f ? `<div class="howtip bad"><span class="hk no">✗</span><span><b>Häufiger Fehler:</b> ${esc(h.f)}</span></div>` : ''}</div></div>
       ${units.length && !compact ? `<div class="small muted">${units.map(esc).join(' · ')}</div>` : ''}`;
   }
+  /* Leichtere / schwerere Variante: zuerst Progressionskette, sonst gleiche Bewegung mit anderem Level */
+  function levelNeighbors(entry) {
+    const ex = getEx(entry.exId); if (!ex) return {};
+    const loc = st.active.loc;
+    if (ex.grp) { const e = E.chainStep(ex, -1, P(), loc), h = E.chainStep(ex, 1, P(), loc); if (e || h) return { easier: e && getEx(e), harder: h && getEx(h) }; }
+    const slot = findSlot(entry) || { p: [ex.pat], r: entry.presc.role };
+    const used = st.active.exercises.map(e => e.exId);
+    const alts = E.alternatives(Object.assign({}, slot, { p: [ex.pat] }), loc, P(), used).filter(x => x.ex.id !== ex.id && x.ex.pat === ex.pat);
+    const pick = f => { const c = alts.filter(x => f(x.ex)); return c.length ? c[0].ex : null; };
+    const near = (a, b) => Math.abs(a.lvl - b.lvl);
+    const easierL = alts.filter(x => x.ex.lvl < ex.lvl).sort((a, b) => near(a.ex, ex) - near(b.ex, ex) || b.s - a.s)[0];
+    const harderL = alts.filter(x => x.ex.lvl > ex.lvl).sort((a, b) => near(a.ex, ex) - near(b.ex, ex) || b.s - a.s)[0];
+    // Bei Gewichtsübungen ohne höheres Level: einarmige/einbeinige Variante ist die schwerere
+    const harder = harderL ? harderL.ex : (ex.kind === 'load' && !ex.uni ? pick(e => e.uni) : null);
+    const easier = easierL ? easierL.ex : (ex.uni ? pick(e => !e.uni && e.lvl <= ex.lvl) : null);
+    return { easier, harder };
+  }
+  function levelRec(entry, S, nb) {
+    const r = S.rec;
+    if (r.harder && nb.harder) return 'harder';
+    if (r.easier && nb.easier) return 'easier';
+    if (nb.harder && (r.notes || []).some(n => /Schwerstes verfügbares Gewicht|Mehr Wdh\. als geplant|Zu leicht/.test(n))) return 'harder';
+    if (nb.easier && r.dayForm != null && r.dayForm <= -0.08) return 'easier';
+    const rd = E.readiness(P()); if (nb.easier && rd && rd.level === 'low') return 'easier';
+    return 'cur';
+  }
   function focusCard(entry, idx) {
     const S = exState(entry); const { ex, presc, done, rec, planned, finished } = S;
     if (!ex) return '';
@@ -687,8 +731,7 @@
         ${rec.warmup && rec.warmup.length ? `<div class="note">Aufwärmen: ${rec.warmup.map(w => fmt(w.w) + ' kg × ' + w.reps).join(' · ')}</div>` : ''}
         ${rec.notes.map(t => `<div class="note">${esc(t)}</div>`).join('')}
         ${rec.stop && !entry.ignoreStop ? `<div class="row"><button class="btn sm" data-a="ignoreStop" data-i="${idx}">Trotzdem weiter</button></div>` : ''}
-        ${rec.harder ? `<div class="row"><button class="btn sm" data-a="switchEx" data-i="${idx}" data-id="${rec.harder}">${I.swap} Schwerer: ${esc(getEx(rec.harder).name)}</button></div>` : ''}
-        ${rec.easier ? `<div class="row"><button class="btn sm" data-a="switchEx" data-i="${idx}" data-id="${rec.easier}">${I.swap} Leichter: ${esc(getEx(rec.easier).name)}</button></div>` : ''}
+        ${(() => { const nb = levelNeighbors(entry); if (!nb.easier && !nb.harder) return ''; const rc = levelRec(entry, S, nb); return `<div class="row"><button class="btn sm" data-a="levelOpen" data-i="${idx}">${I.swap} Leichter / Schwerer${rc !== 'cur' ? `<span class="recdot">${rc === 'harder' ? '▲' : '▼'} Tipp</span>` : ''}</button></div>`; })()}
       </div>`;
     } else target = `<div class="target"><b>Übung erledigt ✓</b><div class="note">Tippe unten auf die nächste Übung oder „+ Satz“ für mehr.</div></div>`;
     const cols = isHold ? ['#', 'Vorher', 'Sek.', 'Res.', ''] : showW ? ['#', 'Vorher', kind === 'bw' ? '+kg' : 'kg', 'Wdh.', 'Res.', ''] : ['#', 'Vorher', 'Wdh.', 'Res.', ''];
@@ -931,6 +974,29 @@
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
     },
+    form(s) {
+      const p = P(); const today = E.todayISO(); const cur = s.v || (s.v = Object.assign({}, ((p.health || []).find(x => x.d === today)) || {}));
+      const f = (k, l, ph, mode) => `<div><label class="lbl" for="hf-${k}">${l}</label><input class="field" id="hf-${k}" inputmode="${mode || 'numeric'}" data-in="hf" data-k="${k}" value="${cur[k] ?? ''}" placeholder="${ph}"></div>`;
+      const rd = E.readiness(p);
+      return `<div class="stack"><div><div class="eyebrow">Garmin</div><h2>Tagesform heute</h2><div class="small muted">Werte aus der Garmin-Connect-App (Startseite / „Mein Tag“). Alles optional – je mehr, desto genauer.</div></div>
+        <div class="row">${f('tr', 'Trainingsbereitschaft', '0–100')}${f('bb', 'Body Battery', '0–100')}</div>
+        <div class="row">${f('sleep', 'Schlaf (Std.)', 'z. B. 7,5', 'decimal')}${f('rhr', 'Ruhepuls', 'z. B. 52')}</div>
+        <div class="row">${f('hrv', 'HRV (ms, Nacht)', 'z. B. 60')}<div></div></div>
+        <button class="btn" data-a="formPaste">Aus Kurzbefehl einfügen</button>
+        <button class="btn primary" data-a="formSave">Speichern</button>
+        ${rd ? `<div class="small muted">Aktuell: ${rd.score}/100 – ${esc(rd.text)}</div>` : ''}
+        <div class="tiny muted">So wirkt es: unter 30 Punkte → 1 Satz weniger pro Übung und 1 Wdh. mehr Reserve; 30–49 → 1 Satz weniger bei Ergänzung, Isolation und Rumpf; ab 50 → wie geplant. Ruhepuls und HRV werden mit deinem 14-Tage-Schnitt verglichen.</div></div>`;
+    },
+    level(s) {
+      const entry = st.active.exercises[s.i]; const S = exState(entry); const ex = S.ex; const nb = levelNeighbors(entry); const rc = levelRec(entry, S, nb);
+      const [lo, hi] = S.presc.rr; const u = ex.kind === 'hold' ? ' s' : ' Wdh.';
+      const why = { easier: ex.kind === 'load' ? `Wenn du heute weniger als ${lo}${u} sauber schaffst oder die Form leidet` : `Wenn du weniger als ${lo}${u} schaffst oder heute nicht dein Tag ist`, cur: `Wenn du im Zielbereich ${lo}–${hi}${u} landest`, harder: ex.kind === 'load' ? `Wenn das Gewicht zu leicht ist und du mehr als ${hi}${u} schaffst` : `Wenn du locker mehr als ${hi}${u} schaffst` };
+      const recWhy = { easier: S.rec.dayForm != null && S.rec.dayForm <= -0.08 ? 'Deine Tagesform ist heute niedriger' : 'Du liegst unter dem Zielbereich', harder: ex.kind === 'load' ? 'Das Gewicht ist für dich zu leicht' : 'Du schaffst mehr als den Zielbereich', cur: S.done.length || (S.hist && S.hist.length) ? 'Du liegst gut im Zielbereich' : 'Passt zu deinem aktuellen Stand' };
+      const card = (k, e, label) => !e ? '' : `<button class="lvlopt ${rc === k ? 'rec' : ''}" ${k === 'cur' ? 'data-a="closeSheet"' : `data-a="levelPick" data-id="${e.id}"`}>${thumb(e)}<div class="grow" style="min-width:0"><div class="row between" style="gap:6px"><span class="eyebrow">${label}</span>${rc === k ? '<span class="rectag">Empfohlen</span>' : ''}</div><b>${esc(e.name)}</b><div class="tiny muted">Lvl ${e.lvl} · ${esc(why[k])}</div>${rc === k ? `<div class="tiny" style="color:var(--lime);margin-top:2px">${esc(recWhy[k])}</div>` : ''}</div></button>`;
+      return `<div class="stack"><div><div class="eyebrow">Heute anpassen</div><h2>Leichter oder schwerer?</h2></div>
+        <div class="stack" style="gap:10px">${card('harder', nb.harder, '▲ Schwerer')}${card('cur', ex, '● Aktuell')}${card('easier', nb.easier, '▼ Leichter')}</div>
+        <div class="tiny muted">Bereits gemachte Sätze bleiben gespeichert. Der Plan ändert sich nicht.</div></div>`;
+    },
     swapWorkout(s) {
       const entry = st.active.exercises[s.i]; const ex = getEx(entry.exId);
       const slot = findSlot(entry) || { p: [ex.pat], r: entry.presc.role };
@@ -979,7 +1045,7 @@
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
       return `<div class="stack"><h2>Einstellungen</h2>
         <div class="card stack" style="gap:10px"><b>Schrift</b><div class="seg">${[['hand', 'Handschrift'], ['classic', 'Klassisch']].map(([k, n]) => `<button data-a="setFont" data-k="${k}" aria-pressed="${(se.font === 'classic' ? 'classic' : 'hand') === k}">${n}</button>`).join('')}</div></div>
-        <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
+        <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}${tog('garmin', 'Garmin-Tagesform', 'Karte auf der Startseite, Training passt sich an')}</div>
         <div class="card stack"><b>Studio-Gewichte</b><div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div></div>
         <div class="card stack"><b>Datensicherung</b><div class="small muted">${Store.mode === 'db' ? 'Deine Daten werden in deinem Konto gespeichert und sind auf allen Geräten verfügbar, auf denen du angemeldet bist.' : 'Deine Daten liegen nur in diesem Browser. Mach ab und zu ein Backup.'}</div>
           <div class="row wrap"><button class="btn grow" data-a="exportData">Backup exportieren</button><label class="btn grow" for="importFile" style="cursor:pointer">Backup importieren</label><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden></div></div>
@@ -1098,10 +1164,25 @@
     editSet(t) { openSheet({ type: 'editSet', i: +t.dataset.i, s: +t.dataset.s }); },
     delSet() { st.sheet.confirm = true; renderSheet(); },
     delSetYes() { const s = st.sheet; const entry = st.active.exercises[s.i]; const doneSets = entry.sets.filter(x => x.done); const target = doneSets[s.s]; entry.sets = entry.sets.filter(x => x !== target); Store.saveActive(); closeSheet(); render(); },
-    setPlus(t) { const e = st.active.exercises[+t.dataset.i]; e.extra = (e.extra || 0) + 1; if (exState(e).rec.stop) e.ignoreStop = true; st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); },
+    setPlus(t) { const e = st.active.exercises[+t.dataset.i]; if (e.closed) { e.closed = false; const S0 = exState(e); e.extra = (e.extra || 0) + S0.done.length - S0.planned; } e.extra = (e.extra || 0) + 1; if (exState(e).rec.stop) e.ignoreStop = true; st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); },
     setMinus(t) { const e = st.active.exercises[+t.dataset.i]; e.extra = (e.extra || 0) - 1; Store.saveActive(); renderOverlay(); },
     ignoreStop(t) { st.active.exercises[+t.dataset.i].ignoreStop = true; Store.saveActive(); renderOverlay(); },
     switchEx(t) { doSwapWorkout(+t.dataset.i, t.dataset.id, false); },
+    formOpen() { openSheet({ type: 'form' }); },
+    async formPaste() {
+      try { const t = await navigator.clipboard.readText(); const o = parseHealth(t); if (!Object.keys(o).length) { toast('Keine Werte in der Zwischenablage gefunden'); return; } Object.assign(st.sheet.v, o); st.sheet.keepScroll = true; renderSheet(); toast('Werte eingefügt'); }
+      catch (e) { toast('Einfügen nicht erlaubt – Werte bitte eintippen'); }
+    },
+    formSave() {
+      const p = P(); const v = st.sheet.v || {}; const o = { d: E.todayISO() };
+      for (const k of ['tr', 'bb', 'sleep', 'rhr', 'hrv']) { const n = parseFloat(String(v[k] ?? '').replace(',', '.')); if (n >= 0) o[k] = n; }
+      p.health = (p.health || []).filter(x => x.d !== o.d); if (Object.keys(o).length > 1) p.health.push(o);
+      p.health.sort((a, b) => a.d < b.d ? -1 : 1); p.health = p.health.slice(-60);
+      if (st.active) for (const e of st.active.exercises) if (!e.sets.some(x => x.done)) { const ex = getEx(e.exId); if (ex) e.presc = E.prescription(findSlot(e), ex, p, plan()); }
+      Store.saveProfile(); if (st.active) Store.saveActive(); closeSheet(); render(); const rd = E.readiness(p); toast(rd ? 'Tagesform ' + rd.score + '/100' : 'Gespeichert');
+    },
+    levelOpen(t) { openSheet({ type: 'level', i: +t.dataset.i }); },
+    levelPick(t) { const i = st.sheet.i; closeSheet(); doSwapWorkout(i, t.dataset.id, false); },
     swapWorkout(t) { openSheet({ type: 'swapWorkout', i: +t.dataset.i, plan: false }); },
     swapPlanToggle(t) { st.sheet.plan = t.checked; },
     swapDo(t) { doSwapWorkout(st.sheet.i, t.dataset.id, st.sheet.plan); },
@@ -1163,7 +1244,7 @@
     },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
-    setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); },
+    setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
     exportData() { exportData(); },
     reset() { st.sheet.confirm = true; renderSheet(); },
     async resetYes() { for (const w of st.workouts) Store.deleteWorkout(w.id); st.workouts = []; st.active = null; st.profile = null; LS.set('profile', null); LS.set('workouts', []); Store.saveActive(true); if (Store.mode === 'db') Store.write('p', () => Store.pRef().delete()); closeSheet(); render(); toast('Alle Daten gelöscht'); },
@@ -1194,7 +1275,7 @@
   function doSwapWorkout(i, id, alsoPlan) {
     const e = st.active.exercises[i]; const ex = getEx(id);
     const slot = findSlot(e);
-    if (e.sets.some(s => s.done)) { const n = newEntry(id, slot); st.active.exercises.splice(i + 1, 0, n); st.active.cur = i + 1; }
+    if (e.sets.some(s => s.done)) { const n = newEntry(id, slot); const nd = e.sets.filter(s => s.done).length; e.closed = true; n.extra = -nd; st.active.exercises.splice(i + 1, 0, n); st.active.cur = i + 1; }
     else { e.exId = id; e.presc = E.prescription(slot, ex, P(), plan()); e.draft = null; }
     if (alsoPlan && slot) { slot.ex[st.active.loc] = id; slot.why[st.active.loc] = ['Von dir gewählt']; slot.locked = Object.assign({}, slot.locked, { [st.active.loc]: true }); Store.saveProfile(); }
     Store.saveActive(); closeSheet(); renderOverlay(); toast('Getauscht: ' + ex.name);
@@ -1243,6 +1324,7 @@
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
+    hf(t) { st.sheet.v[t.dataset.k] = t.value; },
     cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value); } }
   };
 
