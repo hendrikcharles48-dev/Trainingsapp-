@@ -341,6 +341,17 @@
     for (const k in o) if (o[k] == null || isNaN(o[k])) delete o[k];
     return o;
   }
+  // Text vom Kurzbefehl in die Felder der Tagesform übernehmen
+  function applyHealthText(txt) {
+    const o = parseHealth(txt); const keys = Object.keys(o);
+    if (!keys.length || !st.sheet || st.sheet.type !== 'form') return false;
+    Object.assign(st.sheet.v, o);
+    for (const k of keys) { const el = $('#hf-' + k); if (el) el.value = String(o[k]).replace('.', ','); }
+    const names = { tr: 'Bereitschaft', bb: 'Body Battery', sleep: 'Schlaf', rhr: 'Ruhepuls', hrv: 'HRV' };
+    const msg = 'Übernommen: ' + keys.map(k => names[k] + ' ' + String(o[k]).replace('.', ',')).join(' · ');
+    const m = $('#hf-msg'); if (m) { m.textContent = msg + ' – jetzt „Speichern“ tippen.'; m.style.color = 'var(--lime)'; }
+    toast(msg); return true;
+  }
   function checkinCard() {
     return `<div class="card lav stack" style="gap:8px"><div class="row between"><b style="font-size:1.15em">Wochen-Check-in</b><span class="tag">1 Minute</span></div><div class="small" style="opacity:.8">7 kurze Fragen zu Erschöpfung, Muskelkater, Fitness und anderem Sport. Danach passe ich das Volumen dieser Woche an.</div><div class="row"><button class="btn dark grow" data-a="ciOpen">Jetzt ausfüllen</button><button class="btn" style="background:rgba(20,20,22,.1);color:var(--on-light)" data-a="ciLater">Später</button></div></div>`;
   }
@@ -979,10 +990,10 @@
       const f = (k, l, ph, mode) => `<div><label class="lbl" for="hf-${k}">${l}</label><input class="field" id="hf-${k}" inputmode="${mode || 'numeric'}" data-in="hf" data-k="${k}" value="${cur[k] ?? ''}" placeholder="${ph}"></div>`;
       const rd = E.readiness(p);
       return `<div class="stack"><div><div class="eyebrow">Garmin</div><h2>Tagesform heute</h2><div class="small muted">Werte aus der Garmin-Connect-App (Startseite / „Mein Tag“). Alles optional – je mehr, desto genauer.</div></div>
+        <div class="pastebox"><label class="lbl" for="hf-paste">Text vom Kurzbefehl</label><textarea class="field" id="hf-paste" rows="1" data-in="hfPaste" placeholder="Hier gedrückt halten → „Einfügen“" autocomplete="off" autocorrect="off" spellcheck="false"></textarea><div class="tiny muted" id="hf-msg">Ins Feld tippen oder gedrückt halten, dann „Einfügen“ wählen. Die Werte werden automatisch übernommen.</div></div>
         <div class="row">${f('tr', 'Trainingsbereitschaft', '0–100')}${f('bb', 'Body Battery', '0–100')}</div>
         <div class="row">${f('sleep', 'Schlaf (Std.)', 'z. B. 7,5', 'decimal')}${f('rhr', 'Ruhepuls', 'z. B. 52')}</div>
         <div class="row">${f('hrv', 'HRV (ms, Nacht)', 'z. B. 60')}<div></div></div>
-        <button class="btn" data-a="formPaste">Aus Kurzbefehl einfügen</button>
         <button class="btn primary" data-a="formSave">Speichern</button>
         ${rd ? `<div class="small muted">Aktuell: ${rd.score}/100 – ${esc(rd.text)}</div>` : ''}
         <div class="tiny muted">So wirkt es: unter 30 Punkte → 1 Satz weniger pro Übung und 1 Wdh. mehr Reserve; 30–49 → 1 Satz weniger bei Ergänzung, Isolation und Rumpf; ab 50 → wie geplant. Ruhepuls und HRV werden mit deinem 14-Tage-Schnitt verglichen.</div></div>`;
@@ -1170,8 +1181,8 @@
     switchEx(t) { doSwapWorkout(+t.dataset.i, t.dataset.id, false); },
     formOpen() { openSheet({ type: 'form' }); },
     async formPaste() {
-      try { const t = await navigator.clipboard.readText(); const o = parseHealth(t); if (!Object.keys(o).length) { toast('Keine Werte in der Zwischenablage gefunden'); return; } Object.assign(st.sheet.v, o); st.sheet.keepScroll = true; renderSheet(); toast('Werte eingefügt'); }
-      catch (e) { toast('Einfügen nicht erlaubt – Werte bitte eintippen'); }
+      try { const t = await navigator.clipboard.readText(); if (!applyHealthText(t)) toast('Keine Werte in der Zwischenablage gefunden'); }
+      catch (e) { const b = $('#hf-paste'); if (b) b.focus(); toast('Tippe ins Feld und wähle „Einfügen“'); }
     },
     formSave() {
       const p = P(); const v = st.sheet.v || {}; const o = { d: E.todayISO() };
@@ -1325,6 +1336,7 @@
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
     hf(t) { st.sheet.v[t.dataset.k] = t.value; },
+    hfPaste(t) { if (applyHealthText(t.value)) { t.value = ''; t.blur(); } },
     cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value); } }
   };
 
