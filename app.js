@@ -617,9 +617,20 @@
     const presc = E.prescription(slot || null, ex, P(), plan());
     return { key: uid(), exId, slotId: slot ? slot.id : null, presc, sets: [], extra: 0 };
   }
-  function startWorkout(di, loc) {
+  function startWorkout(di, loc, delta) {
     const p = plan(); const day = p.days[di];
-    st.active = { id: uid(), dayIdx: di, dayId: day.id, name: day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises: day.slots.filter(s => s.ex[loc]).map(s => newEntry(s.ex[loc], s)), cur: 0 };
+    let exercises, timeNote = null;
+    if (delta) {
+      const tp = E.timePlan(day, loc, delta, P(), p);
+      exercises = tp.items.map(it => {
+        const e = newEntry(it.ex.id, it.slot);
+        if (it.spec) { e.presc.sets = it.sets; e.presc.rest = it.rest; e.extraEx = true; }
+        else { e.presc.sets += it.boost; e.presc.rest = Math.max(30, Math.round(e.presc.rest * it.factor / 5) * 5); }
+        return e;
+      });
+      timeNote = { delta, minutes: tp.minutes, notes: tp.notes };
+    } else exercises = day.slots.filter(s => s.ex[loc]).map(s => newEntry(s.ex[loc], s));
+    st.active = { id: uid(), dayIdx: di, dayId: day.id, name: day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
@@ -648,7 +659,7 @@
       <div class="stack">
         ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>`}
         <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
-          <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
+          <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
           ${a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join('')}
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
@@ -956,6 +967,16 @@
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
     },
+    time(s) {
+      const p = plan(); const day = p.days[s.d]; const base = estMinutes(day, s.l);
+      const opts = [[-2, 'Viel kürzer', '2 Übungen weniger'], [-1, 'Etwas kürzer', '1 Übung weniger'], [0, 'Wie geplant', 'Alle Übungen'], [1, 'Etwas länger', '1 Übung mehr'], [2, 'Viel länger', '2 Übungen mehr']];
+      return `<div class="stack"><div><div class="eyebrow">${esc(day.name)}</div><h2>Wie viel Zeit hast du?</h2><div class="small muted">Ich passe die Einheit so an, dass du trotzdem alles Wichtige trainierst.</div></div>
+        <div class="stack" style="gap:8px">${opts.map(([d, n, sub]) => {
+          const tp = d ? E.timePlan(day, s.l, d, P(), p) : null; const min = tp ? tp.minutes : base;
+          return `<button class="timeopt ${d === 0 ? 'rec' : ''}" data-a="timePick" data-delta="${d}"><div class="grow" style="min-width:0"><div class="row between"><b>${n}</b><span class="num" style="font-size:20px">${min} min</span></div><div class="tiny muted">${sub}${tp && tp.notes.length ? ' · ' + esc(tp.notes.join(' · ')) : ''}</div></div></button>`;
+        }).join('')}</div>
+        <div class="tiny muted">Kürzer: unwichtigere Übungen entfallen, 1 Satz mehr bei verwandten Übungen, kürzere Pausen. Länger: passende Zusatzübungen für deine Schwerpunkte und etwas mehr Pause bei schweren Übungen. Minuten sind eine Schätzung.</div></div>`;
+    },
     level(s) {
       const entry = st.active.exercises[s.i]; const S = exState(entry); const ex = S.ex; const nb = levelNeighbors(entry); const rc = levelRec(entry, S, nb);
       const [lo, hi] = S.presc.rr; const u = ex.kind === 'hold' ? ' s' : ' Wdh.';
@@ -1115,7 +1136,8 @@
     homeLoc(t) { st.homeLoc = t.dataset.l; render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
     planLoc(t) { st.planLoc = t.dataset.l; render(); },
-    startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; } startWorkout(+t.dataset.d, t.dataset.l); },
+    startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; } openSheet({ type: 'time', d: +t.dataset.d, l: t.dataset.l }); },
+    timePick(t) { const d = st.sheet.d, l = st.sheet.l; closeSheet(); startWorkout(d, l, +t.dataset.delta); },
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
     wMin() { st.ov = null; keepAwake(false); render(); },

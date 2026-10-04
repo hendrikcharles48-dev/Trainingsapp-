@@ -361,6 +361,64 @@
     day.slots = day.slots.filter(sl => Object.values(sl.ex).some(Boolean));
   }
 
+  /* ================= Zeit anpassen: Einheit kürzer / länger =================
+     Kürzer: unwichtigste Übungen weglassen (nie die letzte für eine Muskelgruppe, nie Grundübungen),
+             die Sätze der wegfallenden Muskeln auf verwandte Übungen verteilen (+1 Satz), kürzere Pausen.
+     Länger: 1–2 passende Zusatzübungen (Prioritäten zuerst), etwas mehr Pause bei schweren Übungen. */
+  const KEEP = { main: 5, skill: 4, sec: 3, iso: 2, core: 1, cond: 0 };
+  const EXTRA_PAT = { upper: ['side', 'rear', 'biceps', 'triceps', 'fly', 'latiso'], lower: ['calf', 'hamcurl', 'glute', 'quadiso', 'core'], full: ['side', 'rear', 'biceps', 'triceps', 'calf', 'core'] };
+  const r5 = x => Math.round(x / 5) * 5;
+  function timePlan(day, loc, delta, profile, plan) {
+    const exOf = id => DB.byId[id] || ((profile && profile.custom) || []).find(e => e.id === id);
+    const groupsOf = ex => Object.keys(DB.GROUPS).filter(g => ex.prim.some(m => DB.GROUPS[g].includes(m)));
+    let items = day.slots.filter(sl => sl.ex[loc] && exOf(sl.ex[loc])).map(sl => ({ slot: sl, ex: exOf(sl.ex[loc]), role: sl.r, sets: sl.sets, rest: sl.rest, boost: 0, factor: 1 }));
+    const out = { delta, removed: [], boosted: [], added: [], notes: [] };
+    const favs = (profile && profile.favs) || [];
+    if (delta < 0) {
+      for (let n = 0; n < -delta && items.length > 3; n++) {
+        const cover = {}; for (const it of items) for (const g of groupsOf(it.ex)) cover[g] = (cover[g] || 0) + 1;
+        const cand = items.filter(it => it.role !== 'main').map(it => ({ it, v: KEEP[it.role] + (groupsOf(it.ex).every(g => cover[g] >= 2) ? 0 : 3) + (favs.includes(it.ex.id) ? 1.5 : 0) + (it.slot && it.slot.prio ? 3 : 0) })).sort((a, b) => a.v - b.v)[0];
+        if (!cand) break;
+        items = items.filter(x => x !== cand.it); out.removed.push(cand.it);
+      }
+      for (const rm of out.removed) {
+        const gs = groupsOf(rm.ex);
+        const pick = items.filter(it => it.boost === 0 && (it.role === 'main' || it.role === 'sec' || it.role === 'iso') && groupsOf(it.ex).some(g => gs.includes(g)) && it.sets + 1 <= (it.role === 'iso' ? 4 : 5))
+          .sort((a, b) => (KEEP[b.role] - KEEP[a.role]) || (a.sets - b.sets))[0];
+        if (pick) { pick.boost = 1; out.boosted.push(pick); }
+      }
+      const f = delta <= -2 ? { main: 0.85, sec: 0.75, iso: 0.65, core: 0.65 } : { main: 0.9, sec: 0.8, iso: 0.7, core: 0.7 };
+      for (const it of items) it.factor = f[it.role] || 0.8;
+    } else if (delta > 0) {
+      const focus = day.focus || 'full';
+      const pats = []; for (const g of ((profile.answers || {}).priority || [])) { const ps = PRIO_SLOTS[g]; if (ps && ps.focus.includes(focus)) pats.push(...ps.p); }
+      pats.push(...(EXTRA_PAT[focus] || EXTRA_PAT.full));
+      const have = new Set(items.map(it => it.ex.pat)); const used = items.map(it => it.ex.id);
+      const isoSets = (items.find(it => it.role === 'iso') || {}).sets || 3;
+      for (const pat of pats) {
+        if (out.added.length >= delta) break;
+        if (have.has(pat)) continue;
+        const role = ['hpull', 'hpush', 'lunge'].includes(pat) ? 'sec' : pat === 'core' ? 'core' : 'iso';
+        const best = alternatives(S([pat], role), loc, profile, used)[0];
+        if (!best || best.s <= -10) continue;
+        have.add(pat); used.push(best.ex.id);
+        const it = { slot: null, ex: best.ex, role, sets: role === 'sec' ? 3 : isoSets, rest: role === 'sec' ? 90 : 75, boost: 0, factor: 1, spec: S([pat], role) };
+        items.push(it); out.added.push(it);
+      }
+      for (const it of items) if (it.role === 'main' || it.role === 'sec') it.factor = 1.15;
+    }
+    out.items = items;
+    out.minutes = Math.round(6 + items.reduce((t, it) => t + (it.sets + it.boost) * (0.8 + r5(it.rest * it.factor) / 60), 0));
+    const names = a => a.map(x => x.ex.name).join(', ');
+    if (out.removed.length) out.notes.push('Weggelassen: ' + names(out.removed));
+    if (out.boosted.length) out.notes.push('+1 Satz: ' + names(out.boosted));
+    if (delta < 0) out.notes.push('Kürzere Pausen');
+    if (out.added.length) out.notes.push('Dazu: ' + names(out.added));
+    if (delta > 0 && !out.added.length) out.notes.push('Keine passende Zusatzübung gefunden – nur etwas mehr Pause');
+    if (delta > 0) out.notes.push('Etwas mehr Pause bei schweren Übungen');
+    return out;
+  }
+
   function alternatives(slot, loc, profile, excludeIds) {
     const ctx = { profile, loc, eqSet: locEquip(profile, loc), used: new Set(), dayUsed: new Set(excludeIds || []), ab: abilities(profile.answers || {}), seed: 'alt' };
     const wide = Object.assign({}, slot, { p: slot.r === 'skill' || slot.r === 'core' || slot.r === 'cond' ? slot.p : widenPatterns(slot.p) });
@@ -641,7 +699,7 @@
   }
 
   window.ENGINE = {
-    Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
+    Q, abilities, buildPlan, fillDay, alternatives, timePlan, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
