@@ -333,6 +333,16 @@
   }
 
   /* ================= Plan ================= */
+  function volumeCard(p, loc) {
+    const v = E.planVolume(p, P(), loc); const T = v.targets;
+    const rows = Object.keys(T).map(m => { const val = Math.round(v.week[m] * 2) / 2, t = T[m]; const st_ = val < t - 2.5 ? 'low' : val > 15.5 ? 'high' : 'ok';
+      const col = { low: '#F5C26B', ok: 'var(--lime)', high: '#FF8A8A' }[st_];
+      return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${t / 20 * 100}%"></b><b class="cap" style="left:${15 / 20 * 100}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}</span></div>`; }).join('');
+    return `<div class="card stack" style="gap:10px"><div class="row between"><b>Sätze pro Muskel & Woche</b><span class="tiny muted">Strich = Ziel · rot ab 15</span></div>
+      <div class="tiny muted">Effizienz-Prinzip: ~10 harte Sätze pro Muskel (Schwerpunkte ~14), 2× pro Woche, über 15 bringt kaum noch mehr. Mittrainierte Muskeln zählen halb.</div>
+      <div class="stack" style="gap:6px">${rows}</div>
+      <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div>`;
+  }
   function planView() {
     const p = plan(); const loc = st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
     const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
@@ -352,6 +362,7 @@
         <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
           return `<button class="li" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${favMark(ex.id)}${esc(ex.name)}</b></div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
+      ${volumeCard(p, loc)}
       <div class="card flat small" style="margin-bottom:10px">↕ <b>Tipp:</b> Übung kurz gedrückt halten und nach oben oder unten ziehen, um die Reihenfolge zu ändern.</div>
       <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
       <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
@@ -657,7 +668,7 @@
     const wi = E.weekInfo(plan(), P());
     return `<div class="ohead"><button class="iconbtn" data-a="wMin" aria-label="Minimieren">${I.back}</button><div class="grow"><div class="eyebrow">${LOCN[a.loc]} · Woche ${wi.w}${wi.deload ? ' · Deload' : ''}</div><h2 style="font-size:20px">${esc(a.name)}</h2></div><button class="btn primary sm" data-a="finishAsk">Beenden</button></div>
       <div class="stack">
-        ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>`}
+        ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>${freeCard()}`}
         <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
           <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
           ${a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join('')}
@@ -703,6 +714,14 @@
     if (nb.harder && (r.notes || []).some(n => /Schwerstes verfügbares Gewicht|Mehr Wdh\. als geplant|Zu leicht/.test(n))) return 'harder';
     if (nb.easier && r.dayForm != null && r.dayForm <= -0.08) return 'easier';
     return 'cur';
+  }
+  function freeCard() {
+    const a = st.active; const p = plan(); const day = p && p.days[a.dayIdx];
+    let sug = [];
+    if (day) { const have = new Set(a.exercises.map(e => e.exId)); sug = E.timePlan(day, a.loc, 3, P(), p).added.map(x => x.ex).filter(x => !have.has(x.id)).slice(0, 3); }
+    return `<div class="card stack" style="gap:10px"><div><b style="font-size:1.1em">Noch Lust? Freies Training</b><div class="small muted">Dein Pflichtprogramm ist geschafft. Häng noch Übungen dran – die Empfehlung passt sich wie gewohnt nach jedem Satz an.</div></div>
+      ${sug.length ? `<div class="list">${sug.map(x => `<button class="li" data-a="freeAdd" data-id="${x.id}">${thumb(x)}<div class="grow"><b>${esc(x.name)}</b><div class="small muted">${x.prim.map(m => D.MUSCLES[m]).join(', ')} · passt zu heute</div></div><span class="chev">${I.plus}</span></button>`).join('')}</div>` : ''}
+      <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Andere Übung wählen</button></div>`;
   }
   function focusCard(entry, idx) {
     const S = exState(entry); const { ex, presc, done, rec, planned, finished } = S;
@@ -967,6 +986,12 @@
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
     },
+    balanceInfo(s) {
+      const ch = s.ch || [];
+      return `<div class="stack"><div><div class="eyebrow">Effizienz</div><h2>${ch.length ? 'Plan ausbalanciert' : 'Plan passt schon'}</h2><div class="small muted">Ziel: jeder Muskel ~10 harte Sätze pro Woche (Schwerpunkte ~14), nicht über 15. Deine eigenen Übungen und die Reihenfolge bleiben, festgelegte Übungen werden nicht angefasst.</div></div>
+        ${ch.length ? `<div class="list">${ch.map(c => `<div class="li small">${esc(c)}</div>`).join('')}</div>` : '<div class="small">Alle Muskeln liegen schon im effizienten Bereich.</div>'}
+        <button class="btn primary" data-a="closeSheet">Alles klar</button></div>`;
+    },
     time(s) {
       const p = plan(); const day = p.days[s.d]; const base = estMinutes(day, s.l);
       const opts = [[-2, 'Viel kürzer', '2 Übungen weniger'], [-1, 'Etwas kürzer', '1 Übung weniger'], [0, 'Wie geplant', 'Alle Übungen'], [1, 'Etwas länger', '1 Übung mehr'], [2, 'Viel länger', '2 Übungen mehr']];
@@ -1186,6 +1211,8 @@
       if (s.mode === 'slot') { const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); sl.ex[loc] = id; sl.why[loc] = ['Von dir gewählt']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' im Plan'); }
     },
     addToWorkout(t) { addToWorkout(t.dataset.id); },
+    balanceNow() { const ch = E.balancePlan(plan(), P()); Store.saveProfile(); render(); openSheet({ type: 'balanceInfo', ch }); },
+    freeAdd(t) { addToWorkout(t.dataset.id); const e = st.active.exercises[st.active.exercises.length - 1]; if (e) { e.extraEx = true; Store.saveActive(); } toast('Hinzugefügt – viel Spaß!'); },
     addToPlanAsk(t) { openSheet({ type: 'addToPlan', id: t.dataset.id }); },
     addToPlanDo(t) { addToPlan(+t.dataset.d, t.dataset.id); },
     slotSheet(t) { openSheet({ type: 'slot', d: +t.dataset.d, s: +t.dataset.s }); },
@@ -1405,6 +1432,7 @@
     await Store.init();
     registerCustom();
     if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }
+    let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal) { balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
     const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
     if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) {
       const old = st.profile.plan; const np = E.buildPlan(st.profile);
@@ -1414,5 +1442,6 @@
     }
     if (st.profile && st.profile.plan && st.active) toast('Dein Training läuft noch: tippe auf „Weiter trainieren“', 3500);
     render();
+    if (balCh && balCh.length) setTimeout(() => openSheet({ type: 'balanceInfo', ch: balCh }), 700);
   })();
 })();

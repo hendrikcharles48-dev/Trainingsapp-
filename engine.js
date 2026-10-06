@@ -342,7 +342,103 @@
       plan.days.push(day);
     });
     plan.locs = locs;
+    balancePlan(plan, profile);
     return plan;
+  }
+
+  /* ================= Effizientes Wochenvolumen =================
+     Pro Muskel und Woche: Grundziel ~10 harte Sätze, Schwerpunkte ~14, nie über 15 (danach kaum
+     Zusatznutzen), mindestens ~5. Mittrainierte Muskeln zählen halb. Skills nur 2× pro Woche. */
+  const VOL_T = { chest: 1, lats: 1, upperback: 1, sdelt: 1, rdelt: 1, biceps: 1, triceps: 1, quads: 1, hams: 1, glutes: 1, calves: 1, abs: 1 };
+  const VOL_PAT = { chest: 'fly', lats: 'latiso', upperback: 'hpull', sdelt: 'side', rdelt: 'rear', biceps: 'biceps', triceps: 'triceps', quads: 'quadiso', hams: 'hamcurl', glutes: 'glute', calves: 'calf', abs: 'core' };
+  const LOWER = ['quads', 'hams', 'glutes', 'calves'];
+  function volTargets(profile) {
+    const pr = new Set(); for (const g of ((profile.answers || {}).priority || [])) for (const m of (DB.GROUPS[g] || [])) pr.add(m);
+    const t = {}; for (const m in VOL_T) t[m] = pr.has(m) ? 14 : 10; return t;
+  }
+  function mainLoc(plan, profile) { const l = plan.locs || ['home']; return l.includes('home') && (profile.answers || {}).location !== 'gym' ? 'home' : l[0]; }
+  function planVolume(plan, profile, loc) {
+    loc = loc || mainLoc(plan, profile);
+    const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
+    const week = {}, perDay = []; for (const m in DB.MUSCLES) week[m] = 0;
+    for (const d of plan.days) {
+      const dv = {}; for (const m in DB.MUSCLES) dv[m] = 0;
+      for (const sl of d.slots) { const ex = sl.ex && exOf(sl.ex[loc]); if (!ex || ex.role === 's' || ex.role === 'x') continue; for (const m of ex.prim) dv[m] += sl.sets; for (const m of (ex.sec || [])) dv[m] += sl.sets * 0.5; }
+      for (const m in dv) week[m] += dv[m]; perDay.push(dv);
+    }
+    return { week, perDay, targets: volTargets(profile) };
+  }
+  function balancePlan(plan, profile) {
+    const loc = mainLoc(plan, profile); const changes = [];
+    const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
+    const exAt = sl => sl.ex && exOf(sl.ex[loc]);
+    const hit = (sl, m) => { const ex = exAt(sl); if (!ex || ex.role === 's' || ex.role === 'x') return 0; return ex.prim.includes(m) ? 1 : (ex.sec || []).includes(m) ? 0.5 : 0; };
+    // 1) Skill-Übungen nur an 2 Tagen (gleichmäßig verteilt), außer von dir festgelegt
+    const skillDays = {};
+    plan.days.forEach((d, di) => d.slots.forEach(sl => { if (sl.r === 'skill') (skillDays[sl.skill || 'x'] = skillDays[sl.skill || 'x'] || []).push(di); }));
+    for (const k in skillDays) {
+      const ds = skillDays[k]; if (ds.length <= 2) continue;
+      const keepD = new Set([ds[0], ds[Math.floor(ds.length / 2)]]);
+      for (const di of ds) if (!keepD.has(di)) { const d = plan.days[di]; const rm = d.slots.filter(sl => sl.r === 'skill' && (sl.skill || 'x') === k && !(sl.locked && Object.values(sl.locked).some(Boolean))); d.slots = d.slots.filter(sl => !rm.includes(sl)); for (const sl of rm) { const ex = exAt(sl); changes.push((ex ? ex.name : 'Skill-Übung') + ' nur noch 2× pro Woche – aus ' + d.name + ' entfernt'); } }
+    }
+    const T = volTargets(profile);
+    // 2) Zu viel: über 15 Sätze → Sätze bei Ergänzung/Isolation kürzen (mind. 2 Sätze)
+    for (let guard = 0; guard < 40; guard++) {
+      const { week } = planVolume(plan, profile, loc);
+      const over = Object.keys(T).filter(m => week[m] > 15.5).sort((a, b) => week[b] - week[a])[0];
+      if (!over) break;
+      let best = null;
+      for (const d of plan.days) for (const sl of d.slots) {
+        const h = hit(sl, over); if (!h || sl.sets <= 2 || sl.r === 'main' || sl.r === 'skill') continue;
+        const ex = exAt(sl); const hurts = ex.prim.concat(ex.sec || []).some(m => m !== over && T[m] && week[m] - 1 < T[m] - 1);
+        const v = h * 2 + (sl.r === 'iso' ? 1 : 0) - (hurts ? 3 : 0) + sl.sets * 0.1;
+        if (!best || v > best.v) best = { sl, v, d };
+      }
+      if (!best) break;
+      best.sl.sets -= 1; changes.push('−1 Satz ' + exAt(best.sl).name);
+    }
+    // 3) Zu wenig: erst vorhandene Übungen +1 Satz, sonst neue Übung an einem passenden Tag
+    for (let guard = 0; guard < 30; guard++) {
+      const { week, perDay } = planVolume(plan, profile, loc);
+      const under = Object.keys(T).filter(m => week[m] < T[m] - 2.5).sort((a, b) => (week[a] - T[a]) - (week[b] - T[b]))[0];
+      if (!under) break;
+      const direct = [];
+      plan.days.forEach((d, di) => d.slots.forEach(sl => { if (hit(sl, under) === 1 && sl.sets < (sl.r === 'iso' || sl.r === 'core' ? 4 : 5) && sl.r !== 'skill' && perDay[di][under] < 8) direct.push({ sl, d }); }));
+      direct.sort((a, b) => a.sl.sets - b.sl.sets);
+      if (direct.length && week[under] >= T[under] - 6) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; }
+      // neue Übung
+      const want = LOWER.includes(under) ? ['lower', 'full'] : under === 'abs' ? ['lower', 'full', 'upper'] : ['upper', 'full'];
+      const pat = VOL_PAT[under];
+      // Volle Tage: eine Übung ersetzen, deren Muskeln auch ohne sie (fast) im Ziel bleiben
+      const gap = T[under] - week[under];
+      const spare = (d) => {
+        let best = null;
+        for (const y of d.slots) {
+          if (y.r === 'main' || y.r === 'skill' || y.bal || (y.locked && Object.values(y.locked).some(Boolean))) continue;
+          const ex = exAt(y); if (!ex) continue;
+          // danach darf kein anderer Muskel schlechter dastehen als jetzt der fehlende
+          const worst = Math.max(0, ...ex.prim.filter(m => T[m]).map(m => T[m] - (week[m] - y.sets)));
+          if (worst <= gap - 2 && (!best || worst < best.v)) best = { y, v: worst };
+        }
+        return best && best.y;
+      };
+      const cands = plan.days.map((d, di) => ({ d, di, sp: d.slots.length >= MAX_EX ? spare(d) : null })).filter(x => want.includes(x.d.focus) && (x.d.slots.length < MAX_EX || x.sp) && !x.d.slots.some(sl => sl.p && sl.p.includes(pat)) && perDay[x.di][under] < 6).sort((a, b) => (a.sp ? 1 : 0) - (b.sp ? 1 : 0) || a.d.slots.length - b.d.slots.length);
+      if (!cands.length) { if (direct.length) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; } T[under] = 0; continue; }
+      const d = cands[0].d;
+      if (cands[0].sp) { const y = cands[0].sp; d.slots = d.slots.filter(z => z !== y); changes.push('Ersetzt: ' + exAt(y).name); } const role = pat === 'core' ? 'core' : pat === 'hpull' ? 'sec' : 'iso';
+      const sl = S([pat], role, { sets: 3, rest: role === 'sec' ? 120 : role === 'core' ? 60 : 75, rr: goalRanges(plan.goal || 'muscle')[role] || null, id: 's' + Math.random().toString(36).slice(2, 8), ex: {}, why: {}, bal: true });
+      let ok = false;
+      for (const l of (plan.locs || [loc])) {
+        const used = new Set(); plan.days.forEach(x => x.slots.forEach(y => y.ex && y.ex[l] && used.add(y.ex[l])));
+        const best = rankFor(sl, { profile, loc: l, eqSet: locEquip(profile, l), used, dayUsed: new Set(d.slots.map(y => y.ex && y.ex[l]).filter(Boolean)), ab: abilities(profile.answers || {}), seed: d.id + sl.id }, 1)[0];
+        if (best) { sl.ex[l] = best.ex.id; sl.why[l] = ['Ergänzt dein Wochenvolumen für ' + DB.MUSCLES[under]].concat(best.reasons.slice(0, 1)); if (l === loc) ok = true; }
+      }
+      if (!ok) { T[under] = 0; continue; }
+      const ci = d.slots.findIndex(y => y.r === 'core' || y.r === 'cond'); if (ci >= 0) d.slots.splice(ci, 0, sl); else d.slots.push(sl);
+      changes.push('Neu: ' + DB.byId[sl.ex[loc]].name + ' (' + d.name + ')');
+    }
+    plan.bal = 1;
+    return changes;
   }
 
   function fillDay(day, loc, profile, ab, used, di) {
@@ -699,7 +795,7 @@
   }
 
   window.ENGINE = {
-    Q, abilities, buildPlan, fillDay, alternatives, timePlan, prescription, recommend, historyFor, sessionBest, setScore,
+    Q, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
