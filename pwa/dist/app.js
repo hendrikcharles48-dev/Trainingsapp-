@@ -984,6 +984,7 @@
       const list = E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q)) && (s.all || E.available(ex, eq))).sort((a, b) => a.name.localeCompare(b.name));
       return `<div class="stack"><h2>Übung wählen</h2><input class="field" id="pickq" type="search" data-in="pickQ" placeholder="Suchen" value="${esc(s.q || '')}">
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
+        <button class="btn" data-a="customFrom">${I.plus} Nicht dabei? Eigene Übung anlegen</button>
         <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
     },
     balanceInfo(s) {
@@ -1019,7 +1020,7 @@
       return `<div class="stack"><div><div class="eyebrow">Tauschen</div><h2>${esc(ex.name)}</h2></div>
         ${entry.slotId ? `<label class="row small"><input type="checkbox" id="swapPlan" data-a="swapPlanToggle" ${s.plan ? 'checked' : ''}> Auch dauerhaft im Plan tauschen</label>` : ''}
         <div class="list">${alts.map(x => `<button class="li" data-a="swapDo" data-id="${x.ex.id}"><div class="grow"><div style="font-weight:600">${esc(x.ex.name)}</div><div class="small muted">${x.ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div>${x.reasons.length ? `<div class="why" style="margin-top:3px">${x.reasons.map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div></button>`).join('')}</div>
-        <button class="btn" data-a="pickEx" data-mode="swapWorkout" data-i="${s.i}">Aus allen Übungen wählen</button></div>`;
+        <div class="row wrap"><button class="btn grow" data-a="pickEx" data-mode="swapWorkout" data-i="${s.i}">Aus allen Übungen wählen</button><button class="btn grow" data-a="customFrom">${I.plus} Eigene Übung anlegen</button></div></div>`;
     },
     exMenu(s) {
       const entry = st.active.exercises[s.i]; const ex = getEx(entry.exId);
@@ -1077,17 +1078,17 @@
     },
     custom(s) {
       const c = s.c || (s.c = { name: '', pat: 'biceps', kind: 'load', prim: [], eq: ['bw'], lo: 8, hi: 12 });
-      return `<div class="stack"><h2>Eigene Übung</h2>
-        <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"><div id="cx-hit">${cxHit(c.name)}</div></div>
+      return `<div class="stack"><div>${s.ret ? `<div class="eyebrow">${s.ret.mode === 'swapWorkout' || s.ret.mode === 'slot' ? 'Ersetzt ' + esc(s.base || 'die Übung') : s.ret.mode === 'plan' ? 'Kommt in den Plan' : 'Kommt ins Training'}</div>` : ''}<h2>Eigene Übung</h2>${s.base ? `<div class="small muted">Vorausgefüllt wie „${esc(s.base)}“ – nur Name und Unterschiede anpassen.</div>` : ''}</div>
+        <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"><div id="cx-hit">${cxHit(c.name, !!s.ret)}</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-pat">Bewegung</label><select class="field" id="cx-pat" data-in="cx" data-k="pat">${Object.entries(D.PATTERNS).map(([k, v]) => `<option value="${k}" ${c.pat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
         <div class="grow"><label class="lbl" for="cx-kind">Art</label><select class="field" id="cx-kind" data-in="cx" data-k="kind">${[['load', 'Mit Gewicht'], ['bw', 'Körpergewicht'], ['hold', 'Halten (Sekunden)']].map(([k, v]) => `<option value="${k}" ${c.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
         <div><div class="lbl">Muskeln</div><div class="row wrap">${Object.entries(D.MUSCLES).map(([k, v]) => `<button class="chip ${c.prim.includes(k) ? 'on' : ''}" data-a="cxMuscle" data-k="${k}">${v}</button>`).join('')}</div></div>
         <div><div class="lbl">Geräte</div><div class="row wrap">${Object.entries(D.EQUIP).map(([k, v]) => `<button class="chip ${c.eq.includes(k) ? 'on' : ''}" data-a="cxEq" data-k="${k}">${v}</button>`).join('')}</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-lo">${c.kind === 'hold' ? 'Sek. min' : 'Wdh. min'}</label><input class="field" id="cx-lo" inputmode="numeric" data-in="cx" data-k="lo" value="${c.lo}"></div><div class="grow"><label class="lbl" for="cx-hi">${c.kind === 'hold' ? 'Sek. max' : 'Wdh. max'}</label><input class="field" id="cx-hi" inputmode="numeric" data-in="cx" data-k="hi" value="${c.hi}"></div></div>
-        <button class="btn primary" data-a="cxSave">Speichern</button></div>`;
+        <button class="btn primary" data-a="cxSave">${s.ret ? 'Anlegen & einsetzen' : 'Speichern'}</button></div>`;
     }
   };
-  function cxHit(name) { const b = name && name.trim().length > 3 ? findBuiltin(name) : null; return b ? `<button class="card flat row" style="margin-top:8px;width:100%;text-align:left;gap:10px" data-a="exInfo" data-id="${b.id}">${thumb(b)}<div class="grow small"><b>Gibt es schon:</b> ${esc(b.name)}<div class="muted">Mit Bild, Anleitung und Empfehlungen – antippen</div></div></button>` : ''; }
+  function cxHit(name, ret) { const b = name && name.trim().length > 3 ? findBuiltin(name) : null; return b ? `<button class="card flat row" style="margin-top:8px;width:100%;text-align:left;gap:10px" data-a="${ret ? 'cxUseBuiltin' : 'exInfo'}" data-id="${b.id}">${thumb(b)}<div class="grow small"><b>Gibt es schon:</b> ${esc(b.name)}<div class="muted">${ret ? 'Antippen, um diese Übung direkt einzusetzen' : 'Mit Bild, Anleitung und Empfehlungen – antippen'}</div></div></button>` : ''; }
   function wStep(ex) { const o = E.loadOptions(ex, st.active.loc, P()); if (o && o.length > 1) { let m = Infinity; for (let i = 1; i < o.length; i++) m = Math.min(m, o[i] - o[i - 1]); return isFinite(m) && m > 0 ? m : 2.5; } return ex.kind === 'bw' ? 2.5 : 1; }
   function findSlot(entry) { const p = plan(); if (!p || !entry.slotId) return null; for (const d of p.days) for (const s of d.slots) if (s.id === entry.slotId) return s; return null; }
 
@@ -1203,13 +1204,16 @@
     exInfo(t) { openSheet({ type: 'exInfo', id: t.dataset.id }); },
     pickEx(t) { openSheet({ type: 'pick', mode: t.dataset.mode, d: t.dataset.d != null ? +t.dataset.d : null, s: t.dataset.s != null ? +t.dataset.s : null, i: t.dataset.i != null ? +t.dataset.i : null, q: '' }); setTimeout(() => { const q = $('#pickq'); if (q) q.focus(); }, 80); },
     pickAll(t) { st.sheet.all = t.checked; renderSheet(); },
-    pickDo(t) {
-      const s = st.sheet; const id = t.dataset.id; const ex = getEx(id);
-      if (s.mode === 'workout') { addToWorkout(id); return; }
-      if (s.mode === 'swapWorkout') { doSwapWorkout(s.i, id, false); return; }
-      if (s.mode === 'plan') { addToPlan(s.d, id); return; }
-      if (s.mode === 'slot') { const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); sl.ex[loc] = id; sl.why[loc] = ['Von dir gewählt']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' im Plan'); }
+    pickDo(t) { applyPick(st.sheet, t.dataset.id); },
+    customFrom() {
+      const s = st.sheet; let ret, base = null;
+      if (s.type === 'swapWorkout') { ret = { mode: 'swapWorkout', i: s.i, plan: !!s.plan }; base = getEx(st.active.exercises[s.i].exId); }
+      else { ret = { mode: s.mode, i: s.i, d: s.d, s: s.s }; if (s.mode === 'swapWorkout' && st.active) base = getEx(st.active.exercises[s.i].exId); if (s.mode === 'slot') base = getEx(plan().days[s.d].slots[s.s].ex[st.planLoc || defLoc()]); }
+      const c = base ? { name: s.q || '', pat: base.pat, kind: base.kind === 'int' ? 'bw' : base.kind, prim: base.prim.slice(), eq: base.eq.slice(), lo: (base.rr || [8])[0], hi: (base.rr || [8, 12])[1], skill: base.skill } : null;
+      openSheet(Object.assign({ type: 'custom', ret, base: base && base.name }, c ? { c } : {}));
+      setTimeout(() => { const n = $('#cx-name'); if (n) n.focus(); }, 80);
     },
+    cxUseBuiltin(t) { const r = st.sheet.ret; applyPick(r, t.dataset.id); },
     addToWorkout(t) { addToWorkout(t.dataset.id); },
     balanceNow() { const ch = E.balancePlan(plan(), P()); Store.saveProfile(); render(); openSheet({ type: 'balanceInfo', ch }); },
     freeAdd(t) { addToWorkout(t.dataset.id); const e = st.active.exercises[st.active.exercises.length - 1]; if (e) { e.extraEx = true; Store.saveActive(); } toast('Hinzugefügt – viel Spaß!'); },
@@ -1245,7 +1249,11 @@
     cxSave() {
       const c = st.sheet.c; if (!c.name.trim()) { toast('Bitte einen Namen eingeben'); return; } if (!c.prim.length) { toast('Bitte mindestens einen Muskel wählen'); return; }
       const ex = { id: 'c-' + uid(), custom: true, name: c.name.trim(), pat: c.pat, role: ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i', kind: c.kind, eq: c.eq.length ? c.eq : ['bw'], prim: c.prim, sec: [], lvl: 2, rr: [+c.lo || 8, +c.hi || 12], d: 'Eigene Übung.', c: [], std: 0.3, bwf: c.kind === 'bw' ? 0.6 : undefined };
-      P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile(); render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung angelegt');
+      if (c.skill && ex.pat === 'skill') ex.skill = c.skill;
+      P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile();
+      const ret = st.sheet.ret;
+      if (ret) { closeSheet(); applyPick(ret, ex.id); toast('Übung angelegt und eingesetzt'); return; }
+      render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung angelegt');
     },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
@@ -1265,6 +1273,13 @@
     restAdj(t) { if (!st.rest) return; st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
     restSkip() { st.rest = null; renderRest(); }
   };
+  function applyPick(s, id) {
+      const ex = getEx(id);
+      if (s.mode === 'workout') { addToWorkout(id); return; }
+      if (s.mode === 'swapWorkout') { doSwapWorkout(s.i, id, !!s.plan); return; }
+      if (s.mode === 'plan') { addToPlan(s.d, id); return; }
+      if (s.mode === 'slot') { const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); sl.ex[loc] = id; sl.why[loc] = ['Von dir gewählt']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' im Plan'); }
+    }
   function addToWorkout(id) {
     if (!st.active) return;
     st.active.exercises.push(newEntry(id, null)); st.active.cur = st.active.exercises.length - 1;
@@ -1329,7 +1344,7 @@
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
-    cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value); } }
+    cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value, !!st.sheet.ret); } }
   };
 
   document.addEventListener('click', e => {

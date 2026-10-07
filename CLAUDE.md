@@ -35,7 +35,8 @@ Wo die eigenen Übungen zu finden sind:
   (Artifact https://claude.ai/artifact/9rhKGs5pYvdeqRx7ymim9L).
 - Wenn nichts davon vorliegt: den Nutzer kurz fragen, ob er neue Übungen angelegt hat.
 
-Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`).
+Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`).
+Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
 
 ## Trainingslogik
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
