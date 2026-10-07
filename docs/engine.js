@@ -582,10 +582,31 @@
 
   /* ================= Der Algorithmus hinter jedem Satz ================= */
   const EPL = (load, reps) => load * (1 + reps / 30);
-  function effLoad(ex, set, bw) { return ex.kind === 'bw' ? bw * (ex.bwf || 0) + (+set.w || 0) : (+set.w || 0); }
+  /* Widerstandsbänder zur Unterstützung: ungefähre Hilfe in kg (Loop-Bänder, je nach Marke unterschiedlich) */
+  const BANDS = [
+    { k: 'gelb', n: 'Gelb', kg: 7, c: '#F2D24B' }, { k: 'rot', n: 'Rot', kg: 11, c: '#E5484D' }, { k: 'schwarz', n: 'Schwarz', kg: 16, c: '#2A2A2E' },
+    { k: 'lila', n: 'Lila', kg: 23, c: '#8E5BD9' }, { k: 'gruen', n: 'Grün', kg: 32, c: '#3DAA5C' }, { k: 'blau', n: 'Blau', kg: 45, c: '#3C7DE0' }
+  ];
+  const bandKg = k => { const b = BANDS.find(x => x.k === k); return b ? b.kg : 0; };
+  // Übungen, bei denen ein Band zur Vereinfachung sinnvoll ist (Klimmzüge, Dips, Muscle-ups, Pistols, Nordics, Lever, Planche …)
+  function canBand(ex) {
+    if (!ex || ex.custom && !['vpull', 'dip', 'skill'].includes(ex.pat)) return false;
+    if (['band-pullup', 'dead-hang', 'scap-pull', 'false-grip-hang', 'skin-cat', 'mu-transition'].includes(ex.id)) return false;
+    if (!(ex.kind === 'bw' || ex.kind === 'hold')) return false;
+    if (['vpull', 'dip'].includes(ex.pat)) return !['dip-support', 'ring-support', 'bench-dip'].includes(ex.id);
+    if (ex.pat === 'skill') return ['mu', 'fl', 'bl', 'planche', 'hsskill'].includes(ex.skill) || /muscle|lever|planche|mu-/.test(ex.id);
+    return ['pistol', 'box-pistol', 'shrimp-squat', 'nordic-neg', 'archer-pushup', 'pseudo-planche-pu', 'wall-hspu', 'wall-hspu-neg', 'ring-pistol', 'dragon-flag'].includes(ex.id);
+  }
+  // Haltezeit mit Band zählt weniger: Faktor je nach Hilfe im Verhältnis zum Körpergewicht
+  const holdBandF = (k, bw) => Math.max(0.35, 1 - bandKg(k) / (bw || 80) * 1.2);
+  function effLoad(ex, set, bw) {
+    if (ex.kind !== 'bw') return +set.w || 0;
+    const base = bw * (ex.bwf || 0);
+    return Math.max(base * 0.2, base - bandKg(set.band)) + (+set.w || 0);
+  }
   function setScore(ex, set, bw) {
-    if (!set || !set.done) return null;
-    if (ex.kind === 'hold') return (+set.sec || 0) + 3 * (+set.rir || 0);
+    if (!set || set.done === false) return null; // gespeicherte Sätze haben kein done-Feld
+    if (ex.kind === 'hold') return ((+set.sec || 0) + 3 * (+set.rir || 0)) * (set.band ? holdBandF(set.band, bw) : 1);
     if (ex.kind === 'int') return null;
     if (ex.kind === 'bw' && !(ex.bwf > 0)) return (+set.reps || 0) + (+set.rir || 0);
     const L = effLoad(ex, set, bw); if (!(L > 0)) return null;
@@ -602,7 +623,7 @@
   }
   function historyFor(exId, workouts) {
     const out = [];
-    for (const w of workouts) for (const e of (w.exercises || [])) if (e.exId === exId && (e.sets || []).some(s => s.done)) out.push({ date: w.date, bw: w.bw, entry: e, loc: w.loc });
+    for (const w of workouts) for (const e of (w.exercises || [])) if (e.exId === exId && (e.sets || []).some(s => s.done !== false)) out.push({ date: w.date, bw: w.bw, entry: e, loc: w.loc });
     out.sort((a, b) => a.date < b.date ? -1 : 1);
     return out;
   }
@@ -630,7 +651,7 @@
         const avg = bests.reduce((a, b) => a + b, 0) / bests.length;
         base = Math.max(last, avg * 0.97);
         const lastH = prevSessions[prevSessions.length - 1];
-        const lastSets = (lastH.entry.sets || []).filter(s => s.done);
+        const lastSets = (lastH.entry.sets || []).filter(s => s.done !== false);
         const lastRIRT = lastH.entry.rirT ?? rirT;
         const hitAll = lastSets.length && lastSets.every(s => (ex.kind === 'hold' ? true : (+s.reps || 0) >= lo) && (+s.rir || 0) <= lastRIRT + 1);
         const days = (Date.now() - new Date(lastH.date).getTime()) / 864e5;
@@ -676,6 +697,7 @@
     if (ex.kind === 'int') { out.sec = presc.rr[0]; return out; }
     if (ex.kind === 'hold') {
       out.sec = Math.max(5, Math.round(C * (1 - (done.length ? 0 : 0)) - 3 * rirT));
+      if (ctx.band) out.sec = Math.max(5, Math.round((C / holdBandF(ctx.band, bw)) - 3 * rirT));
       if (out.sec > hi * 1.6) out.harder = chainStep(ex, 1, profile, loc);
       if (out.sec < lo * 0.5) out.easier = chainStep(ex, -1, profile, loc);
       return out;
@@ -684,13 +706,14 @@
     if (ex.kind === 'bw' && !(ex.bwf > 0)) {
       out.reps = Math.max(1, Math.round(C - rirT)); out.w = 0; return out;
     }
-    const baseLoad = ex.kind === 'bw' ? bw * ex.bwf : 0;
-    let opts = loadOptions(ex, loc, profile);
+    const baseLoad = ex.kind === 'bw' ? Math.max(bw * ex.bwf * 0.2, bw * ex.bwf - bandKg(ctx.band)) : 0;
+    let opts = ctx.band && ex.kind === 'bw' ? null : loadOptions(ex, loc, profile);
     const capReps = L => 30 * (C / L - 1) - rirT;
     if (ex.kind === 'bw' && (!opts || opts.length <= 1)) {
       const r = capReps(baseLoad);
       out.w = 0; out.reps = clampReps(r, hi);
-      if (r > hi + 2) { out.harder = chainStep(ex, 1, profile, loc); notes.push('Zu leicht: ' + (out.harder ? 'nächste Stufe probieren' : 'langsamer (3 s ablassen) oder Pause am tiefsten Punkt')); }
+      if (r > hi + 2 && ctx.band) notes.push('Band hilft zu viel: nimm ein leichteres Band oder trainiere ohne');
+      else if (r > hi + 2) { out.harder = chainStep(ex, 1, profile, loc); notes.push('Zu leicht: ' + (out.harder ? 'nächste Stufe probieren' : 'langsamer (3 s ablassen) oder Pause am tiefsten Punkt')); }
       if (r < lo - 1) { out.easier = chainStep(ex, -1, profile, loc); if (out.easier) notes.push('Unter dem Zielbereich: leichtere Stufe wäre sinnvoll'); }
       return out;
     }
@@ -745,7 +768,7 @@
       if (w.date < since) continue;
       for (const e of w.exercises || []) {
         const ex = EX[e.exId] || e.custom; if (!ex) continue;
-        const n = (e.sets || []).filter(s => s.done).length; if (!n) continue;
+        const n = (e.sets || []).filter(s => s.done !== false).length; if (!n) continue;
         for (const m of ex.prim) res[m] += n;
         for (const m of ex.sec || []) res[m] += n * 0.5;
       }
@@ -795,7 +818,7 @@
   }
 
   window.ENGINE = {
-    Q, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
+    Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };

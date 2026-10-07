@@ -46,6 +46,13 @@ Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene
   `balancePlan()`/`planVolume()` in `engine.js`; läuft in `buildPlan` und einmalig für alte Pläne
   (`plan.bal`). Nach dem Pflichtprogramm gibt es „Freies Training“ mit Vorschlägen.
 
+## Widerstandsbänder
+Bei passenden Übungen (`canBand` in `engine.js`) gibt es im Training den Reiter „Widerstandsband“
+(Farben in `BANDS` mit grober kg-Hilfe). Der Satz speichert `band`; `effLoad`/`setScore`/`recommend`
+rechnen die Hilfe heraus, mit Band kein Zusatzgewicht. Beim nächsten Mal fragt die App
+„Letztes Mal mit Band … – heute wieder?“.
+Achtung: gespeicherte Sätze haben kein `done`-Feld – im Engine immer `done !== false` prüfen.
+
 ## Garmin
 Tagesform aus Garmin-Werten wurde gebaut und auf Wunsch des Nutzers wieder entfernt: Garmin gibt
 Trainingsbereitschaft, Body Battery und (wahrscheinlich) HRV nicht an Apple Health weiter, nur
