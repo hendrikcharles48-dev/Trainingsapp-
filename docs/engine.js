@@ -64,6 +64,9 @@
   /* Mögliche Lasten für eine Übung am Ort. null = beliebig (freie Eingabe, Schritt 0.5). */
   function loadOptions(ex, loc, profile) {
     const set = profile.settings || {};
+    // Von dir festgelegte Gewichte für genau diese Übung (pro Ort)
+    const own = (profile.exW || {})[ex.id + '@' + loc];
+    if (own && own.length && (ex.kind === 'load' || ex.kind === 'bw')) { const l = own.slice().sort((a, b) => a - b); return ex.kind === 'bw' ? [0, ...l.filter(x => x > 0)] : l; }
     if (ex.kind === 'bw') {
       if (!ex.addw || !canAdd(profile, loc)) return [0];
       const extra = loc === 'gym' ? [...rangeList(1.25, 10, 1.25), ...rangeList(12.5, 60, 2.5)] : dbList(profile);

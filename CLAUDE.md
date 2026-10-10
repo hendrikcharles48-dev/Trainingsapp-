@@ -53,6 +53,14 @@ rechnen die Hilfe heraus, mit Band kein Zusatzgewicht. Beim nächsten Mal fragt 
 „Letztes Mal mit Band … – heute wieder?“.
 Achtung: gespeicherte Sätze haben kein `done`-Feld – im Engine immer `done !== false` prüfen.
 
+## Gewichte, Supersätze, Notizen
+- Eigene Gewichtsliste pro Übung und Ort: `profile.exW[exId + '@' + loc]` (Knopf „⚖ Gewichte“),
+  `loadOptions` nimmt sie vorrangig.
+- Supersätze: gleiche `ss`-ID an Plan-Slots (`slot.ss`) oder Trainings-Einträgen (`entry.ss`).
+  Nach einem Satz geht es direkt zum Partner (15 s), nach der Runde normale Pause (`commitSet`).
+- Notizen bleiben pro Übung: `profile.exNotes[exId] = {t, d}`; angezeigt im Training, Tagesfenster,
+  Plan und Übungsinfo.
+
 ## Garmin
 Tagesform aus Garmin-Werten wurde gebaut und auf Wunsch des Nutzers wieder entfernt: Garmin gibt
 Trainingsbereitschaft, Body Battery und (wahrscheinlich) HRV nicht an Apple Health weiter, nur
