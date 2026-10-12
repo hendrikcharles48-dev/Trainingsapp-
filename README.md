@@ -56,7 +56,7 @@ Eigenständige App im iOS-Design (dunkel als Standard) für einen Minijob, im Or
 
 - **Monat:** Ring bis zur Monatsgrenze, Grundlohn und Spätzulage getrennt, was noch frei ist, alle Schichten (antippen zum Bearbeiten oder Löschen). Startet jeden Monat bei 0, mit ‹ › zu alten Monaten.
 - **Schicht eintragen** (Plus-Knopf): Beginn und Ende, Pause wird automatisch abgezogen (über 6 Std 30 Min, über 9 Std 45 Min), Spätzulage ab 20 Uhr wird erkannt. Alternativ nur Dauer.
-- **Planer – Kalender:** Arbeitstage antippen, die App verteilt den Rest bis zur Grenze in Viertelstunden auf diese Tage, möglichst bis 6 Std (ohne Pause), „Volle Tage“ oder „Gleichmäßig“; reicht das nicht, Vorschlag mit Pause. Tag antippen: Beginn ändern oder als Schicht eintragen.
+- **Planer – Kalender:** Arbeitstage antippen, die App verteilt den Rest bis zur Grenze in Viertelstunden auf diese Tage, möglichst bis 6 Std (ohne Pause), „Volle Tage“ oder „Gleichmäßig“; reicht das nicht, Vorschlag mit Pause. Tag antippen: feste Zeit, Höchstdauer (z. B. höchstens 4 Std), Beginn oder als Schicht eintragen. KW antippen: Tage der Woche wählen oder ganze Woche frei. „Meine normale Woche“ als Vorlage für alle offenen Wochen. Eigenes Monatsziel unter der Grenze (`S.ziel`).
 - **Planer – Wochenmuster:** Schichtmuster pro Woche oder Monat, prüft gegen die Grenze (4,35 Wochen pro Monat) und rechnet aus, bis wann man an Zusatztagen arbeiten kann.
 - **Übersicht:** Monate, Jahr gegen 12 × Grenze, Einstellungen (Lohn 18,39 €, Grenze 603 €, 25 % ab 20 Uhr, Zulage zählt zur Grenze), Hell/Dunkel, Backup.
 - Daten liegen nur auf dem Gerät (`localStorage`, Schlüssel `stundenzettel-v2`).
