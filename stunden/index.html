@@ -154,6 +154,8 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .answer b{font-variant-numeric:tabular-nums}
 .answer .k{font:700 24px var(--round);display:block;margin:2px 0;font-variant-numeric:tabular-nums}
 
+.pbox{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--fill-2)}
+.pbox input{background:var(--fill)}
 /* Kalender */
 .cal{display:grid;gap:4px;text-align:center}
 .cal .wd{font-size:12px;font-weight:600;color:var(--label-2);padding-bottom:2px}
@@ -241,12 +243,27 @@ const curYM = () => today().slice(0,7);
 const autoPause = g => g > 9*60 ? 45 : g > 6*60 ? 30 : 0;
 const MAXG = 10*60 + 45; // höchstens 10 Std Arbeit + Pause
 
-function shift(von, bis, pauseIn){
+// Vorschlag, wann die Pause liegt: direkt vor der Spätzulage, spätestens nach 6 Std Arbeit
+function suggestPause(s, e, len){
+  const ab = toMin(S().ab), abA = ab >= s ? ab : ab + 1440;
+  let c = abA - len >= s + 60 ? Math.min(abA - len, s + 360) : s + Math.min(360, Math.floor((e - s - len) / 2));
+  c = Math.max(s, Math.min(c, e - len));
+  return c - (c % 5);
+}
+// Schicht von–bis; pauseIn = Pausenlänge (null = gesetzlich), pauseVon = Beginn der Pause (null = Vorschlag)
+function shift(von, bis, pauseIn, pauseVon){
   const s = toMin(von), e0 = toMin(bis); if(s == null || e0 == null) return null;
   let e = e0; if(e <= s) e += 1440;
   const gross = e - s, pause = pauseIn == null ? autoPause(gross) : Math.min(pauseIn, gross), paid = gross - pause;
-  const ab = toMin(S().ab), ov = (a,b) => Math.max(0, Math.min(e,b) - Math.max(s,a));
-  return {gross, pause, paid, spaet: Math.min(paid, ov(ab, 1440+360) + ov(ab-1440, 360))};
+  const ab = toMin(S().ab);
+  const inWin = (a, b) => { const ov = (x, y) => Math.max(0, Math.min(b, y) - Math.max(a, x)); return ov(ab, 1440+360) + ov(ab-1440, 360) + ov(ab+1440, 2880+360); };
+  let pS = null, pauseBad = false;
+  if(pause > 0){
+    if(pauseVon){ pS = toMin(pauseVon); if(pS < s) pS += 1440; if(pS < s || pS + pause > e) pauseBad = true; }
+    else pS = suggestPause(s, e, pause);
+  }
+  const spaet = Math.max(0, inWin(s, e) - (pS != null && !pauseBad ? inWin(pS, pS + pause) : 0));
+  return {gross, pause, paid, spaet: Math.min(paid, spaet), pauseVon: pS != null ? hhmm(pS) : null, pauseBis: pS != null ? hhmm(pS + pause) : null, pauseBad, pauseSpaet: pS != null && !pauseBad && inWin(pS, pS + pause) > 0};
 }
 const money = (paid, spaet) => { const base = paid/60*S().lohn, zul = spaet/60*S().lohn*S().proz/100; return {base, zul, sum: base+zul, zaehlt: base + (S().zaehlt ? zul : 0)}; };
 function maxShift(von, budget){
@@ -336,7 +353,12 @@ function openSheet(entry, pre){
       <div class="chips">${presets.map(p=>`<button type="button" class="chip" data-p="${p[0]}|${p[1]}">${p[0]}–${p[1]}</button>`).join('')}</div>
       <div class="grid2"><div class="field"><label for="fVon">Beginn</label><input id="fVon" type="time" value="${e.von||'14:00'}"></div>
         <div class="field"><label for="fBis">Ende</label><input id="fBis" type="time" value="${e.bis||'21:30'}"></div></div>
-      <div class="field"><label for="fPause">Pause in Minuten (leer = automatisch)</label><input id="fPause" inputmode="numeric" placeholder="automatisch" value="${edit && e.von && e.pause !== autoPause((toMin(e.bis)-toMin(e.von)+1440)%1440||1440) ? e.pause : ''}"></div>
+      <div id="pBox" class="pbox">
+        <div class="lbl">Pause <span style="color:var(--label-3)">· Pflicht ab 6 Std</span></div>
+        <div class="grid2"><div class="field"><label for="fPv">Pause ab</label><input id="fPv" type="time" value="${e.von && (edit || e.pauseVon) ? (e.pauseVon || (shift(e.von, e.bis, e.pause) || {}).pauseVon || '') : ''}"></div>
+          <div class="field"><label for="fPause">Dauer (Min)</label><input id="fPause" inputmode="numeric" placeholder="30" value="${edit && e.von && e.pause ? e.pause : ''}"></div></div>
+        <button type="button" class="chip" id="pSug" style="align-self:flex-start"></button>
+      </div>
     </div>
     <div id="mDauer" class="grid2">
       <div class="field"><label for="fStd">Stunden</label><input id="fStd" inputmode="decimal" placeholder="0" value="${edit && !e.von ? Math.floor((e.minuten||0)/60) : ''}"></div>
@@ -352,10 +374,19 @@ function openSheet(entry, pre){
   const setMode = m => { mode = m; w.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.m===m))); $('#mZeit').hidden = m!=='zeit'; $('#mDauer').hidden = m!=='dauer'; calc(); };
   const read = () => {
     if(mode === 'zeit'){
-      const pv = $('#fPause').value.trim(); if(pv && !/^\d+$/.test(pv)) return {err:'Pause bitte in ganzen Minuten, z. B. 30.'};
-      const r = shift($('#fVon').value, $('#fBis').value, pv ? +pv : null);
-      if(!r) return {err:'Bitte Beginn und Ende wählen.'}; if(r.paid <= 0) return {err:'Die Schicht ist kürzer als die Pause.'};
-      return {von:$('#fVon').value, bis:$('#fBis').value, pause:r.pause, minuten:r.paid, spaetMin:r.spaet};
+      const g = shift($('#fVon').value, $('#fBis').value, 0);
+      if(!g) return {err:'Bitte Beginn und Ende wählen.'};
+      const need = autoPause(g.gross); $('#pBox').hidden = !need;
+      if(!need) return {von:$('#fVon').value, bis:$('#fBis').value, pause:0, pauseVon:null, minuten:g.gross, spaetMin:g.spaet};
+      const pv = $('#fPause').value.trim(); if(pv && !/^\d+$/.test(pv)) return {err:'Pausendauer bitte in ganzen Minuten, z. B. 30.'};
+      const len = pv ? +pv : need;
+      const sug = shift($('#fVon').value, $('#fBis').value, len);
+      $('#pSug').textContent = `Vorschlag: ${sug.pauseVon}–${sug.pauseBis}`; $('#pSug').dataset.v = sug.pauseVon;
+      if(len < need) return {err:`Bei ${fmt(g.gross)} sind mindestens ${need} Min Pause Pflicht.`};
+      if(!$('#fPv').value) return {err:'Wann machst du Pause? Trag „Pause ab“ ein oder tipp auf den Vorschlag.'};
+      const r = shift($('#fVon').value, $('#fBis').value, len, $('#fPv').value);
+      if(r.pauseBad) return {err:'Die Pause muss innerhalb der Schicht liegen.'};
+      return {von:$('#fVon').value, bis:$('#fBis').value, pause:r.pause, pauseVon:r.pauseVon, minuten:r.paid, spaetMin:r.spaet, warn: toMin(r.pauseVon) - toMin($('#fVon').value) > 360 ? 'Gesetzlich gilt: spätestens nach 6 Std Arbeit Pause.' : r.pauseSpaet ? `Die Pause liegt nach ${S().ab} Uhr, dadurch weniger Spätzulage.` : ''};
     }
     const h = num($('#fStd').value || 0), mi = $('#fMin').value.trim(), sp = $('#fSp').value.trim();
     if(h == null || h < 0) return {err:'Stunden bitte als Zahl, z. B. 3 oder 3,5.'};
@@ -369,17 +400,19 @@ function openSheet(entry, pre){
     if(r.err){ c.className = 'calc err'; c.textContent = r.err; $('#fSave').disabled = true; return; }
     $('#fSave').disabled = false; c.className = 'calc';
     const m = money(r.minuten, r.spaetMin);
-    c.innerHTML = `<div><b>${fmtS(r.minuten)}</b><span>Std bezahlt${r.pause?`<br>${r.pause} Min Pause ab`:''}</span></div><div><b class="spaet">${fmtS(r.spaetMin)}</b><span>nach ${S().ab}</span></div><div><b>${eur(m.sum)}</b><span>verdient</span></div>`;
+    c.innerHTML = `<div><b>${fmtS(r.minuten)}</b><span>Std bezahlt${r.pause?`<br>Pause ${r.pauseVon}–${hhmm(toMin(r.pauseVon)+r.pause)}`:''}</span></div><div><b class="spaet">${fmtS(r.spaetMin)}</b><span>nach ${S().ab}</span></div><div><b>${eur(m.sum)}</b><span>verdient</span></div>${r.warn?`<p class="hint" style="grid-column:1/-1;margin:4px 0 0;color:var(--orange)">${r.warn}</p>`:''}`;
   }
   w.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMode(b.dataset.m));
-  w.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const [a,z] = b.dataset.p.split('|'); $('#fVon').value = a; $('#fBis').value = z; $('#fPause').value = ''; calc(); });
+  w.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const [a,z] = b.dataset.p.split('|'); $('#fVon').value = a; $('#fBis').value = z; $('#fPause').value = ''; $('#fPv').value = ''; calc(); });
+  $('#pSug').onclick = () => { $('#fPv').value = $('#pSug').dataset.v; calc(); };
   w.querySelectorAll('input').forEach(i => i.addEventListener('input', calc));
   $('#shX').onclick = closeSheet;
   w.onclick = ev => { if(ev.target === w) closeSheet(); };
   $('#fSave').onclick = () => {
     const r = read(); if(r.err) return;
     const obj = {...(edit ? entry : {id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), ...r, datum:$('#fDatum').value || today(), notiz:$('#fNotiz').value.trim()};
-    if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; }
+    delete obj.warn; if(!obj.pause) delete obj.pauseVon;
+    if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
     st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
     save(); ym = ymOf(obj.datum); closeSheet(); render();
     toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
@@ -476,7 +509,7 @@ function distribute(days, R, mode){
 function recRows(list){
   return list.map(x => {
     const d = new Date(x.d+'T12:00'), s = x.s;
-    const tag = x.fix ? 'feste Zeit' : s && s.pause ? `${s.pause} Min Pause` : 'ohne Pause';
+    const tag = (x.fix ? 'fest · ' : '') + (s && s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause');
     return `<button type="button" class="row" data-day="${x.d}"><div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
       <div class="mid">${s ? `<span class="t">${s.von}–${s.bis}${x.fix ? ' <span class="pill" style="font-size:11px">fest</span>' : ''}</span><span class="s">${fmt(s.paid)} · ${tag}${s.spaet ? ` · <span class="spaet">${fmt(s.spaet)} spät</span>` : ''}</span>`
         : `<span class="t" style="color:var(--label-2)">Frei</span><span class="s">Für dein Ziel nicht nötig</span>`}</div>
@@ -622,7 +655,7 @@ function dayMenu(d, s){
   w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dmT">
     <div class="grab"></div>
     <div class="sheet-head"><button type="button" id="dmX">Fertig</button><h2 id="dmT">${WT[dt.getDay()]}, ${dt.getDate()}. ${MONATE[dt.getMonth()]}</h2><span style="width:60px"></span></div>
-    ${s ? `<div class="calc"><div><b>${s.von}–${s.bis}</b><span>${c.bis ? 'feste Zeit' : 'Empfehlung'}</span></div><div><b>${fmtS(s.paid)}</b><span>${s.pause ? s.pause+' Min Pause' : 'ohne Pause'}</span></div><div><b>${eur(s.cost)}</b><span>verdient</span></div></div>` : '<p class="hint">An diesem Tag wird gerade keine Schicht gebraucht.</p>'}
+    ${s ? `<div class="calc"><div><b>${s.von}–${s.bis}</b><span>${c.bis ? 'feste Zeit' : 'Empfehlung'}</span></div><div><b>${fmtS(s.paid)}</b><span>${s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause'}</span></div><div><b>${eur(s.cost)}</b><span>verdient</span></div></div>` : '<p class="hint">An diesem Tag wird gerade keine Schicht gebraucht.</p>'}
     <div class="seg" role="group" aria-label="Art"><button type="button" data-a="flex">App schlägt vor</button><button type="button" data-a="fest">Feste Zeit</button></div>
     <div class="grid2"><div class="field"><label for="dmVon">Beginn</label><input id="dmVon" type="time" value="${c.von || st.calStart}"></div>
       <div class="field" id="dmBisF"><label for="dmBis">Ende</label><input id="dmBis" type="time" value="${c.bis || (s ? s.bis : '18:00')}"></div>
@@ -644,7 +677,7 @@ function dayMenu(d, s){
     done();
   };
   $('#dmDel').onclick = () => { delete st.cal[d]; done(); };
-  if(s) $('#dmAdd').onclick = () => { delete st.cal[d]; save(); closeSheet(); openSheet(null, {datum: d, von: s.von, bis: s.bis}); };
+  if(s) $('#dmAdd').onclick = () => { delete st.cal[d]; save(); closeSheet(); openSheet(null, {datum: d, von: s.von, bis: s.bis, pauseVon: s.pauseVon}); };
 }
 function planOut(){
   let total = 0, mins = 0;
