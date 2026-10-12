@@ -56,12 +56,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .group-title{font-size:13px;color:var(--label-2);text-transform:uppercase;letter-spacing:.04em;margin:0 4px -12px}
 
 /* Ring */
-.hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}
-.ring{position:relative;width:116px;height:116px}
+.hero{display:flex;flex-direction:column;align-items:center;gap:18px}
+.ring{position:relative;width:168px;height:168px}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.ring .in b{font:700 20px/1 var(--round);font-variant-numeric:tabular-nums}
-.ring .in span{font-size:12px;color:var(--label-2);margin-top:4px}
+.ring .in b{font:700 30px/1 var(--round);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ring .in b small{font-size:16px;font-weight:600}
+.ring .in span{font-size:13px;color:var(--label-2);margin-top:6px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+.tiles div{background:var(--fill-2);border-radius:14px;padding:10px 8px;text-align:center;display:flex;flex-direction:column;gap:3px;min-width:0}
+.tiles b{font:600 16px var(--round);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tiles span{font-size:12px;color:var(--label-2)}
 .stats{display:flex;flex-direction:column;gap:10px;min-width:0}
 .stat{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .stat span{font-size:14px;color:var(--label-2);white-space:nowrap}
@@ -194,7 +199,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 @keyframes fade{from{background:transparent}}
 .toast{position:fixed;left:50%;bottom:calc(var(--tabh) + var(--safe-b) + 90px);transform:translateX(-50%);z-index:50;background:var(--card-2);color:var(--label);padding:10px 16px;border-radius:99px;font-size:15px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.4);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap{animation:none}}
-@media (max-width:370px){.hero{grid-template-columns:1fr;justify-items:center}.stats{width:100%}}
+@media (max-width:360px){.tiles b{font-size:14px}}
 </style>
 </head>
 <body>
@@ -264,9 +269,9 @@ function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlan
 
 // ---------- Monat ----------
 function ring(pct, over){
-  const r = 56, c = 2*Math.PI*r, p = Math.min(1, pct);
-  return `<svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--fill)" stroke-width="12"/>
-    <circle cx="66" cy="66" r="${r}" fill="none" stroke="${over ? 'var(--red)' : 'var(--green)'}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" ${p===0?'opacity="0"':''}/></svg>`;
+  const r = 60, c = 2*Math.PI*r, p = Math.min(1, pct);
+  return `<svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--fill)" stroke-width="9"/>
+    <circle cx="66" cy="66" r="${r}" fill="none" stroke="${over ? 'var(--red)' : 'var(--green)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" ${p===0?'opacity="0"':''}/></svg>`;
 }
 function viewMonat(){
   const [y,m] = ym.split('-').map(Number), list = monthEntries(ym), t = sumOf(list), isCur = ym === curYM();
@@ -288,11 +293,11 @@ function viewMonat(){
       <div class="monthnav"><button type="button" id="prev" aria-label="Vorheriger Monat">‹</button><button type="button" id="next" aria-label="Nächster Monat" ${isCur?'disabled':''}>›</button></div></div>
     <section class="card">
       <div class="hero">
-        <div class="ring">${ring(t.zaehlt/S().grenze, rest<0)}<div class="in"><b>${eur(t.zaehlt)}</b><span>von ${eur(S().grenze).replace(',00','')}</span></div></div>
-        <div class="stats">
-          <div class="stat"><span>Gearbeitet</span><b>${fmtS(t.paid)} Std</b></div>
-          <div class="stat"><span><i class="dot" style="background:var(--green)"></i>Grundlohn</span><b>${eur(t.base)}</b></div>
-          <div class="stat"><span><i class="dot" style="background:var(--violet)"></i>Spätzulage</span><b class="spaet">${eur(t.zul)}</b></div>
+        <div class="ring">${ring(t.zaehlt/S().grenze, rest<0)}<div class="in"><b>${(() => { const [a,c] = t.zaehlt.toFixed(2).split('.'); return `${(+a).toLocaleString('de-DE')}<small>,${c} €</small>`; })()}</b><span>von ${eur(S().grenze).replace(',00','')}</span></div></div>
+        <div class="tiles">
+          <div><b>${fmtS(t.paid)}</b><span>Stunden</span></div>
+          <div><b>${eur(t.base)}</b><span><i class="dot" style="background:var(--green)"></i>Grundlohn</span></div>
+          <div><b class="spaet">${eur(t.zul)}</b><span><i class="dot" style="background:var(--violet)"></i>Spätzulage</span></div>
         </div>
       </div>
       ${restHtml}
