@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Stundenzettel</title>
+<meta name="description" content="Minijob-Stunden eintragen, Spätzulage ab 20 Uhr, 603-€-Grenze im Blick und Schichten planen.">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stunden">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* Layout: iOS-App mit großem Titel, Ring für die 603-€-Grenze, Schichtliste, Tab-Leiste aus Glas und Plus-Knopf.
+   Dunkel als Standard; Grün = Geld/Grundlohn, Violett = Spätzulage ab 20 Uhr. */
+:root{
+  --bg:#000; --card:#1C1C1E; --card-2:#2C2C2E; --fill:rgba(118,118,128,.24); --fill-2:rgba(118,118,128,.14);
+  --label:#fff; --label-2:rgba(235,235,245,.62); --label-3:rgba(235,235,245,.3); --sep:rgba(84,84,88,.55);
+  --green:#32D583; --green-soft:rgba(50,213,131,.16); --violet:#A594FF; --violet-soft:rgba(165,148,255,.18);
+  --red:#FF6961; --red-soft:rgba(255,69,58,.16); --orange:#FFB340;
+  --on-green:#04150C; --glass:rgba(22,22,24,.78); --glass-line:rgba(255,255,255,.08);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --round:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --r:20px; --tabh:62px; --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#F2F2F7; --card:#fff; --card-2:#F2F2F7; --fill:rgba(118,118,128,.12); --fill-2:rgba(118,118,128,.07);
+  --label:#000; --label-2:rgba(60,60,67,.64); --label-3:rgba(60,60,67,.32); --sep:rgba(60,60,67,.18);
+  --green:#1A9E5A; --green-soft:rgba(26,158,90,.13); --violet:#6B55E0; --violet-soft:rgba(107,85,224,.12);
+  --red:#D70015; --red-soft:rgba(255,59,48,.12); --orange:#C25400;
+  --on-green:#fff; --glass:rgba(249,249,251,.8); --glass-line:rgba(0,0,0,.07);
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--label);font:17px/1.4 var(--font);-webkit-text-size-adjust:100%}
+body{min-height:100vh;overscroll-behavior-y:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* Seiten */
+.page{padding:calc(var(--safe-t) + 14px) 16px calc(var(--tabh) + var(--safe-b) + 96px);max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.top h1{font:800 34px/1.1 var(--font);letter-spacing:-.02em;margin:0}
+.eyebrow{font-size:13px;font-weight:600;color:var(--label-2);text-transform:uppercase;letter-spacing:.04em}
+.monthnav{display:flex;gap:6px}
+.monthnav button{width:36px;height:36px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:18px;color:var(--green)}
+.monthnav button:disabled{color:var(--label-3)}
+.card{background:var(--card);border-radius:var(--r);padding:18px}
+.group-title{font-size:13px;color:var(--label-2);text-transform:uppercase;letter-spacing:.04em;margin:0 4px -12px}
+
+/* Ring */
+.hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}
+.ring{position:relative;width:116px;height:116px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring .in b{font:700 20px/1 var(--round);font-variant-numeric:tabular-nums}
+.ring .in span{font-size:12px;color:var(--label-2);margin-top:4px}
+.stats{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stat{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.stat span{font-size:14px;color:var(--label-2);white-space:nowrap}
+.stat b{font:600 16px var(--round);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.rest{margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--green-soft);font-size:15px}
+.rest.over{background:var(--red-soft);color:var(--red)}
+.rest b{font-variant-numeric:tabular-nums}
+
+/* Liste */
+.list{background:var(--card);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 16px;width:100%;text-align:left;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;left:76px;right:0;border-top:.5px solid var(--sep)}
+.row:active{background:var(--fill-2)}
+.day{width:48px;height:48px;border-radius:12px;background:var(--fill);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.day b{font:700 19px var(--round)}
+.day span{font-size:11px;color:var(--label-2);margin-top:3px;text-transform:uppercase}
+.mid{min-width:0;display:flex;flex-direction:column;gap:2px}
+.mid .t{font-weight:600;font-variant-numeric:tabular-nums}
+.mid .s{font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.right{text-align:right;display:flex;flex-direction:column;gap:2px}
+.right b{font:600 16px var(--round);font-variant-numeric:tabular-nums;white-space:nowrap}
+.right span{font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.spaet{color:var(--violet)}
+.empty{padding:28px 20px;text-align:center;color:var(--label-2);font-size:15px}
+.empty b{display:block;color:var(--label);font-size:17px;margin-bottom:4px}
+
+/* Formulare */
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.lbl{font-size:13px;color:var(--label-2);font-weight:500}
+input,select{font:500 17px var(--font);color:var(--label);background:var(--fill-2);border:0;border-radius:12px;padding:12px 14px;width:100%;min-width:0;-webkit-appearance:none;appearance:none}
+input[type=time],input[type=date]{min-height:46px}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%),linear-gradient(135deg,var(--label-2) 50%,transparent 50%);background-position:calc(100% - 18px) 52%,calc(100% - 13px) 52%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.seg{display:flex;background:var(--fill);border-radius:10px;padding:2px}
+.seg button{flex:1;padding:7px 8px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label-2)}
+.seg button[aria-pressed="true"]{background:var(--card-2);color:var(--label);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 14px;border-radius:99px;background:var(--fill);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.chip:active{background:var(--green-soft);color:var(--green)}
+.btn{display:block;width:100%;padding:15px;border-radius:14px;background:var(--green);color:var(--on-green);font-weight:700;font-size:17px;text-align:center}
+.btn:disabled{opacity:.4}
+.btn.plain{background:var(--fill);color:var(--label)}
+.btn.danger{background:var(--red-soft);color:var(--red)}
+.calc{border-radius:14px;background:var(--fill-2);padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+.calc b{display:block;font:700 19px var(--round);font-variant-numeric:tabular-nums}
+.calc span{font-size:12px;color:var(--label-2)}
+.calc.err{display:block;color:var(--red);font-size:15px;text-align:left}
+.hint{font-size:13px;color:var(--label-2);margin:0}
+
+/* Einstellungen-Liste */
+.set{background:var(--card);border-radius:var(--r);overflow:hidden}
+.set .it{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;align-items:center;padding:8px 8px 8px 16px;position:relative}
+.set .it+.it::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.set .it label{font-size:16px;color:var(--label);font-weight:400}
+.set .it input,.set .it select{text-align:right;padding:9px 12px;background:transparent;color:var(--label-2)}
+.set .it select{padding-right:28px}
+.set .act{display:block;width:100%;text-align:left;padding:14px 16px;color:var(--green);position:relative}
+.set .act+.act::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+
+/* Monate */
+.mbar{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 16px;width:100%;text-align:left;position:relative}
+.mbar+.mbar::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.mbar .track{height:8px;border-radius:9px;background:var(--fill);overflow:hidden}
+.mbar .track i{display:block;height:100%;background:var(--green);border-radius:9px}
+.mbar .track i.over{background:var(--red)}
+.mbar b{font:600 15px var(--round);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Planer */
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) 32px;gap:10px;align-items:center;padding:12px 12px 12px 16px;position:relative}
+@media (max-width:430px){.prow.pl{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 32px}.prow.pl .stepper{grid-column:1 / 3;justify-self:start}.prow.pl .x{grid-column:3;grid-row:1}}
+.prow+.prow::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.stepper{display:flex;align-items:center;background:var(--fill-2);border-radius:12px}
+.stepper button{width:34px;height:42px;font-size:20px;color:var(--green)}
+.stepper b{min-width:2.6em;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
+.stepper b small{display:block;font-size:10px;color:var(--label-2);font-weight:500}
+.prow input{padding:10px 8px;font-size:16px;text-align:center}
+.x{width:32px;height:32px;border-radius:50%;background:var(--fill);color:var(--label-2);font-size:16px}
+.verdict{display:flex;flex-direction:column;gap:12px}
+.big{font:800 34px/1 var(--round);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;background:var(--green-soft);color:var(--green);vertical-align:middle}
+.pill.bad{background:var(--red-soft);color:var(--red)}
+.answer{padding:14px;border-radius:14px;background:var(--fill-2);font-size:15px}
+.answer b{font-variant-numeric:tabular-nums}
+.answer .k{font:700 24px var(--round);display:block;margin:2px 0;font-variant-numeric:tabular-nums}
+
+/* Tab-Leiste & Plus */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;padding:6px 8px calc(var(--safe-b) + 4px);background:var(--glass);border-top:.5px solid var(--glass-line);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+.tabbar button{flex:1;max-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--label-3);padding:4px 0}
+.tabbar button svg{width:26px;height:26px}
+.tabbar button[aria-current="page"]{color:var(--green)}
+.fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(var(--tabh) + var(--safe-b) + 16px);z-index:21;width:60px;height:60px;border-radius:50%;background:var(--green);color:var(--on-green);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.fab svg{width:28px;height:28px}
+
+/* Sheet */
+.sheet-wrap{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+.sheet{width:100%;max-width:560px;max-height:calc(100% - var(--safe-t) - 12px);overflow:auto;background:var(--card);border-radius:22px 22px 0 0;padding:8px 16px calc(var(--safe-b) + 20px);display:flex;flex-direction:column;gap:16px;animation:up .28s cubic-bezier(.2,.8,.2,1)}
+.grab{width:38px;height:5px;border-radius:9px;background:var(--fill);margin:4px auto 0}
+.sheet-head{display:flex;justify-content:space-between;align-items:center}
+.sheet-head h2{margin:0;font-size:20px}
+.sheet-head button{color:var(--green);font-weight:600;font-size:17px;padding:6px}
+@keyframes up{from{transform:translateY(100%)}}
+@keyframes fade{from{background:transparent}}
+.toast{position:fixed;left:50%;bottom:calc(var(--tabh) + var(--safe-b) + 90px);transform:translateX(-50%);z-index:50;background:var(--card-2);color:var(--label);padding:10px 16px;border-radius:99px;font-size:15px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.4);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap{animation:none}}
+@media (max-width:370px){.hero{grid-template-columns:1fr;justify-items:center}.stats{width:100%}}
+</style>
+</head>
+<body>
+<main id="view"></main>
+<button class="fab" id="fab" type="button" aria-label="Schicht eintragen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav class="tabbar" aria-label="Bereiche">
+  <button type="button" data-tab="monat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Monat</button>
+  <button type="button" data-tab="planer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Planer</button>
+  <button type="button" data-tab="mehr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11M12 19V5M19 19v-6"/></svg>Übersicht</button>
+</nav>
+<div id="sheet" class="sheet-wrap" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KEY = 'stundenzettel-v2';
+const DEF = {lohn:18.39, grenze:603, wochen:4.35, proz:25, ab:'20:00', zaehlt:true, theme:'dark'};
+const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const WT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+// ---------- Daten ----------
+let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}};
+function load(){ try{ const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if(d) st = {...st, ...d, S:{...DEF, ...(d.S||{})}}; }catch(_){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){ toast('Speichern nicht möglich'); } }
+const S = () => st.S;
+
+// ---------- Rechnen ----------
+const toMin = t => { if(!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
+const hhmm = m => { m = ((m%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); };
+const fmt = min => { min = Math.round(min); const h = Math.floor(min/60), m = min%60; return h&&m ? `${h} Std ${m} Min` : h ? `${h} Std` : `${m} Min`; };
+const fmtS = min => { min = Math.round(min); return `${Math.floor(min/60)}:${String(min%60).padStart(2,'0')}`; };
+const eur = v => v.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+const iso = d => { const x = new Date(d); x.setMinutes(x.getMinutes()-x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
+const today = () => iso(new Date());
+const ymOf = d => d.slice(0,7);
+const curYM = () => today().slice(0,7);
+const autoPause = g => g > 9*60 ? 45 : g > 6*60 ? 30 : 0;
+const MAXG = 10*60 + 45; // höchstens 10 Std Arbeit + Pause
+
+function shift(von, bis, pauseIn){
+  const s = toMin(von), e0 = toMin(bis); if(s == null || e0 == null) return null;
+  let e = e0; if(e <= s) e += 1440;
+  const gross = e - s, pause = pauseIn == null ? autoPause(gross) : Math.min(pauseIn, gross), paid = gross - pause;
+  const ab = toMin(S().ab), ov = (a,b) => Math.max(0, Math.min(e,b) - Math.max(s,a));
+  return {gross, pause, paid, spaet: Math.min(paid, ov(ab, 1440+360) + ov(ab-1440, 360))};
+}
+const money = (paid, spaet) => { const base = paid/60*S().lohn, zul = spaet/60*S().lohn*S().proz/100; return {base, zul, sum: base+zul, zaehlt: base + (S().zaehlt ? zul : 0)}; };
+function maxShift(von, budget){
+  let best = null;
+  for(let g = 1; g <= MAXG; g++){ const r = shift(von, hhmm(toMin(von)+g), null); if(money(r.paid, r.spaet).zaehlt <= budget + .005 && (!best || r.paid > best.paid)) best = {...r, bis: hhmm(toMin(von)+g)}; }
+  return best;
+}
+function sumOf(list){
+  let paid = 0, spaet = 0, base = 0, zul = 0;
+  for(const e of list){ const m = money(e.minuten||0, e.spaetMin||0); paid += e.minuten||0; spaet += e.spaetMin||0; base += m.base; zul += m.zul; }
+  return {paid, spaet, base, zul, zaehlt: base + (S().zaehlt ? zul : 0), n: list.length};
+}
+const monthEntries = ym => st.entries.filter(e => (e.datum||'').startsWith(ym)).sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
+
+// ---------- Navigation ----------
+let tab = 'monat', ym = curYM();
+function go(t){ tab = t; document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false')); render(); window.scrollTo(0,0); }
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
+function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlaner, mehr:viewMehr})[tab](); $('#fab').hidden = tab !== 'monat'; }
+
+// ---------- Monat ----------
+function ring(pct, over){
+  const r = 56, c = 2*Math.PI*r, p = Math.min(1, pct);
+  return `<svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--fill)" stroke-width="12"/>
+    <circle cx="66" cy="66" r="${r}" fill="none" stroke="${over ? 'var(--red)' : 'var(--green)'}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" ${p===0?'opacity="0"':''}/></svg>`;
+}
+function viewMonat(){
+  const [y,m] = ym.split('-').map(Number), list = monthEntries(ym), t = sumOf(list), isCur = ym === curYM();
+  const rest = S().grenze - t.zaehlt;
+  let restHtml;
+  if(rest < 0) restHtml = `<div class="rest over">Über der Grenze um <b>${eur(-rest)}</b>.</div>`;
+  else if(isCur){
+    const s = maxShift('14:00', rest);
+    restHtml = `<div class="rest">Noch <b>${eur(rest)}</b> frei. Das sind <b>${fmt(Math.floor(rest/S().lohn*60))}</b> Arbeit vor ${S().ab} Uhr${s && s.paid>0 && s.spaet>0 && s.gross<MAXG ? `, oder eine Schicht <b>14:00–${s.bis}</b>` : ''}.</div>`;
+  } else restHtml = `<div class="rest">${eur(rest)} unter der Grenze geblieben.</div>`;
+  const v = $('#view');
+  v.innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">${isCur ? 'Dieser Monat' : y}</div><h1>${MONATE[m-1]}</h1></div>
+      <div class="monthnav"><button type="button" id="prev" aria-label="Vorheriger Monat">‹</button><button type="button" id="next" aria-label="Nächster Monat" ${isCur?'disabled':''}>›</button></div></div>
+    <section class="card">
+      <div class="hero">
+        <div class="ring">${ring(t.zaehlt/S().grenze, rest<0)}<div class="in"><b>${eur(t.zaehlt)}</b><span>von ${eur(S().grenze).replace(',00','')}</span></div></div>
+        <div class="stats">
+          <div class="stat"><span>Gearbeitet</span><b>${fmtS(t.paid)} Std</b></div>
+          <div class="stat"><span><i class="dot" style="background:var(--green)"></i>Grundlohn</span><b>${eur(t.base)}</b></div>
+          <div class="stat"><span><i class="dot" style="background:var(--violet)"></i>Spätzulage</span><b class="spaet">${eur(t.zul)}</b></div>
+        </div>
+      </div>
+      ${restHtml}
+    </section>
+    <p class="group-title">${t.n} ${t.n===1?'Schicht':'Schichten'}</p>
+    <section class="list" id="list"></section>
+  </div>`;
+  $('#prev').onclick = () => { ym = iso(new Date(y, m-2, 1)).slice(0,7); render(); };
+  $('#next').onclick = () => { if(!isCur){ ym = iso(new Date(y, m, 1)).slice(0,7); render(); } };
+  const box = $('#list');
+  if(!list.length){ box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`; return; }
+  for(const e of list){
+    const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+    b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
+      <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : 'Ohne Uhrzeit'}</span><span class="s">${esc([fmt(e.minuten||0), e.spaetMin ? `${fmt(e.spaetMin)} spät` : '', e.notiz].filter(Boolean).join(' · '))}</span></div>
+      <div class="right"><b>${eur(mo.sum)}</b>${e.spaetMin ? `<span class="spaet">+${eur(mo.zul)}</span>` : ''}</div>`;
+    b.onclick = () => openSheet(e);
+    box.append(b);
+  }
+}
+
+// ---------- Schicht-Sheet ----------
+function openSheet(entry){
+  const edit = !!entry, e = entry || {datum: ym === curYM() ? today() : ym+'-01', von:'14:00', bis:'21:30'};
+  let mode = edit && !e.von ? 'dauer' : 'zeit';
+  const presets = [['14:00','21:30'],['14:00','22:30']];
+  for(const x of st.entries.slice().sort((a,b)=>(b.erstellt||0)-(a.erstellt||0))) if(x.von && !presets.some(p=>p[0]===x.von&&p[1]===x.bis)){ presets.push([x.von,x.bis]); if(presets.length>=4) break; }
+  const w = $('#sheet');
+  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">
+    <div class="grab"></div>
+    <div class="sheet-head"><button type="button" id="shX">Abbrechen</button><h2 id="shT">${edit?'Schicht bearbeiten':'Neue Schicht'}</h2><span style="width:80px"></span></div>
+    <div class="field"><label for="fDatum">Datum</label><input id="fDatum" type="date" value="${e.datum}"></div>
+    <div class="seg" role="group" aria-label="Eingabe"><button type="button" data-m="zeit">Uhrzeit</button><button type="button" data-m="dauer">Nur Dauer</button></div>
+    <div id="mZeit" class="field" style="gap:12px">
+      <div class="chips">${presets.map(p=>`<button type="button" class="chip" data-p="${p[0]}|${p[1]}">${p[0]}–${p[1]}</button>`).join('')}</div>
+      <div class="grid2"><div class="field"><label for="fVon">Beginn</label><input id="fVon" type="time" value="${e.von||'14:00'}"></div>
+        <div class="field"><label for="fBis">Ende</label><input id="fBis" type="time" value="${e.bis||'21:30'}"></div></div>
+      <div class="field"><label for="fPause">Pause in Minuten (leer = automatisch)</label><input id="fPause" inputmode="numeric" placeholder="automatisch" value="${edit && e.von && e.pause !== autoPause((toMin(e.bis)-toMin(e.von)+1440)%1440||1440) ? e.pause : ''}"></div>
+    </div>
+    <div id="mDauer" class="grid2">
+      <div class="field"><label for="fStd">Stunden</label><input id="fStd" inputmode="decimal" placeholder="0" value="${edit && !e.von ? Math.floor((e.minuten||0)/60) : ''}"></div>
+      <div class="field"><label for="fMin">Minuten</label><input id="fMin" inputmode="numeric" placeholder="0" value="${edit && !e.von ? (e.minuten||0)%60 : ''}"></div>
+      <div class="field" style="grid-column:1/-1"><label for="fSp">Davon nach ${S().ab} Uhr (Minuten)</label><input id="fSp" inputmode="numeric" placeholder="0" value="${edit && !e.von && e.spaetMin ? e.spaetMin : ''}"></div>
+    </div>
+    <div class="field"><label for="fNotiz">Notiz</label><input id="fNotiz" placeholder="optional" value="${esc(e.notiz||'')}"></div>
+    <div class="calc" id="fCalc"></div>
+    <button type="button" class="btn" id="fSave">${edit?'Änderungen speichern':'Schicht speichern'}</button>
+    ${edit?'<button type="button" class="btn danger" id="fDel">Schicht löschen</button>':''}
+  </div>`;
+  w.hidden = false; document.body.style.overflow = 'hidden';
+  const setMode = m => { mode = m; w.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.m===m))); $('#mZeit').hidden = m!=='zeit'; $('#mDauer').hidden = m!=='dauer'; calc(); };
+  const read = () => {
+    if(mode === 'zeit'){
+      const pv = $('#fPause').value.trim(); if(pv && !/^\d+$/.test(pv)) return {err:'Pause bitte in ganzen Minuten, z. B. 30.'};
+      const r = shift($('#fVon').value, $('#fBis').value, pv ? +pv : null);
+      if(!r) return {err:'Bitte Beginn und Ende wählen.'}; if(r.paid <= 0) return {err:'Die Schicht ist kürzer als die Pause.'};
+      return {von:$('#fVon').value, bis:$('#fBis').value, pause:r.pause, minuten:r.paid, spaetMin:r.spaet};
+    }
+    const h = num($('#fStd').value || 0), mi = $('#fMin').value.trim(), sp = $('#fSp').value.trim();
+    if(h == null || h < 0) return {err:'Stunden bitte als Zahl, z. B. 3 oder 3,5.'};
+    if(mi && !/^\d+$/.test(mi)) return {err:'Minuten bitte als ganze Zahl.'};
+    if(sp && !/^\d+$/.test(sp)) return {err:'Späte Minuten bitte als ganze Zahl.'};
+    const total = Math.round(h*60) + (+mi||0); if(total <= 0) return {err:'Bitte eine Dauer eingeben.'};
+    return {von:null, bis:null, pause:null, minuten:total, spaetMin:Math.min(total, +sp||0)};
+  };
+  function calc(){
+    const r = read(), c = $('#fCalc');
+    if(r.err){ c.className = 'calc err'; c.textContent = r.err; $('#fSave').disabled = true; return; }
+    $('#fSave').disabled = false; c.className = 'calc';
+    const m = money(r.minuten, r.spaetMin);
+    c.innerHTML = `<div><b>${fmtS(r.minuten)}</b><span>Std bezahlt${r.pause?`<br>${r.pause} Min Pause ab`:''}</span></div><div><b class="spaet">${fmtS(r.spaetMin)}</b><span>nach ${S().ab}</span></div><div><b>${eur(m.sum)}</b><span>verdient</span></div>`;
+  }
+  w.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMode(b.dataset.m));
+  w.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const [a,z] = b.dataset.p.split('|'); $('#fVon').value = a; $('#fBis').value = z; $('#fPause').value = ''; calc(); });
+  w.querySelectorAll('input').forEach(i => i.addEventListener('input', calc));
+  $('#shX').onclick = closeSheet;
+  w.onclick = ev => { if(ev.target === w) closeSheet(); };
+  $('#fSave').onclick = () => {
+    const r = read(); if(r.err) return;
+    const obj = {...(edit ? entry : {id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), ...r, datum:$('#fDatum').value || today(), notiz:$('#fNotiz').value.trim()};
+    if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; }
+    st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
+    save(); ym = ymOf(obj.datum); closeSheet(); if(tab !== 'monat') go('monat'); else render();
+    toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
+  };
+  if(edit) $('#fDel').onclick = ev => {
+    const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; }
+    st.entries = st.entries.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Schicht gelöscht');
+  };
+  setMode(mode);
+}
+function closeSheet(){ $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = ''; }
+$('#fab').onclick = () => openSheet(null);
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
+
+let tt; function toast(t){ const x = $('#toast'); x.textContent = t; x.hidden = false; clearTimeout(tt); tt = setTimeout(() => x.hidden = true, 2000); }
+
+// ---------- Planer ----------
+function viewPlaner(){
+  const v = $('#view');
+  v.innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">Was passt in ${eur(S().grenze)}?</div><h1>Planer</h1></div></div>
+    <p class="group-title">So möchte ich arbeiten</p>
+    <section class="list" id="prows"></section>
+    <button type="button" class="btn plain" id="padd">Schicht hinzufügen</button>
+    <section class="card verdict" id="pout"></section>
+    <p class="group-title">Zusätzliche Tage</p>
+    <section class="list"><div class="prow" style="grid-template-columns:auto minmax(0,1fr)">
+      <div class="stepper"><button type="button" id="xm" aria-label="Weniger">−</button><b>${st.extra.anz}×<small>${st.extra.per==='w'?'pro Woche':'pro Monat'}</small></b><button type="button" id="xp" aria-label="Mehr">+</button></div>
+      <div class="grid2"><select id="xper" aria-label="Zeitraum"><option value="w">pro Woche</option><option value="m">pro Monat</option></select><input id="xvon" type="time" value="${st.extra.von}" aria-label="Beginn Zusatztag"></div>
+    </div></section>
+    <section class="card verdict" id="xout"></section>
+    <p class="hint">Gerechnet mit ${String(S().wochen).replace('.',',')} Wochen pro Monat wie dein Arbeitgeber, Pause wird automatisch abgezogen (über 6 Std 30 Min, über 9 Std 45 Min).</p>
+  </div>`;
+  const rows = $('#prows');
+  st.plan.forEach((r, i) => {
+    const d = document.createElement('div'); d.className = 'prow pl';
+    d.innerHTML = `<div class="stepper"><button type="button" aria-label="Weniger">−</button><b>${r.anz}×<small>${r.per==='w'?'Woche':'Monat'}</small></b><button type="button" aria-label="Mehr">+</button></div>
+      <input type="time" value="${r.von}" aria-label="Beginn"><input type="time" value="${r.bis}" aria-label="Ende">
+      <button type="button" class="x" aria-label="Entfernen">✕</button>`;
+    const [mi, pl] = d.querySelectorAll('.stepper button'), [iv, ib] = d.querySelectorAll('input');
+    mi.onclick = () => { r.anz = Math.max(0, r.anz-1); save(); viewPlaner(); };
+    pl.onclick = () => { r.anz++; save(); viewPlaner(); };
+    d.querySelector('.stepper b').onclick = () => { r.per = r.per==='w' ? 'm' : 'w'; save(); viewPlaner(); };
+    iv.onchange = () => { r.von = iv.value; save(); planOut(); };
+    ib.onchange = () => { r.bis = ib.value; save(); planOut(); };
+    d.querySelector('.x').onclick = () => { st.plan.splice(i,1); save(); viewPlaner(); };
+    rows.append(d);
+  });
+  if(!st.plan.length) rows.innerHTML = `<div class="empty">Füg eine Schicht hinzu, z. B. 14:00–21:30.</div>`;
+  $('#padd').onclick = () => { st.plan.push({anz:1, per:'w', von:'14:00', bis:'21:30'}); save(); viewPlaner(); };
+  $('#xper').value = st.extra.per;
+  $('#xm').onclick = () => { st.extra.anz = Math.max(0, st.extra.anz-1); save(); viewPlaner(); };
+  $('#xp').onclick = () => { st.extra.anz = Math.min(7, st.extra.anz+1); save(); viewPlaner(); };
+  $('#xper').onchange = () => { st.extra.per = $('#xper').value; save(); viewPlaner(); };
+  $('#xvon').onchange = () => { st.extra.von = $('#xvon').value; save(); planOut(); };
+  planOut();
+}
+function planOut(){
+  let total = 0, mins = 0;
+  for(const r of st.plan){ const s = shift(r.von, r.bis, null); if(!s || !r.anz) continue; const k = r.anz*(r.per==='w'?S().wochen:1); total += money(s.paid, s.spaet).zaehlt*k; mins += s.paid*k; }
+  const rest = S().grenze - total, ok = rest >= 0;
+  let h = `<div><span class="lbl">Im Monat</span><div class="big">${eur(total)} <span class="pill ${ok?'':'bad'}">${ok?'passt':'zu viel'}</span></div><span class="hint">${fmt(mins)} Arbeit</span></div>`;
+  if(!ok){
+    h += `<div class="answer">Das sind <b>${eur(-rest)}</b> mehr als erlaubt.`;
+    const r0 = st.plan.find(r => r.anz && shift(r.von, r.bis, null));
+    if(r0){ const s = shift(r0.von, r0.bis, null), c = money(s.paid, s.spaet).zaehlt, n = Math.floor(S().grenze/c), left = S().grenze - n*c;
+      h += ` Mit ${r0.von}–${r0.bis} gehen höchstens<span class="k">${n} Schichten im Monat</span>danach bleiben ${eur(left)} = ${fmt(Math.floor(left/S().lohn*60))} Arbeit vor ${S().ab} Uhr.`; }
+    h += `</div>`;
+  } else h += `<div class="answer">Bis zur Grenze fehlen noch<span class="k">${eur(rest)}</span>= ${fmt(Math.floor(rest/S().lohn*60))} Arbeit vor ${S().ab} Uhr pro Monat.</div>`;
+  $('#pout').innerHTML = h;
+  // Zusatztage
+  const x = st.extra, xo = $('#xout');
+  if(!ok){ xo.innerHTML = `<p class="hint" style="margin:0">Erst wenn der Plan oben passt, ist Platz für Zusatztage.</p>`; return; }
+  if(!x.anz){ xo.innerHTML = `<p class="hint" style="margin:0">Stell oben ein, wie viele Tage du zusätzlich arbeiten willst.</p>`; return; }
+  const k = x.anz*(x.per==='w'?S().wochen:1), s = maxShift(x.von, rest/k);
+  const wer = x.anz===1 ? 'Am zusätzlichen Tag' : `An jedem der ${x.anz} Zusatztage`;
+  if(!s || s.paid <= 0) xo.innerHTML = `<div class="answer">${wer}: dafür reicht der Rest nicht.</div>`;
+  else if(s.gross >= MAXG) xo.innerHTML = `<div class="answer">${wer} wären mehr als 10 Std nötig. Das ist gesetzlich zu viel, plan lieber mehr Tage ein.</div>`;
+  else xo.innerHTML = `<div class="answer">${wer} (${x.per==='w'?'pro Woche':'pro Monat'}) arbeitest du<span class="k">${x.von}–${s.bis}</span>= ${fmt(s.paid)}${s.pause?` nach ${s.pause} Min Pause`:''}${s.spaet?`, davon <span class="spaet">${fmt(s.spaet)} nach ${S().ab}</span>`:''} · ${eur(money(s.paid,s.spaet).zaehlt)} pro Tag</div>`;
+}
+
+// ---------- Übersicht & Einstellungen ----------
+function viewMehr(){
+  const y = new Date().getFullYear(), by = {};
+  for(const e of st.entries){ const k = (e.datum||'').slice(0,7); if(k) (by[k] = by[k] || []).push(e); }
+  const keys = Object.keys(by).sort().reverse(), ty = sumOf(st.entries.filter(e => (e.datum||'').startsWith(y+'-'))), all = sumOf(st.entries);
+  const v = $('#view');
+  v.innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">Alles auf einen Blick</div><h1>Übersicht</h1></div></div>
+    <section class="card"><div class="stats">
+      <div class="stat"><span>${y} verdient (zählt zur Grenze)</span><b>${eur(ty.zaehlt)}</b></div>
+      <div class="stat"><span>Jahresgrenze (12 × ${eur(S().grenze)})</span><b>${eur(S().grenze*12)}</b></div>
+      <div class="stat"><span>Insgesamt gearbeitet</span><b>${fmtS(all.paid)} Std</b></div>
+    </div></section>
+    <p class="group-title">Monate</p>
+    <section class="list" id="mlist">${keys.length ? '' : '<div class="empty">Noch keine Einträge.</div>'}</section>
+    <p class="group-title">Lohn & Regeln</p>
+    <section class="set">
+      <div class="it"><label for="sLohn">Stundenlohn (€)</label><input id="sLohn" inputmode="decimal" value="${String(S().lohn).replace('.',',')}"></div>
+      <div class="it"><label for="sGrenze">Grenze pro Monat (€)</label><input id="sGrenze" inputmode="decimal" value="${String(S().grenze).replace('.',',')}"></div>
+      <div class="it"><label for="sProz">Spätzulage (%)</label><input id="sProz" inputmode="decimal" value="${String(S().proz).replace('.',',')}"></div>
+      <div class="it"><label for="sAb">Spätzulage ab</label><input id="sAb" type="time" value="${S().ab}"></div>
+      <div class="it"><label for="sZ">Zulage zählt zur Grenze</label><select id="sZ"><option value="1">Ja</option><option value="0">Nein</option></select></div>
+      <div class="it"><label for="sW">Wochen pro Monat</label><input id="sW" inputmode="decimal" value="${String(S().wochen).replace('.',',')}"></div>
+    </section>
+    <p class="group-title">Darstellung</p>
+    <section class="set"><div class="it"><label for="sT">Erscheinungsbild</label><select id="sT"><option value="dark">Dunkel</option><option value="light">Hell</option><option value="auto">Wie iPhone</option></select></div></section>
+    <p class="group-title">Sicherung</p>
+    <section class="set">
+      <button type="button" class="act" id="bExp">Backup speichern</button>
+      <button type="button" class="act" id="bImp">Backup laden</button>
+      <input type="file" id="fImp" accept="application/json,.json" hidden>
+    </section>
+    <p class="hint">Deine Daten liegen nur auf diesem Gerät. Mach ab und zu ein Backup, z. B. in die Dateien-App.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
+  </div>`;
+  const ml = $('#mlist');
+  for(const k of keys){
+    const [yy,mm] = k.split('-').map(Number), t = sumOf(by[k]), p = Math.min(100, t.zaehlt/S().grenze*100);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mbar';
+    b.innerHTML = `<span>${MONATE[mm-1].slice(0,3)} ${String(yy).slice(2)}</span><span class="track"><i class="${t.zaehlt>S().grenze?'over':''}" style="width:${p}%"></i></span><b>${eur(t.zaehlt)}</b>`;
+    b.onclick = () => { ym = k; go('monat'); };
+    ml.append(b);
+  }
+  const bind = (id, key, conv) => $(id).onchange = () => { const val = conv($(id).value); if(val != null && val !== '' ){ st.S[key] = val; save(); toast('Gespeichert'); } };
+  bind('#sLohn','lohn',num); bind('#sGrenze','grenze',num); bind('#sProz','proz',num); bind('#sW','wochen',num); bind('#sAb','ab',v=>v||null);
+  $('#sZ').value = S().zaehlt ? '1' : '0'; $('#sZ').onchange = () => { st.S.zaehlt = $('#sZ').value === '1'; save(); toast('Gespeichert'); };
+  $('#sT').value = S().theme; $('#sT').onchange = () => { st.S.theme = $('#sT').value; save(); applyTheme(); };
+  $('#bExp').onclick = exportData;
+  $('#bImp').onclick = () => $('#fImp').click();
+  $('#fImp').onchange = importData;
+}
+async function exportData(){
+  const name = `stundenzettel-${today()}.json`, data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
+  const file = new File([data], name, {type:'application/json'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Stundenzettel-Backup'}); return; } }catch(e){ if(e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  f.text().then(t => {
+    const d = JSON.parse(t); if(!Array.isArray(d.entries)) throw 0;
+    const ids = new Set(st.entries.map(e => e.id)); let n = 0;
+    for(const e of d.entries) if(e && e.id && e.datum && !ids.has(e.id)){ st.entries.push(e); n++; }
+    if(d.S) st.S = {...DEF, ...d.S};
+    save(); toast(`${n} Schichten geladen`); render();
+  }).catch(() => toast('Datei konnte nicht gelesen werden'));
+}
+
+// ---------- Darstellung & Start ----------
+const mq = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(){
+  const t = S().theme === 'auto' ? (mq.matches ? 'dark' : 'light') : S().theme;
+  document.documentElement.dataset.theme = t;
+  document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#000000' : '#F2F2F7';
+}
+mq.addEventListener?.('change', applyTheme);
+let lastDay = today();
+function dayCheck(){ const t = today(); if(t === lastDay) return; if(ym === lastDay.slice(0,7)) ym = t.slice(0,7); lastDay = t; render(); }
+setInterval(dayCheck, 30000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) dayCheck(); });
+load(); applyTheme(); go('monat');
+if('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+</script>
+</body>
+</html>

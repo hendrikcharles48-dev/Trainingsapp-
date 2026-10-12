@@ -3,7 +3,7 @@
 Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engine.js`,
 `exercises.js`, `howto.js`, `figures.js`. `node pwa/build.js` baut nach `pwa/dist`, danach
 `pwa/dist/*` nach `docs/` kopieren (GitHub Pages läuft aus `main:/docs`).
-Achtung: `docs/toleranzen/` gehört zu einer anderen App – nie löschen oder überschreiben
+Achtung: `docs/toleranzen/` und `docs/stunden/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
