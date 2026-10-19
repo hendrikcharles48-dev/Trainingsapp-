@@ -144,29 +144,8 @@ eq('Foto: ± als 1 gelesen', fl('45 10,2'), ['45 ±0,2']);
 eq('Foto: Abmaße mit Minus bleiben', fl('60 -0,1 -0,3'), ['60 −0,1/−0,3']);
 eq('Foto: + als ± vermutet', pd2.items.map(i => i.kind + ':' + i.label + ':' + !!i.guess), ['pm:60 ±0,1:true']);
 
-if (typeof require !== 'undefined') {
-  try { require('./lernen.js'); } catch (e) { console.log('lernen.js fehlt noch'); }
-  const L = globalThis.TOL.LEARN;
-  if (L) {
-    // Jede Aufgabe viele Male erzeugen: Lösung muss ihre eigenen Schritte bestehen
-    let gen = 0;
-    L.topics.forEach(tp => tp.tasks.forEach(task => {
-      for (let n = 0; n < 300; n++) {
-        const a = task.make();
-        gen++;
-        const vals = {};
-        a.steps.forEach(s => { vals[s.id] = L.answerString(s); });
-        a.steps.forEach(s => {
-          const r = L.checkStep(s, vals[s.id], vals, a.steps);
-          count++;
-          if (r.state !== 'ok') { fails++; console.log('Aufgabe', task.id, s.id, 'Musterlösung falsch bewertet:', r, vals[s.id]); }
-        });
-        if (!a.solution || !a.solution.length) { fails++; console.log('Aufgabe ohne Lösungsweg', task.id); }
-      }
-    }));
-    console.log('Aufgaben erzeugt:', gen);
-  }
-}
+require('./werkstatt.js');
+require('./test-werkstatt.js')(T, eq);
 
 console.log(`${count - fails} von ${count} Prüfungen bestanden`);
 process.exit(fails ? 1 : 0);

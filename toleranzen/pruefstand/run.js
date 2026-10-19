@@ -40,7 +40,7 @@ function page(d) {
   await app.goto('http://localhost:8766/index.html?debug');
   await app.evaluate(() => localStorage.clear());
   await app.reload();
-  await app.click('[data-tab="apply"]');
+  await app.click('[data-page="tol"]');
   await app.click('[data-sec="foto"]');
   const results = [];
   for (const d of D) {

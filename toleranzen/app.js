@@ -1,7 +1,7 @@
-/* Toleranzen – Oberfläche: Navigation wie in iOS, Lernen mit Aufgaben, Anwenden mit Rechnern */
+/* Toleranzen – Oberfläche: Startliste mit Schnellsuche wie ein Tabellenbuch, darunter die Rechner und Tabellen */
 (function () {
   'use strict';
-  const T = window.TOL, L = T.LEARN;
+  const T = window.TOL, WK = T.W;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -38,9 +38,17 @@
     dia: svg('<circle cx="12" cy="12" r="7.4"/><path d="M4.6 19.4 19.4 4.6"/>'),
     camera: svg('<path d="M3.5 8.5a2 2 0 0 1 2-2h2.2l1.5-2.2h5.6l1.5 2.2h2.2a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.8"/>'),
     photos: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17.5 5-5 4 4 2.5-2.5 5 5"/>'),
-    pencil: svg('<path d="M4.5 19.5l1-4L16 5a2.1 2.1 0 0 1 3 3L8.5 18.5Z"/><path d="M14 7l3 3"/>')
+    pencil: svg('<path d="M4.5 19.5l1-4L16 5a2.1 2.1 0 0 1 3 3L8.5 18.5Z"/><path d="M14 7l3 3"/>'),
+    search: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 20.5 20.5"/>'),
+    gdt: svg('<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M9 7v10M15.5 7v10"/><path d="M4.4 12.8 7.2 11"/><circle cx="12.25" cy="12" r="1.9"/><path d="M17.6 12h2.3"/>'),
+    thread: svg('<path d="M8 3.5h8M8 20.5h8"/><path d="M8 6.2l8 2.4M8 9.6l8 2.4M8 13l8 2.4M8 16.4l8 2.4"/><path d="M8 3.5v17M16 3.5v17"/>'),
+    hex: svg('<path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6Z"/><circle cx="12" cy="12" r="3.4"/>'),
+    torque: svg('<path d="M19.2 12a7.2 7.2 0 1 1-2.1-5.1"/><path d="M17.3 3.4v3.6h-3.6"/><path d="M12 12l3.5-3.5"/><circle cx="12" cy="12" r="1.2"/>'),
+    weight: svg('<path d="M6.3 8.5h11.4l2.6 11.5H3.7Z"/><circle cx="12" cy="5.6" r="2.3"/>'),
+    tri: svg('<path d="M4 19.5h16L4 5.5Z"/><path d="M4 15.5h4v4"/>'),
+    rough: svg('<path d="M3 15.5l2-3 1.6 2.6 2-4.6 1.8 3.6 1.7-2.4 2 3.4 1.6-5 2 4.2 2.3-2.4"/><path d="M3 19.5h18"/>'),
+    trow: svg('<path d="M4 9.5h16l-1.6 9a2 2 0 0 1-2 1.6H7.6a2 2 0 0 1-2-1.6Z"/><path d="M8.5 13.5l1.5 1M12 12.5l.8 1.6M14.6 14.6l1.6-.6M10.4 16.6l1.4-.4"/><path d="M8 6.5c.8-1 1.8-1 2.6 0s1.8 1 2.6 0 1.8-1 2.6 0"/>')
   };
-  const TOPIC_ICON = { doc: I.doc, ruler: I.ruler, target: I.dia };
 
   // Symbole für Form und Lage (wie auf der Zeichnung)
   const gd = inner => `<svg class="gdt" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
@@ -52,57 +60,67 @@
     parallelitaet: gd('<path d="M6.5 19.5l5-15M12.5 19.5l5-15"/>'),
     position: gd('<circle cx="12" cy="12" r="5.4"/><path d="M12 2.8v18.4M2.8 12h18.4"/>'),
     rundlauf: gd('<path d="M5 19l10.4-10.4"/><path class="fillc" d="M19.5 4.5l-2 5.8-3.8-3.8z"/>'),
-    profil: gd('<path d="M3.5 16.5a8.5 8.5 0 0 1 17 0z"/>')
+    profil: gd('<path d="M3.5 16.5a8.5 8.5 0 0 1 17 0z"/>'),
+    zylinderform: gd('<circle cx="12" cy="12" r="5.6"/><path d="M4.5 20.5l6-17M13.5 20.5l6-17"/>'),
+    linienform: gd('<path d="M3.5 16.5a8.5 8.5 0 0 1 17 0"/>'),
+    neigung: gd('<path d="M4 19h16M4 19 17.5 6"/>'),
+    koaxialitaet: gd('<circle cx="12" cy="12" r="7.6"/><circle cx="12" cy="12" r="3.6"/>'),
+    symmetrie: gd('<path d="M4 7.5h16M2.5 12h19M4 16.5h16"/>'),
+    gesamtlauf: gd('<path d="M4.5 19.5h15"/><path d="M7 19.5 13 8.5M13 19.5 19 8.5"/><path class="fillc" d="M15.4 4.2l-.9 5.6-3.3-1.8zM21.4 4.2l-.9 5.6-3.3-1.8z"/>')
   };
   const GEO_SHORT = { geradheit: 'Gerad&shy;heit', ebenheit: 'Eben&shy;heit', rundheit: 'Rund&shy;heit', rechtwinkligkeit: 'Recht&shy;winklig&shy;keit', parallelitaet: 'Paral&shy;lelität', position: 'Position', rundlauf: 'Rund&shy;lauf' };
   const fcf = cells => `<span class="fcf">${cells.map(c => `<span>${c}</span>`).join('')}</span>`;
 
   // ---------- Zustand und Navigation ----------
-  function sanitizeStack(st) {
-    const out = [{ v: 'learn' }];
-    if (Array.isArray(st)) st.slice(1).forEach(e => {
-      if (!e) return;
-      if (e.v === 'topic' && L.topic(e.id) && out.length === 1) out.push({ v: 'topic', id: e.id, seg: e.seg === 'ueb' ? 'ueb' : 'erkl' });
-      else if (e.v === 'task' && L.task(e.id) && out[out.length - 1].v === 'topic') out.push({ v: 'task', id: e.id });
-    });
-    return out;
-  }
+  // Startliste wie im Tabellenbuch; jeder Eintrag öffnet eine Seite, manche Seiten haben mehrere Rechner (Reiter oben)
+  const PAGES = [
+    { id: 'tol', title: 'Toleranzen', sub: 'ISO 286, Passungen, Maßketten, Foto', icon: 'dia', color: '#5856D6', secs: ['iso', 'fit', 'chain', 'foto'] },
+    { id: 'gen', title: 'Allgemeintoleranzen', sub: 'ISO 2768-1, ISO 22081, Winkel', icon: 'ruler', color: '#007AFF', secs: ['gen', 'ang'] },
+    { id: 'geo', title: 'Form-/Lagetoleranzen', sub: 'ISO 2768-2, alle Symbole', icon: 'gdt', color: '#AF52DE', secs: ['geo', 'gdt'] },
+    { id: 'thread', title: 'Gewinde', sub: 'M, MF, G, UNC, UNF, Tr, Kernloch', icon: 'thread', color: '#FF9500', secs: ['thread', 'threadtab'] },
+    { id: 'cut', title: 'Schnittdaten', sub: 'Drehzahl, Vorschub, Richtwerte', icon: 'mill', color: '#FF3B30', secs: ['cut', 'cutref'] },
+    { id: 'sw', title: 'Schlüsselweite', sub: 'Schrauben, Bohrungen, Senkungen', icon: 'hex', color: '#34C759', secs: ['sw', 'swtab'] },
+    { id: 'torque', title: 'Drehmoment', sub: 'Anziehdrehmomente 8.8, 10.9, 12.9', icon: 'torque', color: '#30B0C7', secs: ['torque'] },
+    { id: 'weight', title: 'Gewicht', sub: 'Stäbe, Rohre, Platten, Profile', icon: 'weight', color: '#8E8E93', secs: ['weight'] },
+    { id: 'tri', title: 'Dreieck', sub: 'rechtwinklig und beliebig', icon: 'tri', color: '#FF2D55', secs: ['tri', 'tri2'] },
+    { id: 'rough', title: 'Rauheit', sub: 'Ra, Rz, N-Klassen, Vorschub', icon: 'rough', color: '#A2845E', secs: ['rough', 'roughtab'] },
+    { id: 'trow', title: 'Trowalisieren', sub: 'Gleitschleifen: Füllung, Schleifkörper', icon: 'trow', color: '#5AC8FA', secs: ['trow', 'trowinfo'] },
+    { id: 'info', title: 'Info', sub: 'Darstellung, Normen, Hinweise', icon: 'info', color: '#636366', secs: ['info'] }
+  ];
+  const pageOf = id => PAGES.find(p => p.id === id);
+  const pageOfSec = sec => PAGES.find(p => p.secs.includes(sec));
   const S = {
-    tab: ['start', 'learn', 'apply'].includes(store.get('tab')) ? store.get('tab') : 'start',
-    stack: sanitizeStack(store.get('stack', null)),
+    page: pageOf(store.get('page')) ? store.get('page') : 'home',
+    q: '',
     scroll: {},
     hist: 0
   };
-  let CUR = null; // aktuelle Aufgabe
+
   const OPEN = new Set(store.get('open', [])); // offene Rechenwege
+  const persistNav = () => store.set('page', S.page);
+  const saveScroll = () => { S.scroll[S.page] = window.scrollY; };
 
-  const topEntry = () => S.stack[S.stack.length - 1];
-  const viewKey = () => S.tab === 'learn' ? topEntry().v + ':' + (topEntry().id || '') : S.tab;
-  const persistNav = () => { store.set('tab', S.tab); store.set('stack', S.stack); };
-  const saveScroll = () => { S.scroll[viewKey()] = window.scrollY; };
-
-  function goTab(tab) {
-    if (tab === S.tab) {
-      if (tab === 'learn' && S.stack.length > 1) { S.stack = [S.stack[0]]; render('pop'); return; }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
+  function openPage(id, sec) {
+    if (!pageOf(id)) return;
+    if (sec) A.secs[id] = sec;
+    saveA();
+    if (S.page === id) { render('fade'); return; }
     saveScroll();
-    S.tab = tab;
-    render('fade');
-  }
-  function push(entry) {
-    saveScroll();
-    S.tab = 'learn';
-    S.stack.push(entry);
-    try { history.pushState({ tol: S.stack.length }, ''); S.hist++; } catch (e) { /* ohne Verlauf */ }
+    S.page = id;
+    try { history.pushState({ tol: 1 }, ''); S.hist++; } catch (e) { /* ohne Verlauf */ }
     render('push');
   }
+  // Zu einem Rechner springen, auch auf einer anderen Seite
+  function goSection(sec) {
+    const pg = pageOfSec(sec);
+    if (!pg) return;
+    if (S.page === pg.id) showSection(sec);
+    else openPage(pg.id, sec);
+  }
   function popView() {
-    if (S.stack.length < 2) return;
-    if (S.tab !== 'learn') { S.stack.pop(); persistNav(); return; }
+    if (S.page === 'home') return;
     saveScroll();
-    S.stack.pop();
+    S.page = 'home';
     render('pop');
   }
   function back() {
@@ -111,7 +129,7 @@
   }
   window.addEventListener('popstate', () => {
     if (S.hist > 0) S.hist--;
-    if (!$('#sheet').hidden) closeSheet();
+    if (!$('#sheet').hidden) { closeSheet(); return; }
     popView();
   });
 
@@ -124,30 +142,15 @@
   }
 
   function render(anim) {
-    const key = viewKey();
-    let html;
-    CUR = null;
-    if (S.tab === 'start') html = viewCover();
-    else if (S.tab === 'apply') html = viewApply();
-    else {
-      const e = topEntry();
-      html = e.v === 'learn' ? viewLearn() : e.v === 'topic' ? viewTopic(e) : viewTask(e);
-    }
-    view.innerHTML = html;
+    view.innerHTML = S.page === 'home' ? viewHome() : viewPage();
     view.className = anim ? 'enter-' + anim : '';
-    if (S.tab === 'apply') { computeAll(); initSecDrag(); }
-    if (CUR && CUR.st.checked) runCheck(false);
-    renderTabbar();
-    window.scrollTo(0, anim === 'push' ? 0 : (S.scroll[key] || 0));
+    if (S.page === 'home') renderSearch();
+    else { computeCurrent(); initSecDrag(); }
+    window.scrollTo(0, anim === 'push' ? 0 : (S.scroll[S.page] || 0));
     onScroll();
     persistNav();
   }
   view.addEventListener('animationend', () => { view.className = ''; });
-
-  function renderTabbar() {
-    const items = [['start', 'Start', I.home], ['learn', 'Lernen', I.book], ['apply', 'Anwenden', I.caliper]];
-    $('#tabbar').innerHTML = items.map(([k, l, ic]) => `<button data-tab="${k}"${S.tab === k ? ' aria-current="page"' : ''}>${ic}<span>${l}</span></button>`).join('');
-  }
 
   function onScroll() {
     const nav = $('#nav');
@@ -306,38 +309,56 @@
   }
 
   // ================================================================
-  // Deckblatt
+  // Startseite: Schnellsuche und Liste
   // ================================================================
-  function viewCover() {
-    const theme = store.get('theme', 'auto');
-    const standalone = window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.top !== window;
-    return `<div class="page cover">
-      <header>
-        <div class="cover-eyebrow">Zerspanung · CNC-Fräsen</div>
-        <h1 class="cover-title">Toleranzen <span class="dimtol" aria-hidden="true"><span>+0,05</span><span>−0,05</span></span></h1>
-        <p class="cover-lead">Lerne Allgemein-, Freimaß- und ISO-Toleranzen so, wie du sie an der Fräsmaschine brauchst, und rechne sie mit den fest hinterlegten Normtabellen direkt nach.</p>
-      </header>
-      <div class="tiles">
-        <button class="tile tile-learn" data-tab="learn">
-          <span class="tile-deco" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.4"/><path d="M4.6 19.4 19.4 4.6"/></svg></span>
-          <span class="tile-icon">${I.book}</span>
-          <span><span class="tile-title">Lernen</span><span class="tile-sub">Erklärungen aus der Praxis und Aufgaben zum Selberrechnen</span></span>
-        </button>
-        <button class="tile tile-apply" data-tab="apply">
-          <span class="tile-deco" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.4"/><path d="M12 2.8v18.4M2.8 12h18.4"/></svg></span>
-          <span class="tile-icon">${I.caliper}</span>
-          <span><span class="tile-title">Anwenden</span><span class="tile-sub">Rechner für Winkel, Form und Lage, ISO-Toleranzen, Passungen und Maßketten</span></span>
-        </button>
+  const tileIcon = (pg, cls = 'mi') => `<span class="${cls}" style="--c:${pg.color}">${I[pg.icon] || I.info}</span>`;
+  function viewHome() {
+    return `${navbar({ title: 'Toleranzen' })}<div class="page home">
+      <h1 class="large-title">Toleranzen</h1>
+      <div class="search-row">
+        <label class="search">${I.search}<input id="q" type="search" value="${esc(S.q)}" placeholder="Schnellsuche (z. B. M3, 6H7)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Schnellsuche"></label>
+        <button type="button" class="search-x" data-act="q-clear" aria-label="Suche leeren"${S.q ? '' : ' hidden'}>${I.x}</button>
       </div>
-      <div class="cover-foot">
-        <div class="card">
-          <span class="seg-label">Darstellung</span>
-          ${segHTML('theme', theme, [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']])}
-          <p class="foot">Alle Tabellenwerte sind in der App gespeichert, sie funktioniert auch ohne Netz. Grundlage: ISO 286-1, ISO 2768-1 und -2, ISO 22081.${standalone ? '' : ' Tipp fürs iPhone: In Safari über Teilen und „Zum Home-Bildschirm“ startet die App wie eine echte App.'}</p>
-        </div>
-      </div>
+      <div id="q-res"></div>
+      <nav class="menu" id="menu" aria-label="Bereiche"${S.q ? ' hidden' : ''}>${PAGES.map(pg => `<button type="button" class="menu-row" data-page="${pg.id}">${tileIcon(pg)}<span class="mt"><span class="mt1">${esc(pg.title)}</span><span class="mt2">${esc(pg.sub)}</span></span>${I.chevR}</button>`).join('')}</nav>
+      <p class="foot center">Alle Tabellen sind in der App gespeichert, sie funktioniert auch ohne Netz.</p>
     </div>`;
   }
+  function renderSearch() {
+    const box = $('#q-res'), menu = $('#menu'), x = $('[data-act="q-clear"]');
+    if (!box) return;
+    const q = S.q.trim();
+    if (x) x.hidden = !S.q;
+    if (menu) menu.hidden = !!q;
+    if (!q) { box.innerHTML = ''; return; }
+    const res = WK.search(q);
+    box.innerHTML = res.length
+      ? `<div class="menu">${res.map((r, i) => `<button type="button" class="menu-row" data-hit="${i}">${tileIcon(pageOf(r.page))}<span class="mt"><span class="mt1">${esc(r.title)}</span><span class="mt2">${esc(r.sub)}</span></span>${I.chevR}</button>`).join('')}</div>`
+      : msgHTML(`Zu „${esc(q)}“ habe ich nichts gefunden. Probier zum Beispiel M8, M10x1, G1/2, 30H7, 25H7/g6, SW13, N7 oder ein Stichwort wie Kernloch.`);
+    box._res = res;
+  }
+  function openHit(r) {
+    if (!r) return;
+    if (r.kind === 'thread') { A.thread.q = r.q; openPage('thread', 'thread'); return; }
+    if (r.kind === 'iso') { A.iso.q = r.q; openPage('tol', 'iso'); return; }
+    if (r.kind === 'fit') { A.fit.hole = r.hole; A.fit.shaft = r.shaft; openPage('tol', 'fit'); return; }
+    if (r.kind === 'sw') { openPage('sw', 'swtab'); return; }
+    if (r.kind === 'rough') { openPage('rough', 'roughtab'); return; }
+    openPage(r.page);
+  }
+
+  // Eine Seite: Reiter oben (wenn mehrere Rechner), darunter der gewählte Rechner
+  function viewPage() {
+    const pg = pageOf(S.page), sec = curSection();
+    const list = orderedSections();
+    return `${navbar({ title: pg.title, back: 'Start' })}<div class="page">
+      <h1 class="large-title">${esc(pg.title)}</h1>
+      ${list.length > 1 ? `<nav class="sec-bar" id="sec-bar" aria-label="Auswahl">${list.map(x => `<button type="button" data-sec="${x.id}" aria-pressed="${x.id === sec.id}">${x.label}</button>`).join('')}</nav>` : ''}
+      <div id="sec-body" class="page">${sectionHTML()}</div>
+      ${list.length > 1 ? '<p class="foot">Zum Wechseln seitlich wischen. Reihenfolge ändern: Reiter gedrückt halten und verschieben.</p>' : ''}
+    </div>`;
+  }
+
 
   let themeSet = false;
   function applyTheme(t) {
@@ -346,227 +367,6 @@
     else if (themeSet) { r.removeAttribute('data-theme'); themeSet = false; }
   }
 
-  // ================================================================
-  // Lernen
-  // ================================================================
-  function viewLearn() {
-    const solved = store.get('solved', {});
-    return `${navbar({ title: 'Lernen' })}<div class="page">
-      <h1 class="large-title">Lernen</h1>
-      <p class="lead">Drei Themen mit Erklärung aus der Praxis, Fachbegriffen, Merksatz und vielen Aufgaben. Du rechnest selbst, die App prüft nur.</p>
-      ${L.topics.map((tp, i) => {
-        const n = tp.tasks.reduce((a, t) => a + (solved[t.id] || 0), 0);
-        const types = tp.tasks.filter(t => solved[t.id]).length;
-        return `<button class="topic-card" data-topic="${tp.id}">
-          <span class="topic-icon t${i + 1}">${TOPIC_ICON[tp.icon]}</span>
-          <span class="row-main"><span class="row-title">${esc(tp.title)}</span><span class="row-sub">${esc(tp.short)}</span>
-          <span class="row-sub">${tp.tasks.length} Aufgabentypen${n ? ` · ${n} gelöst` : ''}</span>
-          <span class="progress" aria-hidden="true"><i style="width:${Math.round(types / tp.tasks.length * 100)}%"></i></span></span>${I.chevR}</button>`;
-      }).join('')}
-      <p class="foot">Die Aufgaben bauen aufeinander auf. Jeden Aufgabentyp gibt es mit immer neuen Zahlen: „Neue Aufgabe“ würfelt eine neue Variante.</p>
-    </div>`;
-  }
-
-  function figureHTML(id) {
-    if (id === 'schriftfeld') {
-      return `<section class="card figure">
-        <div class="tblock" role="img" aria-label="Schriftfeld mit dem Eintrag Allgemeintoleranzen ISO 2768-mK">
-          <div><span class="lab">Benennung</span>Spannhalter</div><div><span class="lab">Werkstoff</span>EN AW-6082</div>
-          <div><span class="lab">Maßstab</span>1 : 1</div><div><span class="lab">Zeichnungsnummer</span>SH-104</div>
-          <div class="wide"><span class="lab">Allgemeintoleranzen</span><strong>ISO 2768-<i class="tb-m">m</i><i class="tb-k">K</i></strong></div>
-        </div>
-        <div class="tb-legend">
-          <div><b class="tb-m">m</b> Maße nach ISO 2768-1: Längen, Radien, Fasen und Winkel</div>
-          <div><b class="tb-k">K</b> Form und Lage nach ISO 2768-2: Geradheit, Ebenheit, Rechtwinkligkeit, Symmetrie und Lauf</div>
-        </div></section>`;
-    }
-    if (id === 'zahlenstrahl') {
-      return `<section class="card figure"><svg viewBox="0 0 340 124" role="img" aria-label="Zahlenstrahl: Mindestmaß 119,7 mm, Nennmaß 120 mm, Höchstmaß 120,3 mm">
-        <line class="z-grid" x1="14" x2="326" y1="66" y2="66"/>
-        <rect class="z-hole" x="70" y="52" width="200" height="28" rx="6"/>
-        <line class="z-zero" x1="170" x2="170" y1="44" y2="88"/>
-        <text class="z-lbl" x="70" y="40" text-anchor="middle">Mindestmaß</text>
-        <text class="z-lbl" x="170" y="32" text-anchor="middle">Nennmaß</text>
-        <text class="z-lbl" x="270" y="40" text-anchor="middle">Höchstmaß</text>
-        <text class="z-cap" x="120" y="70" text-anchor="middle">−0,3 mm</text>
-        <text class="z-cap" x="220" y="70" text-anchor="middle">+0,3 mm</text>
-        <text class="z-val" x="70" y="104" text-anchor="middle">119,7</text>
-        <text class="z-val" x="170" y="104" text-anchor="middle">120</text>
-        <text class="z-val" x="270" y="104" text-anchor="middle">120,3</text>
-        <text class="z-cap" x="170" y="120" text-anchor="middle">Toleranz 0,6 mm</text>
-      </svg><p class="fig-cap">Die Grundplatte mit 120 mm und ISO 2768-m: Jedes Istmaß in der markierten Zone ist in Ordnung.</p></section>`;
-    }
-    if (id === 'nulllinie') {
-      const H = T.isoTol(8, 'H', '7'), M = T.isoTol(8, 'm', '6');
-      return `<section class="card figure"><div class="zone-wrap">${zoneSVG([{ name: 'Ø8 H7', upper: H.upper, lower: H.lower, hole: true }, { name: 'Ø8 m6', upper: M.upper, lower: M.lower, hole: false }], 'Toleranzfelder Ø8 H7 und Ø8 m6 zur Nulllinie')}</div>
-        <p class="fig-cap">Die Passbohrung Ø8 H7 beginnt an der Nulllinie und ist ${T.um(H.it)} µm breit. Ein Zylinderstift Ø8 m6 liegt ${T.um(M.lower)} µm über der Nulllinie, das ist sein Grundabmaß, und ist ${T.um(M.it)} µm breit. Die Felder überschneiden sich: Je nach Istmaß hat der Stift etwas Spiel oder sitzt stramm.</p></section>`;
-    }
-    return '';
-  }
-
-  function viewTopic(e) {
-    const tp = L.topic(e.id);
-    const seg = e.seg || 'erkl';
-    return `${navbar({ title: tp.title, back: 'Lernen' })}<div class="page">
-      <h1 class="large-title">${esc(tp.title)}</h1>
-      ${segHTML('topicseg', seg, [['erkl', 'Erklärung'], ['ueb', 'Übungen']], 'big')}
-      ${seg === 'erkl' ? topicExplain(tp) : topicTasks(tp)}
-    </div>`;
-  }
-
-  function topicExplain(tp) {
-    const extras = tp.extras.map(x => `<section class="card"><h2>${esc(x.t)}</h2>
-      ${x.ul ? `<ul>${x.ul.map(li => `<li>${esc(li)}</li>`).join('')}</ul>` : ''}
-      ${x.ol ? `<ol>${x.ol.map(li => `<li>${esc(li)}</li>`).join('')}</ol>` : ''}
-      ${x.p ? x.p.map(p => `<p>${esc(p)}</p>`).join('') : ''}
-      ${x.t.includes('22081') ? `<div class="tb-line">ISO 22081 ${fcf([SYM.profil, '0,4', 'A', 'B', 'C'])}</div>` : ''}
-    </section>`).join('');
-    return `<section class="card praxis"><div class="card-eyebrow">${I.mill} Aus der Praxis</div>${tp.praxis.map(p => `<p>${esc(p)}</p>`).join('')}</section>
-      ${figureHTML(tp.figure)}
-      <section class="card"><div class="card-eyebrow">${I.list} Fachbegriffe</div><dl class="terms">${tp.begriffe.map(([t, d]) => `<div><dt>${esc(t)}</dt><dd>${esc(d)}</dd></div>`).join('')}</dl></section>
-      <section class="card merk"><div class="card-eyebrow">${I.bulb} Merksatz</div><p class="merk-text">${esc(tp.merksatz)}</p></section>
-      ${extras}
-      <details class="tables"><summary><span>Tabellen zum Nachschlagen</span>${I.chevR}</summary><div class="tables-body">${tp.tables.map(tableSection).join('')}</div></details>
-      <button class="btn primary" data-act="to-ueb">Zu den Übungen</button>`;
-  }
-
-  function topicTasks(tp) {
-    const solved = store.get('solved', {});
-    return `<p class="muted small">Die Aufgaben werden von oben nach unten anspruchsvoller. Du rechnest selbst und trägst jeden Schritt ein. „Prüfen“ zeigt dir, an welcher Stelle etwas nicht stimmt. Den Lösungsweg siehst du nur, wenn du ihn ausdrücklich öffnest.</p>
-      <div class="list">${tp.tasks.map((t, i) => `<button class="list-row" data-task="${t.id}">
-        <span class="row-num${solved[t.id] ? ' done' : ''}">${i + 1}</span>
-        <span class="row-main"><span class="row-title">${esc(t.title)}</span><span class="row-sub">${esc(t.desc)}</span></span>
-        ${solved[t.id] ? `<span class="row-badge">${solved[t.id]}× gelöst</span>` : ''}${I.chevR}</button>`).join('')}</div>
-      <button class="btn soft" data-act="open-tables" data-tables="${tp.tables.join(',')}">${I.table} Tabellen öffnen</button>`;
-  }
-
-  // ---------- Aufgaben ----------
-  function taskState(id) {
-    let st = store.get('task.' + id, null);
-    if (!st || typeof st.seed !== 'number' || typeof st.vals !== 'object') {
-      st = { seed: L.newSeed(), vals: {}, checked: false, sol: false };
-      store.set('task.' + id, st);
-    }
-    return st;
-  }
-  const saveTask = () => { if (CUR) store.set('task.' + CUR.id, CUR.st); };
-
-  function viewTask(e) {
-    const task = L.task(e.id);
-    const tp = L.topics.find(t => t.tasks.includes(task));
-    const st = taskState(e.id);
-    const inst = task.make(L.rng(st.seed));
-    CUR = { id: e.id, task, tp, st, inst };
-    const idx = tp.tasks.indexOf(task) + 1;
-    const anySigned = inst.steps.some(s => s.signed);
-    return `${navbar({ title: task.title, back: tp.title, right: `<button class="nav-btn icon" data-act="open-tables" data-tables="${tp.tables.join(',')}" aria-label="Tabellen öffnen">${I.table}</button>` })}
-    <div class="page">
-      <div class="task-head"><div class="eyebrow">${esc(tp.title)} · Aufgabentyp ${idx} von ${tp.tasks.length}</div><h1 class="task-title">${esc(task.title)}</h1></div>
-      <section class="card prompt">${inst.prompt}</section>
-      <div id="banner"></div>
-      <ol class="steps">${inst.steps.map((s, i) => stepHTML(s, i, st.vals[s.id])).join('')}</ol>
-      ${anySigned ? '<p class="foot">Vorzeichen: Tippe auf das Plus- oder Minuszeichen links im Feld, um es zu wechseln.</p>' : ''}
-      <div class="task-actions">
-        <button class="btn primary" data-act="check">Prüfen</button>
-        <div class="btn-row"><button class="btn plain" data-act="solution">${st.sol ? 'Lösungsweg ausblenden' : 'Lösungsweg zeigen'}</button><button class="btn plain" data-act="newtask">Neue Aufgabe</button></div>
-      </div>
-      <section class="card solution" id="solution"${st.sol ? '' : ' hidden'}>
-        <div class="card-eyebrow">${I.bulb} Lösungsweg</div>
-        <ol class="calc-steps">${inst.solution.map(s => `<li><div class="cs-t">${esc(s.t)}</div><div class="cs-h">${s.h}</div></li>`).join('')}</ol>
-      </section>
-    </div>`;
-  }
-
-  function stepHTML(s, i, raw) {
-    const id = 'st-' + s.id;
-    let input;
-    if (s.kind === 'num') {
-      input = numInput({ id, attrs: `data-step="${s.id}"`, raw, unit: s.unit, signed: s.signed, pm: s.pm });
-    } else if (s.kind === 'angle') {
-      const [d = '', m = ''] = String(raw || '').split('|');
-      input = `<div class="angle-inp">
-        <div class="inp"><input id="${id}" data-step="${s.id}" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${esc(d)}" aria-label="${esc(s.q)}, Grad"><span class="unit">Grad</span></div>
-        <div class="inp"><input id="${id}-m" data-step="${s.id}" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${esc(m)}" aria-label="${esc(s.q)}, Minuten"><span class="unit">Minuten</span></div></div>`;
-    } else {
-      const o = s.options;
-      if (o.length <= 3 && o.every(x => x.l.length <= 15)) {
-        input = `<div class="seg big" data-step="${s.id}" role="radiogroup" aria-label="${esc(s.q)}">${o.map(x => `<button type="button" data-v="${esc(x.v)}" aria-pressed="${raw === x.v}">${esc(x.l)}</button>`).join('')}</div>`;
-      } else if (o.length <= 5) {
-        input = `<div class="opt-list" data-step="${s.id}" role="radiogroup" aria-label="${esc(s.q)}">${o.map(x => `<button type="button" class="opt" role="radio" data-v="${esc(x.v)}" aria-checked="${raw === x.v}"><span class="radio"></span><span>${esc(x.l)}</span></button>`).join('')}</div>`;
-      } else {
-        input = `<div class="inp sel"><select id="${id}" data-step="${s.id}" aria-label="${esc(s.q)}"><option value="">Bitte wählen</option>${o.map(x => `<option value="${esc(x.v)}"${raw === x.v ? ' selected' : ''}>${esc(x.l)}</option>`).join('')}</select></div>`;
-      }
-    }
-    return `<li class="step" id="step-${s.id}"><div class="step-q"><span class="step-no">${i + 1}</span><label for="${id}">${esc(s.q)}</label><span class="step-state"></span></div>${input}<div class="step-msg" hidden></div></li>`;
-  }
-
-  function clearStep(sid) {
-    const li = $('#step-' + sid);
-    if (!li) return;
-    li.classList.remove('ok', 'wrong', 'follow', 'empty');
-    $('.step-state', li).innerHTML = '';
-    $('.step-msg', li).hidden = true;
-    const b = $('#banner');
-    if (b) b.innerHTML = '';
-  }
-
-  function runCheck(scroll = true) {
-    if (!CUR) return;
-    const { inst, st } = CUR;
-    const res = L.checkAll(inst.steps, st.vals);
-    let firstBad = null, firstEmpty = null, allOk = true, anyFollow = false;
-    inst.steps.forEach((s, i) => {
-      const r = res[s.id], li = $('#step-' + s.id);
-      li.classList.remove('ok', 'wrong', 'follow', 'empty');
-      li.classList.add(r.state);
-      $('.step-state', li).innerHTML = r.state === 'ok' ? I.okc : r.state === 'wrong' ? I.xc : r.state === 'follow' ? I.fc : '';
-      const m = $('.step-msg', li);
-      m.textContent = r.msg || '';
-      m.hidden = !r.msg;
-      if (r.state !== 'ok') allOk = false;
-      if (r.state === 'follow') anyFollow = true;
-      if (r.state === 'wrong' && !firstBad) firstBad = { s, i };
-      if (r.state === 'empty' && !firstEmpty) firstEmpty = { s, i };
-    });
-    let html;
-    if (allOk) {
-      html = `<div class="banner ok">${I.okc}<div><b>Alles richtig.</b>Jeder Schritt stimmt. Mit „Neue Aufgabe“ bekommst du neue Zahlen.</div></div>`;
-      if (st.counted !== st.seed) {
-        const sv = store.get('solved', {});
-        sv[CUR.id] = (sv[CUR.id] || 0) + 1;
-        store.set('solved', sv);
-        st.counted = st.seed;
-      }
-    } else if (firstBad) {
-      html = `<div class="banner bad">${I.xc}<div><b>In Schritt ${firstBad.i + 1} ist es schiefgegangen.</b>Rot markierte Schritte stimmen nicht${anyFollow ? ', orange markierte sind Folgefehler und stimmen mit deinen eigenen Zwischenwerten' : ''}. Korrigiere und prüfe noch einmal.</div></div>`;
-    } else if (firstEmpty) {
-      html = `<div class="banner ok">${I.okc}<div><b>Bis hierhin stimmt alles.</b>In Schritt ${firstEmpty.i + 1} fehlt noch deine Eingabe.</div></div>`;
-    }
-    $('#banner').innerHTML = html || '';
-    st.checked = true;
-    saveTask();
-    if (scroll) {
-      const target = firstBad ? $('#step-' + firstBad.s.id) : firstEmpty ? $('#step-' + firstEmpty.s.id) : $('#banner');
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: firstBad || firstEmpty ? 'center' : 'start' });
-    }
-  }
-
-  function readStepInput(el) {
-    const sid = el.dataset.step;
-    const s = CUR.inst.steps.find(x => x.id === sid);
-    if (!s) return;
-    if (s.kind === 'num') {
-      if (s.signed) normalizeSigned(el);
-      CUR.st.vals[sid] = s.signed ? signedValue(el) : el.value;
-    } else if (s.kind === 'angle') {
-      CUR.st.vals[sid] = $('#st-' + sid).value + '|' + $('#st-' + sid + '-m').value;
-    } else {
-      CUR.st.vals[sid] = el.value;
-    }
-    CUR.st.checked = false;
-    saveTask();
-    clearStep(sid);
-  }
 
   // ================================================================
   // Anwenden
@@ -578,16 +378,24 @@
     fit: { hole: '30H7', shaft: 'g6', sys: 'EB' },
     gen: { tab: 'alt', N: '120', kind: 'len', cls: 'm', hk: 'K', mode: 'profil', pN: '50', t: '0,4', rel: 'bezug', sN: '20', sdev: '0,1' },
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
-    chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] }
+    chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
+    thread: { q: 'M8', kind: 'M' },
+    cut: { mode: 'mill', set: 'vc', mat: 'st', tool: 'hm', d: '10', vc: '150', n: '', z: '4', fz: '0,05', f: '0,15', ae: '', ap: '', r: '0,8' },
+    sw: { d: '8' },
+    torque: { d: '8', cls: '8.8' },
+    weight: { shape: 'rund', d: '20', D: '', s: '', b: '', h: '', a: '', t: '', L: '1000', mat: '0', rho: '' },
+    tri: { a: '30', b: '40', c: '', al: '', be: '' },
+    tri2: { mode: 'SSS', a: '5', b: '6', c: '7', al: '', be: '' },
+    rough: { f: '0,2', r: '0,8', want: '', wk: 'Rz' },
+    trow: { V: '50', fill: '80', mix: 'fein', media: 'ker' }
   };
   const A = (() => {
-    const sec = (store.get('apply', {}) || {}).sec;
     const saved = store.get('apply', {}) || {};
     const out = {};
-    Object.keys(A_DEF).forEach(k => { out[k] = Object.assign({}, A_DEF[k], saved[k] && typeof saved[k] === 'object' ? saved[k] : {}); });
+    Object.keys(A_DEF).forEach(k => { out[k] = Object.assign({}, A_DEF[k], saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k]) ? saved[k] : {}); });
     if (!Array.isArray(out.foto.items)) out.foto.items = [];
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
-    out.sec = typeof sec === 'string' ? sec : 'gen';
+    out.secs = saved.secs && typeof saved.secs === 'object' ? saved.secs : {};
     out.order = Array.isArray(saved.order) ? saved.order.filter(x => typeof x === 'string') : null;
     return out;
   })();
@@ -601,45 +409,60 @@
   const CLS_ML = [['f', 'f', 'fein'], ['m', 'm', 'mittel'], ['c', 'c', 'grob'], ['v', 'v', 'sehr grob']];
   const CLS_HKL = [['H', 'H', 'fein'], ['K', 'K', 'mittel'], ['L', 'L', 'grob']];
 
-  // Reihenfolge nach Wichtigkeit: oberster Eintrag steht in der Auswahl vorne
+  // Alle Rechner und Tabellen; welche Seite sie zeigt, steht in PAGES
   const SECTIONS = [
-    { id: 'gen', label: 'Allgemeintoleranz', title: 'Allgemeintoleranzen', card: () => cardGen() },
-    { id: 'ang', label: 'Winkel', title: 'Winkeltoleranz', tag: 'ISO 2768-1', card: () => cardAngle() },
-    { id: 'geo', label: 'Form und Lage', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo() },
-    { id: 'iso', label: 'ISO-Toleranz', title: 'Einzeltoleranz', tag: 'ISO 286', card: () => cardIso() },
-    { id: 'fit', label: 'Passung', title: 'Passung', card: () => cardFit() },
-    { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain() },
-    { id: 'foto', label: 'Foto', title: 'Zeichnung fotografieren', card: () => cardFoto() }
+    { id: 'iso', label: 'ISO-Toleranz', title: 'Einzeltoleranz', tag: 'ISO 286', card: () => cardIso(), compute: () => computeIso() },
+    { id: 'fit', label: 'Passung', title: 'Passung', tag: 'ISO 286', card: () => cardFit(), compute: () => computeFit() },
+    { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain(), compute: () => computeChain() },
+    { id: 'foto', label: 'Foto', title: 'Zeichnung fotografieren', card: () => cardFoto(), compute: () => computeFoto() },
+    { id: 'gen', label: 'Längen', title: 'Allgemeintoleranzen', card: () => cardGen(), compute: () => computeGen() },
+    { id: 'ang', label: 'Winkel', title: 'Winkeltoleranz', tag: 'ISO 2768-1', card: () => cardAngle(), compute: () => computeAng() },
+    { id: 'geo', label: 'Rechner', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo(), compute: () => computeGeo() },
+    { id: 'gdt', label: 'Symbole', title: 'Alle Symbole', tag: 'ISO 1101', card: () => cardGdt() },
+    { id: 'thread', label: 'Gewinde', title: 'Gewinde nachschlagen', card: () => cardThread(), compute: () => computeThread() },
+    { id: 'threadtab', label: 'Tabellen', title: 'Gewindetabellen', card: () => cardThreadTab(), compute: () => computeThreadTab() },
+    { id: 'cut', label: 'Rechner', title: 'Drehzahl und Vorschub', card: () => cardCut(), compute: () => computeCut() },
+    { id: 'cutref', label: 'Richtwerte', title: 'Richtwerte Schnittgeschwindigkeit', card: () => cardCutRef() },
+    { id: 'sw', label: 'Schraube', title: 'Maße einer Schraube', card: () => cardSw(), compute: () => computeSw() },
+    { id: 'swtab', label: 'Tabelle', title: 'Schlüsselweiten', card: () => cardSwTab() },
+    { id: 'torque', label: 'Drehmoment', title: 'Anziehdrehmoment', tag: 'VDI 2230', card: () => cardTorque(), compute: () => computeTorque() },
+    { id: 'weight', label: 'Gewicht', title: 'Gewicht berechnen', card: () => cardWeight(), compute: () => computeWeight() },
+    { id: 'tri', label: 'Rechtwinklig', title: 'Rechtwinkliges Dreieck', card: () => cardTri(), compute: () => computeTri() },
+    { id: 'tri2', label: 'Beliebig', title: 'Beliebiges Dreieck', card: () => cardTri2(), compute: () => computeTri2() },
+    { id: 'rough', label: 'Drehen', title: 'Rautiefe aus dem Vorschub', card: () => cardRough(), compute: () => computeRough() },
+    { id: 'roughtab', label: 'Tabellen', title: 'Rauheitswerte', tag: 'ISO 1302', card: () => cardRoughTab() },
+    { id: 'trow', label: 'Rechner', title: 'Behälter füllen', card: () => cardTrow(), compute: () => computeTrow() },
+    { id: 'trowinfo', label: 'Wissen', title: 'Gleitschleifen', card: () => cardTrowInfo() },
+    { id: 'info', label: 'Info', title: 'Über die App', card: () => cardInfo() }
   ];
+  const secById = id => SECTIONS.find(x => x.id === id);
   function orderedSections() {
-    const list = (A.order || []).map(id => SECTIONS.find(x => x.id === id)).filter(Boolean);
-    SECTIONS.forEach(x => { if (!list.includes(x)) list.push(x); });
+    const pg = pageOf(S.page);
+    if (!pg) return [];
+    const own = pg.secs.map(secById);
+    const list = (A.order || []).map(secById).filter(x => x && own.includes(x));
+    own.forEach(x => { if (!list.includes(x)) list.push(x); });
     return list;
   }
-  const curSection = () => SECTIONS.find(x => x.id === A.sec) || orderedSections()[0];
+  const curSection = () => { const pg = pageOf(S.page); return secById(pg && pg.secs.includes(A.secs[S.page]) ? A.secs[S.page] : '') || orderedSections()[0]; };
 
   function sectionHTML() {
     const sec = curSection();
-    return `<h2 class="section-h">${sec.title}${sec.tag ? ` <span class="tag">${sec.tag}</span>` : ''}</h2>${sec.card()}`;
+    const pg = pageOf(S.page);
+    const head = pg.secs.length > 1 || sec.title !== pg.title ? `<h2 class="section-h">${sec.title}${sec.tag ? ` <span class="tag">${sec.tag}</span>` : ''}</h2>` : '';
+    return head + sec.card();
   }
-  function viewApply() {
-    const sec = curSection();
-    return `${navbar({ title: 'Anwenden' })}<div class="page">
-      <h1 class="large-title">Anwenden</h1>
-      <nav class="sec-bar" id="sec-bar" aria-label="Rechner auswählen">${orderedSections().map(x => `<button type="button" data-sec="${x.id}" aria-pressed="${x.id === sec.id}">${x.label}</button>`).join('')}</nav>
-      <div id="sec-body" class="page">${sectionHTML()}</div>
-      <p class="foot">Zum Wechseln seitlich über den Bildschirm wischen. Reihenfolge ändern: Reiter oben gedrückt halten und verschieben.</p>
-    </div>`;
-  }
+  function computeCurrent() { const sec = curSection(); if (sec && sec.compute) sec.compute(); }
   function showSection(id, dir = 0) {
-    A.sec = id; saveA();
+    A.secs[S.page] = id; saveA();
     $$('#sec-bar button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sec === id)));
     const body = $('#sec-body');
     body.innerHTML = sectionHTML();
     const anim = dir > 0 ? 'enter-push' : dir < 0 ? 'enter-pop' : 'enter-fade';
     body.classList.remove('enter-fade', 'enter-push', 'enter-pop'); void body.offsetWidth; body.classList.add(anim);
-    computeAll();
+    computeCurrent();
     const bar = $('#sec-bar'), nav = $('#nav');
+    if (!bar) return;
     const barTop = bar.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight : 0);
     if (window.scrollY > barTop) window.scrollTo(0, barTop);
     const act = $(`#sec-bar [data-sec="${id}"]`);
@@ -685,7 +508,8 @@
       drag.btn.classList.remove('lifting');
       bar.classList.remove('reordering');
       drag = null;
-      A.order = $$('button', bar).map(b => b.dataset.sec);
+      const mine = $$('button', bar).map(b => b.dataset.sec);
+      A.order = mine.concat((A.order || []).filter(x => !mine.includes(x)));
       saveA();
       secClickBlock = Date.now() + 450;
     }
@@ -723,7 +547,7 @@
     const skip = el => el.closest('.sec-bar, .tbl-wrap, .zone-wrap, input, select, textarea, .sheet-wrap, .crop-wrap, .foto-wrap.selecting');
     view.addEventListener('touchstart', e => {
       st = null;
-      if (S.tab !== 'apply' || e.touches.length > 1 || skip(e.target)) return;
+      if (S.page === 'home' || orderedSections().length < 2 || e.touches.length > 1 || skip(e.target)) return;
       const body = $('#sec-body'), t = e.touches[0];
       if (!body || !body.contains(e.target) || t.clientX < 18 || t.clientX > window.innerWidth - 18) return;
       st = { x: t.clientX, y: t.clientY, t: Date.now(), mode: null, dx: 0, body };
@@ -1620,7 +1444,7 @@
       FOTO.error = ocrFailText();
     }
     FOTO.busy = false; FOTO.log = null;
-    if (S.tab === 'apply' && A.sec === 'foto') { refreshFotoMl(); computeFoto(); }
+    if (S.page === 'tol' && curSection().id === 'foto') { refreshFotoMl(); computeFoto(); }
   }
   // Eine markierte Stelle vergrößert und auf mehrere Arten lesen
   // Ausschnitt für die Nachsuche: so vergrößert, dass der Rahmen quer zur Schrift etwa th Pixel hoch ist, mit weißem Rand
@@ -1758,7 +1582,7 @@
       FOTO.error = ocrFailText();
     }
     FOTO.busy = false; FOTO.log = null;
-    if (S.tab === 'apply' && A.sec === 'foto') computeFoto();
+    if (S.page === 'tol' && curSection().id === 'foto') computeFoto();
   }
   // Andere Lesart aus der Nachsuche übernehmen: ersetzt das eben erkannte Maß
   function takeRegionAlt(i) {
@@ -1800,12 +1624,434 @@
   }
 
   function out(id, html) { const el = $('#' + id); if (el) el.innerHTML = html; }
-  function computeAll() { computeAng(); computeGeo(); computeIso(); computeFit(); computeGen(); computeChain(); computeFoto(); }
+  // ================================================================
+  // Werkstatt-Bereiche: Gewinde, Schnittdaten, Schrauben, Drehmoment, Gewicht, Dreieck, Rauheit, Gleitschleifen, Info
+  // ================================================================
+  const nf = (x, d = 2) => T.fmt(x, 0, d);
+  const mmv = (x, d = 3) => `${T.fmt(x, 0, d)} mm`;
+  const textInp = (id, k, ph, big) => `<div class="inp${big ? ' big' : ''}"><input id="${id}" data-k="${k}" value="${esc(getK(k))}" placeholder="${esc(ph)}" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="done"></div>`;
+  const selInp = (id, k, opts) => `<div class="inp sel"><select id="${id}" data-k="${k}">${opts.map(([v, l]) => `<option value="${esc(v)}"${String(getK(k)) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  const optOf = s => { const v = optNum(s); return v == null || isNaN(v) ? null : v; };
+
+  // ---------- Form und Lage: alle Symbole ----------
+  function cardGdt() {
+    const groups = ['Form', 'Form oder Lage', 'Richtung', 'Ort', 'Lauf'];
+    const datum = d => d === true ? 'Bezug nötig' : d === 'optional' ? 'Bezug möglich' : d === 'meist' ? 'meist mit Bezug' : 'ohne Bezug';
+    return `<section class="card">
+      <p class="lead-s">So stehen die Symbole im Toleranzrahmen. Links das Symbol, dann der Toleranzwert t in mm, rechts der Bezug.</p>
+      <div class="fcf-demo">${fcf([SYM.parallelitaet, '0,05', 'A'])}<span class="small muted">Beispiel: parallel zu Bezug A innerhalb 0,05 mm</span></div>
+      ${groups.map(g => `<div class="gdt-group"><h3 class="gdt-h">${g === 'Form oder Lage' ? 'Form oder Lage (je nach Bezug)' : g === 'Form' ? 'Formtoleranzen' : g + 'stoleranzen'}</h3>
+        ${WK.GDT.filter(x => x.group === g).map(x => `<div class="gdt-row"><span class="gdt-sym">${SYM[x.id] || ''}</span><div><div class="gdt-name">${esc(x.name)} <span class="tag${x.datum === true ? ' on' : ''}">${datum(x.datum)}</span></div><div class="gdt-what">${esc(x.what)}</div></div></div>`).join('')}</div>`).join('')}
+      <p class="foot">Nach ISO 1101. Für Toleranzen ohne eigene Angabe auf der Zeichnung gilt der Rechner (ISO 2768-2).</p>
+    </section>`;
+  }
+
+  // ---------- Gewinde ----------
+  function cardThread() {
+    return `<section class="card" id="card-thread">
+      <div class="field"><label for="th-q">Gewinde</label>${textInp('th-q', 'thread.q', 'z. B. M8, M10x1, G1/2', true)}
+        <span class="hint-line">Metrisch (M8, M10x1), Rohrgewinde (G1/2), Zoll (1/4-20 UNC, 3/8 UNF), Trapez (Tr20x4).</span></div>
+      <div class="chips">${['M3', 'M4', 'M5', 'M6', 'M8', 'M10', 'M12', 'M16', 'M10x1', 'G1/4', 'G1/2', '1/4-20 UNC', 'Tr20x4'].map(v => `<button type="button" class="chip" data-act="thread-pick" data-v="${v}">${v}</button>`).join('')}</div>
+      <div class="result" id="res-thread" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeThread() {
+    const q = String(A.thread.q || '').trim();
+    if (!q) return out('res-thread', msgHTML('Gib ein Gewinde ein, zum Beispiel M8.'));
+    const t = WK.parseThread(q);
+    if (!t.ok) return out('res-thread', msgHTML(esc(t.error), 'warn'));
+    let html = `<div class="res-hero"><div class="res-big">${esc(t.name)}</div><div class="res-sub">${t.type === 'M' ? (t.coarse ? 'Metrisches ISO-Regelgewinde' : 'Metrisches ISO-Feingewinde') : t.type === 'G' ? 'Rohrgewinde nach ISO 228-1 (zylindrisch)' : t.type === 'Tr' ? 'Metrisches ISO-Trapezgewinde' : t.type === 'UNC' ? 'Unified Grobgewinde (Zoll)' : 'Unified Feingewinde (Zoll)'}</div></div>`;
+    const steps = [];
+    if (t.type === 'M' || t.type === 'UNC' || t.type === 'UNF') {
+      html += `<div class="kv">
+        ${kv('Kernlochbohrer', `${nf(t.tap)} mm${t.type === 'M' && t.tap !== t.tapCalc ? `<small>rechnerisch ${nf(t.tapCalc, 3)} mm (d − P)</small>` : '<small>d − P</small>'}`, true)}
+        ${kv('Nenndurchmesser d', mmv(t.d, 3) + (t.dIn ? `<small>${nf(t.dIn, 4)} Zoll</small>` : ''))}
+        ${kv('Steigung P', mmv(t.P, 4) + (t.tpi ? `<small>${t.tpi} Gänge je Zoll</small>` : ''))}
+        ${kv('Flankendurchmesser d2', mmv(t.d2))}
+        ${kv('Kerndurchmesser Bolzen d3', mmv(t.d3))}
+        ${kv('Kerndurchmesser Mutter D1', mmv(t.d1))}
+        ${kv('Gewindetiefe Bolzen h3', mmv(t.h3))}
+        ${kv('Spannungsquerschnitt As', nf(t.As, 1) + ' mm²')}
+        ${kv('Flankenwinkel', '60°')}
+      </div>`;
+      steps.push({ t: 'Grundprofil', h: `Das Spitzgewinde hat 60° Flankenwinkel. Alle Maße folgen aus d und P: d2 = d − 0,6495 · P, D1 = d − 1,0825 · P, d3 = d − 1,2269 · P, h3 = 0,6134 · P.` });
+      steps.push({ t: 'Kernloch', h: `Für Gewindebohren nimmt man etwa d − P = ${nf(t.d, 3)} − ${nf(t.P, 4)} = ${nf(t.d - t.P, 3)} mm.${t.type === 'M' && t.tap !== t.tapCalc ? ` DIN 336 nennt dafür den Bohrer ${nf(t.tap)} mm.` : ''} Beim Gewindeformen ist das Loch größer, dort gilt die Angabe des Werkzeugherstellers.` });
+      steps.push({ t: 'Spannungsquerschnitt', h: t.type === 'M' ? 'As = π/4 · ((d2 + d3) / 2)², nach ISO 898-1. Er zählt für die Festigkeit der Schraube.' : 'As = π/4 · (d − 0,9743 · P)², nach ASME B1.1.' });
+      if (t.type === 'M' && !t.listed) html += msgHTML('Diese Steigung steht nicht in der üblichen Auswahl nach ISO 261. Die Maße sind trotzdem richtig gerechnet.', 'warn');
+      if (t.type === 'M' && t.coarse) {
+        const sc = WK.screw(t.d), tq = WK.torque(t.d, '8.8');
+        if (sc.ok) html += `<div class="kv">${sc.swIso != null ? kv('Schlüsselweite Sechskant', `${nf(sc.swIso)} mm${sc.swDin !== sc.swIso ? `<small>alte DIN: ${nf(sc.swDin)} mm</small>` : ''}`) : ''}${sc.sw4762 != null ? kv('Innensechskant Zylinderkopf', nf(sc.sw4762) + ' mm') : ''}${sc.hole ? kv('Durchgangsloch mittel', nf(sc.hole[1]) + ' mm') : ''}${tq.ok ? kv('Anziehdrehmoment 8.8', nf(tq.MA, 1) + ' Nm') : ''}</div>
+          <button type="button" class="link-btn" data-act="sw-pick" data-v="${t.d}">Alle Schraubenmaße zu ${esc(t.name)} ${I.chevR}</button>`;
+      }
+    } else if (t.type === 'G') {
+      html += `<div class="kv">
+        ${kv('Kernlochbohrer', t.tap ? nf(t.tap) + ' mm' : `etwa ${nf(t.d1, 2)} mm <small>Kerndurchmesser, Bohrer leicht darüber wählen</small>`, true)}
+        ${kv('Außendurchmesser d', mmv(t.d))}
+        ${kv('Gänge je Zoll', String(t.tpi) + `<small>Steigung ${nf(t.P, 3)} mm</small>`)}
+        ${kv('Flankendurchmesser d2', mmv(t.d2))}
+        ${kv('Kerndurchmesser d1', mmv(t.d1))}
+        ${kv('Flankenwinkel', '55°')}
+        ${kv('Dichtung', 'nicht im Gewinde')}
+      </div>`;
+      steps.push({ t: 'Größe', h: `Die Zollangabe ist keine Abmessung. G 1/2 ist ein Rohr mit „halbzölligem“ Innendurchmesser, das Gewinde hat außen ${nf(t.d, 3)} mm.` });
+      steps.push({ t: 'Profil', h: 'Whitworth-Profil mit 55°. d2 = d − 0,6403 · P, d1 = d − 1,2807 · P. G nach ISO 228-1 dichtet nicht im Gewinde (Dichtring nötig). Das kegelige R-Gewinde nach ISO 7-1 dichtet im Gewinde.' });
+    } else {
+      html += `<div class="kv">
+        ${kv('Bohrung für Mutter D1', mmv(t.D1), true)}
+        ${kv('Nenndurchmesser d', mmv(t.d))}
+        ${kv('Steigung P', mmv(t.P))}
+        ${kv('Flankendurchmesser d2', mmv(t.d2))}
+        ${kv('Kerndurchmesser Spindel d3', mmv(t.d3))}
+        ${kv('Außendurchmesser Mutter D4', mmv(t.D4))}
+        ${kv('Spiel am Kopf ac', mmv(t.ac, 2))}
+        ${kv('Flankenwinkel', '30°')}
+      </div>`;
+      steps.push({ t: 'Profil', h: `Trapezgewinde nach ISO 2904: d2 = d − 0,5 · P, h3 = 0,5 · P + ac = ${nf(t.h3, 3)} mm, d3 = d − 2 · h3, D1 = d − P, D4 = d + 2 · ac. Das Spiel ac ist ${nf(t.ac, 2)} mm bei P = ${nf(t.P)} mm.` });
+      if (!t.listed) html += msgHTML('Diese Kombination steht nicht in der Vorzugsreihe nach ISO 2904.', 'warn');
+    }
+    out('res-thread', html + calcHTML('thread', steps));
+  }
+  function cardThreadTab() {
+    return `<section class="card" id="card-threadtab">
+      ${segHTML('thread.kind', A.thread.kind, [['M', 'M'], ['MF', 'MF'], ['G', 'G'], ['UNC', 'UNC'], ['UNF', 'UNF'], ['Tr', 'Tr']])}
+      <div id="res-threadtab"></div>
+    </section>`;
+  }
+  function computeThreadTab() {
+    const k = A.thread.kind;
+    const row = (t, cells) => `<tr data-act="thread-pick" data-v="${esc(t.name.replace('×', 'x').replace(/-\d+ /, ' ').replace(' UNC', ' UNC').replace(' UNF', ' UNF'))}">${cells.map((c, i) => i === 0 ? `<th scope="row">${c}</th>` : `<td>${c}</td>`).join('')}</tr>`;
+    let head, rows, note = 'Tippe auf eine Zeile für alle Maße.';
+    if (k === 'M' || k === 'MF') {
+      const list = k === 'M' ? WK.M_COARSE : WK.M_FINE;
+      head = ['Gewinde', 'P', 'Kernloch', 'd2', 'd3', 'D1'];
+      rows = list.map(([d, P]) => { const t = WK.metric(d, P); return row(t, [t.name.replace('×', '×'), nf(P, 3), nf(t.tap), nf(t.d2, 3), nf(t.d3, 3), nf(t.d1, 3)]); });
+    } else if (k === 'G') {
+      head = ['Gewinde', 'd', 'Gänge/Zoll', 'Kernloch', 'd1'];
+      rows = WK.G.map(g => { const t = WK.whitworthPipe(g[0]); return row(t, [t.name, nf(t.d, 3), t.tpi, t.tap ? nf(t.tap) : '–', nf(t.d1, 3)]); });
+    } else if (k === 'UNC' || k === 'UNF') {
+      head = ['Gewinde', 'd mm', 'Gänge/Zoll', 'Kernloch', 'D1'];
+      rows = (k === 'UNC' ? WK.UNC : WK.UNF).map(u => { const t = WK.unified(k, u[0]); return `<tr data-act="thread-pick" data-v="${esc(u[0] + '-' + u[2] + ' ' + k)}"><th scope="row">${esc(u[0])}-${u[2]}</th><td>${nf(t.d, 3)}</td><td>${t.tpi}</td><td>${nf(t.tap, 1)}</td><td>${nf(t.d1, 3)}</td></tr>`; });
+      note = 'Kernloch rechnerisch d − P, auf 0,1 mm gerundet. Tippe auf eine Zeile für alle Maße.';
+    } else {
+      head = ['Gewinde', 'P', 'Mutter D1', 'd2', 'd3'];
+      rows = WK.TR.map(([d, P]) => { const t = WK.trapez(d, P); return row(t, [t.name, nf(P), nf(t.D1), nf(t.d2), nf(t.d3)]); });
+    }
+    out('res-threadtab', `<div class="tbl-wrap"><table class="tbl tap-rows"><thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="tbl-note">Maße in mm. ${note}</p>`);
+  }
+
+  // ---------- Schnittdaten ----------
+  function cardCut() {
+    const c = A.cut, mode = c.mode;
+    const mat = WK.MATERIALS_CUT.find(x => x.id === c.mat) || WK.MATERIALS_CUT[0];
+    const key = mode === 'mill' ? 'mill' : mode === 'drill' ? 'drill' : 'turn';
+    const rg = mat[key][c.tool === 'hss' ? 0 : 1];
+    return `<section class="card" id="card-cut">
+      ${segHTML('cut.mode', mode, [['mill', 'Fräsen'], ['drill', 'Bohren'], ['turn', 'Drehen']], 'big')}
+      <div class="fields">
+        <div class="field"><label for="c-mat">Werkstoff</label>${selInp('c-mat', 'cut.mat', WK.MATERIALS_CUT.map(m => [m.id, m.name]))}</div>
+        <div class="field"><span class="lbl">Schneidstoff</span>${segHTML('cut.tool', c.tool, [['hss', 'HSS'], ['hm', 'HM']])}</div>
+      </div>
+      <div class="msg info">${I.info}<div>Richtwert für ${esc(mat.name)} (${esc(mat.ex)}) mit ${c.tool === 'hss' ? 'HSS' : 'Hartmetall'}: vc = <b>${rg[0]} bis ${rg[1]} m/min</b>${mode === 'mill' ? `, fz etwa ${nf(mat.fz[0])} bis ${nf(mat.fz[1])} mm` : ''}. <button type="button" class="link-btn" data-act="cut-vc" data-v="${Math.round((rg[0] + rg[1]) / 2)}">Mitte übernehmen</button></div></div>
+      <div class="field"><span class="lbl">Ich gebe vor</span>${segHTML('cut.set', c.set, [['vc', 'vc vorgeben'], ['n', 'n vorgeben']])}</div>
+      <div class="fields">
+        <div class="field"><label for="c-d">${mode === 'turn' ? 'Werkstück-Ø d' : mode === 'drill' ? 'Bohrer-Ø d' : 'Fräser-Ø d'}</label>${bindNum('c-d', 'cut.d', 'mm', 'z. B. 10')}</div>
+        ${c.set === 'vc' ? `<div class="field"><label for="c-vc">Schnittgeschw. vc</label>${bindNum('c-vc', 'cut.vc', 'm/min', 'z. B. 150')}</div>` : `<div class="field"><label for="c-n">Drehzahl n</label>${bindNum('c-n', 'cut.n', '1/min', 'z. B. 3000')}</div>`}
+        ${mode === 'mill' ? `<div class="field"><label for="c-z">Zähne z</label>${bindNum('c-z', 'cut.z', '', 'z. B. 4')}</div><div class="field"><label for="c-fz">Vorschub je Zahn fz</label>${bindNum('c-fz', 'cut.fz', 'mm', 'z. B. 0,05')}</div>
+          <div class="field"><label for="c-ae">Breite ae, freiwillig</label>${bindNum('c-ae', 'cut.ae', 'mm', 'Eingriff')}</div><div class="field"><label for="c-ap">Tiefe ap, freiwillig</label>${bindNum('c-ap', 'cut.ap', 'mm', 'Zustellung')}</div>`
+        : `<div class="field"><label for="c-f">Vorschub f</label>${bindNum('c-f', 'cut.f', 'mm/U', 'z. B. 0,15')}</div>`}
+        ${mode === 'turn' ? `<div class="field"><label for="c-ap">Schnitttiefe ap, freiwillig</label>${bindNum('c-ap', 'cut.ap', 'mm', 'z. B. 2')}</div><div class="field"><label for="c-r">Eckenradius r, freiwillig</label>${bindNum('c-r', 'cut.r', 'mm', 'z. B. 0,8')}</div>` : ''}
+      </div>
+      <div class="result" id="res-cut" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeCut() {
+    const c = A.cut;
+    const v = { d: optOf(c.d), vc: c.set === 'vc' ? optOf(c.vc) : null, n: c.set === 'n' ? optOf(c.n) : null, z: optOf(c.z), fz: optOf(c.fz), f: optOf(c.f), ae: optOf(c.ae), ap: optOf(c.ap), r: optOf(c.r) };
+    if (c.set === 'n' && !(v.n > 0)) return out('res-cut', msgHTML('Gib die Drehzahl ein.'));
+    const r = c.mode === 'mill' ? WK.milling(v) : c.mode === 'drill' ? WK.drilling(v) : WK.turning(v);
+    if (!r.ok) return out('res-cut', msgHTML(esc(r.error)));
+    const steps = [];
+    if (c.set === 'vc') steps.push({ t: 'Drehzahl', h: `n = vc · 1000 / (π · d) = ${nf(v.vc)} · 1000 / (π · ${nf(v.d)}) = <b>${nf(r.n, 0)} 1/min</b>. Die 1000 macht aus Metern Millimeter.` });
+    else steps.push({ t: 'Schnittgeschwindigkeit', h: `vc = π · d · n / 1000 = π · ${nf(v.d)} · ${nf(v.n, 0)} / 1000 = <b>${nf(r.vc, 1)} m/min</b>.` });
+    let kvs = c.set === 'vc' ? kv('Drehzahl n', `${nf(r.n, 0)} 1/min`) : kv('Schnittgeschwindigkeit vc', `${nf(r.vc, 1)} m/min`);
+    let hero = c.set === 'vc' ? `${nf(r.n, 0)} <small>1/min</small>` : `${nf(r.vc, 1)} <small>m/min</small>`;
+    if (r.vf != null) {
+      kvs += kv('Vorschubgeschw. vf', `${nf(r.vf, 0)} mm/min`);
+      steps.push({ t: 'Vorschubgeschwindigkeit', h: c.mode === 'mill' ? `vf = fz · z · n = ${nf(v.fz, 3)} · ${nf(v.z, 0)} · ${nf(r.n, 0)} = <b>${nf(r.vf, 0)} mm/min</b>.` : `vf = f · n = ${nf(v.f, 3)} · ${nf(r.n, 0)} = <b>${nf(r.vf, 0)} mm/min</b>.` });
+    } else kvs += kv('Vorschubgeschw. vf', c.mode === 'mill' ? 'z und fz eingeben' : 'f eingeben');
+    if (c.mode === 'mill' && r.vf != null) kvs += kv('Vorschub je Umdrehung', `${nf(v.fz * v.z, 3)} mm`);
+    if (r.Q != null) {
+      kvs += kv('Zeitspanvolumen Q', `${nf(r.Q, 1)} cm³/min`);
+      steps.push({ t: 'Zeitspanvolumen', h: c.mode === 'mill' ? `Q = ae · ap · vf / 1000 = ${nf(v.ae)} · ${nf(v.ap)} · ${nf(r.vf, 0)} / 1000 = ${nf(r.Q, 1)} cm³/min.` : c.mode === 'drill' ? `Q = π · d² / 4 · vf / 1000 = ${nf(r.Q, 1)} cm³/min.` : `Q = vc · ap · f = ${nf(r.vc, 1)} · ${nf(v.ap)} · ${nf(v.f, 3)} = ${nf(r.Q, 1)} cm³/min.` });
+    }
+    if (r.Rth != null) {
+      kvs += kv('Theoretische Rautiefe', `Rz ${nf(r.Rth, 2)} µm<small>Ra etwa ${nf(r.RaTh, 2)} µm</small>`);
+      steps.push({ t: 'Rautiefe', h: `Rth = f² / (8 · r) = ${nf(v.f, 3)}² / (8 · ${nf(v.r)}) · 1000 = ${nf(r.Rth, 2)} µm. In der Praxis liegt die Rauheit etwas darüber.` });
+    }
+    out('res-cut', `<div class="res-hero"><div class="res-big">${hero}</div><div class="res-sub">${c.set === 'vc' ? 'Drehzahl' : 'Schnittgeschwindigkeit'}${c.mode === 'mill' ? ' der Frässpindel' : c.mode === 'drill' ? ' beim Bohren' : ' beim Drehen'}</div></div><div class="kv">${kvs}</div>${calcHTML('cut', steps)}`);
+  }
+  function cardCutRef() {
+    const range = r => `${r[0]}–${r[1]}`;
+    return `<section class="card">
+      <div class="tbl-cap">Schnittgeschwindigkeit vc in m/min, HSS und Hartmetall (HM)</div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Werkstoff</th><th scope="col">Fräsen HSS</th><th scope="col">Fräsen HM</th><th scope="col">Bohren HSS</th><th scope="col">Bohren HM</th><th scope="col">Drehen HSS</th><th scope="col">Drehen HM</th><th scope="col">fz Fräsen mm</th></tr></thead>
+      <tbody>${WK.MATERIALS_CUT.map(m => `<tr><th scope="row">${esc(m.name)}<small class="tbl-sub">${esc(m.ex)}</small></th><td>${range(m.mill[0])}</td><td>${range(m.mill[1])}</td><td>${range(m.drill[0])}</td><td>${range(m.drill[1])}</td><td>${range(m.turn[0])}</td><td>${range(m.turn[1])}</td><td>${nf(m.fz[0])}–${nf(m.fz[1])}</td></tr>`).join('')}</tbody></table></div>
+      <div class="tbl-note"><p><b>Richtwerte zum Einstieg.</b> Die Angaben des Werkzeugherstellers gehen immer vor. Beschichtung, Kühlung, Aufspannung und Maschine verschieben die Werte stark.</p>
+      <p><b>Bohren:</b> Vorschub f je Umdrehung etwa 0,01 bis 0,02 · d bei HSS in Stahl (Ø 10: 0,1 bis 0,2 mm). <b>Drehen:</b> Schruppen f 0,2 bis 0,5 mm, Schlichten 0,05 bis 0,15 mm.</p>
+      <p><b>Fräsen:</b> fz bei kleinen Fräsern (unter 6 mm) am unteren Ende wählen. Bei schmalem Eingriff (ae klein) darf fz höher sein, weil der Span dünner wird.</p></div>
+    </section>`;
+  }
+
+  // ---------- Schrauben und Schlüsselweiten ----------
+  function cardSw() {
+    return `<section class="card" id="card-sw">
+      <div class="field"><label for="s-d">Gewinde</label><div class="inp big"><span class="pre">M</span><input id="s-d" data-k="sw.d" value="${esc(A.sw.d)}" inputmode="decimal" placeholder="z. B. 8" autocomplete="off" enterkeyhint="done"></div></div>
+      <div class="chips">${[3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24].map(d => `<button type="button" class="chip" data-act="sw-pick" data-v="${d}">M${d}</button>`).join('')}</div>
+      <div class="result" id="res-sw" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeSw() {
+    const d = numOf(String(A.sw.d).replace(/^m/i, ''));
+    if (!(d > 0)) return out('res-sw', msgHTML('Gib den Gewindedurchmesser ein, zum Beispiel 8 für M8.'));
+    const r = WK.screw(d);
+    if (!r.ok) return out('res-sw', msgHTML(esc(r.error), 'warn'));
+    const v = x => x == null ? '–' : nf(x) + ' mm';
+    const tq = WK.torque(d, '8.8');
+    out('res-sw', `<div class="res-hero"><div class="res-big">SW ${v(r.swIso)}</div><div class="res-sub">Sechskantschraube und Mutter ${esc(r.name)} nach ISO${r.swDin !== r.swIso ? ` · alte DIN 931/933/934: <b>${v(r.swDin)}</b>` : ''}</div></div>
+      <div class="kv">
+        ${kv('Zylinderkopf Innensechskant', v(r.sw4762) + '<small>ISO 4762 (DIN 912)</small>')}
+        ${kv('Kopf ISO 4762', r.dk4762 ? `Ø ${nf(r.dk4762)} mm<small>Höhe ${nf(r.k4762)} mm</small>` : '–')}
+        ${kv('Senkkopf Innensechskant', v(r.sw10642) + '<small>ISO 10642 (DIN 7991)</small>')}
+        ${kv('Flachkopf Innensechskant', v(r.sw7380) + '<small>ISO 7380</small>')}
+        ${kv('Gewindestift', v(r.sw4026) + '<small>ISO 4026 bis 4029</small>')}
+        ${kv('Kernlochbohrer', r.thread ? nf(r.thread.tap) + ' mm' : '–')}
+      </div>
+      <div class="kv three">${r.hole ? kv('Durchgang fein', nf(r.hole[0]) + ' mm') + kv('Durchgang mittel', nf(r.hole[1]) + ' mm') + kv('Durchgang grob', nf(r.hole[2]) + ' mm') : ''}</div>
+      ${r.cbore ? `<div class="kv">${kv('Senkung für ISO 4762', `Ø ${nf(r.cbore[0])} mm<small>DIN 974-1, ohne Unterlegteil</small>`)}${kv('Senktiefe', nf(r.cbore[1]) + ' mm')}</div>` : ''}
+      ${tq.ok ? `<div class="kv">${kv('Anziehdrehmoment 8.8', nf(tq.MA, 1) + ' Nm')}${kv('10.9 / 12.9', `${nf(WK.torque(d, '10.9').MA, 1)} / ${nf(WK.torque(d, '12.9').MA, 1)} Nm`)}</div>` : ''}
+      <p class="foot">Durchgangslöcher nach ISO 273: fein für genaue Lage, mittel ist der Normalfall.</p>`);
+  }
+  function cardSwTab() {
+    const S2 = WK.SCREW_SIZES, v = x => x == null ? '–' : nf(x);
+    return `<section class="card">
+      <div class="tbl-wrap"><table class="tbl tap-rows"><thead><tr><th scope="col">Gewinde</th><th scope="col">Sechskant ISO</th><th scope="col">Sechskant DIN</th><th scope="col">Innen&shy;sechskant ISO 4762</th><th scope="col">Senkkopf ISO 10642</th><th scope="col">Flachkopf ISO 7380</th><th scope="col">Gewinde&shy;stift</th><th scope="col">Durch&shy;gang mittel</th></tr></thead>
+      <tbody>${S2.map((d, i) => `<tr data-act="sw-pick" data-v="${d}"${WK.SW_DIN[i] !== WK.SW_ISO[i] ? ' class="hl"' : ''}><th scope="row">M${nf(d)}</th><td>${v(WK.SW_ISO[i])}</td><td>${v(WK.SW_DIN[i])}</td><td>${v(WK.SW_4762[i])}</td><td>${v(WK.SW_10642[i])}</td><td>${v(WK.SW_7380[i])}</td><td>${v(WK.SW_4026[i])}</td><td>${WK.HOLE_273[i] ? v(WK.HOLE_273[i][1]) : '–'}</td></tr>`).join('')}</tbody></table></div>
+      <p class="tbl-note">Schlüsselweiten in mm. Farbig: Hier unterscheiden sich ISO und alte DIN (M10, M12, M14, M22). Tippe auf eine Zeile für alle Maße.</p>
+    </section>`;
+  }
+
+  // ---------- Drehmoment ----------
+  function cardTorque() {
+    return `<section class="card" id="card-torque">
+      <div class="fields">
+        <div class="field"><label for="t-d">Gewinde</label>${selInp('t-d', 'torque.d', WK.TORQUE.sizes.map(d => [String(d), 'M' + d]))}</div>
+        <div class="field"><span class="lbl">Festigkeitsklasse</span>${segHTML('torque.cls', A.torque.cls, [['8.8', '8.8'], ['10.9', '10.9'], ['12.9', '12.9']])}</div>
+      </div>
+      <div class="result" id="res-torque" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeTorque() {
+    const d = numOf(A.torque.d), cls = A.torque.cls;
+    const r = WK.torque(d, cls);
+    if (!r.ok) return out('res-torque', msgHTML(esc(r.error), 'warn'));
+    const rows = WK.TORQUE.sizes.map((x, i) => `<tr${x === d ? ' class="on"' : ''}><th scope="row">M${x}</th><td>${nf(WK.TORQUE['8.8'][i], 1)}</td><td>${nf(WK.TORQUE['10.9'][i], 1)}</td><td>${nf(WK.TORQUE['12.9'][i], 1)}</td></tr>`).join('');
+    out('res-torque', `<div class="res-hero"><div class="res-big">${nf(r.MA, 1)} <small>Nm</small></div><div class="res-sub">Anziehdrehmoment M${d}, Festigkeitsklasse ${cls}</div></div>
+      ${msgHTML('Gilt für Schaftschrauben mit Regelgewinde, leicht geölt, Reibwert µ = 0,12 (Gewinde und Kopfauflage), Ausnutzung 90 % der Streckgrenze. Andere Schmierung, Edelstahl, Aluminiumgewinde oder kurze Einschraubtiefe brauchen andere Werte.')}
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Gewinde</th><th scope="col">8.8</th><th scope="col">10.9</th><th scope="col">12.9</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="tbl-note">Werte in Nm nach VDI 2230 Blatt 1, Tabelle für µ = 0,12.</p>`);
+  }
+
+  // ---------- Gewicht ----------
+  function cardWeight() {
+    const w = A.weight, sh = WK.SHAPES[w.shape] || WK.SHAPES.rund;
+    return `<section class="card" id="card-weight">
+      ${segHTML('weight.shape', w.shape, Object.keys(WK.SHAPES).map(k => [k, WK.SHAPES[k].name.replace(', Platte', '')]), 'wrap')}
+      <div class="fields">
+        ${sh.fields.map(([k, l]) => `<div class="field"><label for="w-${k}">${esc(l)}</label>${bindNum('w-' + k, 'weight.' + k, 'mm', '')}</div>`).join('')}
+        <div class="field"><label for="w-L">Länge L</label>${bindNum('w-L', 'weight.L', 'mm', 'z. B. 1000')}</div>
+        <div class="field full"><label for="w-mat">Werkstoff</label>${selInp('w-mat', 'weight.mat', WK.DENSITY.map((m, i) => [String(i), `${m[0]} · ${nf(m[1], 2)} g/cm³`]).concat([['own', 'Eigene Dichte']]))}</div>
+        ${w.mat === 'own' ? `<div class="field"><label for="w-rho">Dichte</label>${bindNum('w-rho', 'weight.rho', 'g/cm³', 'z. B. 7,85')}</div>` : ''}
+      </div>
+      <div class="result" id="res-weight" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeWeight() {
+    const w = A.weight, sh = WK.SHAPES[w.shape];
+    const vals = {};
+    sh.fields.forEach(([k]) => { vals[k] = optOf(w[k]); });
+    const rho = w.mat === 'own' ? optOf(w.rho) : (WK.DENSITY[+w.mat] || WK.DENSITY[0])[1];
+    const L = optOf(w.L);
+    const r = WK.weight(w.shape, vals, L, rho);
+    if (!r.ok) return out('res-weight', msgHTML(esc(r.error)));
+    const steps = [{ t: 'Querschnitt', h: `${esc(sh.name)}: A = <b>${nf(r.A, 2)} mm²</b>.` },
+      { t: 'Masse je Meter', h: `A · Dichte: ${nf(r.A, 2)} mm² · ${nf(rho, 3)} g/cm³ / 1000 = <b>${nf(r.perM, 3)} kg/m</b>. (1 m Stab mit 1 mm² Querschnitt hat 1 cm³.)` }];
+    if (r.m != null) steps.push({ t: 'Masse', h: `${nf(r.perM, 3)} kg/m · ${nf(L / 1000, 4)} m = <b>${nf(r.m, 3)} kg</b>.` });
+    out('res-weight', `<div class="res-hero"><div class="res-big">${r.m != null ? nf(r.m, 3) + ' <small>kg</small>' : nf(r.perM, 3) + ' <small>kg/m</small>'}</div><div class="res-sub">${r.m != null ? `${esc(sh.name)}, ${nf(L, 1)} mm lang` : 'Gib eine Länge ein für das Stückgewicht.'}</div></div>
+      <div class="kv">${kv('Je Meter', nf(r.perM, 3) + ' kg/m')}${kv('Querschnitt', nf(r.A, 2) + ' mm²')}${r.m != null ? kv('Volumen', nf(r.A * L / 1000, 2) + ' cm³') + kv('In Gramm', nf(r.m * 1000, 1) + ' g') : ''}</div>
+      ${calcHTML('weight', steps)}`);
+  }
+
+  // ---------- Dreieck ----------
+  function triSVG() {
+    return `<svg class="tri-fig" viewBox="0 0 260 150" aria-hidden="true"><path class="tri-line" d="M20 130H230V20Z"/><path class="tri-ra" d="M214 130v-16h16"/>
+      <text x="125" y="146" text-anchor="middle">b</text><text x="240" y="80">a</text><text x="112" y="66" text-anchor="end">c</text>
+      <text x="44" y="125">α</text><text x="218" y="44" text-anchor="end">β</text><text x="12" y="140" class="pt">A</text><text x="236" y="146" class="pt">C</text><text x="236" y="18" class="pt">B</text></svg>`;
+  }
+  function cardTri() {
+    return `<section class="card" id="card-tri">
+      <div class="tri-wrap">${triSVG()}</div>
+      <p class="hint-line">Gib genau zwei Werte ein, davon mindestens eine Seite. Der rechte Winkel liegt bei C, c ist die Hypotenuse.</p>
+      <div class="fields">
+        <div class="field"><label for="tr-a">Seite a</label>${bindNum('tr-a', 'tri.a', 'mm', '')}</div>
+        <div class="field"><label for="tr-b">Seite b</label>${bindNum('tr-b', 'tri.b', 'mm', '')}</div>
+        <div class="field"><label for="tr-c">Hypotenuse c</label>${bindNum('tr-c', 'tri.c', 'mm', '')}</div>
+        <div class="field"><label for="tr-al">Winkel α</label>${bindNum('tr-al', 'tri.al', '°', '')}</div>
+        <div class="field"><label for="tr-be">Winkel β</label>${bindNum('tr-be', 'tri.be', '°', '')}</div>
+        <div class="field"><button type="button" class="btn plain" data-act="tri-clear">Leeren</button></div>
+      </div>
+      <div class="result" id="res-tri" aria-live="polite"></div>
+    </section>`;
+  }
+  const dms = x => { const t = Math.round(x * 3600); const d = Math.floor(t / 3600), m = Math.floor((t - d * 3600) / 60), sec = t - d * 3600 - m * 60; return `${d}° ${String(m).padStart(2, '0')}′ ${String(sec).padStart(2, '0')}″`; };
+  const triRes = r => `<div class="kv three">${kv('a', nf(r.a, 4) + ' mm')}${kv('b', nf(r.b, 4) + ' mm')}${kv('c', nf(r.c, 4) + ' mm')}${kv('α', nf(r.al, 3) + '°' + `<small>${dms(r.al)}</small>`)}${kv('β', nf(r.be, 3) + '°' + `<small>${dms(r.be)}</small>`)}${kv('γ', nf(r.ga, 3) + '°')}</div><div class="kv">${kv('Fläche', nf(r.A, 3) + ' mm²')}${kv('Umfang', nf(r.U, 3) + ' mm')}${r.h != null ? kv('Höhe auf c', nf(r.h, 4) + ' mm', true) : ''}</div>`;
+  function computeTri() {
+    const v = {};
+    ['a', 'b', 'c', 'al', 'be'].forEach(k => { const x = optOf(A.tri[k]); if (x != null) v[k] = x; });
+    const r = WK.rightTriangle(v);
+    if (!r.ok) return out('res-tri', msgHTML(esc(r.error)));
+    out('res-tri', triRes(r) + calcHTML('tri', [{ t: 'Formeln', h: 'a² + b² = c² (Pythagoras). sin α = a / c, cos α = b / c, tan α = a / b. α + β = 90°.' }]));
+  }
+  function cardTri2() {
+    const m = A.tri2.mode;
+    const fld = (k, l, u) => `<div class="field"><label for="t2-${k}">${l}</label>${bindNum('t2-' + k, 'tri2.' + k, u, '')}</div>`;
+    return `<section class="card" id="card-tri2">
+      ${segHTML('tri2.mode', m, [['SSS', '3 Seiten'], ['SWS', '2 Seiten, Winkel'], ['WSW', '1 Seite, 2 Winkel']], 'wrap')}
+      <p class="hint-line">${m === 'SSS' ? 'Alle drei Seiten a, b, c.' : m === 'SWS' ? 'Die Seiten b und c und der Winkel α dazwischen.' : 'Die Seite c und die Winkel α und β an ihren Enden.'} α liegt gegenüber von a, β gegenüber von b.</p>
+      <div class="fields">${m === 'SSS' ? fld('a', 'Seite a', 'mm') + fld('b', 'Seite b', 'mm') + fld('c', 'Seite c', 'mm') : m === 'SWS' ? fld('b', 'Seite b', 'mm') + fld('c', 'Seite c', 'mm') + fld('al', 'Winkel α', '°') : fld('c', 'Seite c', 'mm') + fld('al', 'Winkel α', '°') + fld('be', 'Winkel β', '°')}</div>
+      <div class="result" id="res-tri2" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeTri2() {
+    const v = {};
+    ['a', 'b', 'c', 'al', 'be'].forEach(k => { v[k] = optOf(A.tri2[k]); });
+    const r = WK.triangle(A.tri2.mode, v);
+    if (!r.ok) return out('res-tri2', msgHTML(esc(r.error)));
+    out('res-tri2', triRes(r) + calcHTML('tri2', [{ t: 'Formeln', h: 'Kosinussatz: a² = b² + c² − 2 · b · c · cos α. Sinussatz: a / sin α = b / sin β = c / sin γ. Winkelsumme 180°. Fläche nach Heron.' }]));
+  }
+
+  // ---------- Rauheit ----------
+  function cardRough() {
+    return `<section class="card" id="card-rough">
+      <div class="fields">
+        <div class="field"><label for="r-f">Vorschub f</label>${bindNum('r-f', 'rough.f', 'mm/U', 'z. B. 0,2')}</div>
+        <div class="field"><label for="r-r">Eckenradius r</label>${bindNum('r-r', 'rough.r', 'mm', 'z. B. 0,8')}</div>
+      </div>
+      <div class="result" id="res-rough" aria-live="polite"></div>
+      <h3 class="card-title sub">Welchen Vorschub darf ich fahren?</h3>
+      <div class="fields">
+        <div class="field"><span class="lbl">Vorgabe</span>${segHTML('rough.wk', A.rough.wk, [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>
+        <div class="field"><label for="r-w">Wert</label>${bindNum('r-w', 'rough.want', 'µm', 'z. B. 6,3')}</div>
+      </div>
+      <div class="result" id="res-rough2" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeRough() {
+    const f = optOf(A.rough.f), r = optOf(A.rough.r);
+    if (!(f > 0 && r > 0)) out('res-rough', msgHTML('Gib Vorschub und Eckenradius ein.'));
+    else {
+      const x = WK.roughTurn(f, r);
+      const cls = WK.N_CLASSES.slice().reverse().find(c => c[1] >= x.RaTh - 1e-9);
+      out('res-rough', `<div class="res-hero"><div class="res-big">Rz ${nf(x.Rth, 2)} <small>µm</small></div><div class="res-sub">theoretische Rautiefe · Ra etwa ${nf(x.RaTh, 2)} µm${cls ? ` · reicht für ${cls[0]} (Ra ${nf(cls[1], 3)})` : ''}</div></div>
+        ${calcHTML('rough', [{ t: 'Rautiefe', h: `Rth = f² / (8 · r) = ${nf(f, 3)}² / (8 · ${nf(r, 2)}) mm = ${nf(x.Rth / 1000, 5)} mm = <b>${nf(x.Rth, 2)} µm</b>.` }, { t: 'Mittenrauwert', h: `Ra ≈ f² / (31,2 · r) = <b>${nf(x.RaTh, 2)} µm</b>. Das ist die Geometrie der Schneidenecke. Schwingungen, Aufbauschneide und Verschleiß machen es in der Praxis rauer.` }])}`);
+    }
+    const w = optOf(A.rough.want);
+    if (!(w > 0 && r > 0)) return out('res-rough2', msgHTML('Gib den gewünschten Rauheitswert und oben den Eckenradius ein.'));
+    const fm = A.rough.wk === 'Rz' ? WK.feedForRz(w, r) : WK.feedForRa(w, r);
+    out('res-rough2', `<div class="kv">${kv('Größter Vorschub', `${nf(fm, 3)} mm/U<small>bei r = ${nf(r, 2)} mm, ${A.rough.wk} ${nf(w, 3)} µm</small>`, true)}</div>`);
+  }
+  function cardRoughTab() {
+    return `<section class="card">
+      <div class="tbl-cap">Rauheitsklassen nach ISO 1302</div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Klasse</th><th scope="col">Ra µm</th><th scope="col">Rz etwa µm</th></tr></thead>
+      <tbody>${WK.N_CLASSES.map(([n, ra]) => `<tr><th scope="row">${n}</th><td>${nf(ra, 3)}</td><td>${nf(ra * 4, 2)} bis ${nf(ra * 7, 2)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="tbl-note">Ra und Rz lassen sich nicht genau umrechnen. Als Faustwert ist Rz etwa 4- bis 7-mal so groß wie Ra.</p>
+      <div class="tbl-cap">Erreichbare Rauheit Ra je Verfahren (Richtwerte)</div>
+      <div class="ra-bars">${WK.PROCESS_RA.map(([p, lo, hi]) => { const x = v => (Math.log10(v) - Math.log10(0.01)) / (Math.log10(50) - Math.log10(0.01)) * 100; return `<div class="ra-row"><span class="ra-name">${esc(p)}</span><span class="ra-track"><i style="left:${x(lo).toFixed(1)}%;width:${(x(hi) - x(lo)).toFixed(1)}%"></i></span><span class="ra-val">${nf(lo, 3)}–${nf(hi, 3)}</span></div>`; }).join('')}
+        <div class="ra-row ra-axis"><span></span><span class="ra-track">${[0.1, 1, 10].map(v => `<b style="left:${((Math.log10(v) + 2) / (Math.log10(50) + 2) * 100).toFixed(1)}%">${nf(v, 2)}</b>`).join('')}</span><span>µm</span></div></div>
+      <div class="tbl-note"><p><b>Auf der Zeichnung:</b> Das Haken-Symbol √ mit Wert, zum Beispiel Ra 1,6. Mit Querstrich: spanend herstellen. Mit Kreis: nicht spanend (Oberfläche bleibt wie geliefert).</p>
+      <p><b>Ra</b> ist der Mittelwert der Abweichungen, <b>Rz</b> die mittlere Höhe zwischen höchster Spitze und tiefstem Tal. Rz reagiert stärker auf einzelne Riefen.</p></div>
+    </section>`;
+  }
+
+  // ---------- Gleitschleifen ----------
+  function cardTrow() {
+    return `<section class="card" id="card-trow">
+      <div class="fields">
+        <div class="field"><label for="tw-V">Behältervolumen</label>${bindNum('tw-V', 'trow.V', 'l', 'z. B. 50')}</div>
+        <div class="field"><label for="tw-f">Füllhöhe</label>${bindNum('tw-f', 'trow.fill', '%', '70 bis 90')}</div>
+        <div class="field full"><label for="tw-mix">Ziel</label>${selInp('tw-mix', 'trow.mix', WK.MIX.map(m => [m.id, `${m.name} (1 : ${m.media})`]))}</div>
+        <div class="field full"><label for="tw-med">Schleifkörper</label>${selInp('tw-med', 'trow.media', WK.MEDIA.map(m => [m.id, m.name]))}</div>
+      </div>
+      <div class="result" id="res-trow" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeTrow() {
+    const t = A.trow;
+    const r = WK.trowal(optOf(t.V), optOf(t.fill) != null ? optOf(t.fill) / 100 : null, t.mix, t.media);
+    if (!r.ok) return out('res-trow', msgHTML(esc(r.error)));
+    out('res-trow', `<div class="res-hero"><div class="res-big">${nf(r.Vp, 1)} <small>l Teile</small></div><div class="res-sub">höchstens, dazu ${nf(r.Vm, 1)} l ${esc(r.med.name)}</div></div>
+      <div class="kv">${kv('Füllung gesamt', nf(r.Vf, 1) + ' l')}${kv('Verhältnis', `1 : ${r.mix.media}<small>${esc(r.mix.note)}</small>`)}${kv('Schleifkörper', nf(r.Vm, 1) + ' l')}${kv('Gewicht Schleifkörper', `etwa ${nf(r.mMedia, 0)} kg<small>Schüttdichte ${nf(r.med.rho, 1)} kg/l</small>`)}</div>
+      ${msgHTML(esc(r.med.use))}
+      <p class="foot">Richtwerte. Teilevolumen heißt das Volumen, das die Teile als Haufen einnehmen. Weniger Teile schonen die Kanten und die Teile untereinander.</p>`);
+  }
+  function cardTrowInfo() {
+    return `<section class="card prose">
+      <p><b>Trowalisieren</b> ist ein alter Markenname für das <b>Gleitschleifen</b>. Teile und Schleifkörper liegen lose in einem Behälter, der rüttelt oder dreht. Dabei reiben die Schleifkörper an den Teilen: Grate verschwinden, Kanten werden rund, die Oberfläche wird glatter.</p>
+      <h3>Anlagen</h3>
+      <ul><li><b>Rundvibrator:</b> Ringförmiger Behälter, die Masse wandert im Kreis. Für die meisten Kleinteile.</li><li><b>Trogvibrator:</b> Langer Trog, für lange Teile.</li><li><b>Fliehkraftanlage:</b> Drehender Teller, viel schneller, auch für kleine, harte Teile.</li><li><b>Schleppfinish:</b> Teile sind aufgespannt und werden durch die Masse gezogen. Für empfindliche, große Teile.</li></ul>
+      <h3>Schleifkörper</h3>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Art</th><th scope="col">Wofür</th></tr></thead><tbody>${WK.MEDIA.map(m => `<tr><th scope="row">${esc(m.name)}</th><td class="wrap">${esc(m.use)}</td></tr>`).join('')}</tbody></table></div>
+      <h3>Form und Größe</h3>
+      <ul><li>Kegel und Pyramiden kommen in Ecken und Nuten, Zylinder und Kugeln laufen ruhiger.</li><li>Größe so wählen, dass die Körper nicht in Bohrungen, Nuten oder Gewinden stecken bleiben: deutlich größer oder deutlich kleiner als die Öffnung, nie ungefähr gleich groß.</li><li>Große Körper tragen mehr ab, kleine kommen besser an Konturen.</li></ul>
+      <h3>Wasser und Compound</h3>
+      <p>Nass gearbeitet wird mit Wasser und einem Zusatz (Compound). Er hält die Körper und Teile sauber, schützt vor Rost und spült den Abrieb weg. Die Dosierung steht beim Hersteller, meist wenige Prozent.</p>
+      <h3>Was es mit dem Maß macht</h3>
+      <ul><li>Kanten werden verrundet, je nach Körper und Zeit etwa 0,05 bis 0,3 mm.</li><li>Flächen verlieren nur wenige µm, enge Toleranzen (zum Beispiel H7) trotzdem nach dem Gleitschleifen prüfen.</li><li>Gewinde, Passbohrungen und Dichtflächen bei Bedarf abdecken.</li></ul>
+      <h3>Ablauf</h3>
+      <ol><li>Teile entfetten, Späne entfernen.</li><li>Schleifkörper und Wasser mit Compound einfüllen, dann die Teile.</li><li>Laufzeit von Minuten bis Stunden, mit Probeteil festlegen.</li><li>Teile trennen, spülen, trocknen (zum Beispiel in Maisgranulat), gegen Rost schützen.</li></ol>
+      <p class="foot">Allgemeine Richtwerte. Für Ihre Anlage und Ihre Teile gelten die Angaben des Herstellers der Anlage und der Schleifkörper.</p>
+    </section>`;
+  }
+
+  // ---------- Info ----------
+  function cardInfo() {
+    const theme = store.get('theme', 'auto');
+    const standalone = window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.top !== window;
+    return `<section class="card">
+      <span class="seg-label">Darstellung</span>
+      ${segHTML('theme', theme, [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']])}
+    </section>
+    <section class="card prose">
+      <h3>Was die App kann</h3>
+      <p>Toleranzen nach ISO 286 (alle Grundabmaße a bis zc), Passungen, Maßketten, Maße aus einem Zeichnungsfoto, Allgemeintoleranzen nach ISO 2768-1 und ISO 22081, Form und Lage nach ISO 2768-2 und ISO 1101, Gewinde, Schnittdaten, Schrauben und Schlüsselweiten, Anziehdrehmomente, Gewichte, Dreiecke, Rauheit und Gleitschleifen.</p>
+      <h3>Schnellsuche</h3>
+      <p>Auf der Startseite: M8 oder M10x1 für Gewinde, G1/2 oder 1/4-20 UNC, 6H7 oder 30g6 für eine ISO-Toleranz, 25H7/g6 für eine Passung, SW13 für eine Schlüsselweite, N7 für eine Rauheitsklasse oder einfach ein Stichwort wie Kernloch.</p>
+      <h3>Grundlagen</h3>
+      <ul><li>ISO 286-1 und -2: Grundtoleranzen, Grundabmaße, Passungen</li><li>ISO 2768-1 und -2, ISO 22081: Allgemeintoleranzen</li><li>ISO 1101: Form und Lage</li><li>ISO 68-1, 261, 724, 228-1, 2904, ASME B1.1: Gewinde · DIN 336: Kernlöcher</li><li>ISO 4014/4017/4032, ISO 4762, 10642, 7380, 4026 bis 4029, ISO 273, DIN 974-1: Schrauben</li><li>VDI 2230 Blatt 1: Anziehdrehmomente · ISO 1302: Rauheit</li></ul>
+      <h3>Wichtig</h3>
+      <p>Normwerte sind fest in der App gespeichert und mit Tests geprüft. Schnittdaten, erreichbare Rauheit und Gleitschleifen sind <b>Richtwerte</b>, die Angaben der Werkzeug- und Maschinenhersteller gehen vor. Im Zweifel gilt immer die Zeichnung und die Norm selbst.</p>
+      <p>Die App läuft ohne Netz, Fotos und Eingaben bleiben auf dem Gerät.${standalone ? '' : ' Tipp fürs iPhone: In Safari über Teilen und „Zum Home-Bildschirm“ startet sie wie eine echte App.'}</p>
+    </section>`;
+  }
+
   function onApplyChange(k) {
-    const sec = k.split('.')[0];
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (k === 'gen.tab' || k === 'gen.mode') $('#sec-body').innerHTML = sectionHTML();
-    ({ ang: computeAng, geo: computeGeo, iso: computeIso, fit: computeFit, gen: computeGen, foto: computeFoto })[sec]();
+    if (['gen.tab', 'gen.mode', 'cut.mode', 'cut.set', 'cut.tool', 'cut.mat', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
+      const ae = document.activeElement, id = ae && ae.id;
+      $('#sec-body').innerHTML = sectionHTML();
+      if (id && ae.tagName === 'SELECT') { const n = $('#' + id); if (n) n.focus({ preventScroll: true }); }
+    }
+    computeCurrent();
   }
 
   // ================================================================
@@ -1819,25 +2065,15 @@
   }
   const ACT = {
     back: () => back(),
-    'to-ueb': () => { topEntry().seg = 'ueb'; render('fade'); window.scrollTo(0, 0); },
     'open-tables': t => openSheet(t.dataset.tables.split(',').filter(Boolean)),
     'close-sheet': () => closeSheet(),
-    check: () => runCheck(true),
-    solution: t => {
-      CUR.st.sol = !CUR.st.sol;
-      saveTask();
-      const s = $('#solution');
-      s.hidden = !CUR.st.sol;
-      t.textContent = CUR.st.sol ? 'Lösungsweg ausblenden' : 'Lösungsweg zeigen';
-      if (CUR.st.sol) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    },
-    newtask: () => {
-      store.set('task.' + CUR.id, { seed: L.newSeed(), vals: {}, checked: false, sol: false });
-      render('fade');
-      window.scrollTo(0, 0);
-    },
+    'q-clear': () => { S.q = ''; const q = $('#q'); if (q) { q.value = ''; q.focus(); } renderSearch(); },
+    'thread-pick': t => { A.thread.q = t.dataset.v; saveA(); if (S.page === 'thread' && curSection().id === 'thread') { $('#th-q').value = t.dataset.v; computeThread(); } else goSection('thread'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    'sw-pick': t => { A.sw.d = t.dataset.v; saveA(); goSection('sw'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    'cut-vc': t => { A.cut.set = 'vc'; A.cut.vc = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCut(); },
+    'tri-clear': () => { ['a', 'b', 'c', 'al', 'be'].forEach(k => { A.tri[k] = ''; }); saveA(); $$('#card-tri input').forEach(x => { x.value = ''; }); computeTri(); },
     'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },
-    'iso-from': t => { setK('iso.q', t.dataset.v); showSection('iso'); },
+    'iso-from': t => { setK('iso.q', t.dataset.v); goSection('iso'); },
     'chain-add': () => {
       A.chain.rows.push({ op: 1, N: '', mode: 'pm', pm: '', up: '', lo: '', iso: '' });
       saveA(); renderChainRows(); computeChain();
@@ -1881,7 +2117,7 @@
       const seg = $('#card-foto [data-k="foto.ml"]');
       if (seg) $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === A.foto.ml)));
     },
-    'foto-calc': t => { const sec = evalDim(A.foto.items[+t.dataset.i]).calc(); saveA(); showSection(sec, 0); },
+    'foto-calc': t => { const sec = evalDim(A.foto.items[+t.dataset.i]).calc(); saveA(); goSection(sec); },
     'chain-del': t => { A.chain.rows.splice(+t.dataset.i, 1); saveA(); renderChainRows(); computeChain(); },
     'chain-example': () => {
       A.chain.rows = [{ op: 1, N: '40', mode: 'pm', pm: '0,1', up: '', lo: '', iso: '' }, { op: -1, N: '12', mode: 'ul', pm: '', up: '0,1', lo: '0', iso: '' }];
@@ -1891,12 +2127,11 @@
   };
 
   document.addEventListener('click', e => {
-    const t = e.target.closest('button');
+    const t = e.target.closest('button, tr[data-act]');
     if (!t) return;
     if (t.dataset.sec) { if (Date.now() > secClickBlock) showSection(t.dataset.sec); return; }
-    if (t.dataset.tab) return goTab(t.dataset.tab);
-    if (t.dataset.topic) return push({ v: 'topic', id: t.dataset.topic, seg: 'erkl' });
-    if (t.dataset.task) return push({ v: 'task', id: t.dataset.task });
+    if (t.dataset.page) return openPage(t.dataset.page);
+    if (t.dataset.hit != null) { const box = $('#q-res'); return openHit(box && box._res && box._res[+t.dataset.hit]); }
     if (t.classList.contains('sign')) {
       t.textContent = t.textContent === '−' ? '+' : '−';
       t.setAttribute('aria-label', `Vorzeichen: ${t.textContent === '−' ? 'minus' : 'plus'}. Tippen zum Wechseln`);
@@ -1925,15 +2160,8 @@
       setPressed(group, t);
       const k = group.dataset.k;
       if (k === 'theme') { store.set('theme', v); applyTheme(v); return; }
-      if (k === 'topicseg') { topEntry().seg = v; persistNav(); render('fade'); return; }
       setK(k, v);
       onApplyChange(k);
-    } else if (group.dataset.step) {
-      setPressed(group, t);
-      CUR.st.vals[group.dataset.step] = v;
-      CUR.st.checked = false;
-      saveTask();
-      clearStep(group.dataset.step);
     } else if (group.dataset.chainOp != null) {
       setPressed(group, t);
       A.chain.rows[+group.dataset.chainOp].op = +v;
@@ -1950,8 +2178,9 @@
       if (el.parentElement.querySelector('.sign')) normalizeSigned(el);
       setK(el.dataset.k, el.value);
       onApplyChange(el.dataset.k);
-    } else if (el.dataset.step && CUR) {
-      readStepInput(el);
+    } else if (el.id === 'q') {
+      S.q = el.value;
+      renderSearch();
     } else if (el.dataset.chain != null) {
       const row = A.chain.rows[+el.dataset.chain];
       if (!row) return;
@@ -1971,29 +2200,20 @@
     if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
     e.preventDefault();
     if (e.target.id === 'foto-add') { fotoAddFromInput(); return; }
-    const scope = e.target.closest('.steps, .card') || document;
+    if (e.target.id === 'q') { const box = $('#q-res'); if (box && box._res && box._res.length) openHit(box._res[0]); return; }
+    const scope = e.target.closest('.card') || document;
     const inputs = $$('input', scope);
     const i = inputs.indexOf(e.target);
     if (i >= 0 && i < inputs.length - 1) inputs[i + 1].focus();
     else e.target.blur();
   });
 
-  // Tastatur offen: Tab-Leiste ausblenden (nur auf Touch-Geräten)
-  const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
-  if (coarse) {
-    document.addEventListener('focusin', e => { if (e.target.matches('input, select')) document.body.classList.add('kb'); });
-    document.addEventListener('focusout', () => setTimeout(() => {
-      const a = document.activeElement;
-      if (!a || !a.matches || !a.matches('input, select')) document.body.classList.remove('kb');
-    }, 80));
-  }
-
   // Als App vom Home-Bildschirm: vom linken Rand wischen geht zurück
   const standalone = window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   if (standalone) {
     let sx = null, sy = 0, dx = 0;
     addEventListener('touchstart', e => {
-      if (S.tab !== 'learn' || S.stack.length < 2 || !$('#sheet').hidden) return;
+      if (S.page === 'home' || !$('#sheet').hidden) return;
       const t = e.touches[0];
       if (t.clientX < 22) { sx = t.clientX; sy = t.clientY; dx = 0; }
     }, { passive: true });

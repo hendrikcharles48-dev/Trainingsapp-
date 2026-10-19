@@ -23,7 +23,7 @@ const only = process.argv[2] ? process.argv[2].split(',').map(Number) : null;
   await app.goto('http://localhost:8766/index.html?debug');
   await app.evaluate(() => localStorage.clear());
   await app.reload();
-  await app.click('[data-tab="apply"]');
+  await app.click('[data-page="tol"]');
   await app.click('[data-sec="foto"]');
   let ok = 0, all = 0, alt = 0;
   for (const [id, ext, regs] of T) {

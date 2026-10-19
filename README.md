@@ -30,20 +30,27 @@ In dieser Version liegen die Daten nur auf dem Gerät. Über Einstellungen → B
 
 # Toleranzen
 
-Eigenständige Lern- und Rechen-App im iOS-Design (Hell und Dunkel) für Zerspanungsmechaniker, im Ordner `toleranzen/`.
+Eigenständige Werkstatt-App im iOS-Design (Hell und Dunkel) für Zerspanungsmechaniker, im Ordner `toleranzen/`. Aufbau wie ein Tabellenbuch: Startseite mit Schnellsuche (z. B. M3, 6H7, 25H7/g6, G1/2, SW13, N7) und einer Liste der Bereiche.
 
-- **Deckblatt** mit den Kacheln „Lernen“ und „Anwenden“
-- **Lernen:** Allgemeintoleranzen, Freimaßtoleranzen und ISO-Toleranzen, jeweils mit Praxisbeispiel aus dem CNC-Fräsen, Fachbegriffen, Merksatz, Eselsbrücken und 24 Aufgabentypen mit immer neuen Zahlen. Du rechnest selbst, die App prüft jeden Schritt, zeigt den Fehler an der richtigen Stelle (auch Folgefehler, Vorzeichen, Einheit, falsche Tabellenzeile) und zeigt den Lösungsweg nur auf Knopfdruck.
-- **Anwenden:** Winkeltoleranz, Form und Lage (ISO 2768-2), Einzeltoleranz nach ISO 286 (1 bis 500 mm, IT01 bis IT18, alle Grundabmaße a bis zc und A bis ZC einschließlich cd, ef, fg, j, js und za, zb, zc), Passungen mit Einheitsbohrung/Einheitswelle, Allgemeintoleranzen alt (ISO 2768) und neu (ISO 22081), Maßketten (Worst Case). Überall mit aufklappbarem Rechenweg.
-- Alle Tabellenwerte sind fest in `tables.js` hinterlegt, die App funktioniert offline.
-- **Foto:** Zeichnung fotografieren, zuschneiden (die App schlägt die Blattecken vor und entzerrt schräge Fotos), dann erkennt die App Maße, Toleranzangaben und die Allgemeintoleranz im Schriftfeld (Texterkennung tesseract.js direkt auf dem Gerät) und zeigt zu jedem Maß die Grenzmaße. Unsichere Stellen sind mit „bitte prüfen“ markiert, Maße lassen sich korrigieren oder von Hand ergänzen. Mit „Stelle genauer ansehen“ tippt oder rahmt man ein fehlendes Maß im Bild ein, die App liest diese Stelle mehrfach vergrößert und bietet andere Lesarten zur Auswahl an.
+- **Toleranzen:** Einzeltoleranz nach ISO 286 (1 bis 500 mm, IT01 bis IT18, alle Grundabmaße a bis zc und A bis ZC), Passungen, Maßketten (Worst Case), Foto einer Zeichnung mit Maßerkennung
+- **Allgemeintoleranzen:** ISO 2768-1 (alt) und ISO 22081 (neu), Winkel
+- **Form-/Lagetoleranzen:** Rechner nach ISO 2768-2 und alle Symbole nach ISO 1101
+- **Gewinde:** M, MF, G, UNC, UNF, Tr mit Flanken- und Kerndurchmessern, Spannungsquerschnitt, Kernlochbohrer
+- **Schnittdaten:** Drehzahl, Vorschubgeschwindigkeit, Zeitspanvolumen für Fräsen, Bohren, Drehen und Richtwerte
+- **Schlüsselweite:** Sechskant ISO und DIN, Innensechskant, Durchgangslöcher ISO 273, Senkungen DIN 974-1
+- **Drehmoment:** Anziehdrehmomente 8.8, 10.9, 12.9 nach VDI 2230
+- **Gewicht, Dreieck, Rauheit, Trowalisieren (Gleitschleifen), Info**
+
+Überall mit aufklappbarem Rechenweg. Alle Werte sind fest hinterlegt, die App funktioniert offline.
+
+**Foto:** Zeichnung fotografieren, zuschneiden (die App schlägt die Blattecken vor und entzerrt schräge Fotos), dann erkennt die App Maße, Toleranzangaben und die Allgemeintoleranz im Schriftfeld (Texterkennung tesseract.js direkt auf dem Gerät). Mit „Stelle genauer ansehen“ rahmt man ein fehlendes Maß ein, die App liest diese Stelle mehrfach vergrößert.
 
 ## Dateien
 - `tables.js`: Normtabellen (ISO 286-1, ISO 2768-1, ISO 2768-2)
-- `calc.js`: Rechenkern mit Rechenwegen in ganzen Sätzen
-- `lernen.js`: Lerninhalte und Aufgaben mit Schrittprüfung
+- `calc.js`: Rechenkern Toleranzen mit Rechenwegen in ganzen Sätzen
+- `werkstatt.js`: Gewinde, Schrauben, Drehmomente, Schnittdaten, Gewicht, Dreieck, Rauheit, Gleitschleifen, Schnellsuche
 - `app.js`, `style.css`, `index.html`: Oberfläche
-- `test.js`: Prüft den Rechenkern gegen Tabellenbuchwerte und jede Aufgabe gegen ihre Musterlösung (`node toleranzen/test.js`)
+- `test.js`, `test-werkstatt.js`: Prüfen alles gegen Normwerte (`node toleranzen/test.js`)
 
 ## Auf dem iPhone nutzen
-Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js`). Die Texterkennung (`ocr/`, etwa 11 MB) liegt nur in `docs/toleranzen/ocr/`; zum lokalen Testen des Foto-Reiters `docs/toleranzen` ausliefern. Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.
+Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js` und `test-werkstatt.js`). Die Texterkennung (`ocr/`, etwa 11 MB) liegt nur in `docs/toleranzen/ocr/`; zum lokalen Testen des Foto-Reiters `docs/toleranzen` ausliefern. Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

@@ -1,7 +1,7 @@
 {
   "name": "Toleranzen",
   "short_name": "Toleranzen",
-  "description": "Allgemein-, Freimaß- und ISO-Toleranzen lernen und anwenden",
+  "description": "Toleranzen und Werkstatt-Tabellen",
   "lang": "de",
   "start_url": "./",
   "scope": "./",
