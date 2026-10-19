@@ -256,7 +256,7 @@ function shift(von, bis, pauseIn, pauseVon){
   let e = e0; if(e <= s) e += 1440;
   const gross = e - s, pause = pauseIn == null ? autoPause(gross) : Math.min(pauseIn, gross), paid = gross - pause;
   const ab = toMin(S().ab);
-  const inWin = (a, b) => { const ov = (x, y) => Math.max(0, Math.min(b, y) - Math.max(a, x)); return ov(ab, 1440+360) + ov(ab-1440, 360) + ov(ab+1440, 2880+360); };
+  const inWin = (a, b) => { const ov = (x, y) => Math.max(0, Math.min(b, y) - Math.max(a, x)); return ov(ab, 1440+360); }; // nur ab 20 Uhr am Tag der Schicht (bis morgens), Frühschichten bekommen keine Zulage
   let pS = null, pauseBad = false;
   if(pause > 0){
     if(pauseVon){ pS = toMin(pauseVon); if(pS < s) pS += 1440; if(pS < s || pS + pause > e) pauseBad = true; }
@@ -784,7 +784,12 @@ let lastDay = today();
 function dayCheck(){ const t = today(); if(t === lastDay) return; if(ym === lastDay.slice(0,7)) ym = t.slice(0,7); lastDay = t; render(); }
 setInterval(dayCheck, 30000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) dayCheck(); });
-load(); applyTheme(); go('monat');
+load(); applyTheme();
+// Spätminuten gespeicherter Schichten neu rechnen (alte Version zählte bei Frühschichten 0–6 Uhr fälschlich mit)
+let fixed = 0;
+for(const e of st.entries){ if(!e.von || !e.bis) continue; const r = shift(e.von, e.bis, e.pause ?? null, e.pauseVon || null); if(r && r.spaet !== e.spaetMin){ e.spaetMin = r.spaet; fixed++; } }
+if(fixed) save();
+go('monat');
 if('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 </script>
 </body>
