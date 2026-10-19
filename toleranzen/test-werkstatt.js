@@ -78,6 +78,18 @@ module.exports = function (T, eq) {
   eq('WSW', r(W.triangle('WSW', { c: 10, al: 60, be: 60 }).a, 6), 10);
   eq('SSS unmöglich', W.triangle('SSS', { a: 1, b: 2, c: 5 }).ok, false);
 
+  // Kegel und Lochkreis
+  const kg = W.cone({ D: 40, d: 30, L: 50 });
+  eq('Kegel Winkel', [r(kg.a, 4), r(kg.full, 4), r(kg.ratio, 3)], [5.7106, 11.4212, 5]);
+  eq('Kegel d', r(W.cone({ D: 40, L: 50, a: 5.710593 }).d, 3), 30);
+  eq('Kegel L', r(W.cone({ D: 40, d: 30, a: 45 }).L, 6), 5);
+  eq('Kegel zu viele', W.cone({ D: 40, d: 30, L: 5, a: 4 }).ok, false);
+  const lk = W.boltCircle({ D: 100, n: 4, start: 45 });
+  eq('Lochkreis', lk.pts.map(p => [r(p.x, 3), r(p.y, 3)]), [[35.355, 35.355], [-35.355, 35.355], [-35.355, -35.355], [35.355, -35.355]]);
+  eq('Lochkreis Sehne', r(W.boltCircle({ D: 100, n: 6 }).chord, 6), 50);
+  eq('Lochkreis Uhrzeigersinn', r(W.boltCircle({ D: 100, n: 4, cw: true }).pts[1].y, 3), -50);
+  eq('Bohrerspitze 118°', r(W.drillTip(10), 3), 3.004);
+
   // Gleitschleifen
   const tw = W.trowal(60, 0.8, 'fein', 'ker');
   eq('Gleitschleifen', [tw.Vf, tw.Vp, tw.Vm], [48, 8, 40]);

@@ -39,7 +39,10 @@ Eigenständige Werkstatt-App im iOS-Design (Hell und Dunkel) für Zerspanungsmec
 - **Schnittdaten:** Drehzahl, Vorschubgeschwindigkeit, Zeitspanvolumen für Fräsen, Bohren, Drehen und Richtwerte
 - **Schlüsselweite:** Sechskant ISO und DIN, Innensechskant, Durchgangslöcher ISO 273, Senkungen DIN 974-1
 - **Drehmoment:** Anziehdrehmomente 8.8, 10.9, 12.9 nach VDI 2230
-- **Gewicht, Dreieck, Rauheit, Trowalisieren (Gleitschleifen), Info**
+- **Dreieck:** rechtwinklig, beliebig, Kegel, Lochkreis – Maße direkt in der Skizze antippen
+- **Gewicht, Rauheit, Trowalisieren (Gleitschleifen), Info**
+
+Startliste und Reiter lassen sich durch Gedrückthalten umsortieren. Schnittdaten und Gewinde zeigen fertige NC-Zeilen (S, F).
 
 Überall mit aufklappbarem Rechenweg. Alle Werte sind fest hinterlegt, die App funktioniert offline.
 

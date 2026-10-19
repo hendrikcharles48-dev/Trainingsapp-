@@ -82,12 +82,19 @@
     { id: 'sw', title: 'Schlüsselweite', sub: 'Schrauben, Bohrungen, Senkungen', icon: 'hex', color: '#34C759', secs: ['sw', 'swtab'] },
     { id: 'torque', title: 'Drehmoment', sub: 'Anziehdrehmomente 8.8, 10.9, 12.9', icon: 'torque', color: '#30B0C7', secs: ['torque'] },
     { id: 'weight', title: 'Gewicht', sub: 'Stäbe, Rohre, Platten, Profile', icon: 'weight', color: '#8E8E93', secs: ['weight'] },
-    { id: 'tri', title: 'Dreieck', sub: 'rechtwinklig und beliebig', icon: 'tri', color: '#FF2D55', secs: ['tri', 'tri2'] },
+    { id: 'tri', title: 'Dreieck', sub: 'Dreieck, Kegel, Lochkreis', icon: 'tri', color: '#FF2D55', secs: ['tri', 'tri2', 'cone', 'bolt'] },
     { id: 'rough', title: 'Rauheit', sub: 'Ra, Rz, N-Klassen, Vorschub', icon: 'rough', color: '#A2845E', secs: ['rough', 'roughtab'] },
     { id: 'trow', title: 'Trowalisieren', sub: 'Gleitschleifen: Füllung, Schleifkörper', icon: 'trow', color: '#5AC8FA', secs: ['trow', 'trowinfo'] },
     { id: 'info', title: 'Info', sub: 'Darstellung, Normen, Hinweise', icon: 'info', color: '#636366', secs: ['info'] }
   ];
   const pageOf = id => PAGES.find(p => p.id === id);
+  // Eigene Reihenfolge der Startliste (gedrückt halten und verschieben)
+  function orderedPages() {
+    const ord = store.get('menuOrder', []);
+    const list = (Array.isArray(ord) ? ord : []).map(pageOf).filter(Boolean);
+    PAGES.forEach(p => { if (!list.includes(p)) list.push(p); });
+    return list;
+  }
   const pageOfSec = sec => PAGES.find(p => p.secs.includes(sec));
   const S = {
     page: pageOf(store.get('page')) ? store.get('page') : 'home',
@@ -144,7 +151,7 @@
   function render(anim) {
     view.innerHTML = S.page === 'home' ? viewHome() : viewPage();
     view.className = anim ? 'enter-' + anim : '';
-    if (S.page === 'home') renderSearch();
+    if (S.page === 'home') { renderSearch(); initMenuDrag(); }
     else { computeCurrent(); initSecDrag(); }
     window.scrollTo(0, anim === 'push' ? 0 : (S.scroll[S.page] || 0));
     onScroll();
@@ -320,8 +327,8 @@
         <button type="button" class="search-x" data-act="q-clear" aria-label="Suche leeren"${S.q ? '' : ' hidden'}>${I.x}</button>
       </div>
       <div id="q-res"></div>
-      <nav class="menu" id="menu" aria-label="Bereiche"${S.q ? ' hidden' : ''}>${PAGES.map(pg => `<button type="button" class="menu-row" data-page="${pg.id}">${tileIcon(pg)}<span class="mt"><span class="mt1">${esc(pg.title)}</span><span class="mt2">${esc(pg.sub)}</span></span>${I.chevR}</button>`).join('')}</nav>
-      <p class="foot center">Alle Tabellen sind in der App gespeichert, sie funktioniert auch ohne Netz.</p>
+      <nav class="menu" id="menu" aria-label="Bereiche"${S.q ? ' hidden' : ''}>${orderedPages().map(pg => `<button type="button" class="menu-row" data-page="${pg.id}">${tileIcon(pg)}<span class="mt"><span class="mt1">${esc(pg.title)}</span><span class="mt2">${esc(pg.sub)}</span></span>${I.chevR}</button>`).join('')}</nav>
+      <p class="foot center">Reihenfolge ändern: Eintrag gedrückt halten und verschieben.<br>Alle Tabellen sind in der App gespeichert, sie funktioniert auch ohne Netz.</p>
     </div>`;
   }
   function renderSearch() {
@@ -345,6 +352,78 @@
     if (r.kind === 'sw') { openPage('sw', 'swtab'); return; }
     if (r.kind === 'rough') { openPage('rough', 'roughtab'); return; }
     openPage(r.page);
+  }
+
+  // Startliste umsortieren: gedrückt halten (0,38 s), dann nach oben oder unten ziehen
+  let menuClickBlock = 0;
+  function initMenuDrag() {
+    const menu = $('#menu');
+    if (!menu) return;
+    let timer = null, drag = null, sx = 0, sy = 0, raf = 0;
+    function begin(row, y) {
+      drag = { row, y0: y, y, sc0: window.scrollY };
+      row.classList.add('lifting');
+      menu.classList.add('reordering');
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* kein Vibrieren */ }
+      const tick = () => {
+        if (!drag) return;
+        if (drag.y < 70) window.scrollBy(0, -6); else if (drag.y > window.innerHeight - 70) window.scrollBy(0, 6);
+        update(drag.y);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    function update(y) {
+      drag.y = y;
+      const rows = $$('.menu-row', menu), i = rows.indexOf(drag.row);
+      const r = drag.row.getBoundingClientRect(), dy = y - drag.y0 + window.scrollY - drag.sc0;
+      const center = r.top - (parseFloat(drag.row.dataset.dy) || 0) + r.height / 2 + dy;
+      const prev = rows[i - 1], next = rows[i + 1];
+      const mid = el => { const b = el.getBoundingClientRect(); return b.top + b.height / 2; };
+      if (next && center > mid(next)) { const before = drag.row.offsetTop; menu.insertBefore(next, drag.row); drag.y0 += drag.row.offsetTop - before; }
+      else if (prev && center < mid(prev)) { const before = drag.row.offsetTop; menu.insertBefore(drag.row, prev); drag.y0 += drag.row.offsetTop - before; }
+      const d = y - drag.y0 + window.scrollY - drag.sc0;
+      drag.row.dataset.dy = d;
+      drag.row.style.transform = `translateY(${d}px) scale(1.02)`;
+    }
+    function finish() {
+      clearTimeout(timer);
+      if (!drag) return;
+      cancelAnimationFrame(raf);
+      drag.row.style.transform = '';
+      drag.row.dataset.dy = 0;
+      drag.row.classList.remove('lifting');
+      menu.classList.remove('reordering');
+      drag = null;
+      store.set('menuOrder', $$('.menu-row', menu).map(b => b.dataset.page));
+      menuClickBlock = Date.now() + 450;
+    }
+    menu.addEventListener('touchstart', e => {
+      const b = e.target.closest('.menu-row');
+      if (!b || e.touches.length > 1) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      clearTimeout(timer);
+      timer = setTimeout(() => begin(b, sy), 380);
+    }, { passive: true });
+    menu.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      if (!drag) { if (Math.hypot(t.clientX - sx, t.clientY - sy) > 8) clearTimeout(timer); return; }
+      e.preventDefault();
+      update(t.clientY);
+    }, { passive: false });
+    menu.addEventListener('touchend', finish);
+    menu.addEventListener('touchcancel', finish);
+    menu.addEventListener('contextmenu', e => e.preventDefault());
+    menu.addEventListener('mousedown', e => {
+      const b = e.target.closest('.menu-row');
+      if (!b || e.button !== 0) return;
+      sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(() => begin(b, sy), 380);
+      const mm = ev => { if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) clearTimeout(timer); return; } ev.preventDefault(); update(ev.clientY); };
+      const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); finish(); };
+      window.addEventListener('mousemove', mm);
+      window.addEventListener('mouseup', mu);
+    });
   }
 
   // Eine Seite: Reiter oben (wenn mehrere Rechner), darunter der gewählte Rechner
@@ -379,12 +458,14 @@
     gen: { tab: 'alt', N: '120', kind: 'len', cls: 'm', hk: 'K', mode: 'profil', pN: '50', t: '0,4', rel: 'bezug', sN: '20', sdev: '0,1' },
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
-    thread: { q: 'M8', kind: 'M' },
+    thread: { q: 'M8', kind: 'M', n: '' },
     cut: { mode: 'mill', set: 'vc', mat: 'st', tool: 'hm', d: '10', vc: '150', n: '', z: '4', fz: '0,05', f: '0,15', ae: '', ap: '', r: '0,8' },
     sw: { d: '8' },
     torque: { d: '8', cls: '8.8' },
     weight: { shape: 'rund', d: '20', D: '', s: '', b: '', h: '', a: '', t: '', L: '1000', mat: '0', rho: '' },
-    tri: { a: '30', b: '40', c: '', al: '', be: '' },
+    tri: { a: '30', b: '40', c: '', al: '', be: '', ord: ['a', 'b'] },
+    cone: { D: '40', d: '30', L: '50', a: '', ord: ['D', 'd', 'L'] },
+    bolt: { D: '100', n: '6', start: '0', cx: '0', cy: '0', dir: 'ccw' },
     tri2: { mode: 'SSS', a: '5', b: '6', c: '7', al: '', be: '' },
     rough: { f: '0,2', r: '0,8', want: '', wk: 'Rz' },
     trow: { V: '50', fill: '80', mix: 'fein', media: 'ker' }
@@ -429,6 +510,8 @@
     { id: 'weight', label: 'Gewicht', title: 'Gewicht berechnen', card: () => cardWeight(), compute: () => computeWeight() },
     { id: 'tri', label: 'Rechtwinklig', title: 'Rechtwinkliges Dreieck', card: () => cardTri(), compute: () => computeTri() },
     { id: 'tri2', label: 'Beliebig', title: 'Beliebiges Dreieck', card: () => cardTri2(), compute: () => computeTri2() },
+    { id: 'cone', label: 'Kegel', title: 'Kegel drehen', card: () => cardCone(), compute: () => computeCone() },
+    { id: 'bolt', label: 'Lochkreis', title: 'Lochkreis', tag: 'Koordinaten', card: () => cardBolt(), compute: () => computeBolt() },
     { id: 'rough', label: 'Drehen', title: 'Rautiefe aus dem Vorschub', card: () => cardRough(), compute: () => computeRough() },
     { id: 'roughtab', label: 'Tabellen', title: 'Rauheitswerte', tag: 'ISO 1302', card: () => cardRoughTab() },
     { id: 'trow', label: 'Rechner', title: 'Behälter füllen', card: () => cardTrow(), compute: () => computeTrow() },
@@ -1652,6 +1735,7 @@
       <div class="field"><label for="th-q">Gewinde</label>${textInp('th-q', 'thread.q', 'z. B. M8, M10x1, G1/2', true)}
         <span class="hint-line">Metrisch (M8, M10x1), Rohrgewinde (G1/2), Zoll (1/4-20 UNC, 3/8 UNF), Trapez (Tr20x4).</span></div>
       <div class="chips">${['M3', 'M4', 'M5', 'M6', 'M8', 'M10', 'M12', 'M16', 'M10x1', 'G1/4', 'G1/2', '1/4-20 UNC', 'Tr20x4'].map(v => `<button type="button" class="chip" data-act="thread-pick" data-v="${v}">${v}</button>`).join('')}</div>
+      <div class="field"><label for="th-n">Drehzahl S beim Gewindebohren, freiwillig</label>${bindNum('th-n', 'thread.n', '1/min', 'für den Vorschub in mm/min')}</div>
       <div class="result" id="res-thread" aria-live="polite"></div>
     </section>`;
   }
@@ -1677,6 +1761,9 @@
       steps.push({ t: 'Grundprofil', h: `Das Spitzgewinde hat 60° Flankenwinkel. Alle Maße folgen aus d und P: d2 = d − 0,6495 · P, D1 = d − 1,0825 · P, d3 = d − 1,2269 · P, h3 = 0,6134 · P.` });
       steps.push({ t: 'Kernloch', h: `Für Gewindebohren nimmt man etwa d − P = ${nf(t.d, 3)} − ${nf(t.P, 4)} = ${nf(t.d - t.P, 3)} mm.${t.type === 'M' && t.tap !== t.tapCalc ? ` DIN 336 nennt dafür den Bohrer ${nf(t.tap)} mm.` : ''} Beim Gewindeformen ist das Loch größer, dort gilt die Angabe des Werkzeugherstellers.` });
       steps.push({ t: 'Spannungsquerschnitt', h: t.type === 'M' ? 'As = π/4 · ((d2 + d3) / 2)², nach ISO 898-1. Er zählt für die Festigkeit der Schraube.' : 'As = π/4 · (d − 0,9743 · P)², nach ASME B1.1.' });
+      const Sn = optOf(A.thread.n), tipL = WK.drillTip(t.tap);
+      html += ncHTML([[`F${ncNum(t.P)}`, 'Gewindebohren mit G95: Vorschub = Steigung'], [Sn > 0 ? `S${Math.round(Sn)} F${ncNum(Sn * t.P)}` : 'F = S × ' + ncNum(t.P), Sn > 0 ? 'mit G94: Vorschub = Drehzahl × Steigung (mm/min)' : 'mit G94: unten die Drehzahl eintragen']])
+        + `<div class="kv">${kv('Bohrerspitze 118° beim Kernloch', `+ ${nf(tipL, 2)} mm<small>zur nutzbaren Bohrtiefe dazurechnen</small>`, true)}</div>`;
       if (t.type === 'M' && !t.listed) html += msgHTML('Diese Steigung steht nicht in der üblichen Auswahl nach ISO 261. Die Maße sind trotzdem richtig gerechnet.', 'warn');
       if (t.type === 'M' && t.coarse) {
         const sc = WK.screw(t.d), tq = WK.torque(t.d, '8.8');
@@ -1740,6 +1827,9 @@
   }
 
   // ---------- Schnittdaten ----------
+  // Zahl für das NC-Programm: Punkt statt Komma, ohne unnötige Nullen
+  const ncNum = x => String(Math.round(x * 1000) / 1000);
+  const ncHTML = lines => `<div class="nc"><div class="nc-h">Für das Programm</div>${lines.map(([code, note]) => `<div class="nc-l"><code>${esc(code)}</code><span>${esc(note)}</span></div>`).join('')}</div>`;
   function cardCut() {
     const c = A.cut, mode = c.mode;
     const mat = WK.MATERIALS_CUT.find(x => x.id === c.mat) || WK.MATERIALS_CUT[0];
@@ -1788,7 +1878,11 @@
       kvs += kv('Theoretische Rautiefe', `Rz ${nf(r.Rth, 2)} µm<small>Ra etwa ${nf(r.RaTh, 2)} µm</small>`);
       steps.push({ t: 'Rautiefe', h: `Rth = f² / (8 · r) = ${nf(v.f, 3)}² / (8 · ${nf(v.r)}) · 1000 = ${nf(r.Rth, 2)} µm. In der Praxis liegt die Rauheit etwas darüber.` });
     }
-    out('res-cut', `<div class="res-hero"><div class="res-big">${hero}</div><div class="res-sub">${c.set === 'vc' ? 'Drehzahl' : 'Schnittgeschwindigkeit'}${c.mode === 'mill' ? ' der Frässpindel' : c.mode === 'drill' ? ' beim Bohren' : ' beim Drehen'}</div></div><div class="kv">${kvs}</div>${calcHTML('cut', steps)}`);
+    const S0 = Math.round(r.n), F0 = r.vf != null ? Math.round(r.vf) : null;
+    let nc = '';
+    if (c.mode === 'turn') nc = ncHTML([[`G96 S${Math.round(r.vc)}${v.f > 0 ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, Vorschub mm/U (G95). Drehzahl begrenzen, z. B. G92 S… oder LIMS'], [`G97 S${S0}${v.f > 0 ? ' F' + ncNum(v.f) : ''}`, `feste Drehzahl für Ø ${nf(v.d)} mm`]]);
+    else nc = ncHTML([[`S${S0}${F0 != null ? ' F' + F0 : ''} M3`, 'Vorschub in mm/min (G94)'].concat([])].concat(c.mode === 'drill' && v.f > 0 ? [[`S${S0} F${ncNum(v.f)}`, 'oder Vorschub in mm/U (G95)']] : []));
+    out('res-cut', `<div class="res-hero"><div class="res-big">${hero}</div><div class="res-sub">${c.set === 'vc' ? 'Drehzahl' : 'Schnittgeschwindigkeit'}${c.mode === 'mill' ? ' der Frässpindel' : c.mode === 'drill' ? ' beim Bohren' : ' beim Drehen'}</div></div>${nc}<div class="kv">${kvs}</div>${calcHTML('cut', steps)}`);
   }
   function cardCutRef() {
     const range = r => `${r[0]}–${r[1]}`;
@@ -1891,52 +1985,183 @@
       ${calcHTML('weight', steps)}`);
   }
 
-  // ---------- Dreieck ----------
-  function triSVG() {
-    return `<svg class="tri-fig" viewBox="0 0 260 150" aria-hidden="true"><path class="tri-line" d="M20 130H230V20Z"/><path class="tri-ra" d="M214 130v-16h16"/>
-      <text x="125" y="146" text-anchor="middle">b</text><text x="240" y="80">a</text><text x="112" y="66" text-anchor="end">c</text>
-      <text x="44" y="125">α</text><text x="218" y="44" text-anchor="end">β</text><text x="12" y="140" class="pt">A</text><text x="236" y="146" class="pt">C</text><text x="236" y="18" class="pt">B</text></svg>`;
+  // ---------- Dreieck, Kegel, Lochkreis: Skizze antippen, um ein Maß einzugeben ----------
+  const dms = x => { const t = Math.round(x * 3600); const d = Math.floor(t / 3600), m = Math.floor((t - d * 3600) / 60), sec = t - d * 3600 - m * 60; return `${d}° ${String(m).padStart(2, '0')}′ ${String(sec).padStart(2, '0')}″`; };
+  // Antippbarer Teil der Skizze: breite unsichtbare Fläche zum Treffen, darüber die Beschriftung mit dem Wert
+  const hit = (k, d, lx, ly, anchor = 'middle', name) => `<g class="fk" data-fk="${k}" role="button" aria-label="${esc(name || k)} eingeben"><path class="fk-hit" d="${d}"/><text class="fk-lab" data-lab="${k}" x="${lx}" y="${ly}" text-anchor="${anchor}">${esc(name || '')}</text></g>`;
+  // Werte in der Skizze anzeigen: given = eingegeben (Akzentfarbe), calc = gerechnet (grün)
+  function figLabels(map) {
+    Object.entries(map).forEach(([k, [txt, state]]) => {
+      const t = $(`[data-lab="${k}"]`);
+      if (!t) return;
+      t.textContent = txt;
+      const g = t.closest('.fk');
+      if (!g) return;
+      g.classList.toggle('given', state === 'given');
+      g.classList.toggle('calc', state === 'calc');
+    });
   }
+  // Nur die zuletzt eingegebenen Werte zählen: ältere werden geleert, wenn zu viele da sind
+  const LIMITS = { tri: [['a', 'b', 'c', 'al', 'be'], 2], cone: [['D', 'd', 'L', 'a'], 3] };
+  let lastCleared = '', clearedBy = '';
+  function keepLatest(k) {
+    const [sec, key] = k.split('.');
+    const lim = LIMITS[sec];
+    if (k !== clearedBy) lastCleared = '';
+    if (!lim || !lim[0].includes(key)) return;
+    const st = A[sec];
+    st.ord = (Array.isArray(st.ord) ? st.ord : []).filter(x => x !== key && lim[0].includes(x));
+    if (String(st[key]).trim()) st.ord.push(key);
+    const filled = lim[0].filter(x => String(st[x]).trim());
+    if (filled.length > lim[1]) {
+      const old = st.ord.find(x => x !== key && String(st[x]).trim()) || filled.find(x => x !== key);
+      st[old] = '';
+      st.ord = st.ord.filter(x => x !== old);
+      const inp = $(`[data-k="${sec}.${old}"]`);
+      if (inp) inp.value = '';
+      lastCleared = old; clearedBy = k;
+    }
+    saveA();
+  }
+  const NAMES = { a: 'a', b: 'b', c: 'c', al: 'α', be: 'β', D: 'D', d: 'd', L: 'L' };
+  const clearedNote = () => lastCleared ? msgHTML(`Den älteren Wert ${esc(NAMES[lastCleared] || lastCleared)} habe ich geleert: Es zählen immer die zuletzt eingegebenen Werte.`) : '';
+  const v4 = x => nf(x, 3);
+
   function cardTri() {
+    const fig = `<svg class="tri-fig" viewBox="0 0 330 190" aria-label="Rechtwinkliges Dreieck, Seiten und Winkel antippen">
+      <path class="tri-line" d="M30 160H250V30Z"/><path class="tri-ra" d="M234 160v-16h16"/>
+      ${hit('tri.b', 'M30 160H250', 140, 182, 'middle', 'b')}
+      ${hit('tri.a', 'M250 160V30', 262, 100, 'start', 'a')}
+      ${hit('tri.c', 'M30 160L250 30', 128, 84, 'end', 'c')}
+      ${hit('tri.al', 'M30 160m-2 0a30 30 0 1 0 60 0a30 30 0 1 0-60 0', 76, 150, 'start', 'α')}
+      ${hit('tri.be', 'M250 30m-24 0a24 24 0 1 0 48 0a24 24 0 1 0-48 0', 238, 66, 'end', 'β')}
+      <text class="pt" x="16" y="172">A</text><text class="pt" x="256" y="176">C</text><text class="pt" x="256" y="24">B</text></svg>`;
     return `<section class="card" id="card-tri">
-      <div class="tri-wrap">${triSVG()}</div>
-      <p class="hint-line">Gib genau zwei Werte ein, davon mindestens eine Seite. Der rechte Winkel liegt bei C, c ist die Hypotenuse.</p>
-      <div class="fields">
-        <div class="field"><label for="tr-a">Seite a</label>${bindNum('tr-a', 'tri.a', 'mm', '')}</div>
-        <div class="field"><label for="tr-b">Seite b</label>${bindNum('tr-b', 'tri.b', 'mm', '')}</div>
-        <div class="field"><label for="tr-c">Hypotenuse c</label>${bindNum('tr-c', 'tri.c', 'mm', '')}</div>
-        <div class="field"><label for="tr-al">Winkel α</label>${bindNum('tr-al', 'tri.al', '°', '')}</div>
-        <div class="field"><label for="tr-be">Winkel β</label>${bindNum('tr-be', 'tri.be', '°', '')}</div>
-        <div class="field"><button type="button" class="btn plain" data-act="tri-clear">Leeren</button></div>
+      <div class="tri-wrap">${fig}</div>
+      <p class="hint-line"><b>Seite oder Winkel in der Skizze antippen</b> und den Wert eingeben. Zwei Werte genügen, mindestens eine Seite. Der rechte Winkel liegt bei C.</p>
+      <div class="fields five">
+        <div class="field"><label for="tr-a">a</label>${bindNum('tr-a', 'tri.a', 'mm', '')}</div>
+        <div class="field"><label for="tr-b">b</label>${bindNum('tr-b', 'tri.b', 'mm', '')}</div>
+        <div class="field"><label for="tr-c">c</label>${bindNum('tr-c', 'tri.c', 'mm', '')}</div>
+        <div class="field"><label for="tr-al">α</label>${bindNum('tr-al', 'tri.al', '°', '')}</div>
+        <div class="field"><label for="tr-be">β</label>${bindNum('tr-be', 'tri.be', '°', '')}</div>
+        <div class="field"><button type="button" class="btn plain" data-act="fig-clear" data-g="tri">Leeren</button></div>
       </div>
       <div class="result" id="res-tri" aria-live="polite"></div>
     </section>`;
   }
-  const dms = x => { const t = Math.round(x * 3600); const d = Math.floor(t / 3600), m = Math.floor((t - d * 3600) / 60), sec = t - d * 3600 - m * 60; return `${d}° ${String(m).padStart(2, '0')}′ ${String(sec).padStart(2, '0')}″`; };
-  const triRes = r => `<div class="kv three">${kv('a', nf(r.a, 4) + ' mm')}${kv('b', nf(r.b, 4) + ' mm')}${kv('c', nf(r.c, 4) + ' mm')}${kv('α', nf(r.al, 3) + '°' + `<small>${dms(r.al)}</small>`)}${kv('β', nf(r.be, 3) + '°' + `<small>${dms(r.be)}</small>`)}${kv('γ', nf(r.ga, 3) + '°')}</div><div class="kv">${kv('Fläche', nf(r.A, 3) + ' mm²')}${kv('Umfang', nf(r.U, 3) + ' mm')}${r.h != null ? kv('Höhe auf c', nf(r.h, 4) + ' mm', true) : ''}</div>`;
   function computeTri() {
     const v = {};
     ['a', 'b', 'c', 'al', 'be'].forEach(k => { const x = optOf(A.tri[k]); if (x != null) v[k] = x; });
     const r = WK.rightTriangle(v);
-    if (!r.ok) return out('res-tri', msgHTML(esc(r.error)));
-    out('res-tri', triRes(r) + calcHTML('tri', [{ t: 'Formeln', h: 'a² + b² = c² (Pythagoras). sin α = a / c, cos α = b / c, tan α = a / b. α + β = 90°.' }]));
+    const st = k => v[k] != null ? 'given' : 'calc';
+    if (!r.ok) { figLabels({ 'tri.a': ['a', ''], 'tri.b': ['b', ''], 'tri.c': ['c', ''], 'tri.al': ['α', ''], 'tri.be': ['β', ''] }); Object.keys(v).forEach(k => figLabels({ ['tri.' + k]: [(NAMES[k]) + ' = ' + nf(v[k], 3) + (k.length > 1 ? '°' : ''), 'given'] })); return out('res-tri', clearedNote() + msgHTML(esc(r.error))); }
+    figLabels({ 'tri.a': ['a = ' + v4(r.a), st('a')], 'tri.b': ['b = ' + v4(r.b), st('b')], 'tri.c': ['c = ' + v4(r.c), st('c')], 'tri.al': ['α = ' + nf(r.al, 3) + '°', st('al')], 'tri.be': ['β = ' + nf(r.be, 3) + '°', st('be')] });
+    out('res-tri', clearedNote() + `<div class="kv three">${kv('a', v4(r.a) + ' mm')}${kv('b', v4(r.b) + ' mm')}${kv('c', v4(r.c) + ' mm')}${kv('α', nf(r.al, 3) + '°' + `<small>${dms(r.al)}</small>`)}${kv('β', nf(r.be, 3) + '°' + `<small>${dms(r.be)}</small>`)}${kv('Fläche', nf(r.A, 2) + ' mm²')}</div>
+      <p class="foot">Blau: eingegeben, grün: gerechnet. Für eine Schräge im Programm: b ist der Weg in X (bzw. Z), a der Weg in Y (bzw. X als Radius).</p>
+      ${calcHTML('tri', [{ t: 'Formeln', h: 'a² + b² = c² (Pythagoras). sin α = a / c, cos α = b / c, tan α = a / b. α + β = 90°.' }])}`);
   }
+
   function cardTri2() {
     const m = A.tri2.mode;
+    const has = k => (m === 'SSS' ? ['a', 'b', 'c'] : m === 'SWS' ? ['b', 'c', 'al'] : ['c', 'al', 'be']).includes(k);
     const fld = (k, l, u) => `<div class="field"><label for="t2-${k}">${l}</label>${bindNum('t2-' + k, 'tri2.' + k, u, '')}</div>`;
+    const fig = `<svg class="tri-fig" viewBox="0 0 300 190" aria-label="Dreieck, Seiten und Winkel antippen">
+      <path class="tri-line" d="M30 160H260L175 30Z"/>
+      ${hit('tri2.c', 'M30 160H260', 145, 182, 'middle', 'c')}
+      ${hit('tri2.a', 'M260 160L175 30', 228, 92, 'start', 'a')}
+      ${hit('tri2.b', 'M30 160L175 30', 92, 88, 'end', 'b')}
+      ${hit('tri2.al', 'M30 160m-2 0a30 30 0 1 0 60 0a30 30 0 1 0-60 0', 70, 150, 'start', 'α')}
+      ${hit('tri2.be', 'M260 160m-30 0a30 30 0 1 0 60 0a30 30 0 1 0-60 0', 220, 150, 'end', 'β')}
+      <text class="fk-lab static" x="175" y="62" text-anchor="middle" data-lab="tri2.ga">γ</text>
+      <text class="pt" x="16" y="172">A</text><text class="pt" x="266" y="172">B</text><text class="pt" x="170" y="22">C</text></svg>`;
     return `<section class="card" id="card-tri2">
-      ${segHTML('tri2.mode', m, [['SSS', '3 Seiten'], ['SWS', '2 Seiten, Winkel'], ['WSW', '1 Seite, 2 Winkel']], 'wrap')}
-      <p class="hint-line">${m === 'SSS' ? 'Alle drei Seiten a, b, c.' : m === 'SWS' ? 'Die Seiten b und c und der Winkel α dazwischen.' : 'Die Seite c und die Winkel α und β an ihren Enden.'} α liegt gegenüber von a, β gegenüber von b.</p>
-      <div class="fields">${m === 'SSS' ? fld('a', 'Seite a', 'mm') + fld('b', 'Seite b', 'mm') + fld('c', 'Seite c', 'mm') : m === 'SWS' ? fld('b', 'Seite b', 'mm') + fld('c', 'Seite c', 'mm') + fld('al', 'Winkel α', '°') : fld('c', 'Seite c', 'mm') + fld('al', 'Winkel α', '°') + fld('be', 'Winkel β', '°')}</div>
+      ${segHTML('tri2.mode', m, [['SSS', '3 Seiten'], ['SWS', '2 Seiten + Winkel'], ['WSW', 'Seite + 2 Winkel']], 'wrap')}
+      <div class="tri-wrap">${fig}</div>
+      <p class="hint-line"><b>Antippen und eingeben.</b> ${m === 'SSS' ? 'Alle drei Seiten.' : m === 'SWS' ? 'Die Seiten b und c und der Winkel α zwischen ihnen.' : 'Die Seite c und die Winkel α und β an ihren Enden.'}</p>
+      <div class="fields">${['a', 'b', 'c'].filter(has).map(k => fld(k, k, 'mm')).join('')}${has('al') ? fld('al', 'α', '°') : ''}${has('be') ? fld('be', 'β', '°') : ''}</div>
       <div class="result" id="res-tri2" aria-live="polite"></div>
     </section>`;
   }
   function computeTri2() {
     const v = {};
     ['a', 'b', 'c', 'al', 'be'].forEach(k => { v[k] = optOf(A.tri2[k]); });
-    const r = WK.triangle(A.tri2.mode, v);
-    if (!r.ok) return out('res-tri2', msgHTML(esc(r.error)));
-    out('res-tri2', triRes(r) + calcHTML('tri2', [{ t: 'Formeln', h: 'Kosinussatz: a² = b² + c² − 2 · b · c · cos α. Sinussatz: a / sin α = b / sin β = c / sin γ. Winkelsumme 180°. Fläche nach Heron.' }]));
+    const m = A.tri2.mode, gv = m === 'SSS' ? ['a', 'b', 'c'] : m === 'SWS' ? ['b', 'c', 'al'] : ['c', 'al', 'be'];
+    const r = WK.triangle(m, v);
+    const st = k => gv.includes(k) ? 'given' : 'calc';
+    if (!r.ok) { figLabels({ 'tri2.a': ['a', ''], 'tri2.b': ['b', ''], 'tri2.c': ['c', ''], 'tri2.al': ['α', ''], 'tri2.be': ['β', ''], 'tri2.ga': ['γ', ''] }); return out('res-tri2', msgHTML(esc(r.error))); }
+    figLabels({ 'tri2.a': ['a = ' + v4(r.a), st('a')], 'tri2.b': ['b = ' + v4(r.b), st('b')], 'tri2.c': ['c = ' + v4(r.c), st('c')], 'tri2.al': ['α = ' + nf(r.al, 3) + '°', st('al')], 'tri2.be': ['β = ' + nf(r.be, 3) + '°', st('be')], 'tri2.ga': ['γ = ' + nf(r.ga, 3) + '°', 'calc'] });
+    out('res-tri2', `<div class="kv three">${kv('a', v4(r.a) + ' mm')}${kv('b', v4(r.b) + ' mm')}${kv('c', v4(r.c) + ' mm')}${kv('α', nf(r.al, 3) + '°')}${kv('β', nf(r.be, 3) + '°')}${kv('γ', nf(r.ga, 3) + '°')}</div><div class="kv">${kv('Fläche', nf(r.A, 2) + ' mm²')}${kv('Umfang', nf(r.U, 3) + ' mm')}</div>
+      ${calcHTML('tri2', [{ t: 'Formeln', h: 'Kosinussatz: a² = b² + c² − 2 · b · c · cos α. Sinussatz: a / sin α = b / sin β = c / sin γ. Winkelsumme 180°. Fläche nach Heron.' }])}`);
+  }
+
+  // Kegel beim Drehen
+  function cardCone() {
+    const fig = `<svg class="tri-fig" viewBox="0 0 300 190" aria-label="Kegel, Maße antippen">
+      <path class="axis" d="M14 95H290"/>
+      <path class="tri-line" d="M60 35L240 65V125L60 155Z"/>
+      <path class="tri-ra" d="M60 35H250" stroke-dasharray="4 4"/>
+      ${hit('cone.D', 'M60 35V155', 52, 100, 'end', 'D')}
+      ${hit('cone.d', 'M240 65V125', 250, 100, 'start', 'd')}
+      ${hit('cone.L', 'M60 172H240', 150, 184, 'middle', 'L')}
+      ${hit('cone.a', 'M180 25m-28 0a28 28 0 1 0 56 0a28 28 0 1 0-56 0', 190, 30, 'middle', 'α/2')}
+      <path class="dim" d="M60 166v12M240 136v42"/></svg>`;
+    return `<section class="card" id="card-cone">
+      <div class="tri-wrap">${fig}</div>
+      <p class="hint-line"><b>Maß in der Skizze antippen</b> und eingeben. Drei der vier Werte genügen: großer Ø D, kleiner Ø d, Länge L, Einstellwinkel α/2 (halber Kegelwinkel, den du an der Maschine einstellst).</p>
+      <div class="fields">
+        <div class="field"><label for="k-D">D</label>${bindNum('k-D', 'cone.D', 'mm', '')}</div>
+        <div class="field"><label for="k-d">d</label>${bindNum('k-d', 'cone.d', 'mm', '')}</div>
+        <div class="field"><label for="k-L">L</label>${bindNum('k-L', 'cone.L', 'mm', '')}</div>
+        <div class="field"><label for="k-a">α/2</label>${bindNum('k-a', 'cone.a', '°', '')}</div>
+        <div class="field full"><button type="button" class="btn plain" data-act="fig-clear" data-g="cone">Leeren</button></div>
+      </div>
+      <div class="result" id="res-cone" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeCone() {
+    const v = {};
+    ['D', 'd', 'L', 'a'].forEach(k => { const x = optOf(A.cone[k]); if (x != null) v[k] = x; });
+    const r = WK.cone(v);
+    const st = k => v[k] != null ? 'given' : 'calc';
+    if (!r.ok) { figLabels({ 'cone.D': ['D', ''], 'cone.d': ['d', ''], 'cone.L': ['L', ''], 'cone.a': ['α/2', ''] }); return out('res-cone', clearedNote() + msgHTML(esc(r.error))); }
+    figLabels({ 'cone.D': ['Ø' + v4(r.D), st('D')], 'cone.d': ['Ø' + v4(r.d), st('d')], 'cone.L': [v4(r.L), st('L')], 'cone.a': [nf(r.a, 3) + '°', st('a')] });
+    out('res-cone', clearedNote() + `<div class="res-hero"><div class="res-big">${nf(r.a, 4)}°</div><div class="res-sub">Einstellwinkel α/2 · ${dms(r.a)}</div></div>
+      <div class="kv">${kv('Kegelwinkel α', nf(r.full, 4) + '°')}${kv('Kegelverhältnis', r.C > 0 ? `1 : ${nf(r.ratio, 3)}<small>C = ${nf(r.C, 4)}</small>` : '–')}${kv('D', 'Ø ' + v4(r.D) + ' mm')}${kv('d', 'Ø ' + v4(r.d) + ' mm')}${kv('L', v4(r.L) + ' mm')}${kv('Zustellung je Seite', v4(r.dx) + ' mm<small>(D − d) / 2, im Radius</small>')}</div>
+      <p class="foot">Im Programm (Durchmesserprogrammierung): von X${v4(r.d)} nach X${v4(r.D)} auf ${v4(r.L)} mm in Z.</p>
+      ${calcHTML('cone', [{ t: 'Formeln', h: 'tan(α/2) = (D − d) / (2 · L). Kegelverhältnis C = (D − d) / L, geschrieben 1 : (L / (D − d)).' }])}`);
+  }
+
+  // Lochkreis: Koordinaten der Bohrungen
+  function cardBolt() {
+    const b = A.bolt;
+    return `<section class="card" id="card-bolt">
+      <div class="tri-wrap" id="bolt-fig"></div>
+      <div class="fields">
+        <div class="field"><label for="b-D">Teilkreis-Ø</label>${bindNum('b-D', 'bolt.D', 'mm', 'z. B. 100')}</div>
+        <div class="field"><label for="b-n">Anzahl Bohrungen</label>${bindNum('b-n', 'bolt.n', 'Stück', 'z. B. 6')}</div>
+        <div class="field"><label for="b-s">Startwinkel</label>${bindNum('b-s', 'bolt.start', '°', '0 = auf +X', { signed: true })}</div>
+        <div class="field"><span class="lbl">Richtung</span>${segHTML('bolt.dir', b.dir, [['ccw', 'gegen Uhr'], ['cw', 'mit Uhr']])}</div>
+        <div class="field"><label for="b-x">Mitte X</label>${bindNum('b-x', 'bolt.cx', 'mm', '0', { signed: true })}</div>
+        <div class="field"><label for="b-y">Mitte Y</label>${bindNum('b-y', 'bolt.cy', 'mm', '0', { signed: true })}</div>
+      </div>
+      <div class="result" id="res-bolt" aria-live="polite"></div>
+    </section>`;
+  }
+  function computeBolt() {
+    const b = A.bolt;
+    const r = WK.boltCircle({ D: optOf(b.D), n: optOf(b.n), start: optOf(b.start) || 0, cx: optOf(b.cx) || 0, cy: optOf(b.cy) || 0, cw: b.dir === 'cw' });
+    const fig = $('#bolt-fig');
+    if (!r.ok) { if (fig) fig.innerHTML = ''; return out('res-bolt', msgHTML(esc(r.error))); }
+    const cx0 = optOf(b.cx) || 0, cy0 = optOf(b.cy) || 0, k = 70 / r.R, show = r.pts.length <= 36;
+    if (fig) fig.innerHTML = `<svg class="tri-fig bolt" viewBox="0 0 220 200" aria-label="Lochkreis mit nummerierten Bohrungen">
+      <path class="axis" d="M10 100H210M110 10V190"/><text class="pt" x="204" y="94" text-anchor="end">+X</text><text class="pt" x="116" y="20">+Y</text>
+      <circle class="pcd" cx="110" cy="100" r="70"/>
+      ${r.pts.map(p => { const x = 110 + (p.x - cx0) * k, y = 100 - (p.y - cy0) * k; return `<circle class="hole${p.i === 1 ? ' first' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${show ? 7 : 3}"/>${show ? `<text class="hn" x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" text-anchor="middle">${p.i}</text>` : ''}`; }).join('')}</svg>`;
+    out('res-bolt', `<div class="kv">${kv('Winkelteilung', nf(r.step, 4) + '°')}${kv('Abstand Nachbarn', v4(r.chord) + ' mm<small>Sehne</small>')}</div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Nr.</th><th scope="col">Winkel</th><th scope="col">X</th><th scope="col">Y</th></tr></thead><tbody>${r.pts.map(p => `<tr><th scope="row">${p.i}</th><td>${nf(p.w, 3)}°</td><td>${T.fmt(p.x, 3, 3)}</td><td>${T.fmt(p.y, 3, 3)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="foot">Winkel ab +X gegen den Uhrzeigersinn. Bohrung 1 ist hervorgehoben. Koordinaten absolut (G90) zur eingegebenen Mitte.</p>
+      ${calcHTML('bolt', [{ t: 'Formeln', h: `X = Mitte X + R · cos(Winkel), Y = Mitte Y + R · sin(Winkel), R = ${v4(r.R)} mm. Winkel = Start ± Nr. · 360° / Anzahl. Sehne = D · sin(180° / Anzahl).` }])}`);
   }
 
   // ---------- Rauheit ----------
@@ -2036,6 +2261,8 @@
       <p>Toleranzen nach ISO 286 (alle Grundabmaße a bis zc), Passungen, Maßketten, Maße aus einem Zeichnungsfoto, Allgemeintoleranzen nach ISO 2768-1 und ISO 22081, Form und Lage nach ISO 2768-2 und ISO 1101, Gewinde, Schnittdaten, Schrauben und Schlüsselweiten, Anziehdrehmomente, Gewichte, Dreiecke, Rauheit und Gleitschleifen.</p>
       <h3>Schnellsuche</h3>
       <p>Auf der Startseite: M8 oder M10x1 für Gewinde, G1/2 oder 1/4-20 UNC, 6H7 oder 30g6 für eine ISO-Toleranz, 25H7/g6 für eine Passung, SW13 für eine Schlüsselweite, N7 für eine Rauheitsklasse oder einfach ein Stichwort wie Kernloch.</p>
+      <h3>Bedienen</h3>
+      <p>Reihenfolge ändern: In der Startliste und bei den Reitern oben einen Eintrag gedrückt halten und verschieben. Bei Dreieck, Kegel und Lochkreis die Seite oder den Winkel in der Skizze antippen, dann den Wert eingeben. Schnittdaten und Gewinde zeigen fertige Zeilen fürs Programm (S, F).</p>
       <h3>Grundlagen</h3>
       <ul><li>ISO 286-1 und -2: Grundtoleranzen, Grundabmaße, Passungen</li><li>ISO 2768-1 und -2, ISO 22081: Allgemeintoleranzen</li><li>ISO 1101: Form und Lage</li><li>ISO 68-1, 261, 724, 228-1, 2904, ASME B1.1: Gewinde · DIN 336: Kernlöcher</li><li>ISO 4014/4017/4032, ISO 4762, 10642, 7380, 4026 bis 4029, ISO 273, DIN 974-1: Schrauben</li><li>VDI 2230 Blatt 1: Anziehdrehmomente · ISO 1302: Rauheit</li></ul>
       <h3>Wichtig</h3>
@@ -2045,6 +2272,7 @@
   }
 
   function onApplyChange(k) {
+    keepLatest(k);
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
     if (['gen.tab', 'gen.mode', 'cut.mode', 'cut.set', 'cut.tool', 'cut.mat', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
       const ae = document.activeElement, id = ae && ae.id;
@@ -2071,7 +2299,7 @@
     'thread-pick': t => { A.thread.q = t.dataset.v; saveA(); if (S.page === 'thread' && curSection().id === 'thread') { $('#th-q').value = t.dataset.v; computeThread(); } else goSection('thread'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sw-pick': t => { A.sw.d = t.dataset.v; saveA(); goSection('sw'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'cut-vc': t => { A.cut.set = 'vc'; A.cut.vc = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCut(); },
-    'tri-clear': () => { ['a', 'b', 'c', 'al', 'be'].forEach(k => { A.tri[k] = ''; }); saveA(); $$('#card-tri input').forEach(x => { x.value = ''; }); computeTri(); },
+    'fig-clear': t => { const g = t.dataset.g; Object.keys(A[g]).forEach(k => { if (k !== 'ord' && k !== 'mode' && k !== 'dir') A[g][k] = ''; }); A[g].ord = []; saveA(); $$(`[data-k^="${g}."]`).forEach(x => { if (x.tagName === 'INPUT') x.value = ''; }); computeCurrent(); const f = $(`[data-k="${g}.${g === 'tri' ? 'a' : 'D'}"]`); if (f) f.focus(); },
     'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },
     'iso-from': t => { setK('iso.q', t.dataset.v); goSection('iso'); },
     'chain-add': () => {
@@ -2127,10 +2355,17 @@
   };
 
   document.addEventListener('click', e => {
+    const fk = e.target.closest && e.target.closest('.fk[data-fk]');
+    if (fk) {
+      const inp = $(`input[data-k="${fk.dataset.fk}"]`);
+      $$('.fk.act').forEach(x => x.classList.remove('act'));
+      if (inp) { fk.classList.add('act'); inp.focus({ preventScroll: true }); inp.select(); inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      return;
+    }
     const t = e.target.closest('button, tr[data-act]');
     if (!t) return;
     if (t.dataset.sec) { if (Date.now() > secClickBlock) showSection(t.dataset.sec); return; }
-    if (t.dataset.page) return openPage(t.dataset.page);
+    if (t.dataset.page) { if (Date.now() > menuClickBlock) openPage(t.dataset.page); return; }
     if (t.dataset.hit != null) { const box = $('#q-res'); return openHit(box && box._res && box._res[+t.dataset.hit]); }
     if (t.classList.contains('sign')) {
       t.textContent = t.textContent === '−' ? '+' : '−';
@@ -2189,6 +2424,12 @@
     }
   }
   document.addEventListener('input', onInput);
+  // Eingabefeld aktiv: passende Stelle in der Skizze hervorheben
+  document.addEventListener('focusin', e => {
+    const k = e.target.dataset && e.target.dataset.k;
+    $$('.fk.act').forEach(x => x.classList.remove('act'));
+    if (k) { const g = $(`.fk[data-fk="${k}"]`); if (g) g.classList.add('act'); }
+  });
   document.addEventListener('change', e => {
     if (e.target.tagName === 'SELECT') onInput(e);
     if (e.target.matches && e.target.matches('#foto-cam, #foto-lib') && e.target.files && e.target.files[0]) { handleFoto(e.target.files[0]); e.target.value = ''; }

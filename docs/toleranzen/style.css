@@ -535,3 +535,37 @@ table.tbl { border-collapse: separate; border-spacing: 0; font-size: 14px; font-
 .large-title { overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
 @media (max-width: 400px) { .large-title { font-size: 30px; line-height: 36px; } }
 .inp select { width: 100%; text-overflow: ellipsis; }
+/* Antippbare Skizzen */
+.tri-fig .fk { cursor: pointer; }
+.tri-fig .fk-hit { fill: transparent; stroke: transparent; stroke-width: 26; stroke-linecap: round; pointer-events: stroke; }
+.tri-fig .fk circle, .tri-fig path.fk-hit[d*="a"] { pointer-events: all; }
+.tri-fig .fk-lab { font: 700 15px var(--font); fill: var(--label-2); paint-order: stroke; stroke: var(--card-2); stroke-width: 4px; font-variant-numeric: tabular-nums; }
+.tri-fig .fk.given .fk-lab { fill: var(--tint); }
+.tri-fig .fk.calc .fk-lab, .tri-fig .fk-lab.static { fill: var(--green); }
+.tri-fig .fk.act .fk-hit { stroke: var(--tint-soft); }
+.tri-fig .fk.act .fk-lab { fill: var(--tint); text-decoration: underline; }
+.tri-fig .fk:active .fk-hit { stroke: var(--tint-soft); }
+.tri-fig .axis { stroke: var(--label-3); stroke-width: 1; stroke-dasharray: 10 4 2 4; fill: none; }
+.tri-fig .dim { stroke: var(--label-3); stroke-width: 1; fill: none; }
+.tri-fig .pcd { fill: none; stroke: var(--label-3); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.tri-fig .hole { fill: var(--card); stroke: var(--tint); stroke-width: 2; }
+.tri-fig .hole.first { fill: var(--tint); }
+.tri-fig .hn { font: 700 9px var(--font); fill: var(--label); }
+.tri-fig .hole.first + .hn { fill: #fff; }
+.fields.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fields.five .inp { padding-inline: 10px; }
+.fields.five .inp .unit { font-size: 13px; }
+.nc { background: #1C1C1E; color: #fff; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.nc-h { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }
+.nc-l { display: flex; flex-direction: column; gap: 1px; }
+.nc-l code { font: 700 22px/1.2 var(--mono); color: #7CFC9A; letter-spacing: .02em; -webkit-user-select: all; user-select: all; }
+.nc-l span { font-size: 13px; color: rgba(255, 255, 255, .7); }
+:root[data-theme="dark"] .nc { background: #2C2C2E; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .nc { background: #2C2C2E; } }
+.tip-v { min-height: 50px; display: flex; flex-direction: column; justify-content: center; font-size: 17px; font-weight: 600; }
+.tip-v small { font-size: 12.5px; font-weight: 500; color: var(--label-2); }
+.menu-row { -webkit-touch-callout: none; touch-action: manipulation; }
+.menu-row.lifting { z-index: 3; background: var(--card); box-shadow: var(--shadow-float); border-radius: 14px; transition: none; }
+.menu.reordering { overflow: visible; }
+.menu.reordering .menu-row:not(.lifting) { opacity: .8; transition: none; }
+.menu.reordering .menu-row::before { display: none; }

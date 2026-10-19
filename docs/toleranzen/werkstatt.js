@@ -289,6 +289,36 @@
     return { ok: true, a, b, c, al, be, ga, A: Math.sqrt(Math.max(0, s * (s - a) * (s - b) * (s - c))), U: a + b + c };
   };
 
+  // Kegel (Drehen): drei von D, d, L, Einstellwinkel a (halber Kegelwinkel) gegeben, der vierte wird gerechnet
+  W.cone = function (v) {
+    let { D, d, L, a } = v;
+    const given = ['D', 'd', 'L', 'a'].filter(k => v[k] != null);
+    if (given.length !== 3) return { ok: false, error: given.length < 3 ? 'Gib drei der vier Werte ein.' : 'Gib nur drei Werte ein, der vierte wird gerechnet.' };
+    if (a != null && !(a > 0 && a < 90)) return { ok: false, error: 'Der Einstellwinkel liegt zwischen 0° und 90°.' };
+    if ([D, d, L].some(x => x != null && !(x >= 0))) return { ok: false, error: 'Maße dürfen nicht negativ sein.' };
+    const t = a != null ? Math.tan(rad(a)) : null;
+    if (D == null) D = d + 2 * L * t;
+    else if (d == null) { d = D - 2 * L * t; if (d < -1e-9) return { ok: false, error: 'Mit diesem Winkel und dieser Länge läuft der Kegel vorher in die Spitze aus.' }; d = Math.max(0, d); }
+    else if (L == null) { if (!(D > d)) return { ok: false, error: 'D muss größer als d sein.' }; L = (D - d) / (2 * t); }
+    else { if (!(D > d) || !(L > 0)) return { ok: false, error: 'D muss größer als d sein und L größer als 0.' }; a = deg(Math.atan((D - d) / (2 * L))); }
+    const C = (D - d) / L;
+    return { ok: true, D, d, L, a, full: 2 * a, C, ratio: C > 0 ? 1 / C : Infinity, dx: (D - d) / 2 };
+  };
+  // Lochkreis: Bohrungen gleichmäßig auf einem Teilkreis, Startwinkel ab +X, gegen den Uhrzeigersinn positiv
+  W.boltCircle = function ({ D, n, start = 0, cx = 0, cy = 0, cw = false }) {
+    if (!(D > 0)) return { ok: false, error: 'Gib den Teilkreisdurchmesser ein.' };
+    if (!(n >= 1 && n <= 360 && Number.isInteger(n))) return { ok: false, error: 'Gib die Anzahl der Bohrungen als ganze Zahl ein.' };
+    const R = D / 2, step = 360 / n, pts = [];
+    for (let i = 0; i < n; i++) {
+      const w = start + (cw ? -1 : 1) * i * step, r0 = rad(w);
+      const x = cx + R * Math.cos(r0), y = cy + R * Math.sin(r0);
+      pts.push({ i: i + 1, w: ((w % 360) + 360) % 360, x: Math.abs(x) < 5e-10 ? 0 : x, y: Math.abs(y) < 5e-10 ? 0 : y });
+    }
+    return { ok: true, R, step, chord: n > 1 ? D * Math.sin(rad(180 / n)) : 0, pts };
+  };
+  // Bohrerspitze: Länge der Spitze bei Spitzenwinkel sigma
+  W.drillTip = (d, sigma = 118) => d / 2 / Math.tan(rad(sigma / 2));
+
   // ================================================================
   // Gleitschleifen (Trowalisieren)
   // ================================================================
