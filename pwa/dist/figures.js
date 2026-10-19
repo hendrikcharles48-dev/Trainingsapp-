@@ -207,6 +207,7 @@
   T.backsq = { k: [ST({ f: [[110, 182], [96, 182]], h: [[90, 46], [86, 46]], es: [-1, -1] }), Object.assign({}, SQ1, { t: 146, h: [[101, 90], [97, 90]], es: [-1, -1] })], p: [{ k: 'bbsh' }] };
   T.legpress = { k: [{ hip: [70, 150], t: 232, f: [[122, 120], [118, 122]], ks: [1, 1], h: [[64, 150], [60, 150]] }, { hip: [70, 150], t: 232, f: [[146, 100], [142, 102]], ks: [1, 1], h: [[64, 150], [60, 150]] }], p: [{ k: 'bench', x1: 70, y1: 158, x2: 30, y2: 120 }, { k: 'footplate' }] };
   T.hack = { k: [ST({ t: 170, f: [[118, 176], [108, 176]], h: [[90, 52], [86, 52]] }), { hip: [92, 136], t: 162, f: [[118, 176], [108, 176]], h: [[98, 92], [94, 92]], es: [1, 1] }], p: [{ k: 'bench', x1: 60, y1: 176, x2: 96, y2: 20 }] };
+  T.ringpistol = { k: [ST({ f: [[104, 182], [128, 164]], h: [[128, 98], [124, 98]], ks: [-1, -1] }), { hip: [84, 152], t: 150, f: [[106, 182], [168, 158]], h: [[154, 112], [150, 112]] }], p: [{ k: 'rings', top: -22 }] };
   T.pistol = (box) => ({ k: [ST({ f: [[104, 182], [128, 164]], h: [[150, 60], [146, 60]], ks: [-1, -1] }), { hip: [84, box ? 142 : 152], t: 150, f: [[106, 182], [168, 158]], h: [[156, 104], [152, 104]] }], p: box ? [{ k: 'box', x: 50, y: 148, w: 44 }] : [] });
   T.shrimp = { k: [ST({ f: [[104, 182], [80, 150]], ks: [-1, 1], tp: [0, 1], h: [[150, 60], [146, 60]] }), { hip: [86, 146], t: 150, f: [[106, 182], [52, 178]], ks: [-1, 1], tp: [0, 1], h: [[156, 104], [152, 104]] }], p: [] };
   T.lunge = (eq) => ({ k: [{ hip: [100, 99], t: 180, l: [[3, 0], [-3, 0]], tp: [0, 0], h: [[101, 112], [97, 112]] }, { hip: [92, 138], t: 180, l: [[80, 2], [-14, -84]], tp: [0, 1], h: [[98, 150], [94, 150]] }], p: eq ? [eqProp(eq)] : [] });
@@ -287,7 +288,7 @@
     'db-curl': ['curl', 'db'], 'hammer-curl': ['curl', 'db'], 'conc-curl': 'conccurl', 'incline-curl': 'inclinecurl', 'cable-curl-high': 'cablecurl', 'cable-curl-rope': 'bayesH', 'ring-curl': 'ringcurl', 'ez-curl': ['curl', 'bb'], 'preacher-machine': 'preacher', 'bayesian-curl': 'bayes',
     'rope-pushdown': 'pushdown', 'cable-oh-ext': 'ohext', 'db-oh-ext': 'dbohext', 'db-kickback': 'kickback', 'db-skull': 'skull', 'ring-tri-ext': 'ringtri', 'close-bench': ['bench', 'bb'], 'gym-pushdown': 'pushdown',
     'straight-arm-pd': 'straightpd', 'db-pullover': 'pullover',
-    'air-squat': 'squat', 'goblet-squat': 'goblet', 'db-front-squat': ['frontsq', 'db'], 'box-pistol': ['pistol', true], 'pistol': ['pistol', false], 'shrimp-squat': 'shrimp', 'back-squat': 'backsq', 'front-squat': ['frontsq', 'bb'], 'hack-squat': 'hack', 'leg-press': 'legpress',
+    'air-squat': 'squat', 'goblet-squat': 'goblet', 'db-front-squat': ['frontsq', 'db'], 'box-pistol': ['pistol', true], 'pistol': ['pistol', false], 'ring-pistol': 'ringpistol', 'shrimp-squat': 'shrimp', 'back-squat': 'backsq', 'front-squat': ['frontsq', 'bb'], 'hack-squat': 'hack', 'leg-press': 'legpress',
     'reverse-lunge': ['lunge', null], 'bss-bw': ['bss', null], 'db-bss': ['bss', 'goblet'], 'db-reverse-lunge': ['lunge', 'db1'], 'db-stepup': 'stepup', 'cossack': 'cossackF', 'walking-lunge': ['lunge', 'db'],
     'sl-rdl-bw': ['slrdl', null], 'db-rdl': ['rdl', 'db1'], 'db-sl-rdl': ['slrdl', 'db1'], 'db-swing': 'swing', 'deadlift': 'deadlift', 'bb-rdl': ['rdl', 'bb'], 'back-ext': 'backext',
     'glute-bridge': 'bridge', 'sl-hip-thrust': ['hipthrust', null, true], 'db-hip-thrust': ['hipthrust', 'db'], 'bb-hip-thrust': ['hipthrust', 'bb'], 'abduction': 'abduct',
@@ -295,7 +296,7 @@
     'calf-sl': ['calf', 'db1'], 'calf-bw': ['calf', null], 'calf-machine': ['calf', null],
     'plank': 'plank', 'side-plank': 'sideplank', 'hollow-hold': 'hollow', 'dead-bug': 'deadbug', 'hanging-knee': 'knee', 'hanging-leg': 'legraise', 'toes-to-bar': 't2b', 'windshield': 'wiperF', 'ring-rollout': 'rollout',
     'cable-crunch': 'cablecrunch', 'cable-woodchop': 'woodchop', 'dragon-flag': 'dragon', 'suitcase-carry': ['carry', false], 'farmer-carry': ['carry', true], 'ab-machine': 'abmachine',
-    'tuck-lsit': 'lsittuck', 'lsit-one': 'lsitone', 'lsit': 'lsit', 'wall-hs': 'wallhs', 'free-hs': 'freehs', 'tuck-fl': 'fltuck', 'adv-tuck-fl': 'fladv', 'straddle-fl': 'fl', 'full-fl': 'fl',
+    'tuck-lsit': 'lsittuck', 'ring-tuck-lsit': 'ringlsittuck', 'ring-lsit': 'ringlsit', 'lsit-one': 'lsitone', 'lsit': 'lsit', 'wall-hs': 'wallhs', 'free-hs': 'freehs', 'tuck-fl': 'fltuck', 'adv-tuck-fl': 'fladv', 'straddle-fl': 'fl', 'full-fl': 'fl',
     'false-grip-hang': 'falsegrip', 'mu-transition': 'mutrans', 'neg-mu': 'mu', 'muscle-up': 'mu', 'ring-mu': 'ringmu', 'skin-cat': 'skincat', 'tuck-bl': 'backlever', 'planche-lean': 'planchelean', 'tuck-planche': 'tuckplanche',
     'burpees': 'burpee', 'mountain': 'climber', 'db-thruster': 'thruster', 'swing-int': 'swing', 'jump-squat': 'jump'
   };
@@ -303,6 +304,8 @@
   T.lsit = LS([[164, 154], [162, 156]], { tp: [1, 1] });
   T.lsittuck = LS([[106, 150], [102, 152]]);
   T.lsitone = LS([[164, 154], [104, 150]], { tp: [1, 0] });
+  T.ringlsit = Object.assign(LS([[164, 154], [162, 156]], { tp: [1, 1] }), { p: [{ k: 'rings', top: -22, part: 'strap', behind: true }, { k: 'rings', top: -22, part: 'ring' }] });
+  T.ringlsittuck = Object.assign(LS([[106, 150], [102, 152]]), { p: [{ k: 'rings', top: -22, part: 'strap', behind: true }, { k: 'rings', top: -22, part: 'ring' }] });
   const PAT_FALLBACK = { vpull: 'pullup', hpull: 'ringrow', vpush: ['press', 'db'], hpush: 'pushup', dip: ['dip', 'post'], fly: ['fly', 'db'], side: ['lateral', 'db'], rear: 'facepull', biceps: ['curl', 'db'], triceps: 'pushdown', latiso: 'straightpd', squat: 'squat', lunge: ['lunge', null], hinge: ['rdl', 'db1'], glute: 'bridge', hamcurl: 'slide', quadiso: 'legext', calf: ['calf', null], core: 'plank', skill: 'hang', cond: 'burpee' };
 
   function resolve(ex) {
@@ -326,8 +329,8 @@
         const idx = pr.feet ? 'an' : 'ha';
         [1, 0].forEach(i => {
           const pts = at(j => j[idx][i]); const top = pts[0][0];
-          out.push(`<line x1="${f1(top)}" y1="${pr.top}" x2="${f1(pts[still][0])}" y2="${f1(pts[still][1])}" class="fl" stroke-width="2">${A('x2', pts.map(p => f1(p[0])))}${A('y2', pts.map(p => f1(p[1])))}</line>`);
-          out.push(g(pts, '<circle r="6.5" fill="none" class="fring"/>'));
+          if (pr.part !== 'ring') out.push(`<line x1="${f1(top)}" y1="${pr.top}" x2="${f1(pts[still][0])}" y2="${f1(pts[still][1])}" class="fl" stroke-width="2">${A('x2', pts.map(p => f1(p[0])))}${A('y2', pts.map(p => f1(p[1])))}</line>`);
+          if (pr.part !== 'strap') out.push(g(pts, '<circle r="6.5" fill="none" class="fring"/>'));
         });
         break;
       }
@@ -366,7 +369,7 @@
     const path = (sel, cls, w) => { const ds = SF.map(sel).map(pth); return `<path d="${ds[still]}" class="${cls}" stroke-width="${w}">${A('d', ds)}</path>`; };
     const circ = (sel, r, cls) => { const ps = SF.map(sel); return `<circle cx="${f1(ps[still][0])}" cy="${f1(ps[still][1])}" r="${r}" class="${cls}">${A('cx', ps.map(p => f1(p[0])))}${A('cy', ps.map(p => f1(p[1])))}</circle>`; };
     const props = (tpl.p || []).filter(p => p && p.k !== 'none');
-    const back = props.filter(p => ['bar', 'bench', 'box', 'post', 'wall', 'door', 'table', 'seat'].includes(p.k));
+    const back = props.filter(p => p.behind || ['bar', 'bench', 'box', 'post', 'wall', 'door', 'table', 'seat'].includes(p.k));
     const front = props.filter(p => !back.includes(p));
     const fr = tpl.k[0].fr, farC = fr ? 'fnear' : 'ffar';
     const body =

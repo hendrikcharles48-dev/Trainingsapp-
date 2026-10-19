@@ -54,3 +54,19 @@ Eigenständige Werkstatt-App im iOS-Design (Hell und Dunkel) für Zerspanungsmec
 
 ## Auf dem iPhone nutzen
 Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js` und `test-werkstatt.js`). Die Texterkennung (`ocr/`, etwa 11 MB) liegt nur in `docs/toleranzen/ocr/`; zum lokalen Testen des Foto-Reiters `docs/toleranzen` ausliefern. Mit GitHub Pages (Branch `main`, Ordner `/docs`) liegt die App dann unter `…/toleranzen/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.
+
+---
+
+# Stundenzettel
+
+Eigenständige App im iOS-Design (dunkel als Standard) für einen Minijob, im Ordner `stunden/`.
+
+- **Monat:** Ring bis zur Monatsgrenze, Grundlohn und Spätzulage getrennt, was noch frei ist, alle Schichten (antippen zum Bearbeiten oder Löschen). Startet jeden Monat bei 0, mit ‹ › zu alten Monaten.
+- **Schicht eintragen** (Plus-Knopf): Beginn und Ende, Ab mehr als 6 Std muss man angeben, wann die Pause liegt (Vorschlag: direkt vor 20 Uhr, `suggestPause`), Länge mindestens 30 bzw. 45 Min; eine Pause nach 20 Uhr senkt die Spätzulage. Gespeichert als `pause` + `pauseVon`. Alternativ nur Dauer.
+- **Planer – Kalender:** Arbeitstage antippen, die App verteilt den Rest bis zur Grenze in Viertelstunden auf diese Tage, möglichst bis 6 Std (ohne Pause), „Volle Tage“ oder „Gleichmäßig“; reicht das nicht, Vorschlag mit Pause. Tag antippen: feste Zeit, Höchstdauer (z. B. höchstens 4 Std), Beginn oder als Schicht eintragen. KW antippen: Tage der Woche wählen oder ganze Woche frei. „Meine normale Woche“ als Vorlage für alle offenen Wochen. Eigenes Monatsziel unter der Grenze (`S.ziel`).
+- **Planer – Wochenmuster:** Schichtmuster pro Woche oder Monat, prüft gegen die Grenze (4,35 Wochen pro Monat) und rechnet aus, bis wann man an Zusatztagen arbeiten kann.
+- **Übersicht:** Monate, Jahr gegen 12 × Grenze, Einstellungen (Lohn 18,39 €, Grenze 603 €, 25 % ab 20 Uhr, Zulage zählt zur Grenze), Hell/Dunkel, Backup.
+- Daten liegen nur auf dem Gerät (`localStorage`, Schlüssel `stundenzettel-v2`).
+
+## Auf dem iPhone nutzen
+Nach Änderungen `stunden/` nach `docs/stunden/` kopieren und `CACHE` in `stunden/sw.js` hochzählen. Mit GitHub Pages liegt die App unter `…/stunden/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

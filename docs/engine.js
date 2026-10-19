@@ -64,6 +64,9 @@
   /* Mögliche Lasten für eine Übung am Ort. null = beliebig (freie Eingabe, Schritt 0.5). */
   function loadOptions(ex, loc, profile) {
     const set = profile.settings || {};
+    // Von dir festgelegte Gewichte für genau diese Übung (pro Ort)
+    const own = (profile.exW || {})[ex.id + '@' + loc];
+    if (own && own.length && (ex.kind === 'load' || ex.kind === 'bw')) { const l = own.slice().sort((a, b) => a - b); return ex.kind === 'bw' ? [0, ...l.filter(x => x > 0)] : l; }
     if (ex.kind === 'bw') {
       if (!ex.addw || !canAdd(profile, loc)) return [0];
       const extra = loc === 'gym' ? [...rangeList(1.25, 10, 1.25), ...rangeList(12.5, 60, 2.5)] : dbList(profile);
@@ -342,7 +345,103 @@
       plan.days.push(day);
     });
     plan.locs = locs;
+    balancePlan(plan, profile);
     return plan;
+  }
+
+  /* ================= Effizientes Wochenvolumen =================
+     Pro Muskel und Woche: Grundziel ~10 harte Sätze, Schwerpunkte ~14, nie über 15 (danach kaum
+     Zusatznutzen), mindestens ~5. Mittrainierte Muskeln zählen halb. Skills nur 2× pro Woche. */
+  const VOL_T = { chest: 1, lats: 1, upperback: 1, sdelt: 1, rdelt: 1, biceps: 1, triceps: 1, quads: 1, hams: 1, glutes: 1, calves: 1, abs: 1 };
+  const VOL_PAT = { chest: 'fly', lats: 'latiso', upperback: 'hpull', sdelt: 'side', rdelt: 'rear', biceps: 'biceps', triceps: 'triceps', quads: 'quadiso', hams: 'hamcurl', glutes: 'glute', calves: 'calf', abs: 'core' };
+  const LOWER = ['quads', 'hams', 'glutes', 'calves'];
+  function volTargets(profile) {
+    const pr = new Set(); for (const g of ((profile.answers || {}).priority || [])) for (const m of (DB.GROUPS[g] || [])) pr.add(m);
+    const t = {}; for (const m in VOL_T) t[m] = pr.has(m) ? 14 : 10; return t;
+  }
+  function mainLoc(plan, profile) { const l = plan.locs || ['home']; return l.includes('home') && (profile.answers || {}).location !== 'gym' ? 'home' : l[0]; }
+  function planVolume(plan, profile, loc) {
+    loc = loc || mainLoc(plan, profile);
+    const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
+    const week = {}, perDay = []; for (const m in DB.MUSCLES) week[m] = 0;
+    for (const d of plan.days) {
+      const dv = {}; for (const m in DB.MUSCLES) dv[m] = 0;
+      for (const sl of d.slots) { const ex = sl.ex && exOf(sl.ex[loc]); if (!ex || ex.role === 's' || ex.role === 'x') continue; for (const m of ex.prim) dv[m] += sl.sets; for (const m of (ex.sec || [])) dv[m] += sl.sets * 0.5; }
+      for (const m in dv) week[m] += dv[m]; perDay.push(dv);
+    }
+    return { week, perDay, targets: volTargets(profile) };
+  }
+  function balancePlan(plan, profile) {
+    const loc = mainLoc(plan, profile); const changes = [];
+    const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
+    const exAt = sl => sl.ex && exOf(sl.ex[loc]);
+    const hit = (sl, m) => { const ex = exAt(sl); if (!ex || ex.role === 's' || ex.role === 'x') return 0; return ex.prim.includes(m) ? 1 : (ex.sec || []).includes(m) ? 0.5 : 0; };
+    // 1) Skill-Übungen nur an 2 Tagen (gleichmäßig verteilt), außer von dir festgelegt
+    const skillDays = {};
+    plan.days.forEach((d, di) => d.slots.forEach(sl => { if (sl.r === 'skill') (skillDays[sl.skill || 'x'] = skillDays[sl.skill || 'x'] || []).push(di); }));
+    for (const k in skillDays) {
+      const ds = skillDays[k]; if (ds.length <= 2) continue;
+      const keepD = new Set([ds[0], ds[Math.floor(ds.length / 2)]]);
+      for (const di of ds) if (!keepD.has(di)) { const d = plan.days[di]; const rm = d.slots.filter(sl => sl.r === 'skill' && (sl.skill || 'x') === k && !(sl.locked && Object.values(sl.locked).some(Boolean))); d.slots = d.slots.filter(sl => !rm.includes(sl)); for (const sl of rm) { const ex = exAt(sl); changes.push((ex ? ex.name : 'Skill-Übung') + ' nur noch 2× pro Woche – aus ' + d.name + ' entfernt'); } }
+    }
+    const T = volTargets(profile);
+    // 2) Zu viel: über 15 Sätze → Sätze bei Ergänzung/Isolation kürzen (mind. 2 Sätze)
+    for (let guard = 0; guard < 40; guard++) {
+      const { week } = planVolume(plan, profile, loc);
+      const over = Object.keys(T).filter(m => week[m] > 15.5).sort((a, b) => week[b] - week[a])[0];
+      if (!over) break;
+      let best = null;
+      for (const d of plan.days) for (const sl of d.slots) {
+        const h = hit(sl, over); if (!h || sl.sets <= 2 || sl.r === 'main' || sl.r === 'skill') continue;
+        const ex = exAt(sl); const hurts = ex.prim.concat(ex.sec || []).some(m => m !== over && T[m] && week[m] - 1 < T[m] - 1);
+        const v = h * 2 + (sl.r === 'iso' ? 1 : 0) - (hurts ? 3 : 0) + sl.sets * 0.1;
+        if (!best || v > best.v) best = { sl, v, d };
+      }
+      if (!best) break;
+      best.sl.sets -= 1; changes.push('−1 Satz ' + exAt(best.sl).name);
+    }
+    // 3) Zu wenig: erst vorhandene Übungen +1 Satz, sonst neue Übung an einem passenden Tag
+    for (let guard = 0; guard < 30; guard++) {
+      const { week, perDay } = planVolume(plan, profile, loc);
+      const under = Object.keys(T).filter(m => week[m] < T[m] - 2.5).sort((a, b) => (week[a] - T[a]) - (week[b] - T[b]))[0];
+      if (!under) break;
+      const direct = [];
+      plan.days.forEach((d, di) => d.slots.forEach(sl => { if (hit(sl, under) === 1 && sl.sets < (sl.r === 'iso' || sl.r === 'core' ? 4 : 5) && sl.r !== 'skill' && perDay[di][under] < 8) direct.push({ sl, d }); }));
+      direct.sort((a, b) => a.sl.sets - b.sl.sets);
+      if (direct.length && week[under] >= T[under] - 6) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; }
+      // neue Übung
+      const want = LOWER.includes(under) ? ['lower', 'full'] : under === 'abs' ? ['lower', 'full', 'upper'] : ['upper', 'full'];
+      const pat = VOL_PAT[under];
+      // Volle Tage: eine Übung ersetzen, deren Muskeln auch ohne sie (fast) im Ziel bleiben
+      const gap = T[under] - week[under];
+      const spare = (d) => {
+        let best = null;
+        for (const y of d.slots) {
+          if (y.r === 'main' || y.r === 'skill' || y.bal || (y.locked && Object.values(y.locked).some(Boolean))) continue;
+          const ex = exAt(y); if (!ex) continue;
+          // danach darf kein anderer Muskel schlechter dastehen als jetzt der fehlende
+          const worst = Math.max(0, ...ex.prim.filter(m => T[m]).map(m => T[m] - (week[m] - y.sets)));
+          if (worst <= gap - 2 && (!best || worst < best.v)) best = { y, v: worst };
+        }
+        return best && best.y;
+      };
+      const cands = plan.days.map((d, di) => ({ d, di, sp: d.slots.length >= MAX_EX ? spare(d) : null })).filter(x => want.includes(x.d.focus) && (x.d.slots.length < MAX_EX || x.sp) && !x.d.slots.some(sl => sl.p && sl.p.includes(pat)) && perDay[x.di][under] < 6).sort((a, b) => (a.sp ? 1 : 0) - (b.sp ? 1 : 0) || a.d.slots.length - b.d.slots.length);
+      if (!cands.length) { if (direct.length) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; } T[under] = 0; continue; }
+      const d = cands[0].d;
+      if (cands[0].sp) { const y = cands[0].sp; d.slots = d.slots.filter(z => z !== y); changes.push('Ersetzt: ' + exAt(y).name); } const role = pat === 'core' ? 'core' : pat === 'hpull' ? 'sec' : 'iso';
+      const sl = S([pat], role, { sets: 3, rest: role === 'sec' ? 120 : role === 'core' ? 60 : 75, rr: goalRanges(plan.goal || 'muscle')[role] || null, id: 's' + Math.random().toString(36).slice(2, 8), ex: {}, why: {}, bal: true });
+      let ok = false;
+      for (const l of (plan.locs || [loc])) {
+        const used = new Set(); plan.days.forEach(x => x.slots.forEach(y => y.ex && y.ex[l] && used.add(y.ex[l])));
+        const best = rankFor(sl, { profile, loc: l, eqSet: locEquip(profile, l), used, dayUsed: new Set(d.slots.map(y => y.ex && y.ex[l]).filter(Boolean)), ab: abilities(profile.answers || {}), seed: d.id + sl.id }, 1)[0];
+        if (best) { sl.ex[l] = best.ex.id; sl.why[l] = ['Ergänzt dein Wochenvolumen für ' + DB.MUSCLES[under]].concat(best.reasons.slice(0, 1)); if (l === loc) ok = true; }
+      }
+      if (!ok) { T[under] = 0; continue; }
+      const ci = d.slots.findIndex(y => y.r === 'core' || y.r === 'cond'); if (ci >= 0) d.slots.splice(ci, 0, sl); else d.slots.push(sl);
+      changes.push('Neu: ' + DB.byId[sl.ex[loc]].name + ' (' + d.name + ')');
+    }
+    plan.bal = 1;
+    return changes;
   }
 
   function fillDay(day, loc, profile, ab, used, di) {
@@ -359,6 +458,64 @@
       else { sl.ex[loc] = null; }
     }
     day.slots = day.slots.filter(sl => Object.values(sl.ex).some(Boolean));
+  }
+
+  /* ================= Zeit anpassen: Einheit kürzer / länger =================
+     Kürzer: unwichtigste Übungen weglassen (nie die letzte für eine Muskelgruppe, nie Grundübungen),
+             die Sätze der wegfallenden Muskeln auf verwandte Übungen verteilen (+1 Satz), kürzere Pausen.
+     Länger: 1–2 passende Zusatzübungen (Prioritäten zuerst), etwas mehr Pause bei schweren Übungen. */
+  const KEEP = { main: 5, skill: 4, sec: 3, iso: 2, core: 1, cond: 0 };
+  const EXTRA_PAT = { upper: ['side', 'rear', 'biceps', 'triceps', 'fly', 'latiso'], lower: ['calf', 'hamcurl', 'glute', 'quadiso', 'core'], full: ['side', 'rear', 'biceps', 'triceps', 'calf', 'core'] };
+  const r5 = x => Math.round(x / 5) * 5;
+  function timePlan(day, loc, delta, profile, plan) {
+    const exOf = id => DB.byId[id] || ((profile && profile.custom) || []).find(e => e.id === id);
+    const groupsOf = ex => Object.keys(DB.GROUPS).filter(g => ex.prim.some(m => DB.GROUPS[g].includes(m)));
+    let items = day.slots.filter(sl => sl.ex[loc] && exOf(sl.ex[loc])).map(sl => ({ slot: sl, ex: exOf(sl.ex[loc]), role: sl.r, sets: sl.sets, rest: sl.rest, boost: 0, factor: 1 }));
+    const out = { delta, removed: [], boosted: [], added: [], notes: [] };
+    const favs = (profile && profile.favs) || [];
+    if (delta < 0) {
+      for (let n = 0; n < -delta && items.length > 3; n++) {
+        const cover = {}; for (const it of items) for (const g of groupsOf(it.ex)) cover[g] = (cover[g] || 0) + 1;
+        const cand = items.filter(it => it.role !== 'main').map(it => ({ it, v: KEEP[it.role] + (groupsOf(it.ex).every(g => cover[g] >= 2) ? 0 : 3) + (favs.includes(it.ex.id) ? 1.5 : 0) + (it.slot && it.slot.prio ? 3 : 0) })).sort((a, b) => a.v - b.v)[0];
+        if (!cand) break;
+        items = items.filter(x => x !== cand.it); out.removed.push(cand.it);
+      }
+      for (const rm of out.removed) {
+        const gs = groupsOf(rm.ex);
+        const pick = items.filter(it => it.boost === 0 && (it.role === 'main' || it.role === 'sec' || it.role === 'iso') && groupsOf(it.ex).some(g => gs.includes(g)) && it.sets + 1 <= (it.role === 'iso' ? 4 : 5))
+          .sort((a, b) => (KEEP[b.role] - KEEP[a.role]) || (a.sets - b.sets))[0];
+        if (pick) { pick.boost = 1; out.boosted.push(pick); }
+      }
+      const f = delta <= -2 ? { main: 0.85, sec: 0.75, iso: 0.65, core: 0.65 } : { main: 0.9, sec: 0.8, iso: 0.7, core: 0.7 };
+      for (const it of items) it.factor = f[it.role] || 0.8;
+    } else if (delta > 0) {
+      const focus = day.focus || 'full';
+      const pats = []; for (const g of ((profile.answers || {}).priority || [])) { const ps = PRIO_SLOTS[g]; if (ps && ps.focus.includes(focus)) pats.push(...ps.p); }
+      pats.push(...(EXTRA_PAT[focus] || EXTRA_PAT.full));
+      const have = new Set(items.map(it => it.ex.pat)); const used = items.map(it => it.ex.id);
+      const isoSets = (items.find(it => it.role === 'iso') || {}).sets || 3;
+      for (const pat of pats) {
+        if (out.added.length >= delta) break;
+        if (have.has(pat)) continue;
+        const role = ['hpull', 'hpush', 'lunge'].includes(pat) ? 'sec' : pat === 'core' ? 'core' : 'iso';
+        const best = alternatives(S([pat], role), loc, profile, used)[0];
+        if (!best || best.s <= -10) continue;
+        have.add(pat); used.push(best.ex.id);
+        const it = { slot: null, ex: best.ex, role, sets: role === 'sec' ? 3 : isoSets, rest: role === 'sec' ? 90 : 75, boost: 0, factor: 1, spec: S([pat], role) };
+        items.push(it); out.added.push(it);
+      }
+      for (const it of items) if (it.role === 'main' || it.role === 'sec') it.factor = 1.15;
+    }
+    out.items = items;
+    out.minutes = Math.round(6 + items.reduce((t, it) => t + (it.sets + it.boost) * (0.8 + r5(it.rest * it.factor) / 60), 0));
+    const names = a => a.map(x => x.ex.name).join(', ');
+    if (out.removed.length) out.notes.push('Weggelassen: ' + names(out.removed));
+    if (out.boosted.length) out.notes.push('+1 Satz: ' + names(out.boosted));
+    if (delta < 0) out.notes.push('Kürzere Pausen');
+    if (out.added.length) out.notes.push('Dazu: ' + names(out.added));
+    if (delta > 0 && !out.added.length) out.notes.push('Keine passende Zusatzübung gefunden – nur etwas mehr Pause');
+    if (delta > 0) out.notes.push('Etwas mehr Pause bei schweren Übungen');
+    return out;
   }
 
   function alternatives(slot, loc, profile, excludeIds) {
@@ -387,18 +544,27 @@
     const len = (plan && plan.meso && plan.meso.len) || 5;
     const deload = w === len;
     const label = deload ? 'Deload-Woche' : ['Einstieg', 'Aufbau', 'Aufbau', 'Peak'][w - 1] || 'Aufbau';
-    return { w, len, deload, label, rirShift: deload ? 0 : [1, 0, 0, -1][w - 1] ?? 0 };
+    return { w, len, deload, label, rirShift: 0 };
   }
   function adaptNow(profile) { const ad = profile && profile.adapt; if (!ad) return null; const t = todayISO(); return t >= ad.from && t < ad.until ? ad : null; }
+  /* Reserve (RIR) pro Mesozyklus-Woche. Hypertrophie-Studien (z. B. Refalo 2023, Robinson 2024):
+     0–2 Wdh. vor dem Versagen bauen am meisten Muskeln auf, mehr Reserve kostet Wachstum,
+     echtes Versagen bei Grundübungen kostet viel Erholung. Darum Grundübungen 2→1, Isolation 1. */
+  const RIR_PLAN = {
+    mod: { main: [3, 2, 2, 2], sec: [2, 2, 2, 1], iso: [2, 2, 1, 1] },
+    hard: { main: [2, 2, 1, 1], sec: [2, 1, 1, 1], iso: [1, 1, 1, 1] },
+    very: { main: [2, 1, 1, 1], sec: [1, 1, 1, 0], iso: [1, 1, 0, 0] }
+  };
   function targetRIR(role, kind, profile, wi) {
-    if (wi.deload) return 4;
+    if (wi.deload) return 3;
     const ad = adaptNow(profile);
     const i = (profile.answers || {}).intensity || 'hard';
-    const base = role === 'main' ? { mod: 3, hard: 2, very: 2 }[i] : role === 'sec' ? { mod: 2, hard: 2, very: 1 }[i] : { mod: 2, hard: 1, very: 0 }[i];
-    let r = base + wi.rirShift + (ad ? ad.rir || 0 : 0);
+    const tbl = RIR_PLAN[i] || RIR_PLAN.hard;
+    const row = role === 'main' ? tbl.main : role === 'sec' ? tbl.sec : tbl.iso;
+    let r = row[Math.min(row.length, Math.max(1, wi.w)) - 1] + (ad ? ad.rir || 0 : 0);
     const min = role === 'main' ? 1 : 0;
     if (kind === 'hold' || role === 'skill') r = Math.max(1, r);
-    return Math.max(min, Math.min(4, r));
+    return Math.max(min, Math.min(3, r));
   }
   function prescription(slot, ex, profile, plan) {
     const wi = weekInfo(plan, profile);
@@ -419,10 +585,31 @@
 
   /* ================= Der Algorithmus hinter jedem Satz ================= */
   const EPL = (load, reps) => load * (1 + reps / 30);
-  function effLoad(ex, set, bw) { return ex.kind === 'bw' ? bw * (ex.bwf || 0) + (+set.w || 0) : (+set.w || 0); }
+  /* Widerstandsbänder zur Unterstützung: ungefähre Hilfe in kg (Loop-Bänder, je nach Marke unterschiedlich) */
+  const BANDS = [
+    { k: 'gelb', n: 'Gelb', kg: 7, c: '#F2D24B' }, { k: 'rot', n: 'Rot', kg: 11, c: '#E5484D' }, { k: 'schwarz', n: 'Schwarz', kg: 16, c: '#2A2A2E' },
+    { k: 'lila', n: 'Lila', kg: 23, c: '#8E5BD9' }, { k: 'gruen', n: 'Grün', kg: 32, c: '#3DAA5C' }, { k: 'blau', n: 'Blau', kg: 45, c: '#3C7DE0' }
+  ];
+  const bandKg = k => { const b = BANDS.find(x => x.k === k); return b ? b.kg : 0; };
+  // Übungen, bei denen ein Band zur Vereinfachung sinnvoll ist (Klimmzüge, Dips, Muscle-ups, Pistols, Nordics, Lever, Planche …)
+  function canBand(ex) {
+    if (!ex || ex.custom && !['vpull', 'dip', 'skill'].includes(ex.pat)) return false;
+    if (['band-pullup', 'dead-hang', 'scap-pull', 'false-grip-hang', 'skin-cat', 'mu-transition'].includes(ex.id)) return false;
+    if (!(ex.kind === 'bw' || ex.kind === 'hold')) return false;
+    if (['vpull', 'dip'].includes(ex.pat)) return !['dip-support', 'ring-support', 'bench-dip'].includes(ex.id);
+    if (ex.pat === 'skill') return ['mu', 'fl', 'bl', 'planche', 'hsskill'].includes(ex.skill) || /muscle|lever|planche|mu-/.test(ex.id);
+    return ['pistol', 'box-pistol', 'shrimp-squat', 'nordic-neg', 'archer-pushup', 'pseudo-planche-pu', 'wall-hspu', 'wall-hspu-neg', 'ring-pistol', 'dragon-flag'].includes(ex.id);
+  }
+  // Haltezeit mit Band zählt weniger: Faktor je nach Hilfe im Verhältnis zum Körpergewicht
+  const holdBandF = (k, bw) => Math.max(0.35, 1 - bandKg(k) / (bw || 80) * 1.2);
+  function effLoad(ex, set, bw) {
+    if (ex.kind !== 'bw') return +set.w || 0;
+    const base = bw * (ex.bwf || 0);
+    return Math.max(base * 0.2, base - bandKg(set.band)) + (+set.w || 0);
+  }
   function setScore(ex, set, bw) {
-    if (!set || !set.done) return null;
-    if (ex.kind === 'hold') return (+set.sec || 0) + 3 * (+set.rir || 0);
+    if (!set || set.done === false) return null; // gespeicherte Sätze haben kein done-Feld
+    if (ex.kind === 'hold') return ((+set.sec || 0) + 3 * (+set.rir || 0)) * (set.band ? holdBandF(set.band, bw) : 1);
     if (ex.kind === 'int') return null;
     if (ex.kind === 'bw' && !(ex.bwf > 0)) return (+set.reps || 0) + (+set.rir || 0);
     const L = effLoad(ex, set, bw); if (!(L > 0)) return null;
@@ -439,7 +626,7 @@
   }
   function historyFor(exId, workouts) {
     const out = [];
-    for (const w of workouts) for (const e of (w.exercises || [])) if (e.exId === exId && (e.sets || []).some(s => s.done)) out.push({ date: w.date, bw: w.bw, entry: e, loc: w.loc });
+    for (const w of workouts) for (const e of (w.exercises || [])) if (e.exId === exId && (e.sets || []).some(s => s.done !== false)) out.push({ date: w.date, bw: w.bw, entry: e, loc: w.loc });
     out.sort((a, b) => a.date < b.date ? -1 : 1);
     return out;
   }
@@ -467,7 +654,7 @@
         const avg = bests.reduce((a, b) => a + b, 0) / bests.length;
         base = Math.max(last, avg * 0.97);
         const lastH = prevSessions[prevSessions.length - 1];
-        const lastSets = (lastH.entry.sets || []).filter(s => s.done);
+        const lastSets = (lastH.entry.sets || []).filter(s => s.done !== false);
         const lastRIRT = lastH.entry.rirT ?? rirT;
         const hitAll = lastSets.length && lastSets.every(s => (ex.kind === 'hold' ? true : (+s.reps || 0) >= lo) && (+s.rir || 0) <= lastRIRT + 1);
         const days = (Date.now() - new Date(lastH.date).getTime()) / 864e5;
@@ -513,6 +700,7 @@
     if (ex.kind === 'int') { out.sec = presc.rr[0]; return out; }
     if (ex.kind === 'hold') {
       out.sec = Math.max(5, Math.round(C * (1 - (done.length ? 0 : 0)) - 3 * rirT));
+      if (ctx.band) out.sec = Math.max(5, Math.round((C / holdBandF(ctx.band, bw)) - 3 * rirT));
       if (out.sec > hi * 1.6) out.harder = chainStep(ex, 1, profile, loc);
       if (out.sec < lo * 0.5) out.easier = chainStep(ex, -1, profile, loc);
       return out;
@@ -521,13 +709,14 @@
     if (ex.kind === 'bw' && !(ex.bwf > 0)) {
       out.reps = Math.max(1, Math.round(C - rirT)); out.w = 0; return out;
     }
-    const baseLoad = ex.kind === 'bw' ? bw * ex.bwf : 0;
-    let opts = loadOptions(ex, loc, profile);
+    const baseLoad = ex.kind === 'bw' ? Math.max(bw * ex.bwf * 0.2, bw * ex.bwf - bandKg(ctx.band)) : 0;
+    let opts = ctx.band && ex.kind === 'bw' ? null : loadOptions(ex, loc, profile);
     const capReps = L => 30 * (C / L - 1) - rirT;
     if (ex.kind === 'bw' && (!opts || opts.length <= 1)) {
       const r = capReps(baseLoad);
       out.w = 0; out.reps = clampReps(r, hi);
-      if (r > hi + 2) { out.harder = chainStep(ex, 1, profile, loc); notes.push('Zu leicht: ' + (out.harder ? 'nächste Stufe probieren' : 'langsamer (3 s ablassen) oder Pause am tiefsten Punkt')); }
+      if (r > hi + 2 && ctx.band) notes.push('Band hilft zu viel: nimm ein leichteres Band oder trainiere ohne');
+      else if (r > hi + 2) { out.harder = chainStep(ex, 1, profile, loc); notes.push('Zu leicht: ' + (out.harder ? 'nächste Stufe probieren' : 'langsamer (3 s ablassen) oder Pause am tiefsten Punkt')); }
       if (r < lo - 1) { out.easier = chainStep(ex, -1, profile, loc); if (out.easier) notes.push('Unter dem Zielbereich: leichtere Stufe wäre sinnvoll'); }
       return out;
     }
@@ -582,7 +771,7 @@
       if (w.date < since) continue;
       for (const e of w.exercises || []) {
         const ex = EX[e.exId] || e.custom; if (!ex) continue;
-        const n = (e.sets || []).filter(s => s.done).length; if (!n) continue;
+        const n = (e.sets || []).filter(s => s.done !== false).length; if (!n) continue;
         for (const m of ex.prim) res[m] += n;
         for (const m of ex.sec || []) res[m] += n * 0.5;
       }
@@ -632,7 +821,7 @@
   }
 
   window.ENGINE = {
-    Q, abilities, buildPlan, fillDay, alternatives, prescription, recommend, historyFor, sessionBest, setScore,
+    Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };

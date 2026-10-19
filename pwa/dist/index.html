@@ -1,4 +1,4 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#111113"><link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Satzwerk">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Satzwerk Training</title>
@@ -69,8 +69,8 @@ h1{font-size:28px} h2{font-size:22px} h3{font-size:18px;font-weight:600}
 .li{display:flex;gap:12px;align-items:center;background:none;border:0;text-align:left;width:100%}
 .chev{color:var(--muted);flex:none;opacity:.7}
 [data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.li.shift{transition:transform .16s ease}
-.li.dragging{z-index:6;background:var(--surface2);border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.55);transition:none}
+.li.shift,.qrow.shift{transition:transform .16s ease}
+.li.dragging,.qrow.dragging{position:relative;opacity:1;z-index:6;background:var(--surface2);border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.55);transition:none}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:0;background:var(--surface2);padding:12px 18px;font-weight:700;min-height:48px;color:var(--ink)}
 .btn.primary{background:var(--lime);color:var(--on-light)}
@@ -165,8 +165,8 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .overlay{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .overlay .inner{max-width:620px;margin:0 auto;padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 8px) calc(env(safe-area-inset-bottom,0px) + 190px)}
 .ohead{position:sticky;top:0;z-index:3;background:linear-gradient(var(--bg) 75%,transparent);display:flex;align-items:center;gap:12px;padding-block:10px 14px}
-.scrim{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--bg);width:100%;max-width:620px;border-radius:32px 32px 0 0;max-height:92vh;overflow-y:auto;padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 24px);border-top:1px solid var(--line)}
+.scrim{overscroll-behavior:contain;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
+.sheet{overscroll-behavior:contain;background:var(--bg);width:100%;max-width:620px;border-radius:32px 32px 0 0;max-height:92vh;overflow-y:auto;padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 24px);border-top:1px solid var(--line)}
 .sheettop{position:sticky;top:-10px;z-index:5;margin:-10px -18px 6px;padding:10px 18px 6px;background:var(--bg);touch-action:none}
 .sheet .grab{width:44px;height:5px;border-radius:9px;background:rgba(255,255,255,.25);margin:4px auto 6px}
 .sheetx{position:absolute;right:12px;top:8px;width:38px;height:38px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);display:grid;place-items:center}
@@ -322,12 +322,36 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 :root:not([data-font="classic"]) .badge b{font-size:18px}
 :root:not([data-font="classic"]) .rirgrid button b{font-size:36px}
 :root[data-font="classic"]{--display:"Oxanium","Arial Rounded MT Bold",-apple-system,system-ui,sans-serif;--body:"Manrope",-apple-system,"SF Pro Text",system-ui,sans-serif}
+.howsec{display:flex;flex-direction:column;gap:8px}.howh{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.howsteps{list-style:none;margin:0;padding:0;counter-reset:hs;display:flex;flex-direction:column;gap:8px}.howsteps li{counter-increment:hs;display:flex;gap:10px;align-items:flex-start;line-height:1.35}
+.howsteps li::before{content:counter(hs);flex:none;width:24px;height:24px;border-radius:50%;background:var(--lime);color:#111;font-weight:800;font-size:13px;display:grid;place-items:center;margin-top:-1px}
+.howlist{display:flex;flex-direction:column;gap:7px}.howtip{display:flex;gap:10px;align-items:flex-start;line-height:1.35}.howtip.bad{background:rgba(255,107,107,.1);border-radius:12px;padding:9px 10px}
+.hk{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:900}.hk.ok{background:rgba(200,240,100,.16);color:var(--lime)}.hk.no{background:rgba(255,107,107,.18);color:#FF6B6B}
+.howtgl{all:unset;box-sizing:border-box;width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;font-weight:700}.howtgl span:first-child{display:flex;align-items:center;gap:8px;min-width:0}.howtgl svg{width:18px;height:18px;flex:none}
+html.sheet-open .overlay{overflow:hidden}
+.restof{font-size:12px;font-weight:700;opacity:.55;text-align:center;margin-top:-2px;letter-spacing:.02em}
+html,body{touch-action:manipulation}button,a,input,select,label{touch-action:manipulation}
+.recdot{margin-left:8px;background:var(--lime);color:var(--on-light);border-radius:99px;padding:1px 8px;font-size:11px;font-weight:800}
+.lvlopt{all:unset;box-sizing:border-box;display:flex;gap:12px;align-items:center;width:100%;background:var(--surface);border-radius:22px;padding:10px 14px 10px 10px;cursor:pointer;border:2px solid transparent}
+.lvlopt.rec{border-color:var(--lime);background:rgba(220,242,126,.07)}.lvlopt .thumb{width:64px;height:64px;flex:none}
+.rectag{background:var(--lime);color:var(--on-light);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+.timeopt{all:unset;box-sizing:border-box;display:flex;width:100%;background:var(--surface);border-radius:20px;padding:12px 16px;cursor:pointer;border:2px solid transparent}.timeopt.rec{border-color:var(--lime);background:rgba(220,242,126,.07)}
+.volrow{display:grid;grid-template-columns:118px 1fr 34px;gap:10px;align-items:center}.volbar{position:relative;height:10px;border-radius:9px;background:var(--surface2)}.volbar i{position:absolute;left:0;top:0;bottom:0;border-radius:9px}.volbar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.8;border-radius:2px}.volbar b.cap{background:#FF8A8A;opacity:.6}
+.bdot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;box-shadow:0 0 0 1.5px rgba(255,255,255,.35)}.bdot.none{background:transparent;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.bandbox{background:var(--surface);border-radius:18px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}.bandbox.ask{background:rgba(183,165,247,.12)}
+.bandtgl{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px}.bandtgl>span:nth-child(2){flex:1}
+.bandchips{display:flex;flex-wrap:wrap;gap:6px}.bchip{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:99px;background:var(--surface2);font-size:13px;font-weight:700}.bchip.on{background:var(--lav);color:var(--on-light)}
+.notechip{display:flex;gap:6px;align-items:flex-start;font-size:12.5px;line-height:1.3;color:var(--lilac);margin-top:3px}.notechip span{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sschip{background:rgba(220,242,126,.1);border:1.5px dashed var(--lime);border-radius:16px;padding:8px 12px;font-size:14px;font-weight:700}
+.sstag{display:inline-block;background:var(--lime);color:var(--on-light);border-radius:8px;padding:0 6px;margin-right:6px;font-size:12px;font-weight:800;vertical-align:1px}
+.qrow.ss,.li.ss{border-left:3px solid var(--lime)}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
 <div id="layer"></div>
 
 <script src="exercises.js"></script>
+<script src="howto.js"></script>
 <script src="engine.js"></script>
 <script src="figures.js"></script>
 <script src="app.js"></script>
