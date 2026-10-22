@@ -149,7 +149,6 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .verdict{display:flex;flex-direction:column;gap:12px}
 .big{font:800 34px/1 var(--round);font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;background:var(--green-soft);color:var(--green);vertical-align:middle}
-.pill.warn{background:rgba(255,179,64,.16);color:var(--orange)}
 .pill.bad{background:var(--red-soft);color:var(--red)}
 .answer{padding:14px;border-radius:14px;background:var(--fill-2);font-size:15px}
 .answer b{font-variant-numeric:tabular-nums}
@@ -158,6 +157,11 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .pbox{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--fill-2)}
 .pbox input{background:var(--fill)}
 
+.xstand{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:22px 18px}
+.xstand b{font:800 48px/1 var(--round);font-variant-numeric:tabular-nums;color:var(--green)}
+.xstand b.neg{color:var(--orange)}
+.grid2 .btn{padding:15px 6px;white-space:nowrap}
+.xstand b small{font-size:18px;font-weight:600;color:var(--label-2)}
 /* Kalender */
 .cal{display:grid;gap:4px;text-align:center}
 .cal .wd{font-size:12px;font-weight:600;color:var(--label-2);padding-bottom:2px}
@@ -341,16 +345,15 @@ function viewMonat(){
 }
 
 // ---------- Schicht-Sheet ----------
-function openSheet(entry, pre, kind = 'entries'){
-  const off = kind === 'offen', edit = !!entry, e = entry || {datum: ym === curYM() ? today() : ym+'-01', von:'14:00', bis:'21:30', ...(pre||{})};
+function openSheet(entry, pre){
+  const edit = !!entry, e = entry || {datum: ym === curYM() ? today() : ym+'-01', von:'14:00', bis:'21:30', ...(pre||{})};
   let mode = edit && !e.von ? 'dauer' : 'zeit';
   const presets = [['14:00','21:30'],['14:00','22:30']];
   for(const x of st.entries.slice().sort((a,b)=>(b.erstellt||0)-(a.erstellt||0))) if(x.von && !presets.some(p=>p[0]===x.von&&p[1]===x.bis)){ presets.push([x.von,x.bis]); if(presets.length>=4) break; }
   const w = $('#sheet');
   w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">
     <div class="grab"></div>
-    <div class="sheet-head"><button type="button" id="shX">Abbrechen</button><h2 id="shT">${off ? 'Nicht gestempelt' : edit?'Schicht bearbeiten':'Neue Schicht'}</h2><span style="width:80px"></span></div>
-    ${off ? `<div class="seg" role="group" aria-label="Status"><button type="button" data-st="offen" aria-pressed="${e.status!=='gemeldet'}">Noch offen</button><button type="button" data-st="gemeldet" aria-pressed="${e.status==='gemeldet'}">Gemeldet</button></div>` : ''}
+    <div class="sheet-head"><button type="button" id="shX">Abbrechen</button><h2 id="shT">${edit?'Schicht bearbeiten':'Neue Schicht'}</h2><span style="width:80px"></span></div>
     <div class="field"><label for="fDatum">Datum</label><input id="fDatum" type="date" value="${e.datum}"></div>
     <div class="seg" role="group" aria-label="Eingabe"><button type="button" data-m="zeit">Uhrzeit</button><button type="button" data-m="dauer">Nur Dauer</button></div>
     <div id="mZeit" class="field" style="gap:12px">
@@ -372,7 +375,6 @@ function openSheet(entry, pre, kind = 'entries'){
     <div class="field"><label for="fNotiz">Notiz</label><input id="fNotiz" placeholder="optional" value="${esc(e.notiz||'')}"></div>
     <div class="calc" id="fCalc"></div>
     <button type="button" class="btn" id="fSave">${edit?'Änderungen speichern':'Schicht speichern'}</button>
-    ${off && edit ? '<button type="button" class="btn plain" id="fMove">Wurde nachgestempelt: zu den Schichten</button>' : ''}
     ${edit?'<button type="button" class="btn danger" id="fDel">Löschen</button>':''}
   </div>`;
   w.hidden = false; document.body.style.overflow = 'hidden';
@@ -418,21 +420,13 @@ function openSheet(entry, pre, kind = 'entries'){
     const obj = {...(edit ? entry : {id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), ...r, datum:$('#fDatum').value || today(), notiz:$('#fNotiz').value.trim()};
     delete obj.warn; if(!obj.pause) delete obj.pauseVon;
     if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
-    if(off) obj.status = w.querySelector('[data-st="gemeldet"]').getAttribute('aria-pressed') === 'true' ? 'gemeldet' : 'offen';
-    st[kind] = edit ? st[kind].map(x => x.id === obj.id ? obj : x) : [...st[kind], obj];
-    save(); if(!off) ym = ymOf(obj.datum); closeSheet(); render();
-    toast(edit ? 'Gespeichert' : off ? `${fmt(obj.minuten)} notiert` : `${fmt(obj.minuten)} eingetragen`);
+    st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
+    save(); ym = ymOf(obj.datum); closeSheet(); render();
+    toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
   };
   if(edit) $('#fDel').onclick = ev => {
     const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; }
-    st[kind] = st[kind].filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Gelöscht');
-  };
-  if(off) w.querySelectorAll('[data-st]').forEach(b => b.onclick = () => w.querySelectorAll('[data-st]').forEach(x => x.setAttribute('aria-pressed', String(x === b))));
-  if(off && edit) $('#fMove').onclick = () => {
-    const r = read(); if(r.err) return calc();
-    const obj = {...entry, ...r, datum:$('#fDatum').value || entry.datum, notiz:$('#fNotiz').value.trim()}; delete obj.warn; delete obj.status;
-    if(!obj.pause) delete obj.pauseVon; if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
-    st.offen = st.offen.filter(x => x.id !== entry.id); st.entries.push(obj); save(); closeSheet(); render(); toast('Zu den Schichten verschoben');
+    st.entries = st.entries.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Schicht gelöscht');
   };
   setMode(mode);
 }
@@ -768,32 +762,61 @@ function viewMehr(){
   $('#bImp').onclick = () => $('#fImp').click();
   $('#fImp').onchange = importData;
 }
+// ---------- Extra: nicht gestempelte Stunden als Konto (+ aufgeschrieben, − genommen) ----------
+const xMin = e => (e.typ === 'minus' ? -1 : 1) * (e.minuten || 0);
+const fmtPM = m => (m < 0 ? '−' : m > 0 ? '+' : '') + fmtS(Math.abs(m));
 function viewExtra(){
-  $('#view').innerHTML = `<div class="page"><div class="top"><div><div class="eyebrow">Extra notiert</div><h1>Nicht gestempelt</h1></div></div><div id="xbody"></div></div>`;
-  renderOffen($('#xbody'));
-}
-function renderOffen(box){
-  const list = st.offen.slice().sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
-  const open = sumOf(list.filter(x => x.status !== 'gemeldet')), all = sumOf(list);
-  box.innerHTML = `<section class="card" style="margin-bottom:16px"><div class="stats">
-      <div class="stat"><span>Insgesamt</span><b>${fmtS(all.paid)} Std · ${eur(all.base + all.zul)}</b></div>
-      ${all.n !== open.n ? `<div class="stat"><span>Davon noch offen</span><b>${fmtS(open.paid)} Std · ${eur(open.base + open.zul)}</b></div>` : ''}
-    </div></section>
-    <button type="button" class="btn" id="oAdd" style="margin-bottom:16px">Stunden notieren</button>
-    <div class="list xlist"></div>
-    <p class="hint" style="margin-top:10px">Zählt nicht im Ring und nicht im Planer. Wurde etwas nachgestempelt: Eintrag antippen und zu den Schichten verschieben.</p>`;
-  $('#oAdd').onclick = () => openSheet(null, {datum: today()}, 'offen');
-  const ls = box.querySelector('.xlist');
-  if(!list.length){ ls.innerHTML = '<div class="empty">Noch nichts notiert.</div>'; return; }
+  const list = st.offen.slice().sort((a,b) => b.datum.localeCompare(a.datum) || (b.erstellt||0) - (a.erstellt||0));
+  const stand = list.reduce((a,e) => a + xMin(e), 0);
+  const plus = list.filter(e => e.typ !== 'minus').reduce((a,e) => a + e.minuten, 0), minus = plus - stand;
+  $('#view').innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">Nicht gestempelt</div><h1>Extra-Stunden</h1></div></div>
+    <section class="card xstand"><span class="lbl">Stand insgesamt</span><b class="${stand < 0 ? 'neg' : ''}">${fmtS(Math.abs(stand))}<small> Std${stand < 0 ? ' im Minus' : ''}</small></b>
+      <span class="hint">${fmtS(plus)} aufgeschrieben · ${fmtS(minus)} genommen</span></section>
+    <div class="grid2"><button type="button" class="btn" id="xPlus">+ Aufschreiben</button><button type="button" class="btn plain" id="xMinus">− Genommen</button></div>
+    <section class="list" id="xlist"></section>
+  </div>`;
+  $('#xPlus').onclick = () => extraSheet(null, 'plus');
+  $('#xMinus').onclick = () => extraSheet(null, 'minus');
+  const ls = $('#xlist');
+  if(!list.length){ ls.innerHTML = '<div class="empty"><b>Noch nichts eingetragen</b>Schreib hier Stunden auf, die nicht gestempelt wurden.</div>'; return; }
   for(const e of list){
-    const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0), done = e.status === 'gemeldet';
+    const d = new Date(e.datum+'T12:00'), m = xMin(e);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
     b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${MONATE[d.getMonth()].slice(0,3)}</span></div>
-      <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : fmt(e.minuten||0)}</span><span class="s">${esc([e.von ? fmt(e.minuten||0) : '', e.notiz].filter(Boolean).join(' · ')) || '&nbsp;'}</span></div>
-      <div class="right"><b>${eur(mo.sum)}</b><span class="pill ${done ? '' : 'warn'}" style="font-size:11px">${done ? 'gemeldet' : 'offen'}</span></div>`;
-    b.onclick = () => openSheet(e, null, 'offen');
+      <div class="mid"><span class="t">${m < 0 ? 'Genommen' : 'Aufgeschrieben'}</span><span class="s">${WT[d.getDay()]}, ${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}</span></div>
+      <div class="right"><b style="color:${m < 0 ? 'var(--orange)' : 'var(--green)'}">${fmtPM(m)}</b></div>`;
+    b.onclick = () => extraSheet(e);
     ls.append(b);
   }
+}
+function extraSheet(entry, typ){
+  const edit = !!entry, e = entry || {datum: today(), minuten: 0, typ};
+  let t = e.typ === 'minus' ? 'minus' : 'plus';
+  const w = $('#sheet');
+  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="xT">
+    <div class="grab"></div>
+    <div class="sheet-head"><button type="button" id="xX">Abbrechen</button><h2 id="xT">${edit ? 'Bearbeiten' : 'Extra-Stunden'}</h2><span style="width:80px"></span></div>
+    <div class="seg" role="group" aria-label="Art"><button type="button" data-xt="plus">+ Aufgeschrieben</button><button type="button" data-xt="minus">− Genommen</button></div>
+    <div class="field"><label for="xD">Tag</label><input id="xD" type="date" value="${e.datum}"></div>
+    <div class="grid2"><div class="field"><label for="xH">Stunden</label><input id="xH" inputmode="decimal" placeholder="0" value="${edit ? Math.floor(e.minuten/60) : ''}"></div>
+      <div class="field"><label for="xM">Minuten</label><input id="xM" inputmode="numeric" placeholder="0" value="${edit && e.minuten%60 ? e.minuten%60 : ''}"></div></div>
+    <button type="button" class="btn" id="xS">Speichern</button>
+    ${edit ? '<button type="button" class="btn danger" id="xDel">Löschen</button>' : ''}
+  </div>`;
+  w.hidden = false; document.body.style.overflow = 'hidden';
+  const setT = v => { t = v; w.querySelectorAll('[data-xt]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.xt === v))); };
+  w.querySelectorAll('[data-xt]').forEach(b => b.onclick = () => setT(b.dataset.xt)); setT(t);
+  $('#xX').onclick = closeSheet; w.onclick = ev => { if(ev.target === w) closeSheet(); };
+  $('#xS').onclick = () => {
+    const h = num($('#xH').value || 0), mi = $('#xM').value.trim();
+    if(h == null || h < 0 || (mi && !/^\d+$/.test(mi))) return toast('Bitte Stunden und Minuten als Zahl');
+    const min = Math.round(h*60) + (+mi||0); if(min <= 0) return toast('Bitte eine Dauer eingeben');
+    const obj = {...(edit ? entry : {id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), datum: $('#xD').value || today(), minuten: min, typ: t};
+    st.offen = edit ? st.offen.map(x => x.id === obj.id ? obj : x) : [...st.offen, obj];
+    save(); closeSheet(); render(); toast(t === 'minus' ? `${fmt(min)} genommen` : `${fmt(min)} aufgeschrieben`);
+  };
+  if(edit) $('#xDel').onclick = ev => { const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; } st.offen = st.offen.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Gelöscht'); };
 }
 async function exportData(){
   const name = `stundenzettel-${today()}.json`, data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
