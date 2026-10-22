@@ -78,6 +78,18 @@ module.exports = function (T, eq) {
   eq('WSW', r(W.triangle('WSW', { c: 10, al: 60, be: 60 }).a, 6), 10);
   eq('SSS unmöglich', W.triangle('SSS', { a: 1, b: 2, c: 5 }).ok, false);
 
+  // Schnittdaten-Löser: Messerkopf Ø80, 10 Platten, r 0,4, n 800, Wunsch Rz 4
+  const sv = W.solve('mill', { d: 80, z: 10, r: 0.4, n: 800, Rz: 4 });
+  eq('Löser fz aus Rz', r(sv.val.fz, 4), r(Math.sqrt(8 * 0.4 * 4 / 1000), 4));
+  eq('Löser vf', Math.round(sv.val.vf), Math.round(Math.sqrt(0.0128) * 10 * 800));
+  eq('Löser vc', r(sv.val.vc, 1), 201.1);
+  eq('Löser deps vf', sv.deps.vf.slice().sort(), ['Rz', 'n', 'r', 'z']);
+  eq('Löser Ra', r(sv.val.Ra, 3), r(4 / 3.9, 3));
+  eq('Löser Widerspruch', W.solve('mill', { d: 10, vc: 100, n: 5000 }).clash.length > 0, true);
+  eq('Löser stimmig', W.solve('mill', { d: 10, vc: 100, n: 3183.0989 }).clash.length, 0);
+  eq('Löser Drehen', r(W.solve('turn', { r: 0.8, Rz: 6.25, d: 50, vc: 200 }).val.vf, 1), r(0.2 * 200000 / (Math.PI * 50), 1));
+  eq('Löser Bohren rückwärts', r(W.solve('drill', { vf: 300, f: 0.15, d: 10 }).val.vc, 2), r(Math.PI * 10 * 2000 / 1000, 2));
+
   // Kegel und Lochkreis
   const kg = W.cone({ D: 40, d: 30, L: 50 });
   eq('Kegel Winkel', [r(kg.a, 4), r(kg.full, 4), r(kg.ratio, 3)], [5.7106, 11.4212, 5]);
@@ -101,5 +113,6 @@ module.exports = function (T, eq) {
   eq('Suche Passung', kinds('25H7/g6')[0], 'fit:Passung 25 H7/g6');
   eq('Suche SW13', W.search('SW13')[0].sub, 'M8 Sechskant ISO');
   eq('Suche Kernloch', W.search('Kernloch').some(x => x.page === 'thread'), true);
+  eq('Suche Drehmoment', W.search('Drehmoment').some(x => x.sec === 'torque'), true);
   eq('Suche G1/2', kinds('G1/2')[0], 'thread:Gewinde G 1/2');
 };

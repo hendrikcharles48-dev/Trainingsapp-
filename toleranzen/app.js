@@ -74,17 +74,10 @@
   // ---------- Zustand und Navigation ----------
   // Startliste wie im Tabellenbuch; jeder Eintrag öffnet eine Seite, manche Seiten haben mehrere Rechner (Reiter oben)
   const PAGES = [
-    { id: 'tol', title: 'Toleranzen', sub: 'ISO 286, Passungen, Maßketten, Foto', icon: 'dia', color: '#5856D6', secs: ['iso', 'fit', 'chain', 'foto'] },
-    { id: 'gen', title: 'Allgemeintoleranzen', sub: 'ISO 2768-1, ISO 22081, Winkel', icon: 'ruler', color: '#007AFF', secs: ['gen', 'ang'] },
-    { id: 'geo', title: 'Form-/Lagetoleranzen', sub: 'ISO 2768-2, alle Symbole', icon: 'gdt', color: '#AF52DE', secs: ['geo', 'gdt'] },
-    { id: 'thread', title: 'Gewinde', sub: 'M, MF, G, UNC, UNF, Tr, Kernloch', icon: 'thread', color: '#FF9500', secs: ['thread', 'threadtab'] },
-    { id: 'cut', title: 'Schnittdaten', sub: 'Drehzahl, Vorschub, Richtwerte', icon: 'mill', color: '#FF3B30', secs: ['cut', 'cutref'] },
-    { id: 'sw', title: 'Schlüsselweite', sub: 'Schrauben, Bohrungen, Senkungen', icon: 'hex', color: '#34C759', secs: ['sw', 'swtab'] },
-    { id: 'torque', title: 'Drehmoment', sub: 'Anziehdrehmomente 8.8, 10.9, 12.9', icon: 'torque', color: '#30B0C7', secs: ['torque'] },
-    { id: 'weight', title: 'Gewicht', sub: 'Stäbe, Rohre, Platten, Profile', icon: 'weight', color: '#8E8E93', secs: ['weight'] },
-    { id: 'tri', title: 'Dreieck', sub: 'Dreieck, Kegel, Lochkreis', icon: 'tri', color: '#FF2D55', secs: ['tri', 'tri2', 'cone', 'bolt'] },
-    { id: 'rough', title: 'Rauheit', sub: 'Ra, Rz, N-Klassen, Vorschub', icon: 'rough', color: '#A2845E', secs: ['rough', 'roughtab'] },
-    { id: 'trow', title: 'Trowalisieren', sub: 'Gleitschleifen: Füllung, Schleifkörper', icon: 'trow', color: '#5AC8FA', secs: ['trow', 'trowinfo'] },
+    { id: 'tol', title: 'Toleranzen', sub: 'ISO 286, Passung, Allgemein, Form/Lage, Maßkette, Foto', icon: 'dia', color: '#5856D6', secs: ['iso', 'fit', 'gen', 'ang', 'geo', 'gdt', 'chain', 'foto'] },
+    { id: 'cut', title: 'Zerspanung', sub: 'Fräsen, Bohren, Drehen, Oberfläche, Gleitschleifen', icon: 'mill', color: '#FF3B30', secs: ['mill', 'drill', 'turn', 'cutref', 'roughtab', 'trow'] },
+    { id: 'thread', title: 'Gewinde und Schrauben', sub: 'Gewinde, Kernloch, Schlüsselweite, Drehmoment', icon: 'thread', color: '#FF9500', secs: ['thread', 'threadtab', 'sw', 'swtab', 'torque'] },
+    { id: 'geom', title: 'Geometrie', sub: 'Dreieck, Kegel, Lochkreis, Gewicht', icon: 'tri', color: '#34C759', secs: ['tri', 'tri2', 'cone', 'bolt', 'weight'] },
     { id: 'info', title: 'Info', sub: 'Darstellung, Normen, Hinweise', icon: 'info', color: '#636366', secs: ['info'] }
   ];
   const pageOf = id => PAGES.find(p => p.id === id);
@@ -349,9 +342,7 @@
     if (r.kind === 'thread') { A.thread.q = r.q; openPage('thread', 'thread'); return; }
     if (r.kind === 'iso') { A.iso.q = r.q; openPage('tol', 'iso'); return; }
     if (r.kind === 'fit') { A.fit.hole = r.hole; A.fit.shaft = r.shaft; openPage('tol', 'fit'); return; }
-    if (r.kind === 'sw') { openPage('sw', 'swtab'); return; }
-    if (r.kind === 'rough') { openPage('rough', 'roughtab'); return; }
-    openPage(r.page);
+    openPage(r.page, r.sec);
   }
 
   // Startliste umsortieren: gedrückt halten (0,38 s), dann nach oben oder unten ziehen
@@ -459,7 +450,9 @@
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
     thread: { q: 'M8', kind: 'M', n: '' },
-    cut: { mode: 'mill', set: 'vc', mat: 'st', tool: 'hm', d: '10', vc: '150', n: '', z: '4', fz: '0,05', f: '0,15', ae: '', ap: '', r: '0,8' },
+    mill: { d: '80', z: '10', r: '0,4', vc: '200', n: '', fz: '', f: '', vf: '', Rz: '6,3', Ra: '', ae: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'z', 'r', 'vc', 'Rz'] },
+    drill: { d: '10', vc: '80', n: '', f: '0,15', vf: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'vc', 'f'] },
+    turn: { d: '50', r: '0,8', vc: '200', n: '', f: '0,2', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'r', 'vc', 'f'] },
     sw: { d: '8' },
     torque: { d: '8', cls: '8.8' },
     weight: { shape: 'rund', d: '20', D: '', s: '', b: '', h: '', a: '', t: '', L: '1000', mat: '0', rho: '' },
@@ -467,7 +460,6 @@
     cone: { D: '40', d: '30', L: '50', a: '', ord: ['D', 'd', 'L'] },
     bolt: { D: '100', n: '6', start: '0', cx: '0', cy: '0', dir: 'ccw' },
     tri2: { mode: 'SSS', a: '5', b: '6', c: '7', al: '', be: '' },
-    rough: { f: '0,2', r: '0,8', want: '', wk: 'Rz' },
     trow: { V: '50', fill: '80', mix: 'fein', media: 'ker' }
   };
   const A = (() => {
@@ -496,26 +488,26 @@
     { id: 'fit', label: 'Passung', title: 'Passung', tag: 'ISO 286', card: () => cardFit(), compute: () => computeFit() },
     { id: 'chain', label: 'Maßkette', title: 'Maßkette', tag: 'arithmetisch, Worst Case', card: () => cardChain(), compute: () => computeChain() },
     { id: 'foto', label: 'Foto', title: 'Zeichnung fotografieren', card: () => cardFoto(), compute: () => computeFoto() },
-    { id: 'gen', label: 'Längen', title: 'Allgemeintoleranzen', card: () => cardGen(), compute: () => computeGen() },
+    { id: 'gen', label: 'Allgemein', title: 'Allgemeintoleranzen', card: () => cardGen(), compute: () => computeGen() },
     { id: 'ang', label: 'Winkel', title: 'Winkeltoleranz', tag: 'ISO 2768-1', card: () => cardAngle(), compute: () => computeAng() },
-    { id: 'geo', label: 'Rechner', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo(), compute: () => computeGeo() },
-    { id: 'gdt', label: 'Symbole', title: 'Alle Symbole', tag: 'ISO 1101', card: () => cardGdt() },
+    { id: 'geo', label: 'Form/Lage', title: 'Form und Lage', tag: 'ISO 2768-2', card: () => cardGeo(), compute: () => computeGeo() },
+    { id: 'gdt', label: 'Symbole', title: 'Symbole Form und Lage', tag: 'ISO 1101', card: () => cardGdt() },
     { id: 'thread', label: 'Gewinde', title: 'Gewinde nachschlagen', card: () => cardThread(), compute: () => computeThread() },
-    { id: 'threadtab', label: 'Tabellen', title: 'Gewindetabellen', card: () => cardThreadTab(), compute: () => computeThreadTab() },
-    { id: 'cut', label: 'Rechner', title: 'Drehzahl und Vorschub', card: () => cardCut(), compute: () => computeCut() },
+    { id: 'threadtab', label: 'Gewindetabellen', title: 'Gewindetabellen', card: () => cardThreadTab(), compute: () => computeThreadTab() },
+    { id: 'mill', label: 'Fräsen', title: 'Fräsen', card: () => cardSolve('mill'), compute: () => computeSolve('mill') },
+    { id: 'drill', label: 'Bohren', title: 'Bohren', card: () => cardSolve('drill'), compute: () => computeSolve('drill') },
+    { id: 'turn', label: 'Drehen', title: 'Drehen', card: () => cardSolve('turn'), compute: () => computeSolve('turn') },
     { id: 'cutref', label: 'Richtwerte', title: 'Richtwerte Schnittgeschwindigkeit', card: () => cardCutRef() },
-    { id: 'sw', label: 'Schraube', title: 'Maße einer Schraube', card: () => cardSw(), compute: () => computeSw() },
-    { id: 'swtab', label: 'Tabelle', title: 'Schlüsselweiten', card: () => cardSwTab() },
+    { id: 'sw', label: 'Schlüsselweite', title: 'Maße einer Schraube', card: () => cardSw(), compute: () => computeSw() },
+    { id: 'swtab', label: 'SW-Tabelle', title: 'Schlüsselweiten', card: () => cardSwTab() },
     { id: 'torque', label: 'Drehmoment', title: 'Anziehdrehmoment', tag: 'VDI 2230', card: () => cardTorque(), compute: () => computeTorque() },
     { id: 'weight', label: 'Gewicht', title: 'Gewicht berechnen', card: () => cardWeight(), compute: () => computeWeight() },
     { id: 'tri', label: 'Rechtwinklig', title: 'Rechtwinkliges Dreieck', card: () => cardTri(), compute: () => computeTri() },
     { id: 'tri2', label: 'Beliebig', title: 'Beliebiges Dreieck', card: () => cardTri2(), compute: () => computeTri2() },
     { id: 'cone', label: 'Kegel', title: 'Kegel drehen', card: () => cardCone(), compute: () => computeCone() },
     { id: 'bolt', label: 'Lochkreis', title: 'Lochkreis', tag: 'Koordinaten', card: () => cardBolt(), compute: () => computeBolt() },
-    { id: 'rough', label: 'Drehen', title: 'Rautiefe aus dem Vorschub', card: () => cardRough(), compute: () => computeRough() },
-    { id: 'roughtab', label: 'Tabellen', title: 'Rauheitswerte', tag: 'ISO 1302', card: () => cardRoughTab() },
-    { id: 'trow', label: 'Rechner', title: 'Behälter füllen', card: () => cardTrow(), compute: () => computeTrow() },
-    { id: 'trowinfo', label: 'Wissen', title: 'Gleitschleifen', card: () => cardTrowInfo() },
+    { id: 'roughtab', label: 'Rauheit', title: 'Rauheitswerte', tag: 'ISO 1302', card: () => cardRoughTab() },
+    { id: 'trow', label: 'Gleitschleifen', title: 'Gleitschleifen (Trowalisieren)', card: () => cardTrow() + cardTrowInfo(), compute: () => computeTrow() },
     { id: 'info', label: 'Info', title: 'Über die App', card: () => cardInfo() }
   ];
   const secById = id => SECTIONS.find(x => x.id === id);
@@ -1830,60 +1822,123 @@
   // Zahl für das NC-Programm: Punkt statt Komma, ohne unnötige Nullen
   const ncNum = x => String(Math.round(x * 1000) / 1000);
   const ncHTML = lines => `<div class="nc"><div class="nc-h">Für das Programm</div>${lines.map(([code, note]) => `<div class="nc-l"><code>${esc(code)}</code><span>${esc(note)}</span></div>`).join('')}</div>`;
-  function cardCut() {
-    const c = A.cut, mode = c.mode;
+  // Zerspanung: eingeben, was man weiß, der Rest wird gerechnet
+  const SV = {
+    d: { s: 'Ø d', mill: 'Fräser, Messerkopf', drill: 'Bohrer', turn: 'Werkstück', u: 'mm', dec: 3 },
+    z: { s: 'z', mill: 'Schneiden, Platten', u: 'Stück', dec: 0 },
+    r: { s: 'rε', mill: 'Eckenradius', turn: 'Eckenradius', u: 'mm', dec: 3 },
+    vc: { s: 'vc', all: 'Schnittgeschw.', u: 'm/min', dec: 1 },
+    n: { s: 'n', all: 'Drehzahl S', u: '1/min', dec: 0 },
+    fz: { s: 'fz', mill: 'je Zahn', u: 'mm', dec: 4 },
+    f: { s: 'f', mill: 'je Umdrehung', drill: 'je Umdrehung', turn: 'je Umdrehung', u: 'mm/U', dec: 3 },
+    vf: { s: 'vf', all: 'Vorschub F (G94)', u: 'mm/min', dec: 0 },
+    Rz: { s: 'Rz', all: 'gemittelte Rautiefe', u: 'µm', dec: 2 },
+    Ra: { s: 'Ra', all: 'Mittenrauwert', u: 'µm', dec: 2 },
+    ae: { s: 'ae', mill: 'Eingriffsbreite', u: 'mm', dec: 2 },
+    ap: { s: 'ap', mill: 'Schnitttiefe', turn: 'Schnitttiefe', u: 'mm', dec: 2 },
+    Q: { s: 'Q', all: 'Zeitspanvolumen', u: 'cm³/min', dec: 1 }
+  };
+  const SV_GROUPS = {
+    mill: [['Werkzeug', ['d', 'z', 'r']], ['Schnitt', ['vc', 'n']], ['Vorschub', ['fz', 'f', 'vf']], ['Oberfläche', ['Rz', 'Ra']], ['Eingriff, freiwillig', ['ae', 'ap', 'Q']]],
+    drill: [['Werkzeug', ['d']], ['Schnitt', ['vc', 'n']], ['Vorschub', ['f', 'vf']], ['Zeitspanvolumen', ['Q']]],
+    turn: [['Werkstück und Platte', ['d', 'r']], ['Schnitt', ['vc', 'n']], ['Vorschub', ['f', 'vf']], ['Oberfläche', ['Rz', 'Ra']], ['Spanen, freiwillig', ['ap', 'Q']]]
+  };
+  const svFmt = (k, x) => T.fmt(x, 0, SV[k].dec);
+  function svGiven(mode) {
+    const g = {};
+    WK.SOLVE_VARS[mode].forEach(k => { const x = optOf(A[mode][k]); if (x != null && x > 0) g[k] = x; });
+    return g;
+  }
+  function cardSolve(mode) {
+    const c = A[mode];
     const mat = WK.MATERIALS_CUT.find(x => x.id === c.mat) || WK.MATERIALS_CUT[0];
     const key = mode === 'mill' ? 'mill' : mode === 'drill' ? 'drill' : 'turn';
     const rg = mat[key][c.tool === 'hss' ? 0 : 1];
-    return `<section class="card" id="card-cut">
-      ${segHTML('cut.mode', mode, [['mill', 'Fräsen'], ['drill', 'Bohren'], ['turn', 'Drehen']], 'big')}
+    const field = k => `<div class="field sv-f" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
+    return `<section class="card" id="card-${mode}">
+      <div class="msg info">${I.info}<div><b>Gib ein, was du weißt</b>, die App rechnet den Rest. <span class="calc-tag">Grün</span> = gerechnet. Tippst du in ein grünes Feld, wird es zur Vorgabe, und ein Wert, aus dem es kam, wird wieder gerechnet.</div></div>
       <div class="fields">
-        <div class="field"><label for="c-mat">Werkstoff</label>${selInp('c-mat', 'cut.mat', WK.MATERIALS_CUT.map(m => [m.id, m.name]))}</div>
-        <div class="field"><span class="lbl">Schneidstoff</span>${segHTML('cut.tool', c.tool, [['hss', 'HSS'], ['hm', 'HM']])}</div>
+        <div class="field"><label for="sv-${mode}-mat">Werkstoff</label>${selInp(`sv-${mode}-mat`, mode + '.mat', WK.MATERIALS_CUT.map(m => [m.id, m.name]))}</div>
+        <div class="field"><span class="lbl">Schneidstoff</span>${segHTML(mode + '.tool', c.tool, [['hss', 'HSS'], ['hm', 'HM']])}</div>
       </div>
-      <div class="msg info">${I.info}<div>Richtwert für ${esc(mat.name)} (${esc(mat.ex)}) mit ${c.tool === 'hss' ? 'HSS' : 'Hartmetall'}: vc = <b>${rg[0]} bis ${rg[1]} m/min</b>${mode === 'mill' ? `, fz etwa ${nf(mat.fz[0])} bis ${nf(mat.fz[1])} mm` : ''}. <button type="button" class="link-btn" data-act="cut-vc" data-v="${Math.round((rg[0] + rg[1]) / 2)}">Mitte übernehmen</button></div></div>
-      <div class="field"><span class="lbl">Ich gebe vor</span>${segHTML('cut.set', c.set, [['vc', 'vc vorgeben'], ['n', 'n vorgeben']])}</div>
-      <div class="fields">
-        <div class="field"><label for="c-d">${mode === 'turn' ? 'Werkstück-Ø d' : mode === 'drill' ? 'Bohrer-Ø d' : 'Fräser-Ø d'}</label>${bindNum('c-d', 'cut.d', 'mm', 'z. B. 10')}</div>
-        ${c.set === 'vc' ? `<div class="field"><label for="c-vc">Schnittgeschw. vc</label>${bindNum('c-vc', 'cut.vc', 'm/min', 'z. B. 150')}</div>` : `<div class="field"><label for="c-n">Drehzahl n</label>${bindNum('c-n', 'cut.n', '1/min', 'z. B. 3000')}</div>`}
-        ${mode === 'mill' ? `<div class="field"><label for="c-z">Zähne z</label>${bindNum('c-z', 'cut.z', '', 'z. B. 4')}</div><div class="field"><label for="c-fz">Vorschub je Zahn fz</label>${bindNum('c-fz', 'cut.fz', 'mm', 'z. B. 0,05')}</div>
-          <div class="field"><label for="c-ae">Breite ae, freiwillig</label>${bindNum('c-ae', 'cut.ae', 'mm', 'Eingriff')}</div><div class="field"><label for="c-ap">Tiefe ap, freiwillig</label>${bindNum('c-ap', 'cut.ap', 'mm', 'Zustellung')}</div>`
-        : `<div class="field"><label for="c-f">Vorschub f</label>${bindNum('c-f', 'cut.f', 'mm/U', 'z. B. 0,15')}</div>`}
-        ${mode === 'turn' ? `<div class="field"><label for="c-ap">Schnitttiefe ap, freiwillig</label>${bindNum('c-ap', 'cut.ap', 'mm', 'z. B. 2')}</div><div class="field"><label for="c-r">Eckenradius r, freiwillig</label>${bindNum('c-r', 'cut.r', 'mm', 'z. B. 0,8')}</div>` : ''}
-      </div>
-      <div class="result" id="res-cut" aria-live="polite"></div>
+      <div class="ref-line">Richtwert vc ${rg[0]}–${rg[1]} m/min${mode === 'mill' ? ` · fz ${nf(mat.fz[0])}–${nf(mat.fz[1])} mm` : ''}
+        <button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="vc" data-v="${Math.round((rg[0] + rg[1]) / 2)}">vc ${Math.round((rg[0] + rg[1]) / 2)}</button>${mode === 'mill' ? `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="fz" data-v="${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}">fz ${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}</button>` : ''}</div>
+      ${SV_GROUPS[mode].map(([t, ks]) => `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
+      <button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button>
+      <div class="result" id="res-${mode}" aria-live="polite"></div>
     </section>`;
   }
-  function computeCut() {
-    const c = A.cut;
-    const v = { d: optOf(c.d), vc: c.set === 'vc' ? optOf(c.vc) : null, n: c.set === 'n' ? optOf(c.n) : null, z: optOf(c.z), fz: optOf(c.fz), f: optOf(c.f), ae: optOf(c.ae), ap: optOf(c.ap), r: optOf(c.r) };
-    if (c.set === 'n' && !(v.n > 0)) return out('res-cut', msgHTML('Gib die Drehzahl ein.'));
-    const r = c.mode === 'mill' ? WK.milling(v) : c.mode === 'drill' ? WK.drilling(v) : WK.turning(v);
-    if (!r.ok) return out('res-cut', msgHTML(esc(r.error)));
-    const steps = [];
-    if (c.set === 'vc') steps.push({ t: 'Drehzahl', h: `n = vc · 1000 / (π · d) = ${nf(v.vc)} · 1000 / (π · ${nf(v.d)}) = <b>${nf(r.n, 0)} 1/min</b>. Die 1000 macht aus Metern Millimeter.` });
-    else steps.push({ t: 'Schnittgeschwindigkeit', h: `vc = π · d · n / 1000 = π · ${nf(v.d)} · ${nf(v.n, 0)} / 1000 = <b>${nf(r.vc, 1)} m/min</b>.` });
-    let kvs = c.set === 'vc' ? kv('Drehzahl n', `${nf(r.n, 0)} 1/min`) : kv('Schnittgeschwindigkeit vc', `${nf(r.vc, 1)} m/min`);
-    let hero = c.set === 'vc' ? `${nf(r.n, 0)} <small>1/min</small>` : `${nf(r.vc, 1)} <small>m/min</small>`;
-    if (r.vf != null) {
-      kvs += kv('Vorschubgeschw. vf', `${nf(r.vf, 0)} mm/min`);
-      steps.push({ t: 'Vorschubgeschwindigkeit', h: c.mode === 'mill' ? `vf = fz · z · n = ${nf(v.fz, 3)} · ${nf(v.z, 0)} · ${nf(r.n, 0)} = <b>${nf(r.vf, 0)} mm/min</b>.` : `vf = f · n = ${nf(v.f, 3)} · ${nf(r.n, 0)} = <b>${nf(r.vf, 0)} mm/min</b>.` });
-    } else kvs += kv('Vorschubgeschw. vf', c.mode === 'mill' ? 'z und fz eingeben' : 'f eingeben');
-    if (c.mode === 'mill' && r.vf != null) kvs += kv('Vorschub je Umdrehung', `${nf(v.fz * v.z, 3)} mm`);
-    if (r.Q != null) {
-      kvs += kv('Zeitspanvolumen Q', `${nf(r.Q, 1)} cm³/min`);
-      steps.push({ t: 'Zeitspanvolumen', h: c.mode === 'mill' ? `Q = ae · ap · vf / 1000 = ${nf(v.ae)} · ${nf(v.ap)} · ${nf(r.vf, 0)} / 1000 = ${nf(r.Q, 1)} cm³/min.` : c.mode === 'drill' ? `Q = π · d² / 4 · vf / 1000 = ${nf(r.Q, 1)} cm³/min.` : `Q = vc · ap · f = ${nf(r.vc, 1)} · ${nf(v.ap)} · ${nf(v.f, 3)} = ${nf(r.Q, 1)} cm³/min.` });
+  // Wird eine gerechnete Größe eingegeben, fliegt die älteste Vorgabe raus, aus der sie kam
+  let svCleared = '';
+  function solveHook(k) {
+    const [mode, key] = k.split('.');
+    if (!WK.SOLVE_VARS[mode] || !WK.SOLVE_VARS[mode].includes(key)) return;
+    const st = A[mode];
+    st.ord = (Array.isArray(st.ord) ? st.ord : []).filter(x => x !== key && WK.SOLVE_VARS[mode].includes(x));
+    if (!String(st[key]).trim()) { saveA(); return; }
+    const g = svGiven(mode);
+    delete g[key];
+    const before = WK.solve(mode, g);
+    if (before.val[key] != null && before.deps[key]) {
+      const deps = before.deps[key];
+      // Lieber Ergebniswerte (Oberfläche, Vorschub, Drehzahl) freigeben als Werkzeugmaße
+      const PRIO = ['Ra', 'Rz', 'Q', 'fz', 'f', 'vf', 'vc', 'n', 'ae', 'ap', 'r', 'z', 'd'];
+      const old = PRIO.find(x => deps.includes(x)) || deps[0];
+      st[old] = '';
+      st.ord = st.ord.filter(x => x !== old);
+      const inp = $(`[data-k="${mode}.${old}"]`);
+      if (inp) inp.value = '';
+      svCleared = old;
     }
-    if (r.Rth != null) {
-      kvs += kv('Theoretische Rautiefe', `Rz ${nf(r.Rth, 2)} µm<small>Ra etwa ${nf(r.RaTh, 2)} µm</small>`);
-      steps.push({ t: 'Rautiefe', h: `Rth = f² / (8 · r) = ${nf(v.f, 3)}² / (8 · ${nf(v.r)}) · 1000 = ${nf(r.Rth, 2)} µm. In der Praxis liegt die Rauheit etwas darüber.` });
-    }
-    const S0 = Math.round(r.n), F0 = r.vf != null ? Math.round(r.vf) : null;
-    let nc = '';
-    if (c.mode === 'turn') nc = ncHTML([[`G96 S${Math.round(r.vc)}${v.f > 0 ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, Vorschub mm/U (G95). Drehzahl begrenzen, z. B. G92 S… oder LIMS'], [`G97 S${S0}${v.f > 0 ? ' F' + ncNum(v.f) : ''}`, `feste Drehzahl für Ø ${nf(v.d)} mm`]]);
-    else nc = ncHTML([[`S${S0}${F0 != null ? ' F' + F0 : ''} M3`, 'Vorschub in mm/min (G94)'].concat([])].concat(c.mode === 'drill' && v.f > 0 ? [[`S${S0} F${ncNum(v.f)}`, 'oder Vorschub in mm/U (G95)']] : []));
-    out('res-cut', `<div class="res-hero"><div class="res-big">${hero}</div><div class="res-sub">${c.set === 'vc' ? 'Drehzahl' : 'Schnittgeschwindigkeit'}${c.mode === 'mill' ? ' der Frässpindel' : c.mode === 'drill' ? ' beim Bohren' : ' beim Drehen'}</div></div>${nc}<div class="kv">${kvs}</div>${calcHTML('cut', steps)}`);
+    st.ord.push(key);
+    saveA();
   }
+  function computeSolve(mode) {
+    const g = svGiven(mode);
+    const r = WK.solve(mode, g);
+    WK.SOLVE_VARS[mode].forEach(k => {
+      const inp = $(`#sv-${mode}-${k}`);
+      if (!inp) return;
+      const box = inp.closest('.inp'), fld = $(`#svf-${mode}-${k}`);
+      const isCalc = g[k] == null && r.val[k] != null;
+      inp.placeholder = isCalc ? svFmt(k, r.val[k]) : g[k] == null ? '?' : '';
+      box.classList.toggle('calc', isCalc);
+      if (fld) fld.classList.toggle('given', g[k] != null);
+    });
+    const v = r.val;
+    let html = '';
+    if (svCleared) { html += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
+    if (r.clash.length) {
+      const c = r.clash[0];
+      html += msgHTML(`Das passt nicht zusammen: nach ${esc(c.rule.f)} müsste ${esc(SV[c.rule.out].s)} = ${svFmt(c.rule.out, c.want)} ${SV[c.rule.out].u} sein, eingegeben ist ${svFmt(c.rule.out, c.have)}. Lass einen der Werte leer.`, 'warn');
+    }
+    // Fürs Programm
+    if (mode === 'turn') {
+      const lines = [];
+      if (v.vc) lines.push([`G96 S${Math.round(v.vc)}${v.f ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, F in mm/U (G95). Drehzahl begrenzen (G92/LIMS)']);
+      if (v.n) lines.push([`G97 S${Math.round(v.n)}${v.f ? ' F' + ncNum(v.f) : ''}`, v.d ? `feste Drehzahl für Ø ${nf(v.d)} mm` : 'feste Drehzahl']);
+      if (lines.length) html += ncHTML(lines);
+    } else if (v.n || v.vf) {
+      const lines = [[`${v.n ? 'S' + Math.round(v.n) : ''}${v.vf ? ' F' + Math.round(v.vf) : ''} M3`.trim(), 'F in mm/min (G94)']];
+      if (mode === 'drill' && v.f) lines.push([`${v.n ? 'S' + Math.round(v.n) + ' ' : ''}F${ncNum(v.f)}`, 'oder F in mm/U (G95)']);
+      html += ncHTML(lines);
+    }
+    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q'].includes(k));
+    if (missing.length) html += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${hintMissing(mode, v)}`);
+    if (mode !== 'drill' && v.Rz) html += `<p class="foot">Rauheit theoretisch aus der Schneidenecke: Rz = ${mode === 'mill' ? 'fz' : 'f'}² / (8 · rε). ${mode === 'mill' ? 'Beim Fräsen gilt das, wenn alle Schneiden gleich hoch stehen. Rund- und Planlauf der Platten machen es rauer. Zum Schlichten mit Messerkopf eine Planschneide (Wiper) nehmen: dann den Vorschub je Umdrehung f kleiner als ihre Breite halten (Herstellerangabe).' : 'In der Praxis wird es durch Schwingungen und Verschleiß etwas rauer.'}</p>`;
+    if (r.steps.length) html += calcHTML('sv-' + mode, r.steps.map(s => ({ t: `${SV[s.out].s} ${SV[s.out][mode] || SV[s.out].all}`, h: `${esc(s.rule.f)} = <b>${svFmt(s.out, s.val)} ${SV[s.out].u}</b>` })));
+    out('res-' + mode, html);
+  }
+  function hintMissing(mode, v) {
+    if (!v.n && !v.vc) return 'Gib vc oder die Drehzahl ein.';
+    if (!v.d && !(v.vc && v.n)) return 'Gib den Durchmesser ein.';
+    if (mode === 'mill' && !v.fz && !v.f && !v.vf) return v.r ? 'Gib fz ein oder die gewünschte Oberfläche Rz bzw. Ra.' : 'Gib fz ein, oder Eckenradius und gewünschte Oberfläche.';
+    if (mode !== 'mill' && !v.f && !v.vf) return mode === 'turn' && v.r ? 'Gib f ein oder die gewünschte Oberfläche.' : 'Gib den Vorschub f ein.';
+    if (mode === 'mill' && !v.z) return 'Gib die Zahl der Schneiden ein.';
+    if (!v.r && mode !== 'drill') return 'Für die Oberfläche fehlt der Eckenradius.';
+    return '';
+  }
+
   function cardCutRef() {
     const range = r => `${r[0]}–${r[1]}`;
     return `<section class="card">
@@ -2024,7 +2079,7 @@
     saveA();
   }
   const NAMES = { a: 'a', b: 'b', c: 'c', al: 'α', be: 'β', D: 'D', d: 'd', L: 'L' };
-  const clearedNote = () => lastCleared ? msgHTML(`Den älteren Wert ${esc(NAMES[lastCleared] || lastCleared)} habe ich geleert: Es zählen immer die zuletzt eingegebenen Werte.`) : '';
+  const clearedNote = sec => lastCleared && clearedBy.startsWith(sec + '.') ? msgHTML(`Den älteren Wert ${esc(NAMES[lastCleared] || lastCleared)} habe ich geleert: Es zählen immer die zuletzt eingegebenen Werte.`) : '';
   const v4 = x => nf(x, 3);
 
   function cardTri() {
@@ -2055,9 +2110,9 @@
     ['a', 'b', 'c', 'al', 'be'].forEach(k => { const x = optOf(A.tri[k]); if (x != null) v[k] = x; });
     const r = WK.rightTriangle(v);
     const st = k => v[k] != null ? 'given' : 'calc';
-    if (!r.ok) { figLabels({ 'tri.a': ['a', ''], 'tri.b': ['b', ''], 'tri.c': ['c', ''], 'tri.al': ['α', ''], 'tri.be': ['β', ''] }); Object.keys(v).forEach(k => figLabels({ ['tri.' + k]: [(NAMES[k]) + ' = ' + nf(v[k], 3) + (k.length > 1 ? '°' : ''), 'given'] })); return out('res-tri', clearedNote() + msgHTML(esc(r.error))); }
+    if (!r.ok) { figLabels({ 'tri.a': ['a', ''], 'tri.b': ['b', ''], 'tri.c': ['c', ''], 'tri.al': ['α', ''], 'tri.be': ['β', ''] }); Object.keys(v).forEach(k => figLabels({ ['tri.' + k]: [(NAMES[k]) + ' = ' + nf(v[k], 3) + (k.length > 1 ? '°' : ''), 'given'] })); return out('res-tri', clearedNote('tri') + msgHTML(esc(r.error))); }
     figLabels({ 'tri.a': ['a = ' + v4(r.a), st('a')], 'tri.b': ['b = ' + v4(r.b), st('b')], 'tri.c': ['c = ' + v4(r.c), st('c')], 'tri.al': ['α = ' + nf(r.al, 3) + '°', st('al')], 'tri.be': ['β = ' + nf(r.be, 3) + '°', st('be')] });
-    out('res-tri', clearedNote() + `<div class="kv three">${kv('a', v4(r.a) + ' mm')}${kv('b', v4(r.b) + ' mm')}${kv('c', v4(r.c) + ' mm')}${kv('α', nf(r.al, 3) + '°' + `<small>${dms(r.al)}</small>`)}${kv('β', nf(r.be, 3) + '°' + `<small>${dms(r.be)}</small>`)}${kv('Fläche', nf(r.A, 2) + ' mm²')}</div>
+    out('res-tri', clearedNote('tri') + `<div class="kv three">${kv('a', v4(r.a) + ' mm')}${kv('b', v4(r.b) + ' mm')}${kv('c', v4(r.c) + ' mm')}${kv('α', nf(r.al, 3) + '°' + `<small>${dms(r.al)}</small>`)}${kv('β', nf(r.be, 3) + '°' + `<small>${dms(r.be)}</small>`)}${kv('Fläche', nf(r.A, 2) + ' mm²')}</div>
       <p class="foot">Blau: eingegeben, grün: gerechnet. Für eine Schräge im Programm: b ist der Weg in X (bzw. Z), a der Weg in Y (bzw. X als Radius).</p>
       ${calcHTML('tri', [{ t: 'Formeln', h: 'a² + b² = c² (Pythagoras). sin α = a / c, cos α = b / c, tan α = a / b. α + β = 90°.' }])}`);
   }
@@ -2124,9 +2179,9 @@
     ['D', 'd', 'L', 'a'].forEach(k => { const x = optOf(A.cone[k]); if (x != null) v[k] = x; });
     const r = WK.cone(v);
     const st = k => v[k] != null ? 'given' : 'calc';
-    if (!r.ok) { figLabels({ 'cone.D': ['D', ''], 'cone.d': ['d', ''], 'cone.L': ['L', ''], 'cone.a': ['α/2', ''] }); return out('res-cone', clearedNote() + msgHTML(esc(r.error))); }
+    if (!r.ok) { figLabels({ 'cone.D': ['D', ''], 'cone.d': ['d', ''], 'cone.L': ['L', ''], 'cone.a': ['α/2', ''] }); return out('res-cone', clearedNote('cone') + msgHTML(esc(r.error))); }
     figLabels({ 'cone.D': ['Ø' + v4(r.D), st('D')], 'cone.d': ['Ø' + v4(r.d), st('d')], 'cone.L': [v4(r.L), st('L')], 'cone.a': [nf(r.a, 3) + '°', st('a')] });
-    out('res-cone', clearedNote() + `<div class="res-hero"><div class="res-big">${nf(r.a, 4)}°</div><div class="res-sub">Einstellwinkel α/2 · ${dms(r.a)}</div></div>
+    out('res-cone', clearedNote('cone') + `<div class="res-hero"><div class="res-big">${nf(r.a, 4)}°</div><div class="res-sub">Einstellwinkel α/2 · ${dms(r.a)}</div></div>
       <div class="kv">${kv('Kegelwinkel α', nf(r.full, 4) + '°')}${kv('Kegelverhältnis', r.C > 0 ? `1 : ${nf(r.ratio, 3)}<small>C = ${nf(r.C, 4)}</small>` : '–')}${kv('D', 'Ø ' + v4(r.D) + ' mm')}${kv('d', 'Ø ' + v4(r.d) + ' mm')}${kv('L', v4(r.L) + ' mm')}${kv('Zustellung je Seite', v4(r.dx) + ' mm<small>(D − d) / 2, im Radius</small>')}</div>
       <p class="foot">Im Programm (Durchmesserprogrammierung): von X${v4(r.d)} nach X${v4(r.D)} auf ${v4(r.L)} mm in Z.</p>
       ${calcHTML('cone', [{ t: 'Formeln', h: 'tan(α/2) = (D − d) / (2 · L). Kegelverhältnis C = (D − d) / L, geschrieben 1 : (L / (D − d)).' }])}`);
@@ -2165,35 +2220,6 @@
   }
 
   // ---------- Rauheit ----------
-  function cardRough() {
-    return `<section class="card" id="card-rough">
-      <div class="fields">
-        <div class="field"><label for="r-f">Vorschub f</label>${bindNum('r-f', 'rough.f', 'mm/U', 'z. B. 0,2')}</div>
-        <div class="field"><label for="r-r">Eckenradius r</label>${bindNum('r-r', 'rough.r', 'mm', 'z. B. 0,8')}</div>
-      </div>
-      <div class="result" id="res-rough" aria-live="polite"></div>
-      <h3 class="card-title sub">Welchen Vorschub darf ich fahren?</h3>
-      <div class="fields">
-        <div class="field"><span class="lbl">Vorgabe</span>${segHTML('rough.wk', A.rough.wk, [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>
-        <div class="field"><label for="r-w">Wert</label>${bindNum('r-w', 'rough.want', 'µm', 'z. B. 6,3')}</div>
-      </div>
-      <div class="result" id="res-rough2" aria-live="polite"></div>
-    </section>`;
-  }
-  function computeRough() {
-    const f = optOf(A.rough.f), r = optOf(A.rough.r);
-    if (!(f > 0 && r > 0)) out('res-rough', msgHTML('Gib Vorschub und Eckenradius ein.'));
-    else {
-      const x = WK.roughTurn(f, r);
-      const cls = WK.N_CLASSES.slice().reverse().find(c => c[1] >= x.RaTh - 1e-9);
-      out('res-rough', `<div class="res-hero"><div class="res-big">Rz ${nf(x.Rth, 2)} <small>µm</small></div><div class="res-sub">theoretische Rautiefe · Ra etwa ${nf(x.RaTh, 2)} µm${cls ? ` · reicht für ${cls[0]} (Ra ${nf(cls[1], 3)})` : ''}</div></div>
-        ${calcHTML('rough', [{ t: 'Rautiefe', h: `Rth = f² / (8 · r) = ${nf(f, 3)}² / (8 · ${nf(r, 2)}) mm = ${nf(x.Rth / 1000, 5)} mm = <b>${nf(x.Rth, 2)} µm</b>.` }, { t: 'Mittenrauwert', h: `Ra ≈ f² / (31,2 · r) = <b>${nf(x.RaTh, 2)} µm</b>. Das ist die Geometrie der Schneidenecke. Schwingungen, Aufbauschneide und Verschleiß machen es in der Praxis rauer.` }])}`);
-    }
-    const w = optOf(A.rough.want);
-    if (!(w > 0 && r > 0)) return out('res-rough2', msgHTML('Gib den gewünschten Rauheitswert und oben den Eckenradius ein.'));
-    const fm = A.rough.wk === 'Rz' ? WK.feedForRz(w, r) : WK.feedForRa(w, r);
-    out('res-rough2', `<div class="kv">${kv('Größter Vorschub', `${nf(fm, 3)} mm/U<small>bei r = ${nf(r, 2)} mm, ${A.rough.wk} ${nf(w, 3)} µm</small>`, true)}</div>`);
-  }
   function cardRoughTab() {
     return `<section class="card">
       <div class="tbl-cap">Rauheitsklassen nach ISO 1302</div>
@@ -2262,7 +2288,7 @@
       <h3>Schnellsuche</h3>
       <p>Auf der Startseite: M8 oder M10x1 für Gewinde, G1/2 oder 1/4-20 UNC, 6H7 oder 30g6 für eine ISO-Toleranz, 25H7/g6 für eine Passung, SW13 für eine Schlüsselweite, N7 für eine Rauheitsklasse oder einfach ein Stichwort wie Kernloch.</p>
       <h3>Bedienen</h3>
-      <p>Reihenfolge ändern: In der Startliste und bei den Reitern oben einen Eintrag gedrückt halten und verschieben. Bei Dreieck, Kegel und Lochkreis die Seite oder den Winkel in der Skizze antippen, dann den Wert eingeben. Schnittdaten und Gewinde zeigen fertige Zeilen fürs Programm (S, F).</p>
+      <p>Reihenfolge ändern: In der Startliste und bei den Reitern oben einen Eintrag gedrückt halten und verschieben. Bei Dreieck, Kegel und Lochkreis die Seite oder den Winkel in der Skizze antippen, dann den Wert eingeben. Zerspanung: Bei Fräsen, Bohren und Drehen gibst du ein, was du weißt (zum Beispiel Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl und gewünschte Rautiefe), der Rest wird gerechnet, mit fertigen Zeilen fürs Programm (S, F).</p>
       <h3>Grundlagen</h3>
       <ul><li>ISO 286-1 und -2: Grundtoleranzen, Grundabmaße, Passungen</li><li>ISO 2768-1 und -2, ISO 22081: Allgemeintoleranzen</li><li>ISO 1101: Form und Lage</li><li>ISO 68-1, 261, 724, 228-1, 2904, ASME B1.1: Gewinde · DIN 336: Kernlöcher</li><li>ISO 4014/4017/4032, ISO 4762, 10642, 7380, 4026 bis 4029, ISO 273, DIN 974-1: Schrauben</li><li>VDI 2230 Blatt 1: Anziehdrehmomente · ISO 1302: Rauheit</li></ul>
       <h3>Wichtig</h3>
@@ -2273,8 +2299,9 @@
 
   function onApplyChange(k) {
     keepLatest(k);
+    solveHook(k);
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (['gen.tab', 'gen.mode', 'cut.mode', 'cut.set', 'cut.tool', 'cut.mat', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
+    if (['gen.tab', 'gen.mode', 'mill.tool', 'mill.mat', 'drill.tool', 'drill.mat', 'turn.tool', 'turn.mat', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
       const ae = document.activeElement, id = ae && ae.id;
       $('#sec-body').innerHTML = sectionHTML();
       if (id && ae.tagName === 'SELECT') { const n = $('#' + id); if (n) n.focus({ preventScroll: true }); }
@@ -2298,7 +2325,8 @@
     'q-clear': () => { S.q = ''; const q = $('#q'); if (q) { q.value = ''; q.focus(); } renderSearch(); },
     'thread-pick': t => { A.thread.q = t.dataset.v; saveA(); if (S.page === 'thread' && curSection().id === 'thread') { $('#th-q').value = t.dataset.v; computeThread(); } else goSection('thread'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sw-pick': t => { A.sw.d = t.dataset.v; saveA(); goSection('sw'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
-    'cut-vc': t => { A.cut.set = 'vc'; A.cut.vc = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCut(); },
+    'sv-take': t => { const m = t.dataset.m, k = t.dataset.k; const inp = $(`[data-k="${m}.${k}"]`); A[m][k] = t.dataset.v; if (inp) inp.value = t.dataset.v; onApplyChange(m + '.' + k); },
+    'sv-clear': t => { const m = t.dataset.m; WK.SOLVE_VARS[m].forEach(k => { A[m][k] = ''; }); A[m].ord = []; saveA(); $$(`#card-${m} input`).forEach(x => { x.value = ''; }); computeSolve(m); const f = $(`#sv-${m}-d`); if (f) f.focus(); },
     'fig-clear': t => { const g = t.dataset.g; Object.keys(A[g]).forEach(k => { if (k !== 'ord' && k !== 'mode' && k !== 'dir') A[g][k] = ''; }); A[g].ord = []; saveA(); $$(`[data-k^="${g}."]`).forEach(x => { if (x.tagName === 'INPUT') x.value = ''; }); computeCurrent(); const f = $(`[data-k="${g}.${g === 'tri' ? 'a' : 'D'}"]`); if (f) f.focus(); },
     'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },
     'iso-from': t => { setK('iso.q', t.dataset.v); goSection('iso'); },

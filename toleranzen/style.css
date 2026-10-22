@@ -569,3 +569,17 @@ table.tbl { border-collapse: separate; border-spacing: 0; font-size: 14px; font-
 .menu.reordering { overflow: visible; }
 .menu.reordering .menu-row:not(.lifting) { opacity: .8; transition: none; }
 .menu.reordering .menu-row::before { display: none; }
+/* Zerspanungs-Rechner: eingegeben, gerechnet, offen */
+.sv-group { display: flex; flex-direction: column; gap: 8px; }
+.sv-h { font-size: 12.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--label-2); margin-top: 4px; }
+.sv-f > label { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.sv-f > label b { font-size: 16px; color: var(--label); white-space: nowrap; }
+.sv-f > label span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-f .inp input { font-size: 19px; font-variant-numeric: tabular-nums; }
+.sv-f.given .inp { box-shadow: inset 0 0 0 1.5px var(--tint); }
+.inp.calc { background: var(--green-soft); }
+.inp.calc input::placeholder { color: var(--green); font-weight: 700; opacity: 1; }
+.inp input::placeholder { opacity: .7; }
+.calc-tag { color: var(--green); font-weight: 700; }
+.ref-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--label-2); }
+.ref-line .chip { height: 30px; font-size: 13px; }

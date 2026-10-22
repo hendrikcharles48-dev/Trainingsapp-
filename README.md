@@ -32,19 +32,12 @@ In dieser Version liegen die Daten nur auf dem Gerät. Über Einstellungen → B
 
 Eigenständige Werkstatt-App im iOS-Design (Hell und Dunkel) für Zerspanungsmechaniker, im Ordner `toleranzen/`. Aufbau wie ein Tabellenbuch: Startseite mit Schnellsuche (z. B. M3, 6H7, 25H7/g6, G1/2, SW13, N7) und einer Liste der Bereiche.
 
-- **Toleranzen:** Einzeltoleranz nach ISO 286 (1 bis 500 mm, IT01 bis IT18, alle Grundabmaße a bis zc und A bis ZC), Passungen, Maßketten (Worst Case), Foto einer Zeichnung mit Maßerkennung
-- **Allgemeintoleranzen:** ISO 2768-1 (alt) und ISO 22081 (neu), Winkel
-- **Form-/Lagetoleranzen:** Rechner nach ISO 2768-2 und alle Symbole nach ISO 1101
-- **Gewinde:** M, MF, G, UNC, UNF, Tr mit Flanken- und Kerndurchmessern, Spannungsquerschnitt, Kernlochbohrer
-- **Schnittdaten:** Drehzahl, Vorschubgeschwindigkeit, Zeitspanvolumen für Fräsen, Bohren, Drehen und Richtwerte
-- **Schlüsselweite:** Sechskant ISO und DIN, Innensechskant, Durchgangslöcher ISO 273, Senkungen DIN 974-1
-- **Drehmoment:** Anziehdrehmomente 8.8, 10.9, 12.9 nach VDI 2230
-- **Dreieck:** rechtwinklig, beliebig, Kegel, Lochkreis – Maße direkt in der Skizze antippen
-- **Gewicht, Rauheit, Trowalisieren (Gleitschleifen), Info**
+- **Toleranzen:** ISO 286 (alle Grundabmaße a bis zc), Passung, Allgemeintoleranzen (ISO 2768, ISO 22081), Winkel, Form und Lage mit allen Symbolen, Maßkette, Foto einer Zeichnung mit Maßerkennung
+- **Zerspanung:** Fräsen, Bohren, Drehen als Löser: eingeben, was man weiß (z. B. Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl, gewünschtes Rz), der Rest wird gerechnet, mit NC-Zeilen (S, F). Dazu Richtwerte, Rauheit und Gleitschleifen
+- **Gewinde und Schrauben:** M, MF, G, UNC, UNF, Tr mit Kernloch, Schlüsselweiten, Durchgangslöcher, Senkungen, Anziehdrehmomente
+- **Geometrie:** Dreieck (rechtwinklig, beliebig), Kegel, Lochkreis – Maße direkt in der Skizze antippen –, Gewicht
 
-Startliste und Reiter lassen sich durch Gedrückthalten umsortieren. Schnittdaten und Gewinde zeigen fertige NC-Zeilen (S, F).
-
-Überall mit aufklappbarem Rechenweg. Alle Werte sind fest hinterlegt, die App funktioniert offline.
+Startliste und Reiter lassen sich durch Gedrückthalten umsortieren. Überall mit aufklappbarem Rechenweg. Alle Werte sind fest hinterlegt, die App funktioniert offline.
 
 **Foto:** Zeichnung fotografieren, zuschneiden (die App schlägt die Blattecken vor und entzerrt schräge Fotos), dann erkennt die App Maße, Toleranzangaben und die Allgemeintoleranz im Schriftfeld (Texterkennung tesseract.js direkt auf dem Gerät). Mit „Stelle genauer ansehen“ rahmt man ein fehlendes Maß ein, die App liest diese Stelle mehrfach vergrößert.
 

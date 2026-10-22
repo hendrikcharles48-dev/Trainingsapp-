@@ -193,6 +193,81 @@
     return res;
   };
 
+  // ----------------------------------------------------------------
+  // Schnittdaten-Löser: beliebige Werte eingeben, alles Fehlende wird über die Formeln gerechnet
+  // ----------------------------------------------------------------
+  const RZ_RA = 31.2 / 8;   // theoretisches Profil der Schneidenecke: Rz = 3,9 · Ra
+  const RULES_BASE = [
+    { out: 'n', ins: ['vc', 'd'], fn: v => v.vc * 1000 / (PI * v.d), f: 'n = vc · 1000 / (π · d)' },
+    { out: 'vc', ins: ['n', 'd'], fn: v => PI * v.d * v.n / 1000, f: 'vc = π · d · n / 1000' },
+    { out: 'd', ins: ['vc', 'n'], fn: v => v.vc * 1000 / (PI * v.n), f: 'd = vc · 1000 / (π · n)' }
+  ];
+  const RULES_RA = [
+    { out: 'Ra', ins: ['Rz'], fn: v => v.Rz / RZ_RA, f: 'Ra ≈ Rz / 3,9 (theoretisches Profil)' },
+    { out: 'Rz', ins: ['Ra'], fn: v => v.Ra * RZ_RA, f: 'Rz ≈ 3,9 · Ra (theoretisches Profil)' }
+  ];
+  const RULES_FEED = [
+    { out: 'vf', ins: ['f', 'n'], fn: v => v.f * v.n, f: 'vf = f · n' },
+    { out: 'f', ins: ['vf', 'n'], fn: v => v.vf / v.n, f: 'f = vf / n' },
+    { out: 'n', ins: ['vf', 'f'], fn: v => v.vf / v.f, f: 'n = vf / f' }
+  ];
+  W.RULES = {
+    // Fräsen: der Vorschub je Zahn fz bestimmt die Rillen (theoretisch, alle Schneiden gleich hoch)
+    mill: RULES_BASE.concat(RULES_RA, [
+      { out: 'f', ins: ['fz', 'z'], fn: v => v.fz * v.z, f: 'f = fz · z' },
+      { out: 'fz', ins: ['f', 'z'], fn: v => v.f / v.z, f: 'fz = f / z' }
+    ], RULES_FEED, [
+      { out: 'Rz', ins: ['fz', 'r'], fn: v => v.fz * v.fz / (8 * v.r) * 1000, f: 'Rz = fz² / (8 · r) · 1000' },
+      { out: 'fz', ins: ['Rz', 'r'], fn: v => Math.sqrt(8 * v.r * v.Rz / 1000), f: 'fz = √(8 · r · Rz / 1000)' },
+      { out: 'r', ins: ['fz', 'Rz'], fn: v => v.fz * v.fz * 1000 / (8 * v.Rz), f: 'r = fz² · 1000 / (8 · Rz)' },
+      { out: 'Q', ins: ['ae', 'ap', 'vf'], fn: v => v.ae * v.ap * v.vf / 1000, f: 'Q = ae · ap · vf / 1000' },
+      { out: 'vf', ins: ['Q', 'ae', 'ap'], fn: v => v.Q * 1000 / (v.ae * v.ap), f: 'vf = Q · 1000 / (ae · ap)' }
+    ]),
+    drill: RULES_BASE.concat(RULES_FEED, [
+      { out: 'Q', ins: ['d', 'vf'], fn: v => PI * v.d * v.d / 4 * v.vf / 1000, f: 'Q = π · d² / 4 · vf / 1000' }
+    ]),
+    turn: RULES_BASE.concat(RULES_RA, RULES_FEED, [
+      { out: 'Rz', ins: ['f', 'r'], fn: v => v.f * v.f / (8 * v.r) * 1000, f: 'Rz = f² / (8 · r) · 1000' },
+      { out: 'f', ins: ['Rz', 'r'], fn: v => Math.sqrt(8 * v.r * v.Rz / 1000), f: 'f = √(8 · r · Rz / 1000)' },
+      { out: 'r', ins: ['f', 'Rz'], fn: v => v.f * v.f * 1000 / (8 * v.Rz), f: 'r = f² · 1000 / (8 · Rz)' },
+      { out: 'Q', ins: ['vc', 'ap', 'f'], fn: v => v.vc * v.ap * v.f, f: 'Q = vc · ap · f' },
+      { out: 'ap', ins: ['Q', 'vc', 'f'], fn: v => v.Q / (v.vc * v.f), f: 'ap = Q / (vc · f)' }
+    ])
+  };
+  W.SOLVE_VARS = {
+    mill: ['d', 'z', 'r', 'vc', 'n', 'fz', 'f', 'vf', 'Rz', 'Ra', 'ae', 'ap', 'Q'],
+    drill: ['d', 'vc', 'n', 'f', 'vf', 'Q'],
+    turn: ['d', 'r', 'vc', 'n', 'f', 'vf', 'Rz', 'Ra', 'ap', 'Q']
+  };
+  // given: {Name: Zahl}. Liefert alle Werte, die Rechenschritte, welche Eingaben hinter jedem Wert stecken (deps) und Widersprüche
+  W.solve = function (mode, given) {
+    const rules = W.RULES[mode];
+    const val = {}, deps = {}, how = {}, steps = [];
+    Object.keys(given).forEach(k => { if (given[k] > 0) { val[k] = given[k]; deps[k] = [k]; } });
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const r of rules) {
+        if (val[r.out] != null || !r.ins.every(k => val[k] != null)) continue;
+        const x = r.fn(val);
+        if (!(x > 0) || !isFinite(x)) continue;
+        val[r.out] = x;
+        deps[r.out] = [...new Set(r.ins.flatMap(k => deps[k]))];
+        how[r.out] = r;
+        steps.push({ out: r.out, rule: r, val: x });
+        changed = true;
+      }
+    }
+    // Widerspruch: eine Formel, bei der alle Werte bekannt sind, ohne dass sie zum Rechnen benutzt wurde, geht nicht auf
+    const clash = [];
+    rules.forEach(r => {
+      if (val[r.out] == null || how[r.out] === r || !r.ins.every(k => val[k] != null)) return;
+      const x = r.fn(val);
+      if (Math.abs(x - val[r.out]) > 0.005 * Math.max(Math.abs(x), Math.abs(val[r.out]))) clash.push({ rule: r, want: x, have: val[r.out] });
+    });
+    return { val, deps, how, steps, clash };
+  };
+
   // ================================================================
   // Rauheit
   // ================================================================
@@ -370,20 +445,32 @@
   // ================================================================
   // Schnellsuche
   // ================================================================
+  // Suchbare Bereiche: Seite und Reiter
   W.MENU = [
-    { id: 'tol', title: 'Toleranzen', kw: 'iso 286 passung passungen maßkette bohrung welle foto zeichnung it grundabmaß einheitsbohrung h7 g6' },
-    { id: 'gen', title: 'Allgemeintoleranzen', kw: 'iso 2768 freimaß freimaße winkel 22081 allgemein fmcv' },
-    { id: 'geo', title: 'Form-/Lagetoleranzen', kw: 'form lage ebenheit geradheit rundheit position parallelität rechtwinkligkeit lauf symbol 1101 2768-2' },
-    { id: 'thread', title: 'Gewinde', kw: 'gewinde metrisch feingewinde kernloch kernlochbohrer steigung g rohrgewinde unc unf trapez tr' },
-    { id: 'cut', title: 'Schnittdaten', kw: 'schnittgeschwindigkeit drehzahl vorschub fräsen bohren drehen vc fz vf n' },
-    { id: 'sw', title: 'Schlüsselweite', kw: 'schlüsselweite sw innensechskant inbus sechskant durchgangsbohrung senkung kopf 4762 912 933' },
-    { id: 'torque', title: 'Drehmoment', kw: 'anziehdrehmoment anzugsmoment drehmoment nm 8.8 10.9 12.9 vdi 2230' },
-    { id: 'weight', title: 'Gewicht', kw: 'gewicht masse dichte kg rundstab rohr platte flach' },
-    { id: 'tri', title: 'Dreieck', kw: 'dreieck winkel pythagoras sinus kosinus hypotenuse trigonometrie' },
-    { id: 'rough', title: 'Rauheit', kw: 'rauheit oberfläche ra rz n7 rautiefe' },
-    { id: 'trow', title: 'Trowalisieren', kw: 'trowalisieren gleitschleifen entgraten schleifkörper vibrator' },
-    { id: 'info', title: 'Info', kw: 'info hilfe darstellung dunkel hell über' }
+    { page: 'tol', sec: 'iso', title: 'ISO-Toleranz', kw: 'iso 286 toleranz bohrung welle it grundabmaß h7 g6' },
+    { page: 'tol', sec: 'fit', title: 'Passung', kw: 'passung passungen einheitsbohrung einheitswelle spiel übermaß' },
+    { page: 'tol', sec: 'gen', title: 'Allgemeintoleranzen', kw: 'allgemeintoleranz iso 2768 freimaß freimaße 22081 fmcv' },
+    { page: 'tol', sec: 'ang', title: 'Winkeltoleranz', kw: 'winkeltoleranz winkel 2768' },
+    { page: 'tol', sec: 'geo', title: 'Form und Lage', kw: 'form lage ebenheit geradheit rundheit position parallelität rechtwinkligkeit lauf 2768-2' },
+    { page: 'tol', sec: 'gdt', title: 'Symbole Form und Lage', kw: 'symbol symbole 1101 toleranzrahmen' },
+    { page: 'tol', sec: 'chain', title: 'Maßkette', kw: 'maßkette kette worst case' },
+    { page: 'tol', sec: 'foto', title: 'Foto einer Zeichnung', kw: 'foto zeichnung kamera erkennen' },
+    { page: 'cut', sec: 'mill', title: 'Fräsen', kw: 'fräsen fräser messerkopf schnittgeschwindigkeit drehzahl vorschub fz vf vc zahn platten oberfläche' },
+    { page: 'cut', sec: 'drill', title: 'Bohren', kw: 'bohren bohrer vorschub drehzahl' },
+    { page: 'cut', sec: 'turn', title: 'Drehen', kw: 'drehen drehmeißel schneidplatte vorschub drehzahl' },
+    { page: 'cut', sec: 'cutref', title: 'Richtwerte Schnittdaten', kw: 'richtwerte schnittdaten werkstoff hss hartmetall' },
+    { page: 'cut', sec: 'roughtab', title: 'Rauheit', kw: 'rauheit oberfläche ra rz n7 rautiefe' },
+    { page: 'cut', sec: 'trow', title: 'Trowalisieren', kw: 'trowalisieren gleitschleifen entgraten schleifkörper vibrator' },
+    { page: 'thread', sec: 'thread', title: 'Gewinde', kw: 'gewinde metrisch feingewinde kernloch kernlochbohrer steigung rohrgewinde unc unf trapez' },
+    { page: 'thread', sec: 'sw', title: 'Schlüsselweite', kw: 'schlüsselweite sw innensechskant inbus sechskant durchgangsbohrung senkung kopf schraube 4762 912 933' },
+    { page: 'thread', sec: 'torque', title: 'Drehmoment', kw: 'anziehdrehmoment anzugsmoment drehmoment nm 8.8 10.9 12.9 vdi 2230' },
+    { page: 'geom', sec: 'tri', title: 'Dreieck', kw: 'dreieck winkel pythagoras sinus kosinus hypotenuse trigonometrie schräge' },
+    { page: 'geom', sec: 'cone', title: 'Kegel', kw: 'kegel konus kegelwinkel verjüngung' },
+    { page: 'geom', sec: 'bolt', title: 'Lochkreis', kw: 'lochkreis teilkreis bohrbild koordinaten' },
+    { page: 'geom', sec: 'weight', title: 'Gewicht', kw: 'gewicht masse dichte kg rundstab rohr platte flach' },
+    { page: 'info', sec: 'info', title: 'Info', kw: 'info hilfe darstellung dunkel hell über' }
   ];
+
 
   // Liefert Treffer: direkte Werte (Gewinde, ISO-Toleranz, Passung, Schlüsselweite, Rauheitsklasse) und passende Bereiche
   W.search = function (q) {
@@ -406,7 +493,7 @@
         if (W.SW_DIN[i] === sw && W.SW_DIN[i] !== W.SW_ISO[i]) hits.push(`M${T.fmt(d)} Sechskant DIN`);
         if (W.SW_4762[i] === sw) hits.push(`M${T.fmt(d)} Zylinderkopf Innensechskant`);
       });
-      out.push({ kind: 'sw', page: 'sw', q: '', title: `Schlüsselweite ${T.fmt(sw)}`, sub: hits.length ? hits.join(', ') : 'Keine Schraube mit dieser Schlüsselweite hinterlegt.' });
+      out.push({ kind: 'sw', page: 'thread', sec: 'swtab', q: '', title: `Schlüsselweite ${T.fmt(sw)}`, sub: hits.length ? hits.join(', ') : 'Keine Schraube mit dieser Schlüsselweite hinterlegt.' });
     }
     // Passung
     if (T.parseFit && /\d/.test(s) && /[a-z]\d.*[a-z]\d/i.test(s)) {
@@ -420,11 +507,11 @@
     }
     // Rauheitsklasse
     m = /^n\s*(\d{1,2})$/i.exec(s);
-    if (m) { const c = W.N_CLASSES.find(x => x[0] === 'N' + m[1]); if (c) out.push({ kind: 'rough', page: 'rough', title: `Rauheitsklasse ${c[0]}`, sub: `Ra ${T.fmt(c[1])} µm` }); }
+    if (m) { const c = W.N_CLASSES.find(x => x[0] === 'N' + m[1]); if (c) out.push({ kind: 'rough', page: 'cut', sec: 'roughtab', title: `Rauheitsklasse ${c[0]}`, sub: `Ra ${T.fmt(c[1])} µm` }); }
     // Bereiche nach Stichwort
     const low = s.toLowerCase();
     W.MENU.forEach(it => {
-      if (it.title.toLowerCase().includes(low) || it.kw.split(' ').some(w => w.startsWith(low) || (low.length >= 4 && w.includes(low)))) out.push({ kind: 'page', page: it.id, title: it.title, sub: 'Bereich öffnen' });
+      if (it.title.toLowerCase().includes(low) || it.kw.split(' ').some(w => w.startsWith(low) || (low.length >= 4 && w.includes(low)))) out.push({ kind: 'page', page: it.page, sec: it.sec, title: it.title, sub: 'öffnen' });
     });
     return out;
   };
