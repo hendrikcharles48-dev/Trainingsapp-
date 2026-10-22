@@ -157,6 +157,15 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 
 .pbox{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--fill-2)}
 .pbox input{background:var(--fill)}
+.xbox{background:var(--card);border-radius:var(--r);padding:0 16px}
+.xbox summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:15px 0;cursor:pointer;font-weight:600;color:var(--label-2)}
+.xbox summary::-webkit-details-marker{display:none}
+.xbox summary::after{content:"›";font-size:22px;line-height:1;margin-left:10px;transition:transform .2s;color:var(--label-3)}
+.xbox[open] summary::after{transform:rotate(90deg)}
+.xbox summary span{flex:1}
+.xbox summary b{font:600 15px var(--round);font-variant-numeric:tabular-nums;color:var(--label-2)}
+.xbox[open]{padding-bottom:16px}
+.xbox .xlist{background:var(--fill-2)}
 /* Kalender */
 .cal{display:grid;gap:4px;text-align:center}
 .cal .wd{font-size:12px;font-weight:600;color:var(--label-2);padding-bottom:2px}
@@ -280,7 +289,7 @@ function sumOf(list){
 const monthEntries = ym => st.entries.filter(e => (e.datum||'').startsWith(ym)).sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
 
 // ---------- Navigation ----------
-let tab = 'monat', ym = curYM(), calYm = curYM(), mtab = 'uebersicht';
+let tab = 'monat', ym = curYM(), calYm = curYM(), xOpen = false;
 function go(t){ tab = t; document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false')); render(); window.scrollTo(0,0); }
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlaner, mehr:viewMehr})[tab](); $('#fab').hidden = tab !== 'monat'; }
@@ -322,11 +331,14 @@ function viewMonat(){
     </section>
     <p class="group-title">${t.n} ${t.n===1?'Schicht':'Schichten'}</p>
     <section class="list" id="list"></section>
+    <details class="xbox" id="xbox" ${xOpen ? 'open' : ''}><summary><span>Nicht gestempelt</span><b id="xsum"></b></summary><div id="xbody"></div></details>
   </div>`;
+  $('#xbox').ontoggle = () => { xOpen = $('#xbox').open; };
+  renderOffen($('#xbody'));
   $('#prev').onclick = () => { ym = iso(new Date(y, m-2, 1)).slice(0,7); render(); };
   $('#next').onclick = () => { if(!isCur){ ym = iso(new Date(y, m, 1)).slice(0,7); render(); } };
   const box = $('#list');
-  if(!list.length){ box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`; return; }
+  if(!list.length) box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`;
   for(const e of list){
     const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
@@ -715,17 +727,13 @@ function planOut(){
 }
 
 // ---------- Übersicht & Einstellungen ----------
-const MSEG = () => `<div class="seg" role="group" aria-label="Bereich"><button type="button" data-mt="uebersicht" aria-pressed="${mtab!=='offen'}">Übersicht</button><button type="button" data-mt="offen" aria-pressed="${mtab==='offen'}">Nicht gestempelt${st.offen.some(x => x.status !== 'gemeldet') ? ` · ${st.offen.filter(x => x.status !== 'gemeldet').length}` : ''}</button></div>`;
-function bindMseg(){ document.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => { mtab = b.dataset.mt; render(); }); }
 function viewMehr(){
-  if(mtab === 'offen') return viewOffen();
   const y = new Date().getFullYear(), by = {};
   for(const e of st.entries){ const k = (e.datum||'').slice(0,7); if(k) (by[k] = by[k] || []).push(e); }
   const keys = Object.keys(by).sort().reverse(), ty = sumOf(st.entries.filter(e => (e.datum||'').startsWith(y+'-'))), all = sumOf(st.entries);
   const v = $('#view');
   v.innerHTML = `<div class="page">
     <div class="top"><div><div class="eyebrow">Alles auf einen Blick</div><h1>Übersicht</h1></div></div>
-    ${MSEG()}
     <section class="card"><div class="stats">
       <div class="stat"><span>${y} verdient (zählt zur Grenze)</span><b>${eur(ty.zaehlt)}</b></div>
       <div class="stat"><span>Jahresgrenze (12 × ${eur(S().grenze)})</span><b>${eur(S().grenze*12)}</b></div>
@@ -753,7 +761,6 @@ function viewMehr(){
     </section>
     <p class="hint">Deine Daten liegen nur auf diesem Gerät. Mach ab und zu ein Backup, z. B. in die Dateien-App.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
   </div>`;
-  bindMseg();
   const ml = $('#mlist');
   for(const k of keys){
     const [yy,mm] = k.split('-').map(Number), t = sumOf(by[k]), p = Math.min(100, t.zaehlt/S().grenze*100);
@@ -771,42 +778,28 @@ function viewMehr(){
   $('#bImp').onclick = () => $('#fImp').click();
   $('#fImp').onchange = importData;
 }
-function viewOffen(){
+function renderOffen(box){
   const list = st.offen.slice().sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
   const open = sumOf(list.filter(x => x.status !== 'gemeldet')), all = sumOf(list);
-  const by = {}; for(const e of list) (by[e.datum.slice(0,7)] = by[e.datum.slice(0,7)] || []).push(e);
-  $('#view').innerHTML = `<div class="page">
-    <div class="top"><div><div class="eyebrow">Extra notiert</div><h1>Übersicht</h1></div></div>
-    ${MSEG()}
-    <section class="card"><div class="stats">
-      <div class="stat"><span>Noch offen</span><b>${fmtS(open.paid)} Std · ${eur(open.base + open.zul)}</b></div>
-      <div class="stat"><span>Insgesamt notiert</span><b>${fmtS(all.paid)} Std</b></div>
-    </div></section>
-    <button type="button" class="btn" id="oAdd">Stunden notieren</button>
-    <div id="olist" style="display:flex;flex-direction:column;gap:22px"></div>
-    <p class="hint">Diese Stunden zählen nicht zum Monat, nicht zum Ring und nicht im Planer. Auch nicht gestempelte Arbeitszeit ist Arbeitszeit und muss bezahlt werden: melde sie, damit sie nachgetragen wird. Danach Eintrag antippen und „zu den Schichten“ verschieben.</p>
-  </div>`;
-  bindMseg();
+  $('#xsum').textContent = list.length ? `${fmtS(all.paid)} Std` : '';
+  box.innerHTML = `<div class="stats" style="padding:4px 2px 12px">
+      <div class="stat"><span>Insgesamt</span><b>${fmtS(all.paid)} Std · ${eur(all.base + all.zul)}</b></div>
+      ${all.n !== open.n ? `<div class="stat"><span>Davon noch offen</span><b>${fmtS(open.paid)} Std · ${eur(open.base + open.zul)}</b></div>` : ''}
+    </div>
+    <div class="list xlist"></div>
+    <button type="button" class="btn plain" id="oAdd" style="margin-top:12px">Stunden notieren</button>
+    <p class="hint" style="margin-top:10px">Zählt nicht im Ring und nicht im Planer. Wurde etwas nachgestempelt: Eintrag antippen und zu den Schichten verschieben.</p>`;
   $('#oAdd').onclick = () => openSheet(null, {datum: today()}, 'offen');
-  const box = $('#olist');
-  if(!list.length){ box.innerHTML = '<section class="list"><div class="empty"><b>Nichts notiert</b>Hier landen Stunden, die nicht gestempelt wurden.</div></section>'; return; }
-  for(const k of Object.keys(by).sort().reverse()){
-    const [yy,mm] = k.split('-').map(Number), t = sumOf(by[k]), st0 = sumOf(st.entries.filter(e => e.datum.startsWith(k)));
-    const withX = st0.zaehlt + t.zaehlt, over = withX > S().grenze;
-    const sec = document.createElement('div'); sec.style.cssText = 'display:flex;flex-direction:column;gap:8px';
-    sec.innerHTML = `<p class="group-title" style="margin:0 4px">${MONATE[mm-1]} ${yy} · ${fmtS(t.paid)} Std</p><section class="list"></section>
-      <p class="hint" style="margin:0 4px">Zusammen mit den gestempelten Stunden: <b>${eur(withX)}</b>${over ? ` <span style="color:var(--red)">(${eur(withX - S().grenze)} über der Grenze)</span>` : ` von ${eur(S().grenze)}`}</p>`;
-    const ls = sec.querySelector('.list');
-    for(const e of by[k]){
-      const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0), done = e.status === 'gemeldet';
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
-      b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
-        <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : fmt(e.minuten||0)}</span><span class="s">${esc([e.von ? fmt(e.minuten||0) : '', e.notiz].filter(Boolean).join(' · ')) || '&nbsp;'}</span></div>
-        <div class="right"><b>${eur(mo.sum)}</b><span class="pill ${done ? '' : 'warn'}" style="font-size:11px">${done ? 'gemeldet' : 'offen'}</span></div>`;
-      b.onclick = () => openSheet(e, null, 'offen');
-      ls.append(b);
-    }
-    box.append(sec);
+  const ls = box.querySelector('.xlist');
+  if(!list.length){ ls.innerHTML = '<div class="empty">Noch nichts notiert.</div>'; return; }
+  for(const e of list){
+    const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0), done = e.status === 'gemeldet';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+    b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${MONATE[d.getMonth()].slice(0,3)}</span></div>
+      <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : fmt(e.minuten||0)}</span><span class="s">${esc([e.von ? fmt(e.minuten||0) : '', e.notiz].filter(Boolean).join(' · ')) || '&nbsp;'}</span></div>
+      <div class="right"><b>${eur(mo.sum)}</b><span class="pill ${done ? '' : 'warn'}" style="font-size:11px">${done ? 'gemeldet' : 'offen'}</span></div>`;
+    b.onclick = () => openSheet(e, null, 'offen');
+    ls.append(b);
   }
 }
 async function exportData(){
