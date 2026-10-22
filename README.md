@@ -70,7 +70,7 @@ Eigenständige App im iOS-Design (dunkel als Standard) für einen Minijob, im Or
 - **Planer – Wochenmuster:** Schichtmuster pro Woche oder Monat, prüft gegen die Grenze (4,35 Wochen pro Monat) und rechnet aus, bis wann man an Zusatztagen arbeiten kann.
 - **Übersicht:** Monate, Jahr gegen 12 × Grenze, Einstellungen (Lohn 18,39 €, Grenze 603 €, 25 % ab 20 Uhr, Zulage zählt zur Grenze), Hell/Dunkel, Backup.
 - **Extra** (vierter Reiter): Konto für nicht gestempelte Stunden, nur Tag + Dauer; `st.offen` mit `typ` plus (aufgeschrieben) oder minus (genommen), oben der Stand insgesamt. Zählt nirgends mit.
-- Daten liegen nur auf dem Gerät (`localStorage`, Schlüssel `stundenzettel-v2`).
+- Daten liegen nur auf dem Gerät (`localStorage`, Schlüssel `stundenzettel-v2`, `navigator.storage.persist()`). Nach jedem Eintrag erscheint „Backup sichern“ (`nudge`), Datei `stundenzettel-backup.json` über das Teilen-Menü; `st.lastBackup` steht in der Übersicht.
 
 ## Auf dem iPhone nutzen
 Nach Änderungen `stunden/` nach `docs/stunden/` kopieren und `CACHE` in `stunden/sw.js` hochzählen. Mit GitHub Pages liegt die App unter `…/stunden/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

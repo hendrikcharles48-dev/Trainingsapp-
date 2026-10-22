@@ -205,6 +205,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .sheet-head button{color:var(--green);font-weight:600;font-size:17px;padding:6px}
 @keyframes up{from{transform:translateY(100%)}}
 @keyframes fade{from{background:transparent}}
+.nudge{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe-b) + 12px);z-index:50;max-width:536px;margin:0 auto;display:flex;align-items:center;gap:10px;background:var(--card-2);border-radius:16px;padding:10px 10px 10px 16px;box-shadow:0 8px 30px rgba(0,0,0,.45);animation:up .25s}
+.fab{transition:bottom .25s}
+body.nudging .fab{bottom:calc(var(--tabh) + var(--safe-b) + 84px)}
+.nudge span{flex:1;min-width:0;font-weight:600;font-size:15px}
+.nudge #nudgeB{background:var(--green);color:var(--on-green);font-weight:700;font-size:15px;padding:9px 14px;border-radius:10px;white-space:nowrap}
+.nudge #nudgeX{width:30px;height:30px;border-radius:50%;color:var(--label-2)}
 .toast{position:fixed;left:50%;bottom:calc(var(--tabh) + var(--safe-b) + 90px);transform:translateX(-50%);z-index:50;background:var(--card-2);color:var(--label);padding:10px 16px;border-radius:99px;font-size:15px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.4);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap{animation:none}}
 @media (max-width:360px){.tiles b{font-size:14px}}
@@ -221,6 +227,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 </nav>
 <div id="sheet" class="sheet-wrap" hidden></div>
 <div id="toast" class="toast" hidden></div>
+<div id="nudge" class="nudge" hidden role="status"><span id="nudgeT"></span><button type="button" id="nudgeB">Backup sichern</button><button type="button" id="nudgeX" aria-label="Schließen">✕</button></div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -422,7 +429,7 @@ function openSheet(entry, pre){
     if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
     st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
     save(); ym = ymOf(obj.datum); closeSheet(); render();
-    toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
+    nudge(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
   };
   if(edit) $('#fDel').onclick = ev => {
     const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; }
@@ -434,6 +441,13 @@ function closeSheet(){ $('#sheet').hidden = true; $('#sheet').innerHTML = ''; do
 $('#fab').onclick = () => openSheet(null);
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 
+// Nach jedem Eintrag: Hinweis mit Ein-Tipp-Backup (das Teilen-Menü braucht einen Tipp, automatisch geht es auf dem iPhone nicht)
+let nt; function nudge(t){
+  const n = $('#nudge'); $('#nudgeT').textContent = t; n.hidden = false; document.body.classList.add('nudging'); clearTimeout(nt); nt = setTimeout(hideNudge, 9000);
+}
+function hideNudge(){ $('#nudge').hidden = true; document.body.classList.remove('nudging'); }
+$('#nudgeB').onclick = async () => { hideNudge(); await exportData(); };
+$('#nudgeX').onclick = hideNudge;
 let tt; function toast(t){ const x = $('#toast'); x.textContent = t; x.hidden = false; clearTimeout(tt); tt = setTimeout(() => x.hidden = true, 2000); }
 
 // ---------- Planer ----------
@@ -743,7 +757,7 @@ function viewMehr(){
       <button type="button" class="act" id="bImp">Backup laden</button>
       <input type="file" id="fImp" accept="application/json,.json" hidden>
     </section>
-    <p class="hint">Deine Daten liegen nur auf diesem Gerät. Mach ab und zu ein Backup, z. B. in die Dateien-App.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
+    <p class="hint">Letztes Backup: <b>${backupAge()}</b>. Deine Daten liegen nur auf diesem Gerät. Beim Sichern im Teilen-Menü „In Dateien sichern“ wählen, am besten iCloud Drive, und die alte Datei ersetzen.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
   </div>`;
   const ml = $('#mlist');
   for(const k of keys){
@@ -814,15 +828,17 @@ function extraSheet(entry, typ){
     const min = Math.round(h*60) + (+mi||0); if(min <= 0) return toast('Bitte eine Dauer eingeben');
     const obj = {...(edit ? entry : {id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), datum: $('#xD').value || today(), minuten: min, typ: t};
     st.offen = edit ? st.offen.map(x => x.id === obj.id ? obj : x) : [...st.offen, obj];
-    save(); closeSheet(); render(); toast(t === 'minus' ? `${fmt(min)} genommen` : `${fmt(min)} aufgeschrieben`);
+    save(); closeSheet(); render(); nudge(t === 'minus' ? `${fmt(min)} genommen` : `${fmt(min)} aufgeschrieben`);
   };
   if(edit) $('#xDel').onclick = ev => { const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; } st.offen = st.offen.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Gelöscht'); };
 }
+function backupDone(){ st.lastBackup = Date.now(); save(); toast('Backup gesichert'); if(tab === 'mehr') render(); }
+function backupAge(){ if(!st.lastBackup) return 'noch nie'; const d = Math.floor((Date.now() - st.lastBackup) / 864e5); return d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`; }
 async function exportData(){
-  const name = `stundenzettel-${today()}.json`, data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
+  const name = 'stundenzettel-backup.json', data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
   const file = new File([data], name, {type:'application/json'});
-  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Stundenzettel-Backup'}); return; } }catch(e){ if(e.name === 'AbortError') return; }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Stundenzettel-Backup'}); backupDone(); return; } }catch(e){ if(e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); backupDone(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 function importData(ev){
   const f = ev.target.files[0]; if(!f) return;
@@ -849,6 +865,8 @@ function dayCheck(){ const t = today(); if(t === lastDay) return; if(ym === last
 setInterval(dayCheck, 30000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) dayCheck(); });
 load(); applyTheme();
+// iPhone bitten, die gespeicherten Daten nicht von selbst zu löschen
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(_){}
 // Spätminuten gespeicherter Schichten neu rechnen (alte Version zählte bei Frühschichten 0–6 Uhr fälschlich mit)
 let fixed = 0;
 for(const e of st.entries){ if(!e.von || !e.bis) continue; const r = shift(e.von, e.bis, e.pause ?? null, e.pauseVon || null); if(r && r.spaet !== e.spaetMin){ e.spaetMin = r.spaet; fixed++; } }
