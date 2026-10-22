@@ -1,5 +1,5 @@
 // Netz zuerst (Updates kommen sofort an), ohne Netz aus dem Zwischenspeicher
-const CACHE = 'toleranzen-v15';
+const CACHE = 'toleranzen-v16';
 const FILES = ['./', './index.html', './style.css', './tables.js', './calc.js', './werkstatt.js', './zerspanung.js', './app.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

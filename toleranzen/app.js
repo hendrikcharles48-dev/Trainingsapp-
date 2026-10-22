@@ -1890,41 +1890,50 @@
   // Gewinde für Gewindebohrer und -former
   const svThread = mode => { const t = ZZ.tool(A[mode].tool); return mode === 'drill' && t && t.thread ? WK.parseThread(A[mode].thr || '') : null; };
 
+  // Aufklappbarer Abschnitt; offen/zu bleibt gespeichert, rechts eine Kurzfassung
+  const fold = (key, title, body, sumId) => `<details class="fold" data-calc="${key}"${OPEN.has(key) ? ' open' : ''}><summary><span class="fold-tx"><span class="fold-t">${title}</span><span class="fold-s" id="${sumId}"></span></span>${I.chevR}</summary><div class="fold-b">${body}</div></details>`;
   function cardSolve(mode) {
     const c = A[mode];
     const tool = ZZ.tool(c.tool) || ZZ.TOOLS.find(x => x.mode === mode);
     const mat = ZZ.mat(c.mat);
     const grp = ZZ.GROUPS.find(g => g.id === mat.g);
-    const field = k => `<div class="field sv-f" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
+    const field = (k, full) => `<div class="field sv-f${full ? ' full' : ''}" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
+    const auxNum = (k, s, l, u, ph) => `<div class="field sv-f"><label for="sv-${mode}-${k}"><b>${s}</b><span>${l}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, mode + '.' + k, u, ph)}</div>`;
     const favs = myTools().filter(t => t.mode === mode);
-    const mach = mode === 'turn' ? 'Drehmaschine' : 'Fräsmaschine';
-    return `<section class="card" id="card-${mode}">
-      <details class="mach"${(mode === 'turn' ? A.mach.nmaxT || A.mach.pmaxT : A.mach.nmax || A.mach.vfmax || A.mach.pmax) ? '' : ' open'}><summary>${I.info}<span>${mach}: ${(mode === 'turn' ? [A.mach.nmaxT ? 'n max ' + esc(A.mach.nmaxT) : '', A.mach.pmaxT ? esc(A.mach.pmaxT) + ' kW' : ''] : [A.mach.nmax ? 'n max ' + esc(A.mach.nmax) : '', A.mach.vfmax ? 'F max ' + esc(A.mach.vfmax) : '', A.mach.pmax ? esc(A.mach.pmax) + ' kW' : '']).filter(Boolean).join(' · ') || 'keine Grenzen eingetragen'}</span>${I.chevR}</summary>
-        <div class="fields">${mode === 'turn'
-          ? `<div class="field"><label for="m-nT">Höchste Drehzahl</label>${bindNum('m-nT', 'mach.nmaxT', '1/min', 'z. B. 4000')}</div><div class="field"><label for="m-pT">Spindelleistung</label>${bindNum('m-pT', 'mach.pmaxT', 'kW', 'z. B. 15')}</div>`
-          : `<div class="field"><label for="m-n">Höchste Drehzahl</label>${bindNum('m-n', 'mach.nmax', '1/min', 'z. B. 12000')}</div><div class="field"><label for="m-vf">Höchster Vorschub</label>${bindNum('m-vf', 'mach.vfmax', 'mm/min', 'z. B. 10000')}</div><div class="field"><label for="m-p">Spindelleistung</label>${bindNum('m-p', 'mach.pmax', 'kW', 'z. B. 11')}</div>`}</div>
-        <p class="foot">Einmal eintragen, dann bleiben die Vorschläge unter diesen Grenzen.</p>
-      </details>
-      ${favs.length ? `<div class="sv-h">Meine Werkzeuge</div><div class="chips fav-chips">${favs.map(t => `<span class="fav"><button type="button" class="chip" data-act="tool-load" data-id="${esc(t.id)}">${esc(t.name)}</button><button type="button" class="fav-x" data-act="tool-del" data-id="${esc(t.id)}" aria-label="${esc(t.name)} löschen">${I.x}</button></span>`).join('')}</div>` : ''}
-      <div class="field"><label for="sv-${mode}-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span></label>${matSelect(`sv-${mode}-mat`, mode + '.mat')}<span class="hint-line">${esc(mat.what)}</span></div>
-      <div class="field"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>
-      ${tool.op ? `<div class="field"><span class="lbl">Bearbeitung</span>${segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap')}</div>` : ''}
-      ${tool.thread && mode === 'drill' ? `<div class="field"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>` : ''}
-      <div class="sv-group"><div class="sv-h">Aufspannung und Kühlung</div><div class="fields">
-        ${mode === 'mill' ? `<div class="field"><label for="sv-${mode}-L"><b>L</b> Auskraglänge</label><span class="rec" id="rec-${mode}-L"></span>${bindNum(`sv-${mode}-L`, mode + '.L', 'mm', 'aus der Aufnahme')}</div><div class="field"><label for="sv-${mode}-lc"><b>lc</b> Schneidenlänge</label><span class="rec" id="rec-${mode}-lc"></span>${bindNum(`sv-${mode}-lc`, mode + '.lc', 'mm', '')}</div>` : ''}
-        ${mode === 'drill' ? `<div class="field full"><label for="sv-${mode}-depth"><b>T</b> Bohrtiefe</label><span class="rec" id="rec-${mode}-depth"></span>${bindNum(`sv-${mode}-depth`, mode + '.depth', 'mm', 'für Tiefe, Zeit')}</div>` : ''}
+    const core = mode === 'mill' ? ['d', 'z', 'vc', 'n', 'fz', 'f', 'vf'] : ['d', 'vc', 'n', 'f', 'vf'];
+    const sk = c.sk === 'Ra' ? 'Ra' : 'Rz';
+    const surf = mode === 'drill' ? '' : fold(`f-${mode}-surf`, 'Oberfläche', `<div class="fields"><div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>${field(sk)}${field('r')}</div><span class="hint-line" id="sv-${mode}-other"></span>`, `sum-${mode}-surf`);
+    const load = fold(`f-${mode}-load`, mode === 'drill' ? 'Bohrtiefe, Leistung und Zeit' : mode === 'mill' ? 'Eingriff, Leistung und Zeit' : 'Schnitttiefe, Leistung und Zeit',
+      `<div class="fields">${mode === 'mill' ? field('ae') + field('ap') : mode === 'turn' ? field('ap') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
+    const setup = fold(`f-${mode}-setup`, mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', `<div class="fields">
+        ${mode === 'mill' ? auxNum('L', 'L', 'Auskraglänge', 'mm', 'ab Aufnahme') + auxNum('lc', 'lc', 'Schneidenlänge', 'mm', '') : ''}
         ${mode !== 'turn' ? `<div class="field"><label for="sv-${mode}-holder">Aufnahme</label>${selInp(`sv-${mode}-holder`, mode + '.holder', ZZ.HOLDERS.filter(h => h.modes.includes(mode)).map(h => [h.id, h.name]))}</div>` : ''}
-        <div class="field${mode === 'turn' ? ' full' : ''}"><label for="sv-${mode}-cool">Kühlung</label>${selInp(`sv-${mode}-cool`, mode + '.cool', ZZ.COOL.map(x => [x.id, x.name]))}</div>
-      </div></div>
-      <div class="field"><span class="lbl">Fehlende Werte</span>${segHTML(mode + '.auto', c.auto, [['on', 'automatisch vorschlagen'], ['off', 'nur rechnen']])}</div>
-      <div class="msg info">${I.info}<div>Gib ein, was du weißt. <span class="tag-given">Blau</span> eingegeben, <span class="tag-soft">Orange</span> vorgeschlagen, <span class="calc-tag">Grün</span> gerechnet. Klein über jedem Feld steht die Empfehlung für Werkstoff und Werkzeug.</div></div>
-      ${SV_GROUPS[mode].map(([t, ks]) => ks.includes('Rz')
-        ? `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields"><div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML(mode + '.sk', c.sk === 'Ra' ? 'Ra' : 'Rz', [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>${field(c.sk === 'Ra' ? 'Ra' : 'Rz')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`
-        : `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
-      ${mode !== 'drill' ? `<div class="field"><label for="sv-${mode}-way"><b>Weg</b> ${mode === 'mill' ? 'Vorschubweg' : 'Drehlänge'}, für die Zeit</label>${bindNum(`sv-${mode}-way`, mode + '.way', 'mm', 'freiwillig')}</div>` : ''}
-      <div class="btn-row"><button type="button" class="btn soft" data-act="sv-accept" data-m="${mode}">Vorschläge übernehmen</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button></div>
-      <button type="button" class="btn plain" data-act="tool-save" data-m="${mode}">${I.plus} Dieses Werkzeug merken</button>
-      <div class="result" id="res-${mode}" aria-live="polite"></div>
+        <div class="field${mode === 'turn' ? ' full' : ''}"><label for="sv-${mode}-cool">Kühlung</label>${selInp(`sv-${mode}-cool`, mode + '.cool', ZZ.COOL.map(x => [x.id, x.name]))}</div></div>`, `sum-${mode}-setup`);
+    const machT = mode === 'turn'
+      ? `<div class="field"><label for="m-nT">Höchste Drehzahl</label>${bindNum('m-nT', 'mach.nmaxT', '1/min', 'z. B. 4000')}</div><div class="field"><label for="m-pT">Spindelleistung</label>${bindNum('m-pT', 'mach.pmaxT', 'kW', 'z. B. 15')}</div>`
+      : `<div class="field"><label for="m-n">Höchste Drehzahl</label>${bindNum('m-n', 'mach.nmax', '1/min', 'z. B. 12000')}</div><div class="field"><label for="m-vf">Höchster Vorschub</label>${bindNum('m-vf', 'mach.vfmax', 'mm/min', 'z. B. 10000')}</div><div class="field"><label for="m-p">Spindelleistung</label>${bindNum('m-p', 'mach.pmax', 'kW', 'z. B. 11')}</div>`;
+    const machine = fold(`f-${mode}-mach`, mode === 'turn' ? 'Drehmaschine' : 'Maschine', `<div class="fields">${machT}</div>
+      <p class="foot">Einmal eintragen, dann bleiben die Vorschläge unter diesen Grenzen.</p>
+      <div class="field"><span class="lbl">Fehlende Werte</span>${segHTML(mode + '.auto', c.auto, [['on', 'automatisch vorschlagen'], ['off', 'nur rechnen']])}</div>`, `sum-${mode}-mach`);
+    return `<section class="card sv-card" id="card-${mode}">
+      ${favs.length ? `<div class="chips fav-chips">${favs.map(t => `<span class="fav"><button type="button" class="chip" data-act="tool-load" data-id="${esc(t.id)}">${esc(t.name)}</button><button type="button" class="fav-x" data-act="tool-del" data-id="${esc(t.id)}" aria-label="${esc(t.name)} löschen">${I.x}</button></span>`).join('')}</div>` : ''}
+      <div class="fields">
+        <div class="field full"><label for="sv-${mode}-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span> <span class="muted">${esc(mat.what)}</span></label>${matSelect(`sv-${mode}-mat`, mode + '.mat')}</div>
+        <div class="field full"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>
+        ${tool.thread && mode === 'drill' ? `<div class="field full"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>` : ''}
+      </div>
+      ${tool.op ? segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap') : ''}
+      <div id="top-${mode}" class="sv-top" aria-live="polite"></div>
+      <div class="legend"><span class="lg given">eingegeben</span><span class="lg soft">vorgeschlagen</span><span class="lg calc">gerechnet</span></div>
+      <div class="fields">${core.map(k => field(k)).join('')}</div>
+      <div class="btn-row"><button type="button" class="btn soft" data-act="sv-accept" data-m="${mode}">Vorschläge übernehmen</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Leeren</button></div>
+      <div class="folds">
+        ${surf}${load}${setup}
+        ${fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`)}
+        ${machine}
+      </div>
+      <div id="res-${mode}"></div>
+      <button type="button" class="link-btn center" data-act="tool-save" data-m="${mode}">${I.plus} Dieses Werkzeug merken</button>
     </section>`;
   }
 
@@ -1998,42 +2007,49 @@
     const oth = $(`#sv-${mode}-other`);
     if (oth) { const ok = c.sk === 'Ra' ? 'Rz' : 'Ra'; oth.textContent = v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm (theoretisches Profil der Schneidenecke, Rz ≈ 3,9 · Ra)` : 'Gibst du die Oberfläche ein, rechnet die App den passenden Vorschub.'; }
 
-    let html = '';
-    if (svCleared) { html += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
-    rec.warn.forEach(w => { html += msgHTML(esc(w), 'warn'); });
+    let top = '';
+    if (svCleared) { top += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
+    rec.warn.forEach(w => { top += msgHTML(esc(w), 'warn'); });
+    if (thr && !thr.ok) top += msgHTML(esc(thr.error), 'warn');
     if (r.clash.length) {
       const cl = r.clash[0];
-      html += msgHTML(`Das passt nicht zusammen: nach ${esc(cl.rule.f)} müsste ${esc(SV[cl.rule.out].s)} = ${svFmt(cl.rule.out, cl.want)} ${SV[cl.rule.out].u} sein, eingegeben ist ${svFmt(cl.rule.out, cl.have)}. Lass einen der Werte leer.`, 'warn');
+      top += msgHTML(`Das passt nicht zusammen: nach ${esc(cl.rule.f)} müsste ${esc(SV[cl.rule.out].s)} = ${svFmt(cl.rule.out, cl.want)} ${SV[cl.rule.out].u} sein, eingegeben ist ${svFmt(cl.rule.out, cl.have)}. Lass einen der Werte leer.`, 'warn');
     }
-    lim.forEach(l => { html += msgHTML(`${l.k === 'n' ? 'Die Drehzahl' : 'Der Vorschub'} ${svFmt(l.k, v[l.k])} liegt über dem Maximum deiner Maschine (${nf(l.max, 0)}). <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${l.k}" data-v="${l.max}">Auf ${nf(l.max, 0)} begrenzen</button>`, 'warn'); });
-    info.forEach(t => { html += msgHTML(esc(t)); });
-    // Hauptergebnis: S und F
-    if (v.n || v.vf) {
-      html += `<div class="sf-hero"><div><span>Drehzahl</span><b>S${v.n ? Math.round(v.n) : '?'}</b></div><div><span>${mode === 'turn' ? 'Vorschub je U' : 'Vorschub'}</span><b>F${mode === 'turn' ? (v.f ? ncNum(v.f) : '?') : (v.vf ? Math.round(v.vf) : '?')}</b></div></div>`;
-    }
+    info.forEach(t => { top += msgHTML(esc(t)); });
+    lim.forEach(l => { top += msgHTML(`${l.k === 'n' ? 'Die Drehzahl' : 'Der Vorschub'} ${svFmt(l.k, v[l.k])} liegt über dem Maximum deiner Maschine (${nf(l.max, 0)}). <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${l.k}" data-v="${l.max}">Auf ${nf(l.max, 0)} begrenzen</button>`, 'warn'); });
+    // Hauptergebnis: S und F mit Programmzeile
+    let nc = '';
     if (mode === 'turn') {
-      const lines = [];
-      if (v.vc) lines.push([`G96 S${Math.round(v.vc)}${v.f ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, F in mm/U (G95). Drehzahl begrenzen (G92/LIMS)' + (S0.mach.nmax ? ` auf ${nf(S0.mach.nmax, 0)}` : '')]);
-      if (v.n) lines.push([`G97 S${Math.round(v.n)}${v.f ? ' F' + ncNum(v.f) : ''}`, v.d ? `feste Drehzahl für Ø ${nf(v.d)} mm` : 'feste Drehzahl']);
-      if (lines.length) html += ncHTML(lines);
+      if (v.vc) nc += `<div class="nc-l"><code>G96 S${Math.round(v.vc)}${v.f ? ' F' + ncNum(v.f) : ''}</code><span>konstante Schnittgeschw., F mm/U${S0.mach.nmax ? `, Drehzahl auf ${nf(S0.mach.nmax, 0)} begrenzen` : ', Drehzahl begrenzen (G92/LIMS)'}</span></div>`;
+      if (v.n) nc += `<div class="nc-l"><code>G97 S${Math.round(v.n)}${v.f ? ' F' + ncNum(v.f) : ''}</code><span>feste Drehzahl${v.d ? ` für Ø ${nf(v.d)} mm` : ''}</span></div>`;
     } else if (v.n || v.vf) {
-      const lines = [[`${v.n ? 'S' + Math.round(v.n) : ''}${v.vf ? ' F' + Math.round(v.vf) : ''} M3`.trim(), 'F in mm/min (G94)']];
-      if (mode === 'drill' && v.f) lines.push([`${v.n ? 'S' + Math.round(v.n) + ' ' : ''}F${ncNum(v.f)}`, thr && thr.ok ? 'F in mm/U (G95) = Steigung, im Gewindezyklus' : 'oder F in mm/U (G95)']);
-      html += ncHTML(lines);
+      nc += `<div class="nc-l"><code>${`${v.n ? 'S' + Math.round(v.n) : ''}${v.vf ? ' F' + Math.round(v.vf) : ''} M3`.trim()}</code><span>F in mm/min (G94)${mode === 'drill' && v.f ? ` · oder F${ncNum(v.f)} in mm/U (G95)${thr && thr.ok ? ' im Gewindezyklus' : ''}` : ''}</span></div>`;
     }
+    if (v.n || v.vf) top += `<div class="sf-box"><div class="sf-hero"><div><span>Drehzahl</span><b>S${v.n ? Math.round(v.n) : '?'}</b></div><div><span>${mode === 'turn' ? 'Vorschub je U' : 'Vorschub'}</span><b>F${mode === 'turn' ? (v.f ? ncNum(v.f) : '?') : (v.vf ? Math.round(v.vf) : '?')}</b></div></div>${nc ? `<div class="nc nc-in">${nc}</div>` : ''}</div>`;
+    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q', 'Rz', 'Ra', 'r'].includes(k));
+    if (missing.length) top += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${!v.d ? 'Gib den Durchmesser ein.' : mode === 'mill' && !v.z ? 'Gib die Zahl der Schneiden ein.' : ''}`);
     // Oberfläche gegen Werkzeug prüfen
     const fk = mode === 'mill' ? 'fz' : 'f', rf = mode === 'mill' ? rec.fz : rec.f;
-    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] > rf[2] * 1.05) html += msgHTML(`Für diese Oberfläche wäre ${fk} = ${svFmt(fk, v[fk])} mm, mehr als für das Werkzeug empfohlen (bis ${svFmt(fk, rf[2])}). Mit ${fk} = ${svFmt(fk, rf[1])} wird die Oberfläche besser als verlangt. <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${fk}" data-v="${T.fmt(rf[1], 0, 4)}">${fk} ${svFmt(fk, rf[1])} nehmen</button>`, 'warn');
-    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] < rf[0] * 0.5) html += msgHTML(`Für diese Oberfläche ist ${fk} = ${svFmt(fk, v[fk])} mm sehr klein. Die Schneide kann dann reiben statt schneiden. Besser: größerer Eckenradius${mode === 'mill' ? ' oder eine Planschneide (Wiper)' : ' oder eine Wiper-Platte'}.`, 'warn');
-    if (thr && !thr.ok) html += msgHTML(esc(thr.error), 'warn');
-    if (rec.core) html += `<div class="kv">${kv('Kernloch', `Ø ${T.fmt(rec.core, 0, 2)} mm<small>${tool.id === 'form' ? 'für Gewindeformen' : 'für Gewindebohren'}</small>`)}${kv('Steigung = Vorschub', T.fmt(thr.P, 0, 3) + ' mm/U')}</div>`;
-    if (rec.pre) html += `<div class="kv">${kv('Vorbohren für Reiben', `Ø ${T.fmt(rec.pre[0], 0, 2)} bis ${T.fmt(rec.pre[1], 0, 2)} mm`, true)}</div>`;
-    html += loadHTML(mode, v, rec, tool, S0);
-    if (rec.notes.length) html += `<div class="tips"><div class="sv-h">Tipps für dieses Werkzeug</div><ul>${rec.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
-    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q', 'Rz', 'Ra', 'r'].includes(k) && !(mode === 'mill' && k === 'z'));
-    if (missing.length) html += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${!v.d ? 'Gib den Durchmesser ein.' : mode === 'mill' && !v.z ? 'Gib die Zahl der Schneiden ein.' : ''}`);
-    if (mode === 'mill' && !v.z && v.fz) html += msgHTML('Für den Vorschub F fehlt noch die Zahl der Schneiden z.');
-    if (mode !== 'drill' && v.Rz && !g.Rz && !g.Ra) html += `<p class="foot">Mit diesem Vorschub wird die Oberfläche theoretisch etwa Rz ${nf(v.Rz, 2)} µm (Ra ${nf(v.Ra, 2)} µm). ${mode === 'mill' ? 'Beim Fräsen gilt das, wenn alle Schneiden gleich hoch stehen.' : ''}</p>`;
+    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] > rf[2] * 1.05) top += msgHTML(`Für diese Oberfläche wäre ${fk} = ${svFmt(fk, v[fk])} mm, mehr als für das Werkzeug empfohlen (bis ${svFmt(fk, rf[2])}). Mit ${fk} = ${svFmt(fk, rf[1])} wird die Oberfläche besser als verlangt. <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${fk}" data-v="${T.fmt(rf[1], 0, 4)}">${fk} ${svFmt(fk, rf[1])} nehmen</button>`, 'warn');
+    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] < rf[0] * 0.5) top += msgHTML(`Für diese Oberfläche ist ${fk} = ${svFmt(fk, v[fk])} mm sehr klein. Die Schneide kann reiben statt schneiden. Besser: größerer Eckenradius${mode === 'mill' ? ' oder eine Planschneide (Wiper)' : ' oder eine Wiper-Platte'}.`, 'warn');
+    if (rec.core) top += `<div class="kv">${kv('Kernloch', `Ø ${T.fmt(rec.core, 0, 2)} mm<small>${tool.id === 'form' ? 'für Gewindeformen' : 'für Gewindebohren'}</small>`)}${kv('Steigung = Vorschub', T.fmt(thr.P, 0, 3) + ' mm/U')}</div>`;
+    if (rec.pre) top += `<div class="kv">${kv('Vorbohren für Reiben', `Ø ${T.fmt(rec.pre[0], 0, 2)} bis ${T.fmt(rec.pre[1], 0, 2)} mm`, true)}</div>`;
+    const ld = loadHTML(mode, v, rec, tool, S0);
+    top += ld.warn;
+    out('top-' + mode, top);
+    out('load-' + mode, ld.body);
+    out('tips-' + mode, rec.notes.length ? `<ul class="tip-list">${rec.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p class="foot">Keine besonderen Hinweise.</p>');
+    // Kurzfassungen in den zugeklappten Abschnitten
+    const sum = (id, t) => { const el = $('#' + id); if (el) el.textContent = t; };
+    sum(`sum-${mode}-surf`, v.Rz ? `${g.Rz || g.Ra ? '' : '≈ '}${c.sk === 'Ra' ? 'Ra ' + nf(v.Ra, 2) : 'Rz ' + nf(v.Rz, 2)} µm${v.r ? ' · rε ' + nf(v.r, 2) : ''}` : 'keine Vorgabe');
+    sum(`sum-${mode}-load`, ld.L ? `${nf(ld.L.Pc / 0.8, 1)} kW${ld.L.defl != null ? ' · ' + nf(ld.L.defl * 1000, 0) + ' µm' : ''}` : mode === 'mill' ? 'ae und ap eingeben' : mode === 'turn' ? 'ap eingeben' : (optOf(c.depth) ? nf(optOf(c.depth), 1) + ' mm tief' : 'freiwillig'));
+    const ho = ZZ.HOLDERS.find(h => h.id === c.holder), co = ZZ.COOL.find(x => x.id === c.cool);
+    sum(`sum-${mode}-setup`, [ho && mode !== 'turn' ? ho.name.replace(/ \(.*\)/, '') : '', co ? co.name : '', optOf(c.L) ? 'L ' + nf(optOf(c.L), 1) : ''].filter(Boolean).join(' · '));
+    sum(`sum-${mode}-tips`, rec.notes.length ? (rec.notes.length === 1 ? '1 Hinweis' : rec.notes.length + ' Hinweise') + ' zu ' + rec.tool.name.replace(/ \(.*\)/, '') : 'keine Hinweise');
+    const m = A.mach;
+    sum(`sum-${mode}-mach`, (mode === 'turn' ? [m.nmaxT ? 'n ' + m.nmaxT : '', m.pmaxT ? m.pmaxT + ' kW' : ''] : [m.nmax ? 'n ' + m.nmax : '', m.vfmax ? 'F ' + m.vfmax : '', m.pmax ? m.pmax + ' kW' : '']).filter(Boolean).join(' · ') || 'keine Grenzen eingetragen') + (A[mode].auto === 'off' ? ' · nur rechnen' : '');
+    let html = '';
+    if (mode !== 'drill' && v.Rz && !g.Rz && !g.Ra) html += `<p class="foot">Mit diesem Vorschub wird die Oberfläche theoretisch etwa Rz ${nf(v.Rz, 2)} µm (Ra ${nf(v.Ra, 2)} µm).${mode === 'mill' ? ' Gilt, wenn alle Schneiden gleich hoch stehen.' : ''}</p>`;
     const steps = [];
     Object.keys(soft).forEach(k => steps.push({ t: `${SV[k].s} vorgeschlagen`, h: `${svFmt(k, soft[k])} ${SV[k].u}, aus der Empfehlung für ${esc(rec.mat.name)} und ${esc(tool.name)}.` }));
     r.steps.forEach(s => steps.push({ t: `${SV[s.out].s} ${SV[s.out][mode] || SV[s.out].all}`, h: `${esc(s.rule.f)} = <b>${svFmt(s.out, s.val)} ${SV[s.out].u}</b>` }));
@@ -2071,7 +2087,7 @@
     if (mode === 'mill') L = ZZ.millLoad({ cls, d: v.d, z: v.z, fz: v.fz, ae: v.ae, ap: v.ap, n: v.n, vf: v.vf, L: optOf(c.L), lc: optOf(c.lc), hss: tool.fam === 'hssm' });
     else if (mode === 'drill' && !(S0.thr && S0.thr.ok)) L = ZZ.drillLoad({ cls, d: v.d, f: v.f, vc: v.vc, n: v.n });
     else if (mode === 'turn') L = ZZ.turnLoad({ cls, vc: v.vc, ap: v.ap, f: v.f, n: v.n });
-    let h = '';
+    let h = '', w = '';
     const pmax = optOf(mode === 'turn' ? A.mach.pmaxT : A.mach.pmax);
     const kv2 = [];
     if (L) {
@@ -2081,16 +2097,16 @@
       if (L.Ff) kv2.push(kv('Vorschubkraft', `etwa ${nf(L.Ff, 0)} N`));
       if (L.hm) kv2.push(kv('Spanungsdicke hm', `${nf(L.hm, 3)} mm<small>kc etwa ${nf(L.kc, 0)} N/mm²</small>`));
       if (L.defl != null) kv2.push(kv('Durchbiegung Fräser', `etwa ${nf(L.defl * 1000, 0)} µm<small>grobe Schätzung bei L ${nf(optOf(c.L), 1)} mm</small>`));
-      if (pmax && L.Pc / 0.8 > pmax) h += msgHTML(`Die Schnitte brauchen etwa ${nf(L.Pc / 0.8, 1)} kW, die Spindel hat ${nf(pmax, 1)} kW. ${mode === 'turn' ? 'Schnitttiefe oder Vorschub verkleinern.' : 'Zustellung ae oder ap verkleinern oder weniger Vorschub.'}`, 'warn');
+      if (pmax && L.Pc / 0.8 > pmax) w += msgHTML(`Die Schnitte brauchen etwa ${nf(L.Pc / 0.8, 1)} kW, die Spindel hat ${nf(pmax, 1)} kW. ${mode === 'turn' ? 'Schnitttiefe oder Vorschub verkleinern.' : 'Zustellung ae oder ap verkleinern oder weniger Vorschub.'}`, 'warn');
       if (L.defl != null) {
         const fin = c.op === 'fin';
-        if (L.defl > (fin ? 0.01 : 0.03)) h += msgHTML(`Der Fräser biegt sich etwa ${nf(L.defl * 1000, 0)} µm weg${fin ? ', zum Schlichten zu viel (Maß und Wand werden schief)' : ', das gibt Rattern oder Bruch'}. Kürzer spannen, ae oder ap kleiner, oder dickerer Fräser.`, 'warn');
+        if (L.defl > (fin ? 0.01 : 0.03)) w += msgHTML(`Der Fräser biegt sich etwa ${nf(L.defl * 1000, 0)} µm weg${fin ? ', zum Schlichten zu viel (Maß und Wand werden schief)' : ', das gibt Rattern oder Bruch'}. Kürzer spannen, ae oder ap kleiner, oder dickerer Fräser.`, 'warn');
       }
     } else if (mode !== 'drill' || !(S0.thr && S0.thr.ok)) {
       h += `<p class="foot">${mode === 'mill' ? 'Gib ae und ap ein (und die Auskraglänge L), dann rechnet die App Leistung, Drehmoment, Schnittkraft und Durchbiegung.' : mode === 'turn' ? 'Gib die Schnitttiefe ap ein, dann rechnet die App Leistung und Schnittkraft.' : ''}</p>`;
     }
     const lc = optOf(c.lc);
-    if (mode === 'mill' && lc && v.ap > lc) h += msgHTML(`ap ${nf(v.ap, 2)} mm ist größer als die Schneidenlänge ${nf(lc, 1)} mm.`, 'warn');
+    if (mode === 'mill' && lc && v.ap > lc) w += msgHTML(`ap ${nf(v.ap, 2)} mm ist größer als die Schneidenlänge ${nf(lc, 1)} mm.`, 'warn');
     // Zeit
     const way = optOf(mode === 'drill' ? c.depth : c.way);
     if (way && v.vf) {
@@ -2098,8 +2114,8 @@
       const t = (way + extra) / v.vf;
       kv2.push(kv(mode === 'drill' ? 'Zeit je Bohrung' : 'Zeit', `${t < 1 ? nf(t * 60, 1) + ' s' : nf(t, 2) + ' min'}<small>${mode === 'drill' ? `Tiefe + Spitze ${nf(extra, 1)} mm, ohne Anfahren` : 'nur Vorschubweg, ohne Eilgang'}</small>`));
     }
-    if (kv2.length) h = `<div class="sv-h">Belastung und Zeit</div><div class="kv">${kv2.join('')}</div>` + h;
-    return h;
+    if (kv2.length) h = `<div class="kv">${kv2.join('')}</div>` + h;
+    return { body: h, warn: w, L };
   }
   // Alle Vorschläge als Eingaben übernehmen
   function acceptSuggestions(mode) {
