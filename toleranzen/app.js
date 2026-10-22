@@ -74,11 +74,11 @@
   // ---------- Zustand und Navigation ----------
   // Startliste wie im Tabellenbuch; jeder Eintrag öffnet eine Seite, manche Seiten haben mehrere Rechner (Reiter oben)
   const PAGES = [
-    { id: 'tol', title: 'Toleranzen', sub: 'ISO 286, Passung, Allgemein, Form/Lage, Maßkette, Foto', icon: 'dia', color: '#5856D6', secs: ['iso', 'fit', 'gen', 'ang', 'geo', 'gdt', 'chain', 'foto'] },
-    { id: 'cut', title: 'Zerspanung', sub: 'Fräsen, Bohren, Drehen, Oberfläche, Gleitschleifen', icon: 'mill', color: '#FF3B30', secs: ['mill', 'drill', 'turn', 'cutref', 'roughtab', 'trow'] },
-    { id: 'thread', title: 'Gewinde und Schrauben', sub: 'Gewinde, Kernloch, Schlüsselweite, Drehmoment', icon: 'thread', color: '#FF9500', secs: ['thread', 'threadtab', 'sw', 'swtab', 'torque'] },
-    { id: 'geom', title: 'Geometrie', sub: 'Dreieck, Kegel, Lochkreis, Gewicht', icon: 'tri', color: '#34C759', secs: ['tri', 'tri2', 'cone', 'bolt', 'weight'] },
-    { id: 'info', title: 'Info', sub: 'Darstellung, Normen, Hinweise', icon: 'info', color: '#636366', secs: ['info'] }
+    { id: 'tol', title: 'Toleranzen', sub: 'ISO 286, Passung, Allgemein, Form/Lage, Maßkette, Foto', tags: 'ISO 286 · Passung · Allgemein · Form/Lage · Maßkette · Foto', icon: 'dia', color: '#5856D6', secs: ['iso', 'fit', 'gen', 'ang', 'geo', 'gdt', 'chain', 'foto'] },
+    { id: 'cut', title: 'Zerspanung', sub: 'Fräsen, Bohren, Drehen, Oberfläche, Gleitschleifen', tags: 'Fräsen · Bohren · Drehen · Oberfläche · Gleitschleifen', icon: 'mill', color: '#FF3B30', secs: ['mill', 'drill', 'turn', 'cutref', 'roughtab', 'trow'] },
+    { id: 'thread', title: 'Gewinde und Schrauben', sub: 'Gewinde, Kernloch, Schlüsselweite, Drehmoment', tags: 'Gewinde · Kernloch · SW · Drehmoment', icon: 'thread', color: '#FF9500', secs: ['thread', 'threadtab', 'sw', 'swtab', 'torque'] },
+    { id: 'geom', title: 'Geometrie', sub: 'Dreieck, Kegel, Lochkreis, Gewicht', tags: 'Dreieck · Kegel · Lochkreis · Gewicht', icon: 'tri', color: '#34C759', secs: ['tri', 'tri2', 'cone', 'bolt', 'weight'] },
+    { id: 'info', title: 'Info', sub: 'Darstellung, Normen, Hinweise', tags: '', icon: 'info', color: '#636366', secs: ['info'] }
   ];
   const pageOf = id => PAGES.find(p => p.id === id);
   // Eigene Reihenfolge der Startliste (gedrückt halten und verschieben)
@@ -320,8 +320,9 @@
         <button type="button" class="search-x" data-act="q-clear" aria-label="Suche leeren"${S.q ? '' : ' hidden'}>${I.x}</button>
       </div>
       <div id="q-res"></div>
-      <nav class="menu" id="menu" aria-label="Bereiche"${S.q ? ' hidden' : ''}>${orderedPages().map(pg => `<button type="button" class="menu-row" data-page="${pg.id}">${tileIcon(pg)}<span class="mt"><span class="mt1">${esc(pg.title)}</span><span class="mt2">${esc(pg.sub)}</span></span>${I.chevR}</button>`).join('')}</nav>
-      <p class="foot center">Reihenfolge ändern: Eintrag gedrückt halten und verschieben.<br>Alle Tabellen sind in der App gespeichert, sie funktioniert auch ohne Netz.</p>
+      <nav class="tiles" id="menu" aria-label="Bereiche"${S.q ? ' hidden' : ''}>${orderedPages().filter(pg => pg.id !== 'info').map(pg => `<button type="button" class="tile" data-page="${pg.id}" style="--c:${pg.color}"><span class="tile-ic">${I[pg.icon]}</span><span class="tile-t">${esc(pg.title)}</span><span class="tile-s">${esc(pg.tags)}</span></button>`).join('')}</nav>
+      <button type="button" class="info-bar" data-page="info" id="info-bar"${S.q ? ' hidden' : ''}>${tileIcon(pageOf('info'))}<span class="mt"><span class="mt1">Info</span><span class="mt2">Darstellung, Bedienung, Normen</span></span>${I.chevR}</button>
+      <p class="foot center">Kacheln gedrückt halten und verschieben, um die Reihenfolge zu ändern.</p>
     </div>`;
   }
   function renderSearch() {
@@ -330,6 +331,8 @@
     const q = S.q.trim();
     if (x) x.hidden = !S.q;
     if (menu) menu.hidden = !!q;
+    const ib = $('#info-bar');
+    if (ib) ib.hidden = !!q;
     if (!q) { box.innerHTML = ''; return; }
     const res = WK.search(q);
     box.innerHTML = res.length
@@ -351,66 +354,64 @@
     const menu = $('#menu');
     if (!menu) return;
     let timer = null, drag = null, sx = 0, sy = 0, raf = 0;
-    function begin(row, y) {
-      drag = { row, y0: y, y, sc0: window.scrollY };
-      row.classList.add('lifting');
+    function begin(tile, x, y) {
+      drag = { tile, x0: x, y0: y, x, y, ox: tile.offsetLeft, oy: tile.offsetTop, sc0: window.scrollY };
+      tile.classList.add('lifting');
       menu.classList.add('reordering');
       try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* kein Vibrieren */ }
       const tick = () => {
         if (!drag) return;
         if (drag.y < 70) window.scrollBy(0, -6); else if (drag.y > window.innerHeight - 70) window.scrollBy(0, 6);
-        update(drag.y);
+        update(drag.x, drag.y);
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
     }
-    function update(y) {
-      drag.y = y;
-      const rows = $$('.menu-row', menu), i = rows.indexOf(drag.row);
-      const r = drag.row.getBoundingClientRect(), dy = y - drag.y0 + window.scrollY - drag.sc0;
-      const center = r.top - (parseFloat(drag.row.dataset.dy) || 0) + r.height / 2 + dy;
-      const prev = rows[i - 1], next = rows[i + 1];
-      const mid = el => { const b = el.getBoundingClientRect(); return b.top + b.height / 2; };
-      if (next && center > mid(next)) { const before = drag.row.offsetTop; menu.insertBefore(next, drag.row); drag.y0 += drag.row.offsetTop - before; }
-      else if (prev && center < mid(prev)) { const before = drag.row.offsetTop; menu.insertBefore(drag.row, prev); drag.y0 += drag.row.offsetTop - before; }
-      const d = y - drag.y0 + window.scrollY - drag.sc0;
-      drag.row.dataset.dy = d;
-      drag.row.style.transform = `translateY(${d}px) scale(1.02)`;
+    function update(x, y) {
+      drag.x = x; drag.y = y;
+      const tiles = $$('.tile', menu);
+      const target = tiles.find(t => { if (t === drag.tile) return false; const r = t.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom; });
+      if (target) {
+        const i = tiles.indexOf(drag.tile), j = tiles.indexOf(target);
+        menu.insertBefore(drag.tile, j > i ? target.nextSibling : target);
+      }
+      const tx = x - drag.x0 - (drag.tile.offsetLeft - drag.ox);
+      const ty = y - drag.y0 + window.scrollY - drag.sc0 - (drag.tile.offsetTop - drag.oy);
+      drag.tile.style.transform = `translate(${tx}px, ${ty}px) scale(1.04)`;
     }
     function finish() {
       clearTimeout(timer);
       if (!drag) return;
       cancelAnimationFrame(raf);
-      drag.row.style.transform = '';
-      drag.row.dataset.dy = 0;
-      drag.row.classList.remove('lifting');
+      drag.tile.style.transform = '';
+      drag.tile.classList.remove('lifting');
       menu.classList.remove('reordering');
       drag = null;
-      store.set('menuOrder', $$('.menu-row', menu).map(b => b.dataset.page));
+      store.set('menuOrder', $$('.tile', menu).map(b => b.dataset.page));
       menuClickBlock = Date.now() + 450;
     }
     menu.addEventListener('touchstart', e => {
-      const b = e.target.closest('.menu-row');
+      const b = e.target.closest('.tile');
       if (!b || e.touches.length > 1) return;
       sx = e.touches[0].clientX; sy = e.touches[0].clientY;
       clearTimeout(timer);
-      timer = setTimeout(() => begin(b, sy), 380);
+      timer = setTimeout(() => begin(b, sx, sy), 380);
     }, { passive: true });
     menu.addEventListener('touchmove', e => {
       const t = e.touches[0];
       if (!drag) { if (Math.hypot(t.clientX - sx, t.clientY - sy) > 8) clearTimeout(timer); return; }
       e.preventDefault();
-      update(t.clientY);
+      update(t.clientX, t.clientY);
     }, { passive: false });
     menu.addEventListener('touchend', finish);
     menu.addEventListener('touchcancel', finish);
     menu.addEventListener('contextmenu', e => e.preventDefault());
     menu.addEventListener('mousedown', e => {
-      const b = e.target.closest('.menu-row');
+      const b = e.target.closest('.tile');
       if (!b || e.button !== 0) return;
       sx = e.clientX; sy = e.clientY;
-      timer = setTimeout(() => begin(b, sy), 380);
-      const mm = ev => { if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) clearTimeout(timer); return; } ev.preventDefault(); update(ev.clientY); };
+      timer = setTimeout(() => begin(b, sx, sy), 380);
+      const mm = ev => { if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) clearTimeout(timer); return; } ev.preventDefault(); update(ev.clientX, ev.clientY); };
       const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); finish(); };
       window.addEventListener('mousemove', mm);
       window.addEventListener('mouseup', mu);
@@ -450,9 +451,9 @@
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
     thread: { q: 'M8', kind: 'M', n: '' },
-    mill: { d: '80', z: '10', r: '0,4', vc: '200', n: '', fz: '', f: '', vf: '', Rz: '6,3', Ra: '', ae: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'z', 'r', 'vc', 'Rz'] },
+    mill: { sk: 'Rz', d: '80', z: '10', r: '0,4', vc: '200', n: '', fz: '', f: '', vf: '', Rz: '6,3', Ra: '', ae: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'z', 'r', 'vc', 'Rz'] },
     drill: { d: '10', vc: '80', n: '', f: '0,15', vf: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'vc', 'f'] },
-    turn: { d: '50', r: '0,8', vc: '200', n: '', f: '0,2', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'r', 'vc', 'f'] },
+    turn: { sk: 'Rz', d: '50', r: '0,8', vc: '200', n: '', f: '0,2', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'r', 'vc', 'f'] },
     sw: { d: '8' },
     torque: { d: '8', cls: '8.8' },
     weight: { shape: 'rund', d: '20', D: '', s: '', b: '', h: '', a: '', t: '', L: '1000', mat: '0', rho: '' },
@@ -469,6 +470,11 @@
     if (!Array.isArray(out.foto.items)) out.foto.items = [];
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
     out.secs = saved.secs && typeof saved.secs === 'object' ? saved.secs : {};
+    ['mill', 'turn'].forEach(m => {   // nur eine Oberflächenangabe sichtbar: die andere darf keine Vorgabe sein
+      const o = out[m];
+      if (!String(o.Rz || '').trim() && String(o.Ra || '').trim()) o.sk = 'Ra';
+      if (o.sk === 'Ra') o.Rz = ''; else { o.sk = 'Rz'; o.Ra = ''; }
+    });
     out.order = Array.isArray(saved.order) ? saved.order.filter(x => typeof x === 'string') : null;
     return out;
   })();
@@ -1863,7 +1869,9 @@
       </div>
       <div class="ref-line">Richtwert vc ${rg[0]}–${rg[1]} m/min${mode === 'mill' ? ` · fz ${nf(mat.fz[0])}–${nf(mat.fz[1])} mm` : ''}
         <button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="vc" data-v="${Math.round((rg[0] + rg[1]) / 2)}">vc ${Math.round((rg[0] + rg[1]) / 2)}</button>${mode === 'mill' ? `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="fz" data-v="${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}">fz ${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}</button>` : ''}</div>
-      ${SV_GROUPS[mode].map(([t, ks]) => `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
+      ${SV_GROUPS[mode].map(([t, ks]) => ks.includes('Rz')
+        ? `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields"><div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML(mode + '.sk', c.sk === 'Ra' ? 'Ra' : 'Rz', [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>${field(c.sk === 'Ra' ? 'Ra' : 'Rz')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`
+        : `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
       <button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button>
       <div class="result" id="res-${mode}" aria-live="polite"></div>
     </section>`;
@@ -1906,6 +1914,8 @@
       if (fld) fld.classList.toggle('given', g[k] != null);
     });
     const v = r.val;
+    const oth = $(`#sv-${mode}-other`);
+    if (oth) { const ok = A[mode].sk === 'Ra' ? 'Rz' : 'Ra'; oth.textContent = v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm (theoretisches Profil der Schneidenecke, Rz ≈ 3,9 · Ra)` : 'Rz und Ra hängen hier über das theoretische Profil zusammen: Rz ≈ 3,9 · Ra.'; }
     let html = '';
     if (svCleared) { html += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
     if (r.clash.length) {
@@ -2298,6 +2308,16 @@
   }
 
   function onApplyChange(k) {
+    const [sk0, sk1] = k.split('.');
+    if (sk1 === 'sk' && A[sk0]) {   // Oberfläche umschalten: eingegebenen Wert umrechnen
+      const st = A[sk0], to = st.sk === 'Ra' ? 'Ra' : 'Rz', from = to === 'Ra' ? 'Rz' : 'Ra';
+      const x = optOf(st[from]);
+      if (x > 0) { st[to] = T.fmt(to === 'Ra' ? x / 3.9 : x * 3.9, 0, 2).replace('−', '-'); st[from] = ''; st.ord = (st.ord || []).map(o => o === from ? to : o); }
+      saveA();
+      $('#sec-body').innerHTML = sectionHTML();
+      computeCurrent();
+      return;
+    }
     keepLatest(k);
     solveHook(k);
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
