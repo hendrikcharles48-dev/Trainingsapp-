@@ -156,6 +156,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 
 .pbox{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--fill-2)}
 .pbox input{background:var(--fill)}
+
+.xstand{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:22px 18px}
+.xstand b{font:800 48px/1 var(--round);font-variant-numeric:tabular-nums;color:var(--green)}
+.xstand b.neg{color:var(--orange)}
+.grid2 .btn{padding:15px 6px;white-space:nowrap}
+.xstand b small{font-size:18px;font-weight:600;color:var(--label-2)}
 /* Kalender */
 .cal{display:grid;gap:4px;text-align:center}
 .cal .wd{font-size:12px;font-weight:600;color:var(--label-2);padding-bottom:2px}
@@ -199,6 +205,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .sheet-head button{color:var(--green);font-weight:600;font-size:17px;padding:6px}
 @keyframes up{from{transform:translateY(100%)}}
 @keyframes fade{from{background:transparent}}
+.nudge{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe-b) + 12px);z-index:50;max-width:536px;margin:0 auto;display:flex;align-items:center;gap:10px;background:var(--card-2);border-radius:16px;padding:10px 10px 10px 16px;box-shadow:0 8px 30px rgba(0,0,0,.45);animation:up .25s}
+.fab{transition:bottom .25s}
+body.nudging .fab{bottom:calc(var(--tabh) + var(--safe-b) + 84px)}
+.nudge span{flex:1;min-width:0;font-weight:600;font-size:15px}
+.nudge #nudgeB{background:var(--green);color:var(--on-green);font-weight:700;font-size:15px;padding:9px 14px;border-radius:10px;white-space:nowrap}
+.nudge #nudgeX{width:30px;height:30px;border-radius:50%;color:var(--label-2)}
 .toast{position:fixed;left:50%;bottom:calc(var(--tabh) + var(--safe-b) + 90px);transform:translateX(-50%);z-index:50;background:var(--card-2);color:var(--label);padding:10px 16px;border-radius:99px;font-size:15px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.4);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap{animation:none}}
 @media (max-width:360px){.tiles b{font-size:14px}}
@@ -211,9 +223,11 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
   <button type="button" data-tab="monat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Monat</button>
   <button type="button" data-tab="planer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Planer</button>
   <button type="button" data-tab="mehr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11M12 19V5M19 19v-6"/></svg>Übersicht</button>
+  <button type="button" data-tab="extra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h4"/></svg>Extra</button>
 </nav>
 <div id="sheet" class="sheet-wrap" hidden></div>
 <div id="toast" class="toast" hidden></div>
+<div id="nudge" class="nudge" hidden role="status"><span id="nudgeT"></span><button type="button" id="nudgeB">Backup sichern</button><button type="button" id="nudgeX" aria-label="Schließen">✕</button></div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -224,7 +238,7 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
 const WT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
 // ---------- Daten ----------
-let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, tpl:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
+let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, tpl:[], offen:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
 function load(){ try{ const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if(d) st = {...st, ...d, S:{...DEF, ...(d.S||{})}}; }catch(_){} }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){ toast('Speichern nicht möglich'); } }
 const S = () => st.S;
@@ -282,7 +296,7 @@ const monthEntries = ym => st.entries.filter(e => (e.datum||'').startsWith(ym)).
 let tab = 'monat', ym = curYM(), calYm = curYM();
 function go(t){ tab = t; document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false')); render(); window.scrollTo(0,0); }
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
-function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlaner, mehr:viewMehr})[tab](); $('#fab').hidden = tab !== 'monat'; }
+function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlaner, mehr:viewMehr, extra:viewExtra})[tab](); $('#fab').hidden = tab !== 'monat'; }
 
 // ---------- Monat ----------
 function ring(pct, over){
@@ -325,7 +339,7 @@ function viewMonat(){
   $('#prev').onclick = () => { ym = iso(new Date(y, m-2, 1)).slice(0,7); render(); };
   $('#next').onclick = () => { if(!isCur){ ym = iso(new Date(y, m, 1)).slice(0,7); render(); } };
   const box = $('#list');
-  if(!list.length){ box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`; return; }
+  if(!list.length) box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`;
   for(const e of list){
     const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
@@ -368,7 +382,7 @@ function openSheet(entry, pre){
     <div class="field"><label for="fNotiz">Notiz</label><input id="fNotiz" placeholder="optional" value="${esc(e.notiz||'')}"></div>
     <div class="calc" id="fCalc"></div>
     <button type="button" class="btn" id="fSave">${edit?'Änderungen speichern':'Schicht speichern'}</button>
-    ${edit?'<button type="button" class="btn danger" id="fDel">Schicht löschen</button>':''}
+    ${edit?'<button type="button" class="btn danger" id="fDel">Löschen</button>':''}
   </div>`;
   w.hidden = false; document.body.style.overflow = 'hidden';
   const setMode = m => { mode = m; w.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.m===m))); $('#mZeit').hidden = m!=='zeit'; $('#mDauer').hidden = m!=='dauer'; calc(); };
@@ -415,7 +429,7 @@ function openSheet(entry, pre){
     if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
     st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
     save(); ym = ymOf(obj.datum); closeSheet(); render();
-    toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
+    nudge(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
   };
   if(edit) $('#fDel').onclick = ev => {
     const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; }
@@ -427,6 +441,13 @@ function closeSheet(){ $('#sheet').hidden = true; $('#sheet').innerHTML = ''; do
 $('#fab').onclick = () => openSheet(null);
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 
+// Nach jedem Eintrag: Hinweis mit Ein-Tipp-Backup (das Teilen-Menü braucht einen Tipp, automatisch geht es auf dem iPhone nicht)
+let nt; function nudge(t){
+  const n = $('#nudge'); $('#nudgeT').textContent = t; n.hidden = false; document.body.classList.add('nudging'); clearTimeout(nt); nt = setTimeout(hideNudge, 9000);
+}
+function hideNudge(){ $('#nudge').hidden = true; document.body.classList.remove('nudging'); }
+$('#nudgeB').onclick = async () => { hideNudge(); await exportData(); };
+$('#nudgeX').onclick = hideNudge;
 let tt; function toast(t){ const x = $('#toast'); x.textContent = t; x.hidden = false; clearTimeout(tt); tt = setTimeout(() => x.hidden = true, 2000); }
 
 // ---------- Planer ----------
@@ -736,7 +757,7 @@ function viewMehr(){
       <button type="button" class="act" id="bImp">Backup laden</button>
       <input type="file" id="fImp" accept="application/json,.json" hidden>
     </section>
-    <p class="hint">Deine Daten liegen nur auf diesem Gerät. Mach ab und zu ein Backup, z. B. in die Dateien-App.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
+    <p class="hint">Letztes Backup: <b>${backupAge()}</b>. Deine Daten liegen nur auf diesem Gerät. Beim Sichern im Teilen-Menü „In Dateien sichern“ wählen, am besten iCloud Drive, und die alte Datei ersetzen.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
   </div>`;
   const ml = $('#mlist');
   for(const k of keys){
@@ -755,11 +776,69 @@ function viewMehr(){
   $('#bImp').onclick = () => $('#fImp').click();
   $('#fImp').onchange = importData;
 }
+// ---------- Extra: nicht gestempelte Stunden als Konto (+ aufgeschrieben, − genommen) ----------
+const xMin = e => (e.typ === 'minus' ? -1 : 1) * (e.minuten || 0);
+const fmtPM = m => (m < 0 ? '−' : m > 0 ? '+' : '') + fmtS(Math.abs(m));
+function viewExtra(){
+  const list = st.offen.slice().sort((a,b) => b.datum.localeCompare(a.datum) || (b.erstellt||0) - (a.erstellt||0));
+  const stand = list.reduce((a,e) => a + xMin(e), 0);
+  const plus = list.filter(e => e.typ !== 'minus').reduce((a,e) => a + e.minuten, 0), minus = plus - stand;
+  $('#view').innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">Nicht gestempelt</div><h1>Extra-Stunden</h1></div></div>
+    <section class="card xstand"><span class="lbl">Stand insgesamt</span><b class="${stand < 0 ? 'neg' : ''}">${fmtS(Math.abs(stand))}<small> Std${stand < 0 ? ' im Minus' : ''}</small></b>
+      <span class="hint">${fmtS(plus)} aufgeschrieben · ${fmtS(minus)} genommen</span></section>
+    <div class="grid2"><button type="button" class="btn" id="xPlus">+ Aufschreiben</button><button type="button" class="btn plain" id="xMinus">− Genommen</button></div>
+    <section class="list" id="xlist"></section>
+  </div>`;
+  $('#xPlus').onclick = () => extraSheet(null, 'plus');
+  $('#xMinus').onclick = () => extraSheet(null, 'minus');
+  const ls = $('#xlist');
+  if(!list.length){ ls.innerHTML = '<div class="empty"><b>Noch nichts eingetragen</b>Schreib hier Stunden auf, die nicht gestempelt wurden.</div>'; return; }
+  for(const e of list){
+    const d = new Date(e.datum+'T12:00'), m = xMin(e);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+    b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${MONATE[d.getMonth()].slice(0,3)}</span></div>
+      <div class="mid"><span class="t">${m < 0 ? 'Genommen' : 'Aufgeschrieben'}</span><span class="s">${WT[d.getDay()]}, ${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}</span></div>
+      <div class="right"><b style="color:${m < 0 ? 'var(--orange)' : 'var(--green)'}">${fmtPM(m)}</b></div>`;
+    b.onclick = () => extraSheet(e);
+    ls.append(b);
+  }
+}
+function extraSheet(entry, typ){
+  const edit = !!entry, e = entry || {datum: today(), minuten: 0, typ};
+  let t = e.typ === 'minus' ? 'minus' : 'plus';
+  const w = $('#sheet');
+  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="xT">
+    <div class="grab"></div>
+    <div class="sheet-head"><button type="button" id="xX">Abbrechen</button><h2 id="xT">${edit ? 'Bearbeiten' : 'Extra-Stunden'}</h2><span style="width:80px"></span></div>
+    <div class="seg" role="group" aria-label="Art"><button type="button" data-xt="plus">+ Aufgeschrieben</button><button type="button" data-xt="minus">− Genommen</button></div>
+    <div class="field"><label for="xD">Tag</label><input id="xD" type="date" value="${e.datum}"></div>
+    <div class="grid2"><div class="field"><label for="xH">Stunden</label><input id="xH" inputmode="decimal" placeholder="0" value="${edit ? Math.floor(e.minuten/60) : ''}"></div>
+      <div class="field"><label for="xM">Minuten</label><input id="xM" inputmode="numeric" placeholder="0" value="${edit && e.minuten%60 ? e.minuten%60 : ''}"></div></div>
+    <button type="button" class="btn" id="xS">Speichern</button>
+    ${edit ? '<button type="button" class="btn danger" id="xDel">Löschen</button>' : ''}
+  </div>`;
+  w.hidden = false; document.body.style.overflow = 'hidden';
+  const setT = v => { t = v; w.querySelectorAll('[data-xt]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.xt === v))); };
+  w.querySelectorAll('[data-xt]').forEach(b => b.onclick = () => setT(b.dataset.xt)); setT(t);
+  $('#xX').onclick = closeSheet; w.onclick = ev => { if(ev.target === w) closeSheet(); };
+  $('#xS').onclick = () => {
+    const h = num($('#xH').value || 0), mi = $('#xM').value.trim();
+    if(h == null || h < 0 || (mi && !/^\d+$/.test(mi))) return toast('Bitte Stunden und Minuten als Zahl');
+    const min = Math.round(h*60) + (+mi||0); if(min <= 0) return toast('Bitte eine Dauer eingeben');
+    const obj = {...(edit ? entry : {id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), datum: $('#xD').value || today(), minuten: min, typ: t};
+    st.offen = edit ? st.offen.map(x => x.id === obj.id ? obj : x) : [...st.offen, obj];
+    save(); closeSheet(); render(); nudge(t === 'minus' ? `${fmt(min)} genommen` : `${fmt(min)} aufgeschrieben`);
+  };
+  if(edit) $('#xDel').onclick = ev => { const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; } st.offen = st.offen.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Gelöscht'); };
+}
+function backupDone(){ st.lastBackup = Date.now(); save(); toast('Backup gesichert'); if(tab === 'mehr') render(); }
+function backupAge(){ if(!st.lastBackup) return 'noch nie'; const d = Math.floor((Date.now() - st.lastBackup) / 864e5); return d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`; }
 async function exportData(){
-  const name = `stundenzettel-${today()}.json`, data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
+  const name = 'stundenzettel-backup.json', data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
   const file = new File([data], name, {type:'application/json'});
-  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Stundenzettel-Backup'}); return; } }catch(e){ if(e.name === 'AbortError') return; }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Stundenzettel-Backup'}); backupDone(); return; } }catch(e){ if(e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); backupDone(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 function importData(ev){
   const f = ev.target.files[0]; if(!f) return;
@@ -767,6 +846,7 @@ function importData(ev){
     const d = JSON.parse(t); if(!Array.isArray(d.entries)) throw 0;
     const ids = new Set(st.entries.map(e => e.id)); let n = 0;
     for(const e of d.entries) if(e && e.id && e.datum && !ids.has(e.id)){ st.entries.push(e); n++; }
+    if(Array.isArray(d.offen)){ const oi = new Set(st.offen.map(e => e.id)); for(const e of d.offen) if(e && e.id && e.datum && !oi.has(e.id)){ st.offen.push(e); n++; } }
     if(d.S) st.S = {...DEF, ...d.S};
     save(); toast(`${n} Schichten geladen`); render();
   }).catch(() => toast('Datei konnte nicht gelesen werden'));
@@ -785,6 +865,8 @@ function dayCheck(){ const t = today(); if(t === lastDay) return; if(ym === last
 setInterval(dayCheck, 30000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) dayCheck(); });
 load(); applyTheme();
+// iPhone bitten, die gespeicherten Daten nicht von selbst zu löschen
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(_){}
 // Spätminuten gespeicherter Schichten neu rechnen (alte Version zählte bei Frühschichten 0–6 Uhr fälschlich mit)
 let fixed = 0;
 for(const e of st.entries){ if(!e.von || !e.bis) continue; const r = shift(e.von, e.bis, e.pause ?? null, e.pauseVon || null); if(r && r.spaet !== e.spaetMin){ e.spaetMin = r.spaet; fixed++; } }
