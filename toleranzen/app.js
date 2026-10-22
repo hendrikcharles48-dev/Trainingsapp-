@@ -1844,8 +1844,8 @@
     n: { s: 'n', all: 'Drehzahl S', u: '1/min', dec: 0 },
     fz: { s: 'fz', mill: 'je Zahn', u: 'mm', dec: 4 },
     f: { s: 'f', mill: 'je Umdrehung', drill: 'je Umdrehung', turn: 'je Umdrehung', u: 'mm/U', dec: 3 },
-    vf: { s: 'vf', all: 'Vorschub F (G94)', u: 'mm/min', dec: 0 },
-    Rz: { s: 'Rz', all: 'gemittelte Rautiefe', u: 'µm', dec: 2 },
+    vf: { s: 'vf', all: 'Vorschub F', u: 'mm/min', dec: 0 },
+    Rz: { s: 'Rz', all: 'Rautiefe', u: 'µm', dec: 2 },
     Ra: { s: 'Ra', all: 'Mittenrauwert', u: 'µm', dec: 2 },
     ae: { s: 'ae', mill: 'Eingriffsbreite', u: 'mm', dec: 2 },
     ap: { s: 'ap', mill: 'Schnitttiefe', turn: 'Schnitttiefe', u: 'mm', dec: 2 },
@@ -1902,7 +1902,13 @@
     const field = (k, full) => `<div class="field sv-f${full ? ' full' : ''}" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
     const auxNum = (k, s, l, u, ph) => `<div class="field sv-f"><label for="sv-${mode}-${k}"><b>${s}</b><span>${l}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, mode + '.' + k, u, ph)}</div>`;
     const favs = myTools().filter(t => t.mode === mode);
-    const core = mode === 'mill' ? ['d', 'z', 'vc', 'n', 'fz', 'f', 'vf'] : ['d', 'vc', 'n', 'f', 'vf'];
+    const inputs = mode === 'mill' ? ['d', 'z'] : ['d'];
+    const tiles = mode === 'mill' ? ['vc', 'n', 'fz', 'f', 'vf'] : ['vc', 'n', 'f', 'vf'];
+    // Ergebnis-Kachel: zeigt den Wert grün; antippen macht daraus ein Eingabefeld für einen eigenen Wert
+    const tile = k => `<div class="rt" id="svf-${mode}-${k}">
+        <button type="button" class="rt-face" data-act="rt-edit" data-m="${mode}" data-k="${k}"><span class="rt-l"><b>${SV[k].s}</b> ${esc(SV[k][mode] || SV[k].all)}</span><span class="rt-v"><b id="rtv-${mode}-${k}">?</b> <small>${SV[k].u}</small></span><span class="rt-tag" id="rtt-${mode}-${k}"></span></button>
+        <div class="rt-ed"><label class="rt-l" for="sv-${mode}-${k}"><b>${SV[k].s}</b> eigener Wert</label><div class="rt-row">${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}<button type="button" class="rt-x" data-act="rt-reset" data-m="${mode}" data-k="${k}" aria-label="${SV[k].s} wieder rechnen lassen">${I.x}</button></div></div>
+        <span class="rec" id="rec-${mode}-${k}"></span></div>`;
     const sk = c.sk === 'Ra' ? 'Ra' : 'Rz';
     // Oberfläche sichtbar: Wunsch eingeben, Vorschub wird daraus gerechnet
     const surf = mode === 'drill' ? '' : `<div class="surf-box"><div class="surf-h"><span class="sv-h">Oberfläche</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']], 'mini')}</div><div class="fields">${field(sk)}${field('r')}</div><div class="chips">${(sk === 'Ra' ? ['0,4', '0,8', '1,6', '3,2', '6,3'] : ['2,5', '4', '6,3', '10', '16', '25']).map(v => `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="${sk}" data-v="${v}">${sk} ${v}</button>`).join('')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`;
@@ -1926,18 +1932,18 @@
         ${tool.thread && mode === 'drill' ? `<div class="field full"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>` : ''}
       </div>
       ${tool.op ? segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap') : ''}
-      <div id="top-${mode}" class="sv-top" aria-live="polite"></div>
-      <div class="legend"><span class="lg given">eingegeben</span><span class="lg soft">vorgeschlagen</span><span class="lg calc">gerechnet</span></div>
-      <div class="fields">${core.map(k => field(k)).join('')}</div>
+      <div class="fields">${inputs.map(k => field(k)).join('')}</div>
       ${surf}
-      <div class="btn-row"><button type="button" class="btn soft" data-act="sv-accept" data-m="${mode}">Vorschläge übernehmen</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Leeren</button></div>
+      <div id="top-${mode}" class="sv-top" aria-live="polite"></div>
+      <div class="rt-cap">Zum Ändern antippen</div>
+      <div class="rt-grid">${tiles.map(tile).join('')}</div>
       <div class="folds">
         ${load}${setup}
         ${fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`)}
         ${machine}
       </div>
       <div id="res-${mode}"></div>
-      <button type="button" class="link-btn center" data-act="tool-save" data-m="${mode}">${I.plus} Dieses Werkzeug merken</button>
+      <div class="btn-row"><button type="button" class="btn soft" data-act="tool-save" data-m="${mode}">${I.plus} Merken</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button></div>
     </section>`;
   }
 
@@ -2009,12 +2015,19 @@
       box.classList.toggle('soft', isSoft);
       box.classList.toggle('fixed', !!isHard);
       if (fld) fld.classList.toggle('given', isGiven);
+      const tv = $(`#rtv-${mode}-${k}`);
+      if (tv) {
+        tv.textContent = v[k] != null ? svFmt(k, v[k]) : '?';
+        $(`#rtt-${mode}-${k}`).textContent = isHard ? 'aus dem Gewinde' : isSoft ? 'Richtwert' : isCalc ? 'gerechnet' : 'antippen zum Eingeben';
+        fld.classList.toggle('res', isSoft || isCalc || isHard);
+        fld.classList.toggle('fixed', !!isHard);
+      }
       const rl = $(`#rec-${mode}-${k}`);
       if (rl) rl.innerHTML = recLine(mode, k, rec, v, tool, thr);
     });
     ['L', 'lc', 'depth'].forEach(k => { const rl = $(`#rec-${mode}-${k}`); if (rl) rl.innerHTML = recLine(mode, k, rec, v, tool, thr); });
     const oth = $(`#sv-${mode}-other`);
-    if (oth) { const ok = c.sk === 'Ra' ? 'Rz' : 'Ra'; oth.textContent = v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm (theoretisches Profil der Schneidenecke, Rz ≈ 3,9 · Ra)` : 'Gibst du die Oberfläche ein, rechnet die App den passenden Vorschub.'; }
+    if (oth) { const ok = c.sk === 'Ra' ? 'Rz' : 'Ra'; const sk2 = c.sk === 'Ra' ? 'Ra' : 'Rz'; oth.textContent = g.Rz || g.Ra ? (v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm. Der Vorschub unten ist daraus gerechnet.` : '') : v[sk2] != null ? `Mit dem Vorschub unten wird es etwa ${sk2} ${svFmt(sk2, v[sk2])} µm. Gib einen Wunschwert ein, dann rechnet die App den Vorschub dafür.` : 'Gib einen Wunschwert ein, dann rechnet die App den Vorschub dafür.'; }
 
     let top = '';
     if (svCleared) { top += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
@@ -2058,7 +2071,6 @@
     const m = A.mach;
     sum(`sum-${mode}-mach`, (mode === 'turn' ? [m.nmaxT ? 'n ' + m.nmaxT : '', m.pmaxT ? m.pmaxT + ' kW' : ''] : [m.nmax ? 'n ' + m.nmax : '', m.vfmax ? 'F ' + m.vfmax : '', m.pmax ? m.pmax + ' kW' : '']).filter(Boolean).join(' · ') || 'keine Grenzen eingetragen') + (A[mode].auto === 'off' ? ' · nur rechnen' : '');
     let html = '';
-    if (mode !== 'drill' && v.Rz && !g.Rz && !g.Ra) html += `<p class="foot">Mit diesem Vorschub wird die Oberfläche theoretisch etwa Rz ${nf(v.Rz, 2)} µm (Ra ${nf(v.Ra, 2)} µm).${mode === 'mill' ? ' Gilt, wenn alle Schneiden gleich hoch stehen.' : ''}</p>`;
     const steps = [];
     Object.keys(soft).forEach(k => steps.push({ t: `${SV[k].s} vorgeschlagen`, h: `${svFmt(k, soft[k])} ${SV[k].u}, aus der Empfehlung für ${esc(rec.mat.name)} und ${esc(tool.name)}.` }));
     r.steps.forEach(s => steps.push({ t: `${SV[s.out].s} ${SV[s.out][mode] || SV[s.out].all}`, h: `${esc(s.rule.f)} = <b>${svFmt(s.out, s.val)} ${SV[s.out].u}</b>` }));
@@ -2652,10 +2664,18 @@
     'ref-mat': t => { A.ref.mat = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); },
     'ref-go': () => refGo(),
     'sv-accept': t => acceptSuggestions(t.dataset.m),
+    'rt-edit': t => {   // Kachel wird zum Eingabefeld
+      const box = t.closest('.rt'), inp = box && $('input', box);
+      if (!inp || box.classList.contains('fixed')) return;
+      box.classList.add('edit');
+      inp.focus();
+      inp.addEventListener('blur', () => { if (!inp.value.trim()) box.classList.remove('edit'); }, { once: true });
+    },
+    'rt-reset': t => { const m = t.dataset.m, k = t.dataset.k; A[m][k] = ''; const inp = $(`#sv-${m}-${k}`); if (inp) inp.value = ''; const box = t.closest('.rt'); if (box) box.classList.remove('edit'); onApplyChange(m + '.' + k); },
     'tool-save': t => saveTool(t.dataset.m),
     'tool-load': t => loadTool(t.dataset.id),
     'tool-del': t => { const l = myTools(), x = l.find(y => y.id === t.dataset.id); if (x && window.confirm(`„${x.name}“ aus deinen Werkzeugen löschen?`)) { store.set('tools', l.filter(y => y !== x)); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); } },
-    'sv-clear': t => { const m = t.dataset.m; WK.SOLVE_VARS[m].forEach(k => { A[m][k] = ''; }); A[m].ord = []; saveA(); $$(`#card-${m} input`).forEach(x => { x.value = ''; }); computeSolve(m); const f = $(`#sv-${m}-d`); if (f) f.focus(); },
+    'sv-clear': t => { const m = t.dataset.m; WK.SOLVE_VARS[m].forEach(k => { A[m][k] = ''; }); A[m].ord = []; saveA(); $$(`#card-${m} input`).forEach(x => { x.value = ''; }); $$(`#card-${m} .rt.edit`).forEach(x => x.classList.remove('edit')); computeSolve(m); const f = $(`#sv-${m}-d`); if (f) f.focus(); },
     'fig-clear': t => { const g = t.dataset.g; Object.keys(A[g]).forEach(k => { if (k !== 'ord' && k !== 'mode' && k !== 'dir') A[g][k] = ''; }); A[g].ord = []; saveA(); $$(`[data-k^="${g}."]`).forEach(x => { if (x.tagName === 'INPUT') x.value = ''; }); computeCurrent(); const f = $(`[data-k="${g}.${g === 'tri' ? 'a' : 'D'}"]`); if (f) f.focus(); },
     'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },
     'iso-from': t => { setK('iso.q', t.dataset.v); goSection('iso'); },
