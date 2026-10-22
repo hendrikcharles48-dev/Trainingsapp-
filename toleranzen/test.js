@@ -145,7 +145,30 @@ eq('Foto: Abmaße mit Minus bleiben', fl('60 -0,1 -0,3'), ['60 −0,1/−0,3']);
 eq('Foto: + als ± vermutet', pd2.items.map(i => i.kind + ':' + i.label + ':' + !!i.guess), ['pm:60 ±0,1:true']);
 
 require('./werkstatt.js');
+require('./zerspanung.js');
 require('./test-werkstatt.js')(T, eq);
+{
+  const Z = T.Z, rr = (x, d) => Math.round(x * 10 ** d) / 10 ** d;
+  Z.MATERIALS.forEach(m => eq('Werkstoff hat Tabelle ' + m.id, !!Z.VC[m.cls] && Z.FEED[m.cls] > 0, true));
+  eq('Werkstoff-Kennungen eindeutig', new Set(Z.MATERIALS.map(m => m.id)).size, Z.MATERIALS.length);
+  eq('Werkzeug-Kennungen eindeutig', new Set(Z.TOOLS.map(t => t.id)).size, Z.TOOLS.length);
+  Object.values(Z.VC).forEach(row => eq('VC-Zeile 11 Spalten', row.length, 11));
+  const a = Z.recommend({ mode: 'mill', mat: 'c45', tool: 'vhm', d: 10, op: 'side' });
+  eq('VHM Ø10 in C45', [rr(a.vc[1], 0), rr(a.fz[1], 4)], [170, 0.045]);
+  const b = Z.recommend({ mode: 'mill', mat: '6082', tool: 'face', d: 80 });
+  eq('Messerkopf Alu', [rr(b.vc[1], 0), rr(b.fz[1], 3)], [900, 0.18]);
+  eq('Former in Guss ungeeignet', Z.recommend({ mode: 'drill', mat: 'gjl250', tool: 'form', d: 8 }).warn.length, 1);
+  const th = T.W.parseThread('M8');
+  const c = Z.recommend({ mode: 'drill', mat: 's235', tool: 'tap', thread: th });
+  eq('Gewindebohrer f = P', [c.fixedF, c.core], [1.25, 6.8]);
+  eq('Gewindeformer Kernloch', Z.recommend({ mode: 'drill', mat: 's235', tool: 'form', thread: th }).core, 7.38);
+  const d = Z.recommend({ mode: 'drill', mat: 's235', tool: 'ream', d: 10 });
+  eq('Reiben Vorbohrer', d.pre, [9.7, 9.8]);
+  const e = Z.recommend({ mode: 'turn', mat: '1.4301', tool: 'tfin' });
+  eq('Drehen Schlichten 1.4301', [rr(e.vc[1], 0), e.r], [198, 0.4]);
+  eq('Spanverdünnung', [rr(Z.chipThin(1, 10), 3), Z.chipThin(5, 10)], [1.667, 1]);
+  eq('Maschinengrenze', Z.limit({ n: 15000, vf: 500 }, { nmax: 12000, vfmax: 10000 }).map(x => x.k), ['n']);
+}
 
 console.log(`${count - fails} von ${count} Prüfungen bestanden`);
 process.exit(fails ? 1 : 0);

@@ -1,7 +1,7 @@
 /* Toleranzen – Oberfläche: Startliste mit Schnellsuche wie ein Tabellenbuch, darunter die Rechner und Tabellen */
 (function () {
   'use strict';
-  const T = window.TOL, WK = T.W;
+  const T = window.TOL, WK = T.W, ZZ = T.Z;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -451,9 +451,10 @@
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
     thread: { q: 'M8', kind: 'M', n: '' },
-    mill: { sk: 'Rz', d: '80', z: '10', r: '0,4', vc: '200', n: '', fz: '', f: '', vf: '', Rz: '6,3', Ra: '', ae: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'z', 'r', 'vc', 'Rz'] },
-    drill: { d: '10', vc: '80', n: '', f: '0,15', vf: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'vc', 'f'] },
-    turn: { sk: 'Rz', d: '50', r: '0,8', vc: '200', n: '', f: '0,2', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 'st', tool: 'hm', ord: ['d', 'r', 'vc', 'f'] },
+    mill: { sk: 'Rz', d: '10', z: '4', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', ord: ['d', 'z'] },
+    drill: { d: '8', vc: '', n: '', f: '', vf: '', Q: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', ord: ['d'] },
+    turn: { sk: 'Rz', d: '50', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 's235', tool: 'tmed', auto: 'on', ord: ['d'] },
+    mach: { nmax: '', vfmax: '', nmaxT: '' },
     sw: { d: '8' },
     torque: { d: '8', cls: '8.8' },
     weight: { shape: 'rund', d: '20', D: '', s: '', b: '', h: '', a: '', t: '', L: '1000', mat: '0', rho: '' },
@@ -470,6 +471,10 @@
     if (!Array.isArray(out.foto.items)) out.foto.items = [];
     if (!Array.isArray(out.chain.rows) || !out.chain.rows.length) out.chain.rows = A_DEF.chain.rows.map(r => Object.assign({}, r));
     out.secs = saved.secs && typeof saved.secs === 'object' ? saved.secs : {};
+    ['mill', 'drill', 'turn'].forEach(m => {   // alte Werkstoff- und Werkzeug-Kennungen
+      if (!T.Z.MATERIALS.some(x => x.id === out[m].mat)) out[m].mat = 's235';
+      if (!T.Z.TOOLS.some(x => x.id === out[m].tool && x.mode === m)) out[m].tool = A_DEF[m].tool;
+    });
     ['mill', 'turn'].forEach(m => {   // nur eine Oberflächenangabe sichtbar: die andere darf keine Vorgabe sein
       const o = out[m];
       if (!String(o.Rz || '').trim() && String(o.Ra || '').trim()) o.sk = 'Ra';
@@ -1855,28 +1860,6 @@
     WK.SOLVE_VARS[mode].forEach(k => { const x = optOf(A[mode][k]); if (x != null && x > 0) g[k] = x; });
     return g;
   }
-  function cardSolve(mode) {
-    const c = A[mode];
-    const mat = WK.MATERIALS_CUT.find(x => x.id === c.mat) || WK.MATERIALS_CUT[0];
-    const key = mode === 'mill' ? 'mill' : mode === 'drill' ? 'drill' : 'turn';
-    const rg = mat[key][c.tool === 'hss' ? 0 : 1];
-    const field = k => `<div class="field sv-f" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
-    return `<section class="card" id="card-${mode}">
-      <div class="msg info">${I.info}<div><b>Gib ein, was du weißt</b>, die App rechnet den Rest. <span class="calc-tag">Grün</span> = gerechnet. Tippst du in ein grünes Feld, wird es zur Vorgabe, und ein Wert, aus dem es kam, wird wieder gerechnet.</div></div>
-      <div class="fields">
-        <div class="field"><label for="sv-${mode}-mat">Werkstoff</label>${selInp(`sv-${mode}-mat`, mode + '.mat', WK.MATERIALS_CUT.map(m => [m.id, m.name]))}</div>
-        <div class="field"><span class="lbl">Schneidstoff</span>${segHTML(mode + '.tool', c.tool, [['hss', 'HSS'], ['hm', 'HM']])}</div>
-      </div>
-      <div class="ref-line">Richtwert vc ${rg[0]}–${rg[1]} m/min${mode === 'mill' ? ` · fz ${nf(mat.fz[0])}–${nf(mat.fz[1])} mm` : ''}
-        <button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="vc" data-v="${Math.round((rg[0] + rg[1]) / 2)}">vc ${Math.round((rg[0] + rg[1]) / 2)}</button>${mode === 'mill' ? `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="fz" data-v="${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}">fz ${nf((mat.fz[0] + mat.fz[1]) / 2, 3)}</button>` : ''}</div>
-      ${SV_GROUPS[mode].map(([t, ks]) => ks.includes('Rz')
-        ? `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields"><div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML(mode + '.sk', c.sk === 'Ra' ? 'Ra' : 'Rz', [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>${field(c.sk === 'Ra' ? 'Ra' : 'Rz')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`
-        : `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
-      <button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button>
-      <div class="result" id="res-${mode}" aria-live="polite"></div>
-    </section>`;
-  }
-  // Wird eine gerechnete Größe eingegeben, fliegt die älteste Vorgabe raus, aus der sie kam
   let svCleared = '';
   function solveHook(k) {
     const [mode, key] = k.split('.');
@@ -1901,63 +1884,212 @@
     st.ord.push(key);
     saveA();
   }
-  function computeSolve(mode) {
+  // Werkstoffauswahl, gruppiert nach ISO-Gruppe
+  const matSelect = (id, k) => `<div class="inp sel"><select id="${id}" data-k="${k}">${ZZ.GROUPS.map(g => `<optgroup label="${g.id} · ${esc(g.name)}">${ZZ.MATERIALS.filter(m => m.g === g.id).map(m => `<option value="${m.id}"${getK(k) === m.id ? ' selected' : ''}>${esc(m.name)}${m.alt ? ' · ' + esc(m.alt) : ''}</option>`).join('')}</optgroup>`).join('')}</select></div>`;
+  const myTools = () => { const t = store.get('tools', []); return Array.isArray(t) ? t : []; };
+  // Gewinde für Gewindebohrer und -former
+  const svThread = mode => { const t = ZZ.tool(A[mode].tool); return mode === 'drill' && t && t.thread ? WK.parseThread(A[mode].thr || '') : null; };
+
+  function cardSolve(mode) {
+    const c = A[mode];
+    const tool = ZZ.tool(c.tool) || ZZ.TOOLS.find(x => x.mode === mode);
+    const mat = ZZ.mat(c.mat);
+    const grp = ZZ.GROUPS.find(g => g.id === mat.g);
+    const field = k => `<div class="field sv-f" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
+    const favs = myTools().filter(t => t.mode === mode);
+    const mach = mode === 'turn' ? 'Drehmaschine' : 'Fräsmaschine';
+    return `<section class="card" id="card-${mode}">
+      <details class="mach"${(mode === 'turn' ? A.mach.nmaxT : A.mach.nmax) ? '' : ' open'}><summary>${I.info}<span>${mach}: ${mode === 'turn' ? (A.mach.nmaxT ? 'n max ' + esc(A.mach.nmaxT) : 'keine Grenze eingetragen') : (A.mach.nmax || A.mach.vfmax ? [A.mach.nmax ? 'n max ' + esc(A.mach.nmax) : '', A.mach.vfmax ? 'F max ' + esc(A.mach.vfmax) : ''].filter(Boolean).join(' · ') : 'keine Grenzen eingetragen')}</span>${I.chevR}</summary>
+        <div class="fields">${mode === 'turn'
+          ? `<div class="field"><label for="m-nT">Höchste Drehzahl</label>${bindNum('m-nT', 'mach.nmaxT', '1/min', 'z. B. 4000')}</div>`
+          : `<div class="field"><label for="m-n">Höchste Drehzahl</label>${bindNum('m-n', 'mach.nmax', '1/min', 'z. B. 12000')}</div><div class="field"><label for="m-vf">Höchster Vorschub</label>${bindNum('m-vf', 'mach.vfmax', 'mm/min', 'z. B. 10000')}</div>`}</div>
+        <p class="foot">Einmal eintragen, dann bleiben die Vorschläge unter diesen Grenzen.</p>
+      </details>
+      ${favs.length ? `<div class="sv-h">Meine Werkzeuge</div><div class="chips fav-chips">${favs.map(t => `<span class="fav"><button type="button" class="chip" data-act="tool-load" data-id="${esc(t.id)}">${esc(t.name)}</button><button type="button" class="fav-x" data-act="tool-del" data-id="${esc(t.id)}" aria-label="${esc(t.name)} löschen">${I.x}</button></span>`).join('')}</div>` : ''}
+      <div class="field"><label for="sv-${mode}-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span></label>${matSelect(`sv-${mode}-mat`, mode + '.mat')}<span class="hint-line">${esc(mat.what)}</span></div>
+      <div class="field"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>
+      ${tool.op ? `<div class="field"><span class="lbl">Bearbeitung</span>${segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap')}</div>` : ''}
+      ${tool.thread && mode === 'drill' ? `<div class="field"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>` : ''}
+      <div class="field"><span class="lbl">Fehlende Werte</span>${segHTML(mode + '.auto', c.auto, [['on', 'automatisch vorschlagen'], ['off', 'nur rechnen']])}</div>
+      <div class="msg info">${I.info}<div>Gib ein, was du weißt. <span class="tag-given">Blau</span> eingegeben, <span class="tag-soft">Orange</span> vorgeschlagen, <span class="calc-tag">Grün</span> gerechnet. Klein über jedem Feld steht die Empfehlung für Werkstoff und Werkzeug.</div></div>
+      ${SV_GROUPS[mode].map(([t, ks]) => ks.includes('Rz')
+        ? `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields"><div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML(mode + '.sk', c.sk === 'Ra' ? 'Ra' : 'Rz', [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>${field(c.sk === 'Ra' ? 'Ra' : 'Rz')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`
+        : `<div class="sv-group"><div class="sv-h">${t}</div><div class="fields">${ks.map(field).join('')}</div></div>`).join('')}
+      <div class="btn-row"><button type="button" class="btn soft" data-act="sv-accept" data-m="${mode}">Vorschläge übernehmen</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button></div>
+      <button type="button" class="btn plain" data-act="tool-save" data-m="${mode}">${I.plus} Dieses Werkzeug merken</button>
+      <div class="result" id="res-${mode}" aria-live="polite"></div>
+    </section>`;
+  }
+
+  // Rechnen mit Vorschlägen: was nicht eingegeben und nicht ableitbar ist, kommt aus der Empfehlung
+  const SV_LAST = {};
+  function solveWithSuggestions(mode) {
+    const c = A[mode];
     const g = svGiven(mode);
-    const r = WK.solve(mode, g);
+    const tool = ZZ.tool(c.tool) || ZZ.TOOLS.find(x => x.mode === mode);
+    const thr = svThread(mode);
+    const hard = {};
+    if (thr && thr.ok) { g.d = thr.d; hard.d = true; g.f = thr.P; hard.f = true; delete g.vf; }
+    let r = WK.solve(mode, g);
+    const rec = ZZ.recommend({ mode, mat: c.mat, tool: tool.id, d: r.val.d, op: c.op, ae: r.val.ae, thread: thr });
+    const soft = {}, info = [];
+    const known = ks => ks.some(k => r.val[k] != null);
+    const resolve = () => { r = WK.solve(mode, Object.assign({}, g, soft)); };
+    if (c.auto !== 'off' && !rec.warn.length) {
+      if (mode === 'turn' && !known(['r']) && rec.r) { soft.r = rec.r; resolve(); }   // zuerst die Platte, dann kann eine Oberflächenvorgabe den Vorschub bestimmen
+      if (!known(['vc', 'n']) && rec.vc) { soft.vc = rec.vc[1]; resolve(); }
+      if (mode === 'mill' && !known(['fz', 'f', 'vf']) && rec.fz) { soft.fz = rec.fz[1]; resolve(); }
+      if (mode !== 'mill' && !known(['f', 'vf']) && rec.f) { soft.f = rec.f[1]; resolve(); }
+      if (mode === 'mill' && tool.op && !known(['ae']) && rec.ae && c.op !== 'slot') { /* ae nur als Empfehlung anzeigen */ }
+      if (mode === 'mill' && c.op === 'slot' && !known(['ae']) && r.val.d) { soft.ae = r.val.d; resolve(); }
+    }
+    // Maschinengrenzen
+    const mach = mode === 'turn' ? { nmax: optOf(A.mach.nmaxT) } : { nmax: optOf(A.mach.nmax), vfmax: optOf(A.mach.vfmax) };
+    const lim = [];
+    let over = ZZ.limit(r.val, mach);
+    if (over.find(o => o.k === 'n')) {
+      if (soft.vc != null && g.n == null) { delete soft.vc; soft.n = mach.nmax; resolve(); info.push(`Drehzahl auf das Maschinenmaximum ${nf(mach.nmax, 0)} 1/min begrenzt, dadurch ist vc kleiner als empfohlen.`); }
+      else lim.push({ k: 'n', max: mach.nmax });
+    }
+    over = ZZ.limit(r.val, mach);
+    if (over.find(o => o.k === 'vf')) {
+      const sk = soft.fz != null ? 'fz' : soft.f != null ? 'f' : null;
+      if (sk && g.vf == null) { delete soft[sk]; soft.vf = mach.vfmax; resolve(); info.push(`Vorschub auf das Maschinenmaximum F${nf(mach.vfmax, 0)} begrenzt, dadurch ist ${sk} kleiner als empfohlen.`); }
+      else lim.push({ k: 'vf', max: mach.vfmax });
+    }
+    return { r, g, soft, hard, rec, tool, thr, info, lim, mach };
+  }
+
+  function computeSolve(mode) {
+    const c = A[mode];
+    const S0 = solveWithSuggestions(mode);
+    const { r, g, soft, hard, rec, tool, thr, info, lim } = S0;
+    SV_LAST[mode] = S0;
+    const v = r.val;
+    // Felder: eingegeben, vorgeschlagen, gerechnet
     WK.SOLVE_VARS[mode].forEach(k => {
       const inp = $(`#sv-${mode}-${k}`);
       if (!inp) return;
       const box = inp.closest('.inp'), fld = $(`#svf-${mode}-${k}`);
-      const isCalc = g[k] == null && r.val[k] != null;
-      inp.placeholder = isCalc ? svFmt(k, r.val[k]) : g[k] == null ? '?' : '';
+      const isHard = hard[k], isSoft = soft[k] != null, isGiven = g[k] != null && !isHard;
+      const isCalc = !isGiven && !isSoft && !isHard && v[k] != null;
+      if (isHard) inp.value = svFmt(k, v[k]);
+      inp.readOnly = !!isHard;
+      inp.placeholder = (isSoft || isCalc) && v[k] != null ? svFmt(k, v[k]) : isGiven || isHard ? '' : '?';
       box.classList.toggle('calc', isCalc);
-      if (fld) fld.classList.toggle('given', g[k] != null);
+      box.classList.toggle('soft', isSoft);
+      box.classList.toggle('fixed', !!isHard);
+      if (fld) fld.classList.toggle('given', isGiven);
+      const rl = $(`#rec-${mode}-${k}`);
+      if (rl) rl.innerHTML = recLine(mode, k, rec, v, tool, thr);
     });
-    const v = r.val;
     const oth = $(`#sv-${mode}-other`);
-    if (oth) { const ok = A[mode].sk === 'Ra' ? 'Rz' : 'Ra'; oth.textContent = v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm (theoretisches Profil der Schneidenecke, Rz ≈ 3,9 · Ra)` : 'Rz und Ra hängen hier über das theoretische Profil zusammen: Rz ≈ 3,9 · Ra.'; }
+    if (oth) { const ok = c.sk === 'Ra' ? 'Rz' : 'Ra'; oth.textContent = v[ok] != null ? `Entspricht ${ok} ≈ ${svFmt(ok, v[ok])} µm (theoretisches Profil der Schneidenecke, Rz ≈ 3,9 · Ra)` : 'Gibst du die Oberfläche ein, rechnet die App den passenden Vorschub.'; }
+
     let html = '';
     if (svCleared) { html += msgHTML(`Ich habe ${esc(SV[svCleared].s)} geleert, weil du einen Wert eingegeben hast, der sonst daraus gerechnet würde.`); svCleared = ''; }
+    rec.warn.forEach(w => { html += msgHTML(esc(w), 'warn'); });
     if (r.clash.length) {
-      const c = r.clash[0];
-      html += msgHTML(`Das passt nicht zusammen: nach ${esc(c.rule.f)} müsste ${esc(SV[c.rule.out].s)} = ${svFmt(c.rule.out, c.want)} ${SV[c.rule.out].u} sein, eingegeben ist ${svFmt(c.rule.out, c.have)}. Lass einen der Werte leer.`, 'warn');
+      const cl = r.clash[0];
+      html += msgHTML(`Das passt nicht zusammen: nach ${esc(cl.rule.f)} müsste ${esc(SV[cl.rule.out].s)} = ${svFmt(cl.rule.out, cl.want)} ${SV[cl.rule.out].u} sein, eingegeben ist ${svFmt(cl.rule.out, cl.have)}. Lass einen der Werte leer.`, 'warn');
     }
-    // Fürs Programm
+    lim.forEach(l => { html += msgHTML(`${l.k === 'n' ? 'Die Drehzahl' : 'Der Vorschub'} ${svFmt(l.k, v[l.k])} liegt über dem Maximum deiner Maschine (${nf(l.max, 0)}). <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${l.k}" data-v="${l.max}">Auf ${nf(l.max, 0)} begrenzen</button>`, 'warn'); });
+    info.forEach(t => { html += msgHTML(esc(t)); });
+    // Hauptergebnis: S und F
+    if (v.n || v.vf) {
+      html += `<div class="sf-hero"><div><span>Drehzahl</span><b>S${v.n ? Math.round(v.n) : '?'}</b></div><div><span>${mode === 'turn' ? 'Vorschub je U' : 'Vorschub'}</span><b>F${mode === 'turn' ? (v.f ? ncNum(v.f) : '?') : (v.vf ? Math.round(v.vf) : '?')}</b></div></div>`;
+    }
     if (mode === 'turn') {
       const lines = [];
-      if (v.vc) lines.push([`G96 S${Math.round(v.vc)}${v.f ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, F in mm/U (G95). Drehzahl begrenzen (G92/LIMS)']);
+      if (v.vc) lines.push([`G96 S${Math.round(v.vc)}${v.f ? ' F' + ncNum(v.f) : ''}`, 'konstante Schnittgeschwindigkeit, F in mm/U (G95). Drehzahl begrenzen (G92/LIMS)' + (S0.mach.nmax ? ` auf ${nf(S0.mach.nmax, 0)}` : '')]);
       if (v.n) lines.push([`G97 S${Math.round(v.n)}${v.f ? ' F' + ncNum(v.f) : ''}`, v.d ? `feste Drehzahl für Ø ${nf(v.d)} mm` : 'feste Drehzahl']);
       if (lines.length) html += ncHTML(lines);
     } else if (v.n || v.vf) {
       const lines = [[`${v.n ? 'S' + Math.round(v.n) : ''}${v.vf ? ' F' + Math.round(v.vf) : ''} M3`.trim(), 'F in mm/min (G94)']];
-      if (mode === 'drill' && v.f) lines.push([`${v.n ? 'S' + Math.round(v.n) + ' ' : ''}F${ncNum(v.f)}`, 'oder F in mm/U (G95)']);
+      if (mode === 'drill' && v.f) lines.push([`${v.n ? 'S' + Math.round(v.n) + ' ' : ''}F${ncNum(v.f)}`, thr && thr.ok ? 'F in mm/U (G95) = Steigung, im Gewindezyklus' : 'oder F in mm/U (G95)']);
       html += ncHTML(lines);
     }
-    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q'].includes(k));
-    if (missing.length) html += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${hintMissing(mode, v)}`);
-    if (mode !== 'drill' && v.Rz) html += `<p class="foot">Rauheit theoretisch aus der Schneidenecke: Rz = ${mode === 'mill' ? 'fz' : 'f'}² / (8 · rε). ${mode === 'mill' ? 'Beim Fräsen gilt das, wenn alle Schneiden gleich hoch stehen. Rund- und Planlauf der Platten machen es rauer. Zum Schlichten mit Messerkopf eine Planschneide (Wiper) nehmen: dann den Vorschub je Umdrehung f kleiner als ihre Breite halten (Herstellerangabe).' : 'In der Praxis wird es durch Schwingungen und Verschleiß etwas rauer.'}</p>`;
-    if (r.steps.length) html += calcHTML('sv-' + mode, r.steps.map(s => ({ t: `${SV[s.out].s} ${SV[s.out][mode] || SV[s.out].all}`, h: `${esc(s.rule.f)} = <b>${svFmt(s.out, s.val)} ${SV[s.out].u}</b>` })));
+    // Oberfläche gegen Werkzeug prüfen
+    const fk = mode === 'mill' ? 'fz' : 'f', rf = mode === 'mill' ? rec.fz : rec.f;
+    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] > rf[2] * 1.05) html += msgHTML(`Für diese Oberfläche wäre ${fk} = ${svFmt(fk, v[fk])} mm, mehr als für das Werkzeug empfohlen (bis ${svFmt(fk, rf[2])}). Mit ${fk} = ${svFmt(fk, rf[1])} wird die Oberfläche besser als verlangt. <button type="button" class="btn" data-act="sv-take" data-m="${mode}" data-k="${fk}" data-v="${T.fmt(rf[1], 0, 4)}">${fk} ${svFmt(fk, rf[1])} nehmen</button>`, 'warn');
+    if (rf && v[fk] && (g.Rz || g.Ra) && v[fk] < rf[0] * 0.5) html += msgHTML(`Für diese Oberfläche ist ${fk} = ${svFmt(fk, v[fk])} mm sehr klein. Die Schneide kann dann reiben statt schneiden. Besser: größerer Eckenradius${mode === 'mill' ? ' oder eine Planschneide (Wiper)' : ' oder eine Wiper-Platte'}.`, 'warn');
+    if (thr && !thr.ok) html += msgHTML(esc(thr.error), 'warn');
+    if (rec.core) html += `<div class="kv">${kv('Kernloch', `Ø ${T.fmt(rec.core, 0, 2)} mm<small>${tool.id === 'form' ? 'für Gewindeformen' : 'für Gewindebohren'}</small>`)}${kv('Steigung = Vorschub', T.fmt(thr.P, 0, 3) + ' mm/U')}</div>`;
+    if (rec.pre) html += `<div class="kv">${kv('Vorbohren für Reiben', `Ø ${T.fmt(rec.pre[0], 0, 2)} bis ${T.fmt(rec.pre[1], 0, 2)} mm`, true)}</div>`;
+    if (rec.notes.length) html += `<div class="tips"><div class="sv-h">Tipps für dieses Werkzeug</div><ul>${rec.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
+    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q', 'Rz', 'Ra', 'r'].includes(k) && !(mode === 'mill' && k === 'z'));
+    if (missing.length) html += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${!v.d ? 'Gib den Durchmesser ein.' : mode === 'mill' && !v.z ? 'Gib die Zahl der Schneiden ein.' : ''}`);
+    if (mode === 'mill' && !v.z && v.fz) html += msgHTML('Für den Vorschub F fehlt noch die Zahl der Schneiden z.');
+    if (mode !== 'drill' && v.Rz && !g.Rz && !g.Ra) html += `<p class="foot">Mit diesem Vorschub wird die Oberfläche theoretisch etwa Rz ${nf(v.Rz, 2)} µm (Ra ${nf(v.Ra, 2)} µm). ${mode === 'mill' ? 'Beim Fräsen gilt das, wenn alle Schneiden gleich hoch stehen.' : ''}</p>`;
+    const steps = [];
+    Object.keys(soft).forEach(k => steps.push({ t: `${SV[k].s} vorgeschlagen`, h: `${svFmt(k, soft[k])} ${SV[k].u}, aus der Empfehlung für ${esc(rec.mat.name)} und ${esc(tool.name)}.` }));
+    r.steps.forEach(s => steps.push({ t: `${SV[s.out].s} ${SV[s.out][mode] || SV[s.out].all}`, h: `${esc(s.rule.f)} = <b>${svFmt(s.out, s.val)} ${SV[s.out].u}</b>` }));
+    if (steps.length) html += calcHTML('sv-' + mode, steps);
     out('res-' + mode, html);
   }
-  function hintMissing(mode, v) {
-    if (!v.n && !v.vc) return 'Gib vc oder die Drehzahl ein.';
-    if (!v.d && !(v.vc && v.n)) return 'Gib den Durchmesser ein.';
-    if (mode === 'mill' && !v.fz && !v.f && !v.vf) return v.r ? 'Gib fz ein oder die gewünschte Oberfläche Rz bzw. Ra.' : 'Gib fz ein, oder Eckenradius und gewünschte Oberfläche.';
-    if (mode !== 'mill' && !v.f && !v.vf) return mode === 'turn' && v.r ? 'Gib f ein oder die gewünschte Oberfläche.' : 'Gib den Vorschub f ein.';
-    if (mode === 'mill' && !v.z) return 'Gib die Zahl der Schneiden ein.';
-    if (!v.r && mode !== 'drill') return 'Für die Oberfläche fehlt der Eckenradius.';
+  // Kleine Empfehlung über einem Feld
+  function recLine(mode, k, rec, v, tool, thr) {
+    const rr = (a, dec) => `${T.fmt(a[0], 0, dec)}–${T.fmt(a[2], 0, dec)}`;
+    if (k === 'vc' && rec.vc) return `Empfohlen ${rr(rec.vc, 0)}`;
+    if (k === 'n' && rec.vc && v.d) return `Empfohlen ${Math.round(rec.vc[0] * 1000 / (Math.PI * v.d))}–${Math.round(rec.vc[2] * 1000 / (Math.PI * v.d))}`;
+    if (k === 'fz' && rec.fz) return `Empfohlen ${rr(rec.fz, 3)}`;
+    if (k === 'f' && rec.fixedF) return 'Steigung des Gewindes';
+    if (k === 'f' && rec.f) return `Empfohlen ${rr(rec.f, 3)}`;
+    if (k === 'f' && mode === 'mill' && rec.fz && v.z) return `≈ ${T.fmt(rec.fz[0] * v.z, 0, 2)}–${T.fmt(rec.fz[2] * v.z, 0, 2)}`;
+    if (k === 'vf' && v.n && mode === 'mill' && rec.fz && v.z) return `≈ ${Math.round(rec.fz[0] * v.z * v.n)}–${Math.round(rec.fz[2] * v.z * v.n)}`;
+    if (k === 'ae' && rec.ae) return `Empfohlen ${rr(rec.ae, 1)}`;
+    if (k === 'ap' && rec.ap) return `Empfohlen ${rr(rec.ap, 1)}`;
+    if (k === 'r' && rec.r) return `Platte meist ${T.fmt(rec.r, 0, 1)}`;
+    if (k === 'r' && mode === 'mill' && v.r && (A[mode].Rz || A[mode].Ra) && !A[mode].r) return 'nötig für diese Oberfläche';
+    if (k === 'd' && thr && thr.ok) return 'aus dem Gewinde';
+    if (k === 'z' && tool.id === 'face') return 'Platten im Messerkopf';
+    if (k === 'z' && rec.mat.cls === 'N1') return 'Alu: 2–3 Schneiden';
     return '';
   }
 
+  // Alle Vorschläge als Eingaben übernehmen
+  function acceptSuggestions(mode) {
+    const S0 = SV_LAST[mode];
+    if (!S0) return;
+    Object.keys(S0.soft).forEach(k => { A[mode][k] = T.fmt(S0.soft[k], 0, SV[k].dec).replace('−', '-'); A[mode].ord = (A[mode].ord || []).filter(x => x !== k).concat(k); });
+    saveA();
+    $('#sec-body').innerHTML = sectionHTML();
+    computeCurrent();
+  }
+  function saveTool(mode) {
+    const c = A[mode], t = ZZ.tool(c.tool);
+    const d = optOf(c.d), z = optOf(c.z), r = optOf(c.r);
+    const def = `${t ? t.name.replace(/ \(.*\)/, '') : 'Werkzeug'}${d ? ' Ø' + nf(d) : ''}${z ? ' z' + nf(z, 0) : ''}${r ? ' r' + nf(r) : ''}`;
+    let name = def;
+    try { const p = window.prompt('Name für das Werkzeug', def); if (p === null) return; name = p.trim() || def; } catch (e) { /* ohne Eingabefenster den Vorschlag nehmen */ }
+    const list = myTools();
+    list.push({ id: 't' + Date.now(), name, mode, tool: c.tool, op: c.op, thr: c.thr, d: c.d, z: c.z, r: c.r });
+    store.set('tools', list);
+    $('#sec-body').innerHTML = sectionHTML();
+    computeCurrent();
+  }
+  function loadTool(id) {
+    const t = myTools().find(x => x.id === id);
+    if (!t) return;
+    const c = A[t.mode];
+    ['tool', 'op', 'thr'].forEach(k => { if (t[k] != null) c[k] = t[k]; });
+    ['d', 'z', 'r'].forEach(k => { if (k in c) c[k] = t[k] || ''; });
+    c.ord = ['d', 'z', 'r'].filter(k => String(c[k] || '').trim());
+    WK.SOLVE_VARS[t.mode].forEach(k => { if (!['d', 'z', 'r', 'Rz', 'Ra'].includes(k)) c[k] = ''; });
+    saveA();
+    $('#sec-body').innerHTML = sectionHTML();
+    computeCurrent();
+  }
   function cardCutRef() {
-    const range = r => `${r[0]}–${r[1]}`;
+    const cols = [['vhm', 'Schaftfräser VHM'], ['wsp', 'Messerkopf WSP'], ['hssm', 'Fräser HSS'], ['dvhm', 'Bohrer VHM'], ['dhss', 'Bohrer HSS'], ['tap', 'Gewinde­bohrer'], ['turn', 'Drehen HM']];
+    const fam = ['vhm', 'hssm', 'wsp', 'dhss', 'dvhm', 'dwsp', 'ream', 'tap', 'form', 'turn', 'turnhss'];
+    const v = (m, f) => { const b = ZZ.VC[m.cls][fam.indexOf(f)]; return b == null ? '–' : String(Math.round(b * m.k / 5) * 5); };
     return `<section class="card">
-      <div class="tbl-cap">Schnittgeschwindigkeit vc in m/min, HSS und Hartmetall (HM)</div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Werkstoff</th><th scope="col">Fräsen HSS</th><th scope="col">Fräsen HM</th><th scope="col">Bohren HSS</th><th scope="col">Bohren HM</th><th scope="col">Drehen HSS</th><th scope="col">Drehen HM</th><th scope="col">fz Fräsen mm</th></tr></thead>
-      <tbody>${WK.MATERIALS_CUT.map(m => `<tr><th scope="row">${esc(m.name)}<small class="tbl-sub">${esc(m.ex)}</small></th><td>${range(m.mill[0])}</td><td>${range(m.mill[1])}</td><td>${range(m.drill[0])}</td><td>${range(m.drill[1])}</td><td>${range(m.turn[0])}</td><td>${range(m.turn[1])}</td><td>${nf(m.fz[0])}–${nf(m.fz[1])}</td></tr>`).join('')}</tbody></table></div>
-      <div class="tbl-note"><p><b>Richtwerte zum Einstieg.</b> Die Angaben des Werkzeugherstellers gehen immer vor. Beschichtung, Kühlung, Aufspannung und Maschine verschieben die Werte stark.</p>
-      <p><b>Bohren:</b> Vorschub f je Umdrehung etwa 0,01 bis 0,02 · d bei HSS in Stahl (Ø 10: 0,1 bis 0,2 mm). <b>Drehen:</b> Schruppen f 0,2 bis 0,5 mm, Schlichten 0,05 bis 0,15 mm.</p>
-      <p><b>Fräsen:</b> fz bei kleinen Fräsern (unter 6 mm) am unteren Ende wählen. Bei schmalem Eingriff (ae klein) darf fz höher sein, weil der Span dünner wird.</p></div>
+      <div class="tbl-cap">Schnittgeschwindigkeit vc in m/min (Mittelwert, etwa ±20 %)</div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Werkstoff</th>${cols.map(c => `<th scope="col">${c[1]}</th>`).join('')}</tr></thead>
+      <tbody>${ZZ.GROUPS.map(g => `<tr class="grp"><th scope="row" colspan="${cols.length + 1}"><span class="grp-dot" style="--c:${g.color}">${g.id}</span> ${esc(g.name)}</th></tr>` + ZZ.MATERIALS.filter(m => m.g === g.id).map(m => `<tr><th scope="row">${esc(m.name)}<small class="tbl-sub">${esc(m.alt)}</small></th>${cols.map(c => `<td>${v(m, c[0])}</td>`).join('')}</tr>`).join('')).join('')}</tbody></table></div>
+      <div class="tbl-note"><p><b>Richtwerte</b> für beschichtete Werkzeuge, stabile Aufspannung und Kühlung. Die Angaben des Werkzeugherstellers gehen immer vor. Ein Strich heißt: Werkzeug für diesen Werkstoff nicht üblich.</p>
+      <p>Im Reiter Fräsen, Bohren oder Drehen rechnet die App daraus mit deinem Durchmesser Drehzahl und Vorschub und zeigt die Empfehlung klein über jedem Feld.</p></div>
     </section>`;
   }
 
@@ -2298,7 +2430,7 @@
       <h3>Schnellsuche</h3>
       <p>Auf der Startseite: M8 oder M10x1 für Gewinde, G1/2 oder 1/4-20 UNC, 6H7 oder 30g6 für eine ISO-Toleranz, 25H7/g6 für eine Passung, SW13 für eine Schlüsselweite, N7 für eine Rauheitsklasse oder einfach ein Stichwort wie Kernloch.</p>
       <h3>Bedienen</h3>
-      <p>Reihenfolge ändern: In der Startliste und bei den Reitern oben einen Eintrag gedrückt halten und verschieben. Bei Dreieck, Kegel und Lochkreis die Seite oder den Winkel in der Skizze antippen, dann den Wert eingeben. Zerspanung: Bei Fräsen, Bohren und Drehen gibst du ein, was du weißt (zum Beispiel Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl und gewünschte Rautiefe), der Rest wird gerechnet, mit fertigen Zeilen fürs Programm (S, F).</p>
+      <p>Reihenfolge ändern: In der Startliste und bei den Reitern oben einen Eintrag gedrückt halten und verschieben. Bei Dreieck, Kegel und Lochkreis die Seite oder den Winkel in der Skizze antippen, dann den Wert eingeben. Zerspanung: Werkstoff und (wenn du willst) Werkzeug wählen, die App schlägt vc und Vorschub vor und zeigt die Empfehlung klein über jedem Feld. Deine Maschinengrenzen und eigene Werkzeuge kannst du speichern. Bei Fräsen, Bohren und Drehen gibst du ein, was du weißt (zum Beispiel Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl und gewünschte Rautiefe), der Rest wird gerechnet, mit fertigen Zeilen fürs Programm (S, F).</p>
       <h3>Grundlagen</h3>
       <ul><li>ISO 286-1 und -2: Grundtoleranzen, Grundabmaße, Passungen</li><li>ISO 2768-1 und -2, ISO 22081: Allgemeintoleranzen</li><li>ISO 1101: Form und Lage</li><li>ISO 68-1, 261, 724, 228-1, 2904, ASME B1.1: Gewinde · DIN 336: Kernlöcher</li><li>ISO 4014/4017/4032, ISO 4762, 10642, 7380, 4026 bis 4029, ISO 273, DIN 974-1: Schrauben</li><li>VDI 2230 Blatt 1: Anziehdrehmomente · ISO 1302: Rauheit</li></ul>
       <h3>Wichtig</h3>
@@ -2321,7 +2453,7 @@
     keepLatest(k);
     solveHook(k);
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (['gen.tab', 'gen.mode', 'mill.tool', 'mill.mat', 'drill.tool', 'drill.mat', 'turn.tool', 'turn.mat', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
+    if (['gen.tab', 'gen.mode', 'mill.tool', 'mill.mat', 'mill.op', 'mill.auto', 'drill.tool', 'drill.mat', 'drill.auto', 'turn.tool', 'turn.mat', 'turn.auto', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
       const ae = document.activeElement, id = ae && ae.id;
       $('#sec-body').innerHTML = sectionHTML();
       if (id && ae.tagName === 'SELECT') { const n = $('#' + id); if (n) n.focus({ preventScroll: true }); }
@@ -2346,6 +2478,10 @@
     'thread-pick': t => { A.thread.q = t.dataset.v; saveA(); if (S.page === 'thread' && curSection().id === 'thread') { $('#th-q').value = t.dataset.v; computeThread(); } else goSection('thread'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sw-pick': t => { A.sw.d = t.dataset.v; saveA(); goSection('sw'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sv-take': t => { const m = t.dataset.m, k = t.dataset.k; const inp = $(`[data-k="${m}.${k}"]`); A[m][k] = t.dataset.v; if (inp) inp.value = t.dataset.v; onApplyChange(m + '.' + k); },
+    'sv-accept': t => acceptSuggestions(t.dataset.m),
+    'tool-save': t => saveTool(t.dataset.m),
+    'tool-load': t => loadTool(t.dataset.id),
+    'tool-del': t => { const l = myTools(), x = l.find(y => y.id === t.dataset.id); if (x && window.confirm(`„${x.name}“ aus deinen Werkzeugen löschen?`)) { store.set('tools', l.filter(y => y !== x)); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); } },
     'sv-clear': t => { const m = t.dataset.m; WK.SOLVE_VARS[m].forEach(k => { A[m][k] = ''; }); A[m].ord = []; saveA(); $$(`#card-${m} input`).forEach(x => { x.value = ''; }); computeSolve(m); const f = $(`#sv-${m}-d`); if (f) f.focus(); },
     'fig-clear': t => { const g = t.dataset.g; Object.keys(A[g]).forEach(k => { if (k !== 'ord' && k !== 'mode' && k !== 'dir') A[g][k] = ''; }); A[g].ord = []; saveA(); $$(`[data-k^="${g}."]`).forEach(x => { if (x.tagName === 'INPUT') x.value = ''; }); computeCurrent(); const f = $(`[data-k="${g}.${g === 'tri' ? 'a' : 'D'}"]`); if (f) f.focus(); },
     'fit-equiv': t => { setK('fit.hole', t.dataset.h); setK('fit.shaft', t.dataset.s); $('#p-h').value = t.dataset.h; $('#p-s').value = t.dataset.s; onApplyChange('fit.hole'); },

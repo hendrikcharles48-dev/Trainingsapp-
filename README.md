@@ -33,7 +33,7 @@ In dieser Version liegen die Daten nur auf dem Gerät. Über Einstellungen → B
 Eigenständige Werkstatt-App im iOS-Design (Hell und Dunkel) für Zerspanungsmechaniker, im Ordner `toleranzen/`. Aufbau wie ein Tabellenbuch: Startseite mit Schnellsuche (z. B. M3, 6H7, 25H7/g6, G1/2, SW13, N7) und einer Liste der Bereiche.
 
 - **Toleranzen:** ISO 286 (alle Grundabmaße a bis zc), Passung, Allgemeintoleranzen (ISO 2768, ISO 22081), Winkel, Form und Lage mit allen Symbolen, Maßkette, Foto einer Zeichnung mit Maßerkennung
-- **Zerspanung:** Fräsen, Bohren, Drehen als Löser: eingeben, was man weiß (z. B. Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl, gewünschtes Rz), der Rest wird gerechnet, mit NC-Zeilen (S, F). Dazu Richtwerte, Rauheit und Gleitschleifen
+- **Zerspanung:** Schnittdaten-Helfer mit 44 gängigen Werkstoffen (P, M, K, N, S, H) und 23 Werkzeugarten (Schaftfräser, Messerkopf, Fasen-, Kugel-, Gewindefräser, Bohrer, Anbohrer, Senker, Reibahle, Gewindebohrer und -former, Drehplatten). Empfehlungen klein über jedem Feld, fehlende Werte werden vorgeschlagen, Maschinengrenzen und eigene Werkzeuge speicherbar (`zerspanung.js`). Fräsen, Bohren, Drehen als Löser: eingeben, was man weiß (z. B. Messerkopf Ø80, 10 Platten, Eckenradius 0,4, Drehzahl, gewünschtes Rz), der Rest wird gerechnet, mit NC-Zeilen (S, F). Dazu Richtwerte, Rauheit und Gleitschleifen
 - **Gewinde und Schrauben:** M, MF, G, UNC, UNF, Tr mit Kernloch, Schlüsselweiten, Durchgangslöcher, Senkungen, Anziehdrehmomente
 - **Geometrie:** Dreieck (rechtwinklig, beliebig), Kegel, Lochkreis – Maße direkt in der Skizze antippen –, Gewicht
 
@@ -44,6 +44,7 @@ Startliste und Reiter lassen sich durch Gedrückthalten umsortieren. Überall mi
 ## Dateien
 - `tables.js`: Normtabellen (ISO 286-1, ISO 2768-1, ISO 2768-2)
 - `calc.js`: Rechenkern Toleranzen mit Rechenwegen in ganzen Sätzen
+- `zerspanung.js`: Werkstoffe, Werkzeuge, empfohlene Schnittdaten
 - `werkstatt.js`: Gewinde, Schrauben, Drehmomente, Schnittdaten, Gewicht, Dreieck, Rauheit, Gleitschleifen, Schnellsuche
 - `app.js`, `style.css`, `index.html`: Oberfläche
 - `test.js`, `test-werkstatt.js`: Prüfen alles gegen Normwerte (`node toleranzen/test.js`)

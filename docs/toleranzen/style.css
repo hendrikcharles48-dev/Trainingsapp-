@@ -600,3 +600,33 @@ table.tbl { border-collapse: separate; border-spacing: 0; font-size: 14px; font-
 .info-bar .chev { width: 16px; height: 16px; color: var(--label-3); flex: none; stroke-width: 2.4; }
 .info-bar:active { background: var(--fill-2); }
 @media (max-width: 350px) { .tile { min-height: 150px; } .tile-t { font-size: 17px; } }
+/* Zerspanungs-Helfer */
+.rec { font-size: 12px; font-weight: 600; color: var(--orange); min-height: 1.2em; margin-top: -4px; }
+.rec:empty { visibility: hidden; }
+.inp.soft { background: var(--orange-soft); }
+.inp.soft input::placeholder { color: var(--orange); font-weight: 700; opacity: 1; }
+.inp.fixed { background: var(--fill-2); }
+.inp.fixed input { color: var(--label-2); }
+.tag-given { color: var(--tint); font-weight: 700; }
+.tag-soft { color: var(--orange); font-weight: 700; }
+.sf-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sf-hero > div { background: var(--tint-soft); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; }
+.sf-hero span { font-size: 13px; color: var(--label-2); font-weight: 600; }
+.sf-hero b { font: 800 30px/1.1 var(--mono); letter-spacing: -.01em; }
+details.mach { background: var(--card-2); border-radius: 14px; padding: 0 14px; }
+details.mach summary { list-style: none; display: flex; align-items: center; gap: 10px; min-height: 48px; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+details.mach summary::-webkit-details-marker { display: none; }
+details.mach summary svg { width: 18px; height: 18px; color: var(--tint); flex: none; }
+details.mach summary span { flex: 1; }
+details.mach summary .chev { width: 14px; height: 14px; color: var(--label-3); transition: transform .2s; }
+details.mach[open] summary .chev { transform: rotate(90deg); }
+details.mach > .fields, details.mach > .foot { margin-bottom: 12px; }
+.fav { display: inline-flex; align-items: center; flex: none; background: var(--tint-soft); border-radius: 999px; }
+.fav .chip { background: none; padding-right: 4px; }
+.fav-x { width: 30px; height: 30px; display: grid; place-items: center; color: var(--tint); }
+.fav-x svg { width: 14px; height: 14px; stroke-width: 2.4; }
+.grp-dot { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding-inline: 5px; border-radius: 6px; background: var(--c); color: #fff; font-size: 12px; font-weight: 800; vertical-align: 1px; }
+.tips { background: var(--card-2); border-radius: 14px; padding: 12px 14px; }
+.tips ul { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; line-height: 1.4; }
+.tbl tr.grp th { background: var(--card-2); font-size: 13px; text-align: left; }
+.msg .btn { width: auto; display: inline-flex; padding-inline: 14px; }
