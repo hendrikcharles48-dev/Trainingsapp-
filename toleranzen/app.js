@@ -454,7 +454,7 @@
     mill: { sk: 'Rz', d: '10', z: '4', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', holder: 'shrink', cool: 'emul', L: '', lc: '', way: '', ord: ['d', 'z'] },
     drill: { d: '8', vc: '', n: '', f: '', vf: '', Q: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', holder: 'er', cool: 'emul', depth: '', ord: ['d'] },
     turn: { sk: 'Rz', d: '50', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 's235', tool: 'tmed', auto: 'on', cool: 'emul', way: '', ord: ['d'] },
-    cutref: { fam: 'vhm', grp: 'all' },
+    ref: { proc: 'turn', mat: 's235', tool: 'tmed', d: '', z: '', sk: 'Rz', R: '', r: '' },
     mach: { nmax: '', vfmax: '', pmax: '', nmaxT: '', pmaxT: '' },
     sw: { d: '8' },
     torque: { d: '8', cls: '8.8' },
@@ -476,6 +476,7 @@
       if (!T.Z.MATERIALS.some(x => x.id === out[m].mat)) out[m].mat = 's235';
       if (!T.Z.TOOLS.some(x => x.id === out[m].tool && x.mode === m)) out[m].tool = A_DEF[m].tool;
     });
+    if (!T.Z.MATERIALS.some(x => x.id === out.ref.mat)) out.ref.mat = 's235';
     ['mill', 'turn'].forEach(m => {   // nur eine Oberflächenangabe sichtbar: die andere darf keine Vorgabe sein
       const o = out[m];
       if (!String(o.Rz || '').trim() && String(o.Ra || '').trim()) o.sk = 'Ra';
@@ -509,7 +510,7 @@
     { id: 'mill', label: 'Fräsen', title: 'Fräsen', card: () => cardSolve('mill'), compute: () => computeSolve('mill') },
     { id: 'drill', label: 'Bohren', title: 'Bohren', card: () => cardSolve('drill'), compute: () => computeSolve('drill') },
     { id: 'turn', label: 'Drehen', title: 'Drehen', card: () => cardSolve('turn'), compute: () => computeSolve('turn') },
-    { id: 'cutref', label: 'Richtwerte', title: 'Richtwerte Schnittgeschwindigkeit', card: () => cardCutRef() },
+    { id: 'cutref', label: 'Richtwerte', title: 'Richtwerte Schnittdaten', card: () => cardCutRef(), compute: () => computeCutRef() },
     { id: 'sw', label: 'Schlüsselweite', title: 'Maße einer Schraube', card: () => cardSw(), compute: () => computeSw() },
     { id: 'swtab', label: 'SW-Tabelle', title: 'Schlüsselweiten', card: () => cardSwTab() },
     { id: 'torque', label: 'Drehmoment', title: 'Anziehdrehmoment', tag: 'VDI 2230', card: () => cardTorque(), compute: () => computeTorque() },
@@ -1904,7 +1905,7 @@
     const core = mode === 'mill' ? ['d', 'z', 'vc', 'n', 'fz', 'f', 'vf'] : ['d', 'vc', 'n', 'f', 'vf'];
     const sk = c.sk === 'Ra' ? 'Ra' : 'Rz';
     // Oberfläche sichtbar: Wunsch eingeben, Vorschub wird daraus gerechnet
-    const surf = mode === 'drill' ? '' : `<div class="surf-box"><div class="surf-h"><span class="sv-h">Oberfläche</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']], 'mini')}</div><div class="fields">${field(sk)}${field('r')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`;
+    const surf = mode === 'drill' ? '' : `<div class="surf-box"><div class="surf-h"><span class="sv-h">Oberfläche</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']], 'mini')}</div><div class="fields">${field(sk)}${field('r')}</div><div class="chips">${(sk === 'Ra' ? ['0,4', '0,8', '1,6', '3,2', '6,3'] : ['2,5', '4', '6,3', '10', '16', '25']).map(v => `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="${sk}" data-v="${v}">${sk} ${v}</button>`).join('')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`;
     const load = fold(`f-${mode}-load`, mode === 'drill' ? 'Bohrtiefe, Leistung und Zeit' : mode === 'mill' ? 'Eingriff, Leistung und Zeit' : 'Schnitttiefe, Leistung und Zeit',
       `<div class="fields">${mode === 'mill' ? field('ae') + field('ap') : mode === 'turn' ? field('ap') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
     const setup = fold(`f-${mode}-setup`, mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', `<div class="fields">
@@ -2158,25 +2159,97 @@
     $('#sec-body').innerHTML = sectionHTML();
     computeCurrent();
   }
-  // Richtwerte fürs Handy: Werkzeug wählen, dann eine Liste mit großem vc rechts
-  const REF_FAMS = [['vhm', 'Schaftfräser VHM', 'mill', 'vhm'], ['wsp', 'Messerkopf / WSP', 'mill', 'face'], ['hssm', 'Fräser HSS', 'mill', 'hssm'], ['dvhm', 'Bohrer VHM', 'drill', 'dvhm'], ['dhss', 'Bohrer HSS', 'drill', 'dhss'], ['dwsp', 'WSP-Bohrer', 'drill', 'dwsp'], ['ream', 'Reibahle', 'drill', 'ream'], ['tap', 'Gewindebohrer', 'drill', 'tap'], ['form', 'Gewindeformer', 'drill', 'form'], ['turn', 'Drehen HM', 'turn', 'tmed'], ['turnhss', 'Drehen HSS', 'turn', 'thss']];
-  const REF_FAM_ORDER = ['vhm', 'hssm', 'wsp', 'dhss', 'dvhm', 'dwsp', 'ream', 'tap', 'form', 'turn', 'turnhss'];
+  // Richtwerte als Rechner fürs Handy: Verfahren, Werkstoff und Werkzeug wählen, grün kommen die Werte
+  const REF_PROC = { mill: 'Fräsen', drill: 'Bohren', turn: 'Drehen' };
+  const REF_TOOL = { mill: 'vhm', drill: 'dvhm', turn: 'tmed' };
+  const refProc = () => REF_PROC[A.ref.proc] ? A.ref.proc : 'turn';
+  const refTool = () => { const p = refProc(), t = ZZ.tool(A.ref.tool); return t && t.mode === p ? t : ZZ.tool(REF_TOOL[p]); };
+  const rd5 = x => Math.round(x / 5) * 5;
   function cardCutRef() {
-    const st = A.cutref, fam = REF_FAMS.find(f => f[0] === st.fam) || REF_FAMS[0];
-    const col = REF_FAM_ORDER.indexOf(fam[0]);
-    const groups = ZZ.GROUPS.filter(g => st.grp === 'all' || g.id === st.grp);
-    return `<section class="card">
-      <div class="field"><label for="ref-fam">Werkzeug</label>${selInp('ref-fam', 'cutref.fam', REF_FAMS.map(f => [f[0], f[1]]))}</div>
-      ${segHTML('cutref.grp', st.grp, [['all', 'Alle']].concat(ZZ.GROUPS.map(g => [g.id, g.id])), 'grp-seg')}
-      <p class="foot">Schnittgeschwindigkeit vc in m/min, Mittelwert und Bereich. Tippe auf einen Werkstoff, um damit zu rechnen.</p>
-      ${groups.map(g => `<div class="ref-grp"><div class="ref-gh" style="--c:${g.color}"><span class="grp-dot" style="--c:${g.color}">${g.id}</span>${esc(g.name)}</div>
-        ${ZZ.MATERIALS.filter(m => m.g === g.id).map(m => {
-          const b = ZZ.VC[m.cls][col];
-          const v = b == null ? null : b * m.k;
-          return `<button type="button" class="ref-row" data-act="ref-use" data-mat="${m.id}"${v == null ? ' disabled' : ''}><span class="ref-n"><b>${esc(m.name)}</b><small>${esc(m.alt || m.what)}</small></span><span class="ref-v">${v == null ? '<em>nicht üblich</em>' : `<b>${Math.round(v / 5) * 5}</b><small>${Math.round(v * 0.8 / 5) * 5}–${Math.round(v * 1.2 / 5) * 5}</small>`}</span></button>`;
-        }).join('')}</div>`).join('')}
-      <div class="tbl-note"><p><b>Richtwerte</b> für beschichtete Werkzeuge, stabile Aufspannung und Kühlung. Die Angaben des Werkzeugherstellers gehen immer vor.</p></div>
+    const c = A.ref, proc = refProc(), tool = refTool(), mat = ZZ.mat(c.mat), grp = ZZ.GROUPS.find(g => g.id === mat.g);
+    const sk = c.sk === 'Ra' ? 'Ra' : 'Rz';
+    const chips = (sk === 'Ra' ? ['0,4', '0,8', '1,6', '3,2', '6,3'] : ['2,5', '4', '6,3', '10', '16', '25']).map(v => `<button type="button" class="chip" data-act="ref-r" data-v="${v}">${sk} ${v}</button>`).join('');
+    return `<section class="card" id="card-cutref">
+      <div class="msg info">${I.info}<div><b>Wähl aus, was du machst.</b> <span class="calc-tag">Grün</span> sind die Richtwerte dazu. Mit dem Durchmesser kommt die Drehzahl dazu, mit der Wunsch-Oberfläche der größte Vorschub.</div></div>
+      ${segHTML('ref.proc', proc, Object.entries(REF_PROC))}
+      <div class="fields">
+        <div class="field full"><label for="rf-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span> <span class="muted">${esc(mat.what)}</span></label>${matSelect('rf-mat', 'ref.mat')}</div>
+        <div class="field full"><label for="rf-tool">Werkzeug</label>${selInp('rf-tool', 'ref.tool', ZZ.TOOLS.filter(t => t.mode === proc).map(t => [t.id, t.name]))}</div>
+        <div class="field"><label for="rf-d"><b>Ø d</b> ${proc === 'turn' ? 'Werkstück' : proc === 'drill' ? 'Bohrer' : 'Fräser'}</label>${bindNum('rf-d', 'ref.d', 'mm', 'freiwillig')}</div>
+        ${proc === 'mill' ? `<div class="field"><label for="rf-z"><b>z</b> Schneiden</label>${bindNum('rf-z', 'ref.z', '', 'freiwillig')}</div>` : ''}
+      </div>
+      ${proc !== 'drill' && !tool.thread ? `<div class="sv-group"><div class="sv-h">Oberfläche, freiwillig</div><div class="fields">
+        <div class="field"><span class="lbl">Angabe auf der Zeichnung</span>${segHTML('ref.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']])}</div>
+        <div class="field"><label for="rf-R"><b>${sk}</b> gewünscht</label>${bindNum('rf-R', 'ref.R', 'µm', sk === 'Ra' ? '1,6' : '6,3')}</div>
+        <div class="field"><label for="rf-r"><b>rε</b> Eckenradius</label>${bindNum('rf-r', 'ref.r', 'mm', proc === 'turn' && tool.plate ? T.fmt(ZZ.PLATES[tool.plate].r, 0, 1) : proc === 'mill' && !tool.inserts ? (tool.id === 'ball' ? 'Ø/2' : '0,2') : '0,8')}</div>
+      </div><div class="chips">${chips}</div></div>` : ''}
+      <div class="result" id="res-cutref" aria-live="polite"></div>
     </section>`;
+  }
+  // Zweispaltig ohne Lücke: breite Kästen ans Ende, eine ungerade Zahl schmaler Kästen füllt die Zeile
+  function kvCells(cells) {
+    const half = cells.filter(c => !c.full), full = cells.filter(c => c.full);
+    return half.map((c, i) => c.h(half.length % 2 === 1 && i === half.length - 1)).join('') + full.map(c => c.h(true)).join('');
+  }
+  function computeCutRef() {
+    const c = A.ref, proc = refProc(), tool = refTool(), mat = ZZ.mat(c.mat);
+    const d = optOf(c.d), z = optOf(c.z), R = proc === 'drill' || tool.thread ? null : optOf(c.R);
+    const rec = ZZ.recommend({ mode: proc, mat: mat.id, tool: tool.id, d: d > 0 ? d : null, op: 'side' });
+    const list = ZZ.MATERIALS.map(m => { const x = ZZ.recommend({ mode: proc, mat: m.id, tool: tool.id, d: d > 0 ? d : 10, op: 'side' }); return { m, vc: x.vc }; });
+    const listHTML = `<div class="tbl-cap">Alle Werkstoffe mit ${esc(tool.name)}: vc in m/min. Tippen zum Wählen.</div>
+      ${ZZ.GROUPS.map(g => `<div class="ref-grp"><div class="ref-gh"><span class="grp-dot" style="--c:${g.color}">${g.id}</span>${esc(g.name)}</div>${list.filter(x => x.m.g === g.id).map(x => `<button type="button" class="ref-row${x.m.id === mat.id ? ' on' : ''}" data-act="ref-mat" data-v="${x.m.id}"><span class="ref-n"><b>${esc(x.m.name)}</b><small>${esc(x.m.alt || x.m.what)}</small></span><span class="ref-v">${x.vc ? `<b>${rd5(x.vc[1])}</b><small>${rd5(x.vc[0])}–${rd5(x.vc[2])}</small>` : '<em>nicht üblich</em>'}</span></button>`).join('')}</div>`).join('')}
+      <p class="tbl-note"><b>Richtwerte</b> für beschichtete Werkzeuge, stabile Aufspannung und Kühlung. Die Angaben des Werkzeugherstellers gehen immer vor.</p>`;
+    if (!rec.vc) return out('res-cutref', rec.warn.map(w => msgHTML(esc(w), 'warn')).join('') + listHTML);
+    const mid = rd5(rec.vc[1]), box = (k, v, sub, full) => ({ full, h: f => `<div${f ? ' class="full"' : ''}><span>${k}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>` });
+    const nOf = vc => vc * 1000 / (Math.PI * d), cells = [];
+    let notes = '';
+    if (d > 0) cells.push(box('Drehzahl n', `${Math.round(nOf(rec.vc[0]))} bis ${Math.round(nOf(rec.vc[2]))} <small>1/min</small>`, `Mitte ${Math.round(nOf(rec.vc[1]))} 1/min`));
+    const fz = proc === 'mill', fr = fz ? rec.fz : rec.f, fUnit = fz ? 'mm' : 'mm/U';
+    if (rec.fixedF) cells.push(box('f = Steigung', `${nf(rec.fixedF, 3)} <small>mm/U</small>`));
+    else if (fr) cells.push(box(fz ? 'fz je Schneide' : 'f je Umdrehung', `${nf(fr[0], 3)} bis ${nf(fr[2], 3)} <small>${fUnit}</small>`, `Mitte ${nf(fr[1], 3)} ${fUnit}`));
+    if (rec.ae && d > 0) cells.push(box('ae Eingriffsbreite', `${nf(rec.ae[0], 1)} bis ${nf(rec.ae[2], 1)} <small>mm</small>`));
+    if (rec.ap) cells.push(box(proc === 'turn' ? 'ap Schnitttiefe' : 'ap Zustellung', `${nf(rec.ap[0], 1)} bis ${nf(rec.ap[2], 1)} <small>mm</small>`));
+    if (rec.core) cells.push(box('Kernloch', `Ø ${nf(rec.core, 2)} <small>mm</small>`));
+    // Vorschub aus der Wunsch-Oberfläche: Rz = f² / (8 · rε)
+    const r = optOf(c.r) || (proc === 'turn' ? rec.r : tool.id === 'ball' && d > 0 ? d / 2 : tool.inserts ? 0.8 : 0.2);   // Fräsen ohne Angabe: übliche Ecke
+    let fMax = null;
+    if (R > 0 && r > 0) {
+      const sk = c.sk === 'Ra' ? 'Ra' : 'Rz', Rz = sk === 'Rz' ? R : R * 3.9;
+      fMax = Math.sqrt(8 * r * Rz / 1000);
+      const other = sk === 'Rz' ? `Ra ≈ ${nf(R / 3.9)} µm` : `Rz ≈ ${nf(R * 3.9)} µm`;
+      cells.push(box(`${fz ? 'fz' : 'f'} für ${sk} ${nf(R)} µm`, `höchstens ${nf(fMax, 3)} <small>${fUnit}</small>`, `mit rε ${nf(r)} mm${optOf(c.r) ? '' : proc === 'mill' && !tool.inserts ? ' (übliche Ecke, eigenen Wert eintragen)' : ' (übliche Platte)'} · entspricht ${other}`, true));
+      if (fr && fMax < fr[0] * 0.5) notes += msgHTML(`Für diese Oberfläche wird ${fz ? 'fz' : 'f'} sehr klein. Die Schneide kann reiben statt schneiden. Nimm einen größeren Eckenradius oder eine Planschneide (Wiper).`, 'warn');
+      else if (fr && fMax >= fr[2]) notes += msgHTML(`Die Oberfläche begrenzt hier nicht. Bleib beim Richtwert für ${fz ? 'fz' : 'f'}.`);
+    } else if (R > 0) notes += msgHTML('Für den Vorschub aus der Oberfläche fehlt noch der Eckenradius rε.');
+    const fUse = rec.fixedF || (fr ? (fMax != null ? Math.min(fMax, fr[1]) : fr[1]) : fMax);
+    if (d > 0 && fUse) {
+      if (fz && z > 0) cells.push(box('vf Vorschub F', `${Math.round(fUse * z * nOf(rec.vc[1]))} <small>mm/min</small>`, `bei vc ${mid}, fz ${nf(fUse, 3)}, z ${nf(z, 0)}`));
+      if (!fz) cells.push(box('vf Vorschub F', `${Math.round(fUse * nOf(rec.vc[1]))} <small>mm/min</small>`, `bei vc ${mid}, f ${nf(fUse, 3)}`));
+    }
+    if (fz && d > 0 && !(z > 0)) notes += msgHTML('Mit der Zahl der Schneiden z kommt auch die Vorschubgeschwindigkeit dazu.');
+    if (!(d > 0)) notes += msgHTML(proc === 'turn' ? 'Gib den Durchmesser ein, dann kommt die Drehzahl dazu.' : 'Gib den Durchmesser ein, dann kommen Drehzahl und Vorschub dazu.');
+    out('res-cutref', `${rec.warn.map(w => msgHTML(esc(w), 'warn')).join('')}<div class="res-hero green"><div class="res-big">vc ${rd5(rec.vc[0])} bis ${rd5(rec.vc[2])} <small>m/min</small></div><div class="res-sub">${esc(mat.name)} mit ${esc(tool.name)}. Zum Anfangen die Mitte: <b>${mid} m/min</b>.</div></div>
+      ${cells.length ? `<div class="kv green">${kvCells(cells)}</div>` : ''}
+      ${notes}
+      <button type="button" class="btn primary" data-act="ref-go">Im Rechner ${REF_PROC[proc]} weiterrechnen</button>
+      ${listHTML}
+      <p class="tbl-note">Der Vorschub aus der Oberfläche ist theoretisch (Rz = f² / (8 · rε)). In der Praxis wird es durch Schwingungen und Verschleiß etwas rauer, also lieber etwas darunter bleiben.${fz ? ' Beim Fräsen gilt die Formel, wenn alle Schneiden gleich hoch stehen.' : ''}</p>`);
+  }
+  // Auswahl in den passenden Rechner übernehmen: dort schlägt die App vc und Vorschub vor, die Oberfläche bestimmt den Vorschub
+  function refGo() {
+    const c = A.ref, proc = refProc(), tool = refTool(), st = A[proc];
+    st.mat = ZZ.mat(c.mat).id; st.tool = tool.id;
+    WK.SOLVE_VARS[proc].forEach(k => { if (!['ae', 'ap'].includes(k)) st[k] = ''; });
+    const ord = [];
+    const set = (k, v) => { st[k] = v; ord.push(k); };
+    if (optOf(c.d) > 0) set('d', c.d);
+    if (proc === 'mill' && optOf(c.z) > 0) set('z', c.z);
+    if (proc !== 'drill' && optOf(c.r) > 0) set('r', c.r);
+    if (proc !== 'drill' && !tool.thread && optOf(c.R) > 0) { st.sk = c.sk === 'Ra' ? 'Ra' : 'Rz'; set(st.sk, c.R); OPEN.add(`f-${proc}-surf`); store.set('open', [...OPEN]); }
+    st.ord = ord;
+    saveA();
+    goSection(proc);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ---------- Schrauben und Schlüsselweiten ----------
@@ -2527,6 +2600,17 @@
 
   function onApplyChange(k) {
     const [sk0, sk1] = k.split('.');
+    if (sk0 === 'ref' && ['sk', 'proc', 'tool'].includes(sk1)) {   // Richtwerte: Oberfläche umrechnen, Werkzeug passend zum Verfahren
+      const x = optOf(A.ref.R);
+      if (sk1 === 'sk' && x > 0) A.ref.R = T.fmt(A.ref.sk === 'Ra' ? x / 3.9 : x * 3.9, 0, 2).replace('−', '-');
+      if (sk1 === 'proc') A.ref.tool = REF_TOOL[refProc()];
+      saveA();
+      const ae = document.activeElement, id = ae && ae.tagName === 'SELECT' && ae.id;
+      $('#sec-body').innerHTML = sectionHTML();
+      if (id) { const n = $('#' + id); if (n) n.focus({ preventScroll: true }); }
+      computeCurrent();
+      return;
+    }
     if (sk1 === 'sk' && A[sk0]) {   // Oberfläche umschalten: eingegebenen Wert umrechnen
       const st = A[sk0], to = st.sk === 'Ra' ? 'Ra' : 'Rz', from = to === 'Ra' ? 'Rz' : 'Ra';
       const x = optOf(st[from]);
@@ -2539,7 +2623,7 @@
     keepLatest(k);
     solveHook(k);
     if (k === 'geo.prop') $('#geo-inputs').innerHTML = geoInputs();
-    if (['gen.tab', 'gen.mode', 'cutref.fam', 'cutref.grp', 'mill.tool', 'mill.mat', 'mill.op', 'mill.auto', 'drill.tool', 'drill.mat', 'drill.auto', 'turn.tool', 'turn.mat', 'turn.auto', 'weight.shape', 'weight.mat', 'tri2.mode'].includes(k)) {
+    if (['gen.tab', 'gen.mode', 'mill.tool', 'mill.mat', 'mill.op', 'mill.auto', 'drill.tool', 'drill.mat', 'drill.auto', 'turn.tool', 'turn.mat', 'turn.auto', 'weight.shape', 'weight.mat', 'tri2.mode', 'ref.mat'].includes(k)) {
       const ae = document.activeElement, id = ae && ae.id;
       $('#sec-body').innerHTML = sectionHTML();
       if (id && ae.tagName === 'SELECT') { const n = $('#' + id); if (n) n.focus({ preventScroll: true }); }
@@ -2564,8 +2648,10 @@
     'thread-pick': t => { A.thread.q = t.dataset.v; saveA(); if (S.page === 'thread' && curSection().id === 'thread') { $('#th-q').value = t.dataset.v; computeThread(); } else goSection('thread'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sw-pick': t => { A.sw.d = t.dataset.v; saveA(); goSection('sw'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'sv-take': t => { const m = t.dataset.m, k = t.dataset.k; const inp = $(`[data-k="${m}.${k}"]`); A[m][k] = t.dataset.v; if (inp) inp.value = t.dataset.v; onApplyChange(m + '.' + k); },
+    'ref-r': t => { A.ref.R = t.dataset.v; saveA(); const i = $('#rf-R'); if (i) i.value = t.dataset.v; computeCutRef(); },
+    'ref-mat': t => { A.ref.mat = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); },
+    'ref-go': () => refGo(),
     'sv-accept': t => acceptSuggestions(t.dataset.m),
-    'ref-use': t => { const f = REF_FAMS.find(x => x[0] === A.cutref.fam) || REF_FAMS[0]; const m = f[2]; A[m].mat = t.dataset.mat; A[m].tool = f[3]; saveA(); showSection(m); window.scrollTo({ top: 0, behavior: 'smooth' }); },
     'tool-save': t => saveTool(t.dataset.m),
     'tool-load': t => loadTool(t.dataset.id),
     'tool-del': t => { const l = myTools(), x = l.find(y => y.id === t.dataset.id); if (x && window.confirm(`„${x.name}“ aus deinen Werkzeugen löschen?`)) { store.set('tools', l.filter(y => y !== x)); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); } },

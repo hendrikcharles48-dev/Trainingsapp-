@@ -678,7 +678,7 @@ details.fold[open] summary .chev { transform: rotate(90deg); }
 .ref-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; text-align: left; width: 100%; min-height: 56px; }
 .ref-row + .ref-row { border-top: .5px solid var(--sep); }
 .ref-row:active { background: var(--fill-2); }
-.ref-row[disabled] { opacity: .55; }
+.ref-row.on { background: var(--tint-soft, var(--fill-2)); }
 .ref-n { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ref-n b { font-size: 16px; }
 .ref-n small { font-size: 12.5px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -686,3 +686,10 @@ details.fold[open] summary .chev { transform: rotate(90deg); }
 .ref-v b { font: 800 22px/1.1 var(--font-round); color: var(--tint); font-variant-numeric: tabular-nums; }
 .ref-v small { font-size: 12px; color: var(--label-2); font-variant-numeric: tabular-nums; }
 .ref-v em { font-size: 12.5px; color: var(--label-3); font-style: normal; }
+.res-hero.green { background: var(--green-soft); }
+.res-hero.green .res-big { color: var(--green); }
+.kv.green b { color: var(--green); }
+.kv.green b small { display: inline; font-size: 13px; color: var(--label-2); font-weight: 500; }
+.kv > div > small { color: var(--label-2); font-size: 12px; }
+.fold-b .chips { margin-inline: -14px; padding-inline: 14px; }
+.surf-box .chips { margin-inline: -14px; padding-inline: 14px; }

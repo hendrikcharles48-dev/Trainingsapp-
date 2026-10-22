@@ -458,7 +458,7 @@
     { page: 'cut', sec: 'mill', title: 'Fräsen', kw: 'fräsen fräser messerkopf schnittgeschwindigkeit drehzahl vorschub fz vf vc zahn platten oberfläche' },
     { page: 'cut', sec: 'drill', title: 'Bohren', kw: 'bohren bohrer vorschub drehzahl' },
     { page: 'cut', sec: 'turn', title: 'Drehen', kw: 'drehen drehmeißel schneidplatte vorschub drehzahl' },
-    { page: 'cut', sec: 'cutref', title: 'Richtwerte Schnittdaten', kw: 'richtwerte schnittdaten werkstoff hss hartmetall' },
+    { page: 'cut', sec: 'cutref', title: 'Richtwerte Schnittdaten', kw: 'richtwerte schnittdaten werkstoff hss hartmetall vorschub rauheit oberfläche drehzahl' },
     { page: 'cut', sec: 'roughtab', title: 'Rauheit', kw: 'rauheit oberfläche ra rz n7 rautiefe' },
     { page: 'cut', sec: 'trow', title: 'Trowalisieren', kw: 'trowalisieren gleitschleifen entgraten schleifkörper vibrator' },
     { page: 'thread', sec: 'thread', title: 'Gewinde', kw: 'gewinde metrisch feingewinde kernloch kernlochbohrer steigung rohrgewinde unc unf trapez' },
