@@ -59,11 +59,11 @@ Nach Änderungen `toleranzen/` nach `docs/toleranzen/` kopieren (ohne `test.js` 
 Eigenständige App im iOS-Design (dunkel als Standard) für einen Minijob, im Ordner `stunden/`.
 
 - **Monat:** Ring bis zur Monatsgrenze, Grundlohn und Spätzulage getrennt, was noch frei ist, alle Schichten (antippen zum Bearbeiten oder Löschen). Startet jeden Monat bei 0, mit ‹ › zu alten Monaten.
-- **Schicht eintragen** (Plus-Knopf): Beginn und Ende, Ab mehr als 6 Std muss man angeben, wann die Pause liegt (Vorschlag: direkt vor 20 Uhr, `suggestPause`), Länge mindestens 30 bzw. 45 Min; eine Pause nach 20 Uhr senkt die Spätzulage. Gespeichert als `pause` + `pauseVon`. Alternativ nur Dauer.
+- **Schicht eintragen** (Plus-Knopf): Beginn und Ende, Ab mehr als 6 Std muss man angeben, wann die Pause liegt (Beginn + Dauer oder von–bis) (Vorschlag: direkt vor 20 Uhr, `suggestPause`), Länge mindestens 30 bzw. 45 Min; eine Pause nach 20 Uhr senkt die Spätzulage. Gespeichert als `pause` + `pauseVon`. Alternativ nur Dauer.
 - **Planer – Kalender:** Arbeitstage antippen, die App verteilt den Rest bis zur Grenze in Viertelstunden auf diese Tage, möglichst bis 6 Std (ohne Pause), „Volle Tage“ oder „Gleichmäßig“; reicht das nicht, Vorschlag mit Pause. Tag antippen: feste Zeit, Höchstdauer (z. B. höchstens 4 Std), Beginn oder als Schicht eintragen. KW antippen: Tage der Woche wählen oder ganze Woche frei. „Meine normale Woche“ als Vorlage für alle offenen Wochen. Eigenes Monatsziel unter der Grenze (`S.ziel`).
 - **Planer – Wochenmuster:** Schichtmuster pro Woche oder Monat, prüft gegen die Grenze (4,35 Wochen pro Monat) und rechnet aus, bis wann man an Zusatztagen arbeiten kann.
 - **Übersicht:** Monate, Jahr gegen 12 × Grenze, Einstellungen (Lohn 18,39 €, Grenze 603 €, 25 % ab 20 Uhr, Zulage zählt zur Grenze), Hell/Dunkel, Backup.
-- **Extra** (vierter Reiter): Konto für nicht gestempelte Stunden, nur Tag + Dauer; `st.offen` mit `typ` plus (aufgeschrieben) oder minus (genommen), oben der Stand insgesamt. Zählt nirgends mit.
+- **Extra** (vierter Reiter): Konto für nicht gestempelte Stunden, nur Tag + Dauer; `st.offen` mit `typ` plus (aufgeschrieben) oder minus (genommen), Eingabe als Dauer oder gekommen–gegangen (`von`/`bis`), oben der Stand insgesamt. Zählt nirgends mit.
 - Daten liegen nur auf dem Gerät (`localStorage`, Schlüssel `stundenzettel-v2`, `navigator.storage.persist()`). Nach jedem Eintrag erscheint „Backup sichern“ (`nudge`), Datei `stundenzettel-backup.json` über das Teilen-Menü; `st.lastBackup` steht in der Übersicht.
 
 ## Auf dem iPhone nutzen
