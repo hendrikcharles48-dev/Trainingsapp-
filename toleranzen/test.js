@@ -167,6 +167,15 @@ require('./test-werkstatt.js')(T, eq);
   const e = Z.recommend({ mode: 'turn', mat: '1.4301', tool: 'tfin' });
   eq('Drehen Schlichten 1.4301', [rr(e.vc[1], 0), e.r], [198, 0.4]);
   eq('Spanverdünnung', [rr(Z.chipThin(1, 10), 3), Z.chipThin(5, 10)], [1.667, 1]);
+  eq('Auskragung 3d voll, 5d reduziert', [Z.overhang(3).vc, Z.overhang(5).fz], [1, 0.7]);
+  eq('Auskragung senkt Empfehlung', Z.recommend({ mode: 'mill', mat: 'c45', tool: 'vhm', d: 10, L: 50 }).vc[1] < a.vc[1], true);
+  eq('Bohrfutter mit VHM warnt', Z.recommend({ mode: 'drill', mat: 's235', tool: 'dvhm', d: 8, holder: 'chuck' }).warn.length, 1);
+  eq('Kugel wirksamer Ø', rr(Z.ballDeff(10, 0.3), 3), rr(2 * Math.sqrt(0.3 * 9.7), 3));
+  const ml = Z.millLoad({ cls: 'P2', d: 10, z: 4, fz: 0.04, ae: 3, ap: 15, n: 5000, vf: 800 });
+  eq('Fräsen Leistung = Q · kc / 60000', rr(ml.Pc, 4), rr(36 * ml.kc / 60000, 4));
+  eq('Drehen Leistung', rr(Z.turnLoad({ cls: 'P1', vc: 250, ap: 3, f: 0.3 }).Pc, 3), rr(250 * 3 * 0.3 * Z.kc('P1', 0.3 * Math.sin(85 * Math.PI / 180)) / 60000, 3));
+  const dl = Z.millLoad({ cls: 'P2', d: 10, z: 4, fz: 0.04, ae: 3, ap: 15, n: 5000, vf: 800, L: 40, lc: 40 });
+  eq('Durchbiegung Biegebalken', rr(dl.defl, 5), rr(0.6 * dl.Fc * Math.pow(40, 3) / (3 * 600000 * Math.PI * Math.pow(8, 4) / 64), 5));
   eq('Maschinengrenze', Z.limit({ n: 15000, vf: 500 }, { nmax: 12000, vfmax: 10000 }).map(x => x.k), ['n']);
 }
 

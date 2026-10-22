@@ -132,6 +132,73 @@
   // Reiben: Aufmaß im Durchmesser
   Z.reamAllowance = d => d <= 5 ? [0.1, 0.2] : d <= 20 ? [0.2, 0.3] : [0.3, 0.5];
 
+  // Werkzeugaufnahmen: Rundlauf in µm (typisch), Faktor für den Vorschub, ob für dynamisches Fräsen geeignet
+  Z.HOLDERS = [
+    { id: 'shrink', name: 'Schrumpffutter', ro: 3, f: 1.0, hpc: true, modes: ['mill', 'drill'] },
+    { id: 'hydro', name: 'Hydrodehnspannfutter', ro: 3, f: 1.0, hpc: true, modes: ['mill', 'drill'], note: 'Hydrodehnspannfutter: sehr guter Rundlauf, dämpft Schwingungen. Für schweres Schruppen mit großen Seitenkräften eher Schrumpf- oder Kraftspannfutter.' },
+    { id: 'power', name: 'Kraftspannfutter (Powerchuck)', ro: 5, f: 1.0, hpc: true, modes: ['mill'] },
+    { id: 'er', name: 'Spannzange ER', ro: 10, f: 0.85, modes: ['mill', 'drill'], note: 'Spannzange: Rundlauf meist 5–15 µm und weniger steif als Schrumpf- oder Hydrodehnspannfutter. Für hohe Zustellungen und dynamisches Fräsen eine steifere Aufnahme nehmen.' },
+    { id: 'weldon', name: 'Weldon (Seitenspannung)', ro: 10, f: 0.95, modes: ['mill', 'drill'], note: 'Weldon hält sicher (kein Herausziehen beim Schruppen), läuft aber einseitig: Rundlauf meist 10 µm und mehr.' },
+    { id: 'arbor', name: 'Aufsteckfräsdorn (Messerkopf)', ro: 10, f: 1.0, modes: ['mill'] },
+    { id: 'chuck', name: 'Bohrfutter', ro: 30, f: 0.7, modes: ['drill'], note: 'Bohrfutter: Rundlauf oft 30 µm und mehr, für VHM-Bohrer ungeeignet (bricht). Nur für HSS-Bohrer.' }
+  ];
+  // Kühlung: Faktor für vc
+  Z.COOL = [
+    { id: 'emul', name: 'Emulsion außen', vc: 1.0 },
+    { id: 'inner', name: 'Innenkühlung', vc: 1.1 },
+    { id: 'mms', name: 'Minimalmenge (MMS)', vc: 0.95 },
+    { id: 'air', name: 'Trocken / Luft', vc: 0.9 }
+  ];
+  // Auskragung L/D: Faktoren für vc, fz und Zustellung (ab 3 × d)
+  Z.OVERHANG = [[3, 1, 1, 1], [4, 0.9, 0.85, 0.8], [5, 0.8, 0.7, 0.65], [6, 0.7, 0.55, 0.5], [8, 0.6, 0.45, 0.4], [10, 0.5, 0.35, 0.3]];
+  Z.overhang = ld => {
+    const t = Z.OVERHANG;
+    if (!(ld > t[0][0])) return { vc: 1, fz: 1, a: 1 };
+    for (let i = 1; i < t.length; i++) if (ld <= t[i][0]) { const a = t[i - 1], b = t[i], q = (ld - a[0]) / (b[0] - a[0]); return { vc: a[1] + (b[1] - a[1]) * q, fz: a[2] + (b[2] - a[2]) * q, a: a[3] + (b[3] - a[3]) * q }; }
+    const l = t[t.length - 1]; return { vc: l[1], fz: l[2], a: l[3] };
+  };
+  // Bohrtiefe L/D: Faktor für den Vorschub
+  Z.drillDepth = ld => !(ld > 3) ? 1 : ld <= 5 ? 0.9 : ld <= 8 ? 0.8 : 0.7;
+  // Spezifische Schnittkraft: kc1 in N/mm² bei 1 mm Spanungsdicke, Exponent mc (Richtwerte je Klasse, wie in Herstellerkatalogen)
+  Z.KC = { P1: [1500, 0.25], P2: [1700, 0.25], P3: [2000, 0.25], M1: [2000, 0.21], M2: [1850, 0.25], M3: [2350, 0.21], K1: [1100, 0.28], K2: [1350, 0.28], N1: [600, 0.25], N2: [750, 0.25], N3: [700, 0.25], N4: [1000, 0.25], N5: [250, 0.2], S1: [1450, 0.23], H1: [2800, 0.25], H2: [3500, 0.25] };
+  Z.kc = (cls, h) => { const [k, mc] = Z.KC[cls]; return k * Math.pow(Math.max(h, 0.005), -mc); };
+  // Fräsen: mittlere Spanungsdicke, Schnittleistung, Drehmoment, Schnittkraft, Durchbiegung des Fräsers
+  Z.millLoad = function ({ cls, d, z, fz, ae, ap, n, vf, L, lc, hss }) {
+    if (!(d > 0 && fz > 0 && ae > 0 && ap > 0 && n > 0 && vf > 0)) return null;
+    const e = Math.min(ae, d);
+    const phi = Math.acos(1 - 2 * e / d) * 180 / Math.PI;                 // Eingriffswinkel in Grad
+    const hm = 360 / (Math.PI * phi) * fz * (e / d);                    // mittlere Spanungsdicke
+    const kc = Z.kc(cls, hm);
+    const Pc = e * ap * vf * kc / 60e6;                                  // kW
+    const Mc = Pc * 30e3 / (Math.PI * n);                                // Nm
+    const Fc = 2 * Mc * 1000 / d;                                        // mittlere Schnittkraft am Umfang, N
+    const res = { phi, hm, kc, Pc, Mc, Fc, Q: e * ap * vf / 1000 };
+    if (L > 0) {
+      // Biegebalken: Schaft (voller Ø) bis zur Schneidenlänge, dann der genutete Teil mit etwa 0,8 · d.
+      // Die Kraft quer zum Fräser ist etwa 0,6 · Schnittkraft (Mittel der Radial- und Tangentialanteile).
+      const E = hss ? 210000 : 600000, I1 = Math.PI * Math.pow(d, 4) / 64, I2 = Math.PI * Math.pow(0.8 * d, 4) / 64;
+      const l2 = Math.min(lc > 0 ? lc : L, L);
+      res.defl = 0.6 * Fc * ((Math.pow(L, 3) - Math.pow(l2, 3)) / (3 * I1) + Math.pow(l2, 3) / (3 * I2)) / E;   // mm
+    }
+    return res;
+  };
+  // Bohren: Schnittleistung Pc = f · vc · d · kc / 240 000 (kW), Spitzenwinkel 140° bzw. 118°
+  Z.drillLoad = function ({ cls, d, f, vc, n }) {
+    if (!(d > 0 && f > 0 && vc > 0 && n > 0)) return null;
+    const hm = f / 2 * Math.sin(70 * Math.PI / 180), kc = Z.kc(cls, hm);
+    const Pc = f * vc * d * kc / 240000, Mc = Pc * 30e3 / (Math.PI * n);
+    return { hm, kc, Pc, Mc, Ff: 0.5 * kc * d / 2 * f * Math.sin(70 * Math.PI / 180) };
+  };
+  // Drehen: Pc = vc · ap · f · kc / 60 000 (kW), Einstellwinkel 95°
+  Z.turnLoad = function ({ cls, vc, ap, f, n }) {
+    if (!(vc > 0 && ap > 0 && f > 0)) return null;
+    const hm = f * Math.sin(85 * Math.PI / 180), kc = Z.kc(cls, hm);
+    const Fc = kc * ap * f, Pc = Fc * vc / 60e3;
+    return { hm, kc, Fc, Pc, Mc: n > 0 ? Pc * 30e3 / (Math.PI * n) : null };
+  };
+  // Wirksamer Durchmesser beim Kugelfräser bei Zustellung ap
+  Z.ballDeff = (d, ap) => ap > 0 && ap < d / 2 ? 2 * Math.sqrt(ap * (d - ap)) : d;
+
   const interp = (pts, x) => {
     if (x <= pts[0][0]) return pts[0][1] * x / pts[0][0];
     for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); }
@@ -144,14 +211,31 @@
   Z.chipThin = (ae, d) => { const x = ae / d; if (!(x > 0) || x >= 0.5) return 1; return Math.min(2.5, 1 / (2 * Math.sqrt(x * (1 - x)))); };
 
   // Empfehlung: liefert vc, fz bzw. f, ae, ap, r als [von, mitte, bis] und Hinweise
-  Z.recommend = function ({ mode, mat, tool, d, op, ae, thread }) {
+  Z.recommend = function ({ mode, mat, tool, d, op, ae, thread, L, lc, holder, cool, depth, ap }) {
     const m = Z.mat(mat), t = Z.tool(tool) || Z.TOOLS.find(x => x.mode === mode);
     const res = { mat: m, tool: t, notes: [], warn: [] };
     const col = FAM.indexOf(t.fam);
     const base = Z.VC[m.cls][col];
     if (base == null) { res.warn.push(`${t.name} ist für ${m.name} nicht geeignet. ${t.fam === 'form' ? 'Gewindeformen geht nur in verformbaren Werkstoffen (nicht in Guss, Messing mit Blei, Kunststoff).' : 'Nimm ein Hartmetall-Werkzeug.'}`); return res; }
-    const kf = Z.FEED[m.cls];
+    const kf0 = Z.FEED[m.cls];
     let vc = base * m.k * (t.vcf || 1);
+    // Aufspannung: Auskragung, Aufnahme, Kühlung
+    const ld = L > 0 && d > 0 ? L / d : 0;
+    const oh = mode === 'turn' ? { vc: 1, fz: 1, a: 1 } : Z.overhang(ld);
+    const ho = Z.HOLDERS.find(h => h.id === holder);
+    const co = Z.COOL.find(c => c.id === cool);
+    let coolF = co ? co.vc : 1;
+    if (co && co.id === 'air' && (m.g === 'M' || m.g === 'S' || m.cls === 'N1' || t.fam === 'hssm' || t.fam === 'dhss' || t.fam === 'turnhss')) coolF = 0.75;
+    vc *= oh.vc * coolF;
+    const kf = kf0 * oh.fz * (ho ? ho.f : 1) * (mode === 'drill' && depth > 0 && d > 0 ? Z.drillDepth(depth / d) : 1);
+    res.factors = { ld, oh, holder: ho, cool: co, coolF };
+    if (ld > 3) res.notes.push(`Auskragung ${T.fmt(ld, 0, 1)} × d: vc auf ${Math.round(oh.vc * 100)} %, Vorschub auf ${Math.round(oh.fz * 100)} %${mode === 'mill' ? ` und Zustellung auf ${Math.round(oh.a * 100)} %` : ''} reduziert. So kurz wie möglich spannen.`);
+    if (ho && ho.note) res.notes.push(ho.note);
+    if (ho && ho.id === 'chuck' && (t.fam === 'dvhm' || t.fam === 'vhm')) res.warn.push('VHM-Werkzeuge nicht im Bohrfutter spannen: Der Rundlauf ist zu schlecht, das Werkzeug bricht.');
+    if (ho && mode === 'mill' && op === 'hpc' && !ho.hpc) res.notes.push('Dynamisches Fräsen braucht eine steife Aufnahme mit gutem Rundlauf (Schrumpf-, Hydrodehn- oder Kraftspannfutter).');
+    if (co && co.id === 'air' && coolF < 0.8) res.notes.push(m.g === 'S' ? 'Titan nicht trocken bearbeiten, Kühlschmierstoff nötig.' : `Trocken: vc auf ${Math.round(coolF * 100)} % reduziert. ${m.cls === 'N1' ? 'Alu klebt ohne Kühlung an der Schneide.' : 'Für diesen Werkstoff besser mit Kühlung.'}`);
+    if (co && co.id === 'air' && (m.g === 'P' || m.g === 'K' || m.g === 'H') && (t.fam === 'vhm' || t.fam === 'wsp')) res.notes.push('Hartmetall in Stahl, Guss und gehärtet: trocken mit Luft ist oft sogar besser (keine Temperaturschocks).');
+    if (co && co.id === 'inner' && mode === 'drill') res.notes.push('Innenkühlung: tiefe Bohrungen ohne Entspanen möglich, Druck nach Herstellerangabe.');
     if (mode === 'mill') {
       const o = Z.OPS.find(x => x.id === op) || Z.OPS[0];
       if (t.op) vc *= o.vcf;
@@ -165,8 +249,9 @@
       } else if (d) {
         let fz = interp(Z.FZ_VHM, d) * kf * (t.fam === 'hssm' ? 0.6 : 1) * (t.fzf || 1) * (t.op ? o.fzf : 1);
         if (t.op) {
-          res.ae = [o.ae[0] * d, (o.ae[0] + o.ae[1]) / 2 * d, o.ae[1] * d];
-          res.ap = [o.ap[0] * d, (o.ap[0] + o.ap[1]) / 2 * d, o.ap[1] * d];
+          res.ae = [o.ae[0] * d, (o.ae[0] + o.ae[1]) / 2 * d, o.ae[1] * d].map(x => o.id === 'slot' ? x : x * oh.a);
+          res.ap = [o.ap[0] * d, (o.ap[0] + o.ap[1]) / 2 * d, o.ap[1] * d].map(x => x * (o.id === 'slot' ? oh.a : 1));
+          if (lc > 0 && res.ap[2] > lc) { res.ap = res.ap.map(x => Math.min(x, lc)); res.notes.push(`Schneidenlänge ${T.fmt(lc, 0, 1)} mm: Die Zustellung ap ist darauf begrenzt.`); }
           const aeUse = ae > 0 ? ae : res.ae[1];
           const ct = Z.chipThin(aeUse, d);
           if (ct > 1.05 && o.id !== 'slot') { fz *= ct; res.notes.push(`Schmaler Eingriff (ae ${T.fmt(aeUse, 0, 2)} mm): Der Span ist dünner, deshalb ist fz um den Faktor ${T.fmt(ct, 0, 2)} erhöht.`); }
@@ -174,7 +259,10 @@
         res.fz = rng(fz);
       }
       if (t.id === 'chamfer') res.notes.push('Fasenfräser: als d den wirksamen Durchmesser an der Fase eingeben (dort, wo geschnitten wird).');
-      if (t.id === 'ball') res.notes.push('Kugelfräser: bei kleiner Zustellung den wirksamen Durchmesser eingeben, sonst ist die Drehzahl zu klein.');
+      if (t.id === 'ball') {
+        if (d > 0 && ap > 0 && ap < d / 2) { res.deff = Z.ballDeff(d, ap); res.notes.push(`Kugelfräser: Bei ap ${T.fmt(ap, 0, 2)} mm schneidet er nur mit Ø ${T.fmt(res.deff, 0, 2)} mm. Die empfohlene Drehzahl ist darauf gerechnet, sonst wäre vc dort viel zu klein.`); }
+        else res.notes.push('Kugelfräser: Gib die Zustellung ap ein, dann rechnet die App mit dem wirksamen Durchmesser.');
+      }
       if (t.thread) res.notes.push('Gewindefräsen: Bahn und Steigung kommen aus dem Zyklus der Steuerung, fz gilt am Werkzeugumfang.');
     } else if (mode === 'drill') {
       res.vc = rng(vc);
@@ -199,7 +287,9 @@
           res.pre = [d - a[1], d - a[0]];
           res.notes.push(`Reiben: Aufmaß ${T.fmt(a[0], 0, 2)} bis ${T.fmt(a[1], 0, 2)} mm im Durchmesser, also vorbohren mit Ø ${T.fmt(d - a[1], 0, 2)} bis ${T.fmt(d - a[0], 0, 2)} mm.`);
         }
-        if (t.fam === 'dhss' && !t.vcf) res.notes.push('Ab etwa 3 · d Bohrtiefe entspanen (Bohren mit Spanbruch oder Entspanen).');
+        const dd = depth > 0 && d > 0 ? depth / d : 0;
+        if (dd > 3) res.notes.push(`Bohrtiefe ${T.fmt(dd, 0, 1)} × d: Vorschub auf ${Math.round(Z.drillDepth(dd) * 100)} % reduziert. ${t.fam === 'dhss' ? 'Mit HSS entspanen (Zyklus mit Rückzug).' : dd > 8 ? 'Ab 8 × d mit Pilotbohrung (2–3 × d, gleicher Ø) und Langbohrer mit Innenkühlung.' : 'VHM mit Innenkühlung bis etwa 8 × d ohne Entspanen.'}`);
+        else if (t.fam === 'dhss' && !t.vcf) res.notes.push('Ab etwa 3 · d Bohrtiefe entspanen (Bohren mit Spanbruch oder Entspanen).');
         if (t.id === 'spot') res.notes.push('Anbohren: nur so tief, dass der folgende Bohrer an der Fase zentriert (Anbohrer-Ø etwas größer als der Bohrer, 90°).');
       }
     } else {
@@ -217,6 +307,8 @@
     if (m.g === 'N' && m.cls === 'N1' && mode !== 'turn') res.notes.push('Aluminium: 2- oder 3-Schneider mit polierten Spannuten, sonst klebt der Span.');
     if (m.g === 'M' && mode === 'mill') res.notes.push('Edelstahl: im Gleichlauf fräsen, nicht reiben lassen, Kühlung.');
     if (m.g === 'H') res.notes.push('Gehärteter Stahl: nur mit Werkzeugen für harte Werkstoffe, kleine Zustellungen, trocken mit Luft.');
+    const fzMid = res.fz ? res.fz[1] : null;
+    if (ho && fzMid && mode === 'mill' && ho.ro / 1000 > 0.2 * fzMid) res.notes.push(`Rundlauf der Aufnahme etwa ${ho.ro} µm ist groß im Vergleich zu fz ${T.fmt(fzMid, 0, 3)} mm: Eine Schneide trägt deutlich mehr und verschleißt schneller. Bessere Aufnahme oder weniger Schneiden.`);
     return res;
   };
 
