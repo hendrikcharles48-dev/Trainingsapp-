@@ -149,6 +149,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .verdict{display:flex;flex-direction:column;gap:12px}
 .big{font:800 34px/1 var(--round);font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;background:var(--green-soft);color:var(--green);vertical-align:middle}
+.pill.warn{background:rgba(255,179,64,.16);color:var(--orange)}
 .pill.bad{background:var(--red-soft);color:var(--red)}
 .answer{padding:14px;border-radius:14px;background:var(--fill-2);font-size:15px}
 .answer b{font-variant-numeric:tabular-nums}
@@ -224,7 +225,7 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
 const WT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
 // ---------- Daten ----------
-let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, tpl:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
+let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, tpl:[], offen:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
 function load(){ try{ const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if(d) st = {...st, ...d, S:{...DEF, ...(d.S||{})}}; }catch(_){} }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){ toast('Speichern nicht möglich'); } }
 const S = () => st.S;
@@ -279,7 +280,7 @@ function sumOf(list){
 const monthEntries = ym => st.entries.filter(e => (e.datum||'').startsWith(ym)).sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
 
 // ---------- Navigation ----------
-let tab = 'monat', ym = curYM(), calYm = curYM();
+let tab = 'monat', ym = curYM(), calYm = curYM(), mtab = 'uebersicht';
 function go(t){ tab = t; document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false')); render(); window.scrollTo(0,0); }
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 function render(){ $('#view').innerHTML = ''; ({monat:viewMonat, planer:viewPlaner, mehr:viewMehr})[tab](); $('#fab').hidden = tab !== 'monat'; }
@@ -338,15 +339,16 @@ function viewMonat(){
 }
 
 // ---------- Schicht-Sheet ----------
-function openSheet(entry, pre){
-  const edit = !!entry, e = entry || {datum: ym === curYM() ? today() : ym+'-01', von:'14:00', bis:'21:30', ...(pre||{})};
+function openSheet(entry, pre, kind = 'entries'){
+  const off = kind === 'offen', edit = !!entry, e = entry || {datum: ym === curYM() ? today() : ym+'-01', von:'14:00', bis:'21:30', ...(pre||{})};
   let mode = edit && !e.von ? 'dauer' : 'zeit';
   const presets = [['14:00','21:30'],['14:00','22:30']];
   for(const x of st.entries.slice().sort((a,b)=>(b.erstellt||0)-(a.erstellt||0))) if(x.von && !presets.some(p=>p[0]===x.von&&p[1]===x.bis)){ presets.push([x.von,x.bis]); if(presets.length>=4) break; }
   const w = $('#sheet');
   w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">
     <div class="grab"></div>
-    <div class="sheet-head"><button type="button" id="shX">Abbrechen</button><h2 id="shT">${edit?'Schicht bearbeiten':'Neue Schicht'}</h2><span style="width:80px"></span></div>
+    <div class="sheet-head"><button type="button" id="shX">Abbrechen</button><h2 id="shT">${off ? 'Nicht gestempelt' : edit?'Schicht bearbeiten':'Neue Schicht'}</h2><span style="width:80px"></span></div>
+    ${off ? `<div class="seg" role="group" aria-label="Status"><button type="button" data-st="offen" aria-pressed="${e.status!=='gemeldet'}">Noch offen</button><button type="button" data-st="gemeldet" aria-pressed="${e.status==='gemeldet'}">Gemeldet</button></div>` : ''}
     <div class="field"><label for="fDatum">Datum</label><input id="fDatum" type="date" value="${e.datum}"></div>
     <div class="seg" role="group" aria-label="Eingabe"><button type="button" data-m="zeit">Uhrzeit</button><button type="button" data-m="dauer">Nur Dauer</button></div>
     <div id="mZeit" class="field" style="gap:12px">
@@ -368,7 +370,8 @@ function openSheet(entry, pre){
     <div class="field"><label for="fNotiz">Notiz</label><input id="fNotiz" placeholder="optional" value="${esc(e.notiz||'')}"></div>
     <div class="calc" id="fCalc"></div>
     <button type="button" class="btn" id="fSave">${edit?'Änderungen speichern':'Schicht speichern'}</button>
-    ${edit?'<button type="button" class="btn danger" id="fDel">Schicht löschen</button>':''}
+    ${off && edit ? '<button type="button" class="btn plain" id="fMove">Wurde nachgestempelt: zu den Schichten</button>' : ''}
+    ${edit?'<button type="button" class="btn danger" id="fDel">Löschen</button>':''}
   </div>`;
   w.hidden = false; document.body.style.overflow = 'hidden';
   const setMode = m => { mode = m; w.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.m===m))); $('#mZeit').hidden = m!=='zeit'; $('#mDauer').hidden = m!=='dauer'; calc(); };
@@ -413,13 +416,21 @@ function openSheet(entry, pre){
     const obj = {...(edit ? entry : {id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), ...r, datum:$('#fDatum').value || today(), notiz:$('#fNotiz').value.trim()};
     delete obj.warn; if(!obj.pause) delete obj.pauseVon;
     if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
-    st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
-    save(); ym = ymOf(obj.datum); closeSheet(); render();
-    toast(edit ? 'Gespeichert' : `${fmt(obj.minuten)} eingetragen`);
+    if(off) obj.status = w.querySelector('[data-st="gemeldet"]').getAttribute('aria-pressed') === 'true' ? 'gemeldet' : 'offen';
+    st[kind] = edit ? st[kind].map(x => x.id === obj.id ? obj : x) : [...st[kind], obj];
+    save(); if(!off) ym = ymOf(obj.datum); closeSheet(); render();
+    toast(edit ? 'Gespeichert' : off ? `${fmt(obj.minuten)} notiert` : `${fmt(obj.minuten)} eingetragen`);
   };
   if(edit) $('#fDel').onclick = ev => {
     const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich löschen?'; return; }
-    st.entries = st.entries.filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Schicht gelöscht');
+    st[kind] = st[kind].filter(x => x.id !== entry.id); save(); closeSheet(); render(); toast('Gelöscht');
+  };
+  if(off) w.querySelectorAll('[data-st]').forEach(b => b.onclick = () => w.querySelectorAll('[data-st]').forEach(x => x.setAttribute('aria-pressed', String(x === b))));
+  if(off && edit) $('#fMove').onclick = () => {
+    const r = read(); if(r.err) return calc();
+    const obj = {...entry, ...r, datum:$('#fDatum').value || entry.datum, notiz:$('#fNotiz').value.trim()}; delete obj.warn; delete obj.status;
+    if(!obj.pause) delete obj.pauseVon; if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
+    st.offen = st.offen.filter(x => x.id !== entry.id); st.entries.push(obj); save(); closeSheet(); render(); toast('Zu den Schichten verschoben');
   };
   setMode(mode);
 }
@@ -704,13 +715,17 @@ function planOut(){
 }
 
 // ---------- Übersicht & Einstellungen ----------
+const MSEG = () => `<div class="seg" role="group" aria-label="Bereich"><button type="button" data-mt="uebersicht" aria-pressed="${mtab!=='offen'}">Übersicht</button><button type="button" data-mt="offen" aria-pressed="${mtab==='offen'}">Nicht gestempelt${st.offen.some(x => x.status !== 'gemeldet') ? ` · ${st.offen.filter(x => x.status !== 'gemeldet').length}` : ''}</button></div>`;
+function bindMseg(){ document.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => { mtab = b.dataset.mt; render(); }); }
 function viewMehr(){
+  if(mtab === 'offen') return viewOffen();
   const y = new Date().getFullYear(), by = {};
   for(const e of st.entries){ const k = (e.datum||'').slice(0,7); if(k) (by[k] = by[k] || []).push(e); }
   const keys = Object.keys(by).sort().reverse(), ty = sumOf(st.entries.filter(e => (e.datum||'').startsWith(y+'-'))), all = sumOf(st.entries);
   const v = $('#view');
   v.innerHTML = `<div class="page">
     <div class="top"><div><div class="eyebrow">Alles auf einen Blick</div><h1>Übersicht</h1></div></div>
+    ${MSEG()}
     <section class="card"><div class="stats">
       <div class="stat"><span>${y} verdient (zählt zur Grenze)</span><b>${eur(ty.zaehlt)}</b></div>
       <div class="stat"><span>Jahresgrenze (12 × ${eur(S().grenze)})</span><b>${eur(S().grenze*12)}</b></div>
@@ -738,6 +753,7 @@ function viewMehr(){
     </section>
     <p class="hint">Deine Daten liegen nur auf diesem Gerät. Mach ab und zu ein Backup, z. B. in die Dateien-App.<br>Werte laut Personalabteilung: 18,39 €/Std, Minijob-Grenze 2026 603 €, 25 % Spätzulage ab 20 Uhr, zählt zur Grenze.</p>
   </div>`;
+  bindMseg();
   const ml = $('#mlist');
   for(const k of keys){
     const [yy,mm] = k.split('-').map(Number), t = sumOf(by[k]), p = Math.min(100, t.zaehlt/S().grenze*100);
@@ -755,6 +771,44 @@ function viewMehr(){
   $('#bImp').onclick = () => $('#fImp').click();
   $('#fImp').onchange = importData;
 }
+function viewOffen(){
+  const list = st.offen.slice().sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
+  const open = sumOf(list.filter(x => x.status !== 'gemeldet')), all = sumOf(list);
+  const by = {}; for(const e of list) (by[e.datum.slice(0,7)] = by[e.datum.slice(0,7)] || []).push(e);
+  $('#view').innerHTML = `<div class="page">
+    <div class="top"><div><div class="eyebrow">Extra notiert</div><h1>Übersicht</h1></div></div>
+    ${MSEG()}
+    <section class="card"><div class="stats">
+      <div class="stat"><span>Noch offen</span><b>${fmtS(open.paid)} Std · ${eur(open.base + open.zul)}</b></div>
+      <div class="stat"><span>Insgesamt notiert</span><b>${fmtS(all.paid)} Std</b></div>
+    </div></section>
+    <button type="button" class="btn" id="oAdd">Stunden notieren</button>
+    <div id="olist" style="display:flex;flex-direction:column;gap:22px"></div>
+    <p class="hint">Diese Stunden zählen nicht zum Monat, nicht zum Ring und nicht im Planer. Auch nicht gestempelte Arbeitszeit ist Arbeitszeit und muss bezahlt werden: melde sie, damit sie nachgetragen wird. Danach Eintrag antippen und „zu den Schichten“ verschieben.</p>
+  </div>`;
+  bindMseg();
+  $('#oAdd').onclick = () => openSheet(null, {datum: today()}, 'offen');
+  const box = $('#olist');
+  if(!list.length){ box.innerHTML = '<section class="list"><div class="empty"><b>Nichts notiert</b>Hier landen Stunden, die nicht gestempelt wurden.</div></section>'; return; }
+  for(const k of Object.keys(by).sort().reverse()){
+    const [yy,mm] = k.split('-').map(Number), t = sumOf(by[k]), st0 = sumOf(st.entries.filter(e => e.datum.startsWith(k)));
+    const withX = st0.zaehlt + t.zaehlt, over = withX > S().grenze;
+    const sec = document.createElement('div'); sec.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+    sec.innerHTML = `<p class="group-title" style="margin:0 4px">${MONATE[mm-1]} ${yy} · ${fmtS(t.paid)} Std</p><section class="list"></section>
+      <p class="hint" style="margin:0 4px">Zusammen mit den gestempelten Stunden: <b>${eur(withX)}</b>${over ? ` <span style="color:var(--red)">(${eur(withX - S().grenze)} über der Grenze)</span>` : ` von ${eur(S().grenze)}`}</p>`;
+    const ls = sec.querySelector('.list');
+    for(const e of by[k]){
+      const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0), done = e.status === 'gemeldet';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+      b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
+        <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : fmt(e.minuten||0)}</span><span class="s">${esc([e.von ? fmt(e.minuten||0) : '', e.notiz].filter(Boolean).join(' · ')) || '&nbsp;'}</span></div>
+        <div class="right"><b>${eur(mo.sum)}</b><span class="pill ${done ? '' : 'warn'}" style="font-size:11px">${done ? 'gemeldet' : 'offen'}</span></div>`;
+      b.onclick = () => openSheet(e, null, 'offen');
+      ls.append(b);
+    }
+    box.append(sec);
+  }
+}
 async function exportData(){
   const name = `stundenzettel-${today()}.json`, data = JSON.stringify({app:'stundenzettel', v:2, ...st}, null, 1);
   const file = new File([data], name, {type:'application/json'});
@@ -767,6 +821,7 @@ function importData(ev){
     const d = JSON.parse(t); if(!Array.isArray(d.entries)) throw 0;
     const ids = new Set(st.entries.map(e => e.id)); let n = 0;
     for(const e of d.entries) if(e && e.id && e.datum && !ids.has(e.id)){ st.entries.push(e); n++; }
+    if(Array.isArray(d.offen)){ const oi = new Set(st.offen.map(e => e.id)); for(const e of d.offen) if(e && e.id && e.datum && !oi.has(e.id)){ st.offen.push(e); n++; } }
     if(d.S) st.S = {...DEF, ...d.S};
     save(); toast(`${n} Schichten geladen`); render();
   }).catch(() => toast('Datei konnte nicht gelesen werden'));
