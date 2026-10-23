@@ -25,6 +25,12 @@
     table: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/>'),
     plus: svg('<path d="M12 5v14M5 12h14"/>'),
     x: svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
+    grip: svg('<path d="M5 8h14M5 12h14M5 16h14"/>'),
+    up: svg('<path d="M6 14.5l6-6 6 6"/>'),
+    down: svg('<path d="M6 9.5l6 6 6-6"/>'),
+    eye: svg('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>'),
+    eyeOff: svg('<path d="M3.5 3.5l17 17"/><path d="M9.9 5.8A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.8 3.6M6.4 7.4A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 4.2-1"/>'),
+    arrange: svg('<path d="M7 4v16M3.5 7.5 7 4l3.5 3.5M17 20V4M13.5 16.5 17 20l3.5-3.5"/>'),
     info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.2M12 7.7v.3"/>'),
     warn: svg('<path d="M12 3.8 2.8 19.5h18.4Z"/><path d="M12 9.6v4.6M12 16.9v.3"/>'),
     okc: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor"/><path d="M7.3 12.4l3.1 3.1 6.3-6.6" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -1924,27 +1930,109 @@
     const machine = fold(`f-${mode}-mach`, mode === 'turn' ? 'Drehmaschine' : 'Maschine', `<div class="fields">${machT}</div>
       <p class="foot">Einmal eintragen, dann bleiben die Vorschläge unter diesen Grenzen.</p>
       <div class="field"><span class="lbl">Fehlende Werte</span>${segHTML(mode + '.auto', c.auto, [['on', 'automatisch vorschlagen'], ['off', 'nur rechnen']])}</div>`, `sum-${mode}-mach`);
+    // Jeder Teil ist ein eigener Block, Reihenfolge und Ausblenden stellt der Nutzer ein (Anordnen)
+    const B = [];
+    const blk = (id, title, h, half) => B.push({ id, title, h, half });
+    if (favs.length) blk('favs', 'Gemerkte Werkzeuge', `<div class="chips fav-chips">${favs.map(t => `<span class="fav"><button type="button" class="chip" data-act="tool-load" data-id="${esc(t.id)}">${esc(t.name)}</button><button type="button" class="fav-x" data-act="tool-del" data-id="${esc(t.id)}" aria-label="${esc(t.name)} löschen">${I.x}</button></span>`).join('')}</div>`);
+    blk('mat', 'Werkstoff', `<div class="field"><label for="sv-${mode}-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span> <span class="muted">${esc(mat.what)}</span></label>${matSelect(`sv-${mode}-mat`, mode + '.mat')}</div>`);
+    blk('tool', 'Werkzeug', `<div class="field"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>`);
+    if (tool.thread && mode === 'drill') blk('thr', 'Gewinde', `<div class="field"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>`);
+    if (tool.op) blk('op', 'Bearbeitung', segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap'));
+    inputs.forEach(k => blk(k, k === 'd' ? 'Ø d' : 'Schneiden z', field(k), true));
+    if (surf) blk('surf', 'Oberfläche', surf);
+    blk('top', 'Ergebnis S und F', `<div id="top-${mode}" class="sv-top" aria-live="polite"></div>`);
+    tiles.forEach(k => blk(k, { vc: 'vc Schnittgeschw.', n: 'n Drehzahl', fz: 'fz je Zahn', f: 'f je Umdrehung', vf: 'vf Vorschub F' }[k], tile(k), true));
+    blk('load', mode === 'drill' ? 'Bohrtiefe, Leistung, Zeit' : mode === 'mill' ? 'Eingriff, Leistung, Zeit' : 'Schnitttiefe, Leistung, Zeit', load);
+    blk('setup', mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', setup);
+    blk('tips', 'Tipps', fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`));
+    blk('mach', 'Maschine', machine);
+    blk('res', 'Rechenweg', `<div id="res-${mode}"></div>`);
+    blk('btns', 'Merken und Leeren', `<div class="btn-row"><button type="button" class="btn soft" data-act="tool-save" data-m="${mode}">${I.plus} Merken</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button></div>`);
+    const lay = layoutOf(mode), order = layOrder(B.map(b => b.id), lay.order);
+    const byId = Object.fromEntries(B.map(b => [b.id, b]));
     return `<section class="card sv-card" id="card-${mode}">
-      ${favs.length ? `<div class="chips fav-chips">${favs.map(t => `<span class="fav"><button type="button" class="chip" data-act="tool-load" data-id="${esc(t.id)}">${esc(t.name)}</button><button type="button" class="fav-x" data-act="tool-del" data-id="${esc(t.id)}" aria-label="${esc(t.name)} löschen">${I.x}</button></span>`).join('')}</div>` : ''}
-      <div class="fields">
-        <div class="field full"><label for="sv-${mode}-mat">Werkstoff <span class="grp-dot" style="--c:${grp.color}">${grp.id}</span> <span class="muted">${esc(mat.what)}</span></label>${matSelect(`sv-${mode}-mat`, mode + '.mat')}</div>
-        <div class="field full"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>
-        ${tool.thread && mode === 'drill' ? `<div class="field full"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>` : ''}
-      </div>
-      ${tool.op ? segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap') : ''}
-      <div class="fields">${inputs.map(k => field(k)).join('')}</div>
-      ${surf}
-      <div id="top-${mode}" class="sv-top" aria-live="polite"></div>
-      <div class="rt-cap">Zum Ändern antippen</div>
-      <div class="rt-grid">${tiles.map(tile).join('')}</div>
-      <div class="folds">
-        ${load}${setup}
-        ${fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`)}
-        ${machine}
-      </div>
-      <div id="res-${mode}"></div>
-      <div class="btn-row"><button type="button" class="btn soft" data-act="tool-save" data-m="${mode}">${I.plus} Merken</button><button type="button" class="btn plain" data-act="sv-clear" data-m="${mode}">Alles leeren</button></div>
+      <div class="lay-head"><button type="button" class="link-btn" data-act="lay-on" data-m="${mode}">${I.arrange} Anordnen</button></div>
+      <div class="lay-tools"><b>Anordnen</b><span>Am Griff ziehen oder mit den Pfeilen schieben. Das Auge blendet einen Teil aus.</span><button type="button" class="btn plain" data-act="lay-reset" data-m="${mode}">Standard wiederherstellen</button></div>
+      <button type="button" class="btn primary lay-fab" data-act="lay-off" data-m="${mode}">Fertig</button>
+      <div class="lay" id="lay-${mode}" data-m="${mode}">${order.map(id => { const b = byId[id]; return `<div class="blk${b.half ? ' half' : ''}${lay.hide.includes(id) ? ' off' : ''}" data-blk="${id}"><div class="blk-bar"><span class="blk-grip" aria-hidden="true">${I.grip}</span><span class="blk-t">${esc(b.title)}</span><button type="button" class="blk-b" data-act="lay-up" aria-label="${esc(b.title)} nach oben">${I.up}</button><button type="button" class="blk-b" data-act="lay-down" aria-label="${esc(b.title)} nach unten">${I.down}</button><button type="button" class="blk-b" data-act="lay-eye" aria-label="${esc(b.title)} ein- oder ausblenden">${lay.hide.includes(id) ? I.eyeOff : I.eye}</button></div><div class="blk-c">${b.h}</div></div>`; }).join('')}</div>
     </section>`;
+  }
+  // Gespeicherte Anordnung je Rechner: { order: [...], hide: [...] }
+  function layoutOf(mode) {
+    const all = store.get('cutLayout', {}), l = all && all[mode];
+    return { order: l && Array.isArray(l.order) ? l.order : [], hide: l && Array.isArray(l.hide) ? l.hide : [] };
+  }
+  function saveLayout(mode, l) { const all = store.get('cutLayout', {}) || {}; all[mode] = l; store.set('cutLayout', all); }
+  // Gespeicherte Reihenfolge, neue Blöcke an ihrer Standardstelle einfügen
+  function layOrder(def, saved) {
+    const out = saved.filter(id => def.includes(id));
+    def.forEach((id, i) => {
+      if (out.includes(id)) return;
+      const prev = def.slice(0, i).reverse().find(x => out.includes(x));
+      out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, id);
+    });
+    return out;
+  }
+  // Halbe Blöcke paarweise nebeneinander; ein einzelner wird breit
+  function layPair(lay) {
+    const arranging = lay.closest('.arranging');
+    let open = null;
+    $$('.blk', lay).forEach(b => {
+      b.classList.remove('solo');
+      if (!arranging && b.classList.contains('off')) return;
+      if (!b.classList.contains('half')) { if (open) open.classList.add('solo'); open = null; return; }
+      if (open) open = null; else open = b;
+    });
+    if (open) open.classList.add('solo');
+  }
+  function layStore(lay) {
+    const blks = $$('.blk', lay);
+    saveLayout(lay.dataset.m, { order: blks.map(b => b.dataset.blk), hide: blks.filter(b => b.classList.contains('off')).map(b => b.dataset.blk) });
+    layPair(lay);
+  }
+  // Ziehen am Griff (Finger oder Maus)
+  function initLayDrag(lay) {
+    if (!lay || lay._drag) return;
+    lay._drag = true;
+    let drag = null, raf = 0;
+    const update = (x, y) => {
+      drag.x = x; drag.y = y;
+      const blks = $$('.blk', lay);
+      const target = blks.find(t => { if (t === drag.el) return false; const r = t.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom; });
+      if (target) { const i = blks.indexOf(drag.el), j = blks.indexOf(target); lay.insertBefore(drag.el, j > i ? target.nextSibling : target); layPair(lay); }
+      const r = drag.el.getBoundingClientRect();
+      const bx = r.left - (parseFloat(drag.el.dataset.tx) || 0), by = r.top - (parseFloat(drag.el.dataset.ty) || 0);
+      const tx = x - drag.dx - bx, ty = y - drag.dy - by;
+      drag.el.dataset.tx = tx; drag.el.dataset.ty = ty;
+      drag.el.style.transform = `translate(${tx}px, ${ty}px) scale(1.03)`;
+    };
+    lay.addEventListener('pointerdown', e => {
+      const g = e.target.closest('.blk-grip, .blk-t');
+      if (!g || !lay.closest('.arranging')) return;
+      const el = g.closest('.blk'), r = el.getBoundingClientRect();
+      drag = { el, dx: e.clientX - r.left, dy: e.clientY - r.top, x: e.clientX, y: e.clientY, id: e.pointerId };
+      el.dataset.tx = 0; el.dataset.ty = 0;
+      el.classList.add('lifting');
+      try { g.setPointerCapture(e.pointerId); } catch (err) { /* ohne Capture */ }
+      e.preventDefault();
+      const tick = () => {
+        if (!drag) return;
+        if (drag.y < 80) window.scrollBy(0, -7); else if (drag.y > window.innerHeight - 80) window.scrollBy(0, 7);
+        update(drag.x, drag.y);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    });
+    lay.addEventListener('pointermove', e => { if (drag && e.pointerId === drag.id) { e.preventDefault(); drag.x = e.clientX; drag.y = e.clientY; } });
+    const end = () => {
+      if (!drag) return;
+      cancelAnimationFrame(raf);
+      drag.el.style.transform = ''; drag.el.classList.remove('lifting');
+      drag = null;
+      layStore(lay);
+    };
+    lay.addEventListener('pointerup', end);
+    lay.addEventListener('pointercancel', end);
   }
 
   // Rechnen mit Vorschlägen: was nicht eingegeben und nicht ableitbar ist, kommt aus der Empfehlung
@@ -1997,6 +2085,8 @@
 
   function computeSolve(mode) {
     const c = A[mode];
+    const lay = $('#lay-' + mode);
+    if (lay && !lay.closest('.arranging')) layPair(lay);
     const S0 = solveWithSuggestions(mode);
     const { r, g, soft, hard, rec, tool, thr, info, lim } = S0;
     SV_LAST[mode] = S0;
@@ -2664,6 +2754,12 @@
     'ref-mat': t => { A.ref.mat = t.dataset.v; saveA(); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); },
     'ref-go': () => refGo(),
     'sv-accept': t => acceptSuggestions(t.dataset.m),
+    'lay-on': t => { const card = $('#card-' + t.dataset.m); card.classList.add('arranging'); const lay = $('#lay-' + t.dataset.m); initLayDrag(lay); layPair(lay); window.scrollTo({ top: Math.max(0, card.getBoundingClientRect().top + window.scrollY - 70) }); },
+    'lay-off': t => { $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); },
+    'lay-reset': t => { saveLayout(t.dataset.m, { order: [], hide: [] }); $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); const c = $('#card-' + t.dataset.m); if (c) { c.classList.add('arranging'); initLayDrag($('#lay-' + t.dataset.m)); layPair($('#lay-' + t.dataset.m)); } },
+    'lay-up': t => { const b = t.closest('.blk'), p = b.previousElementSibling; if (p) b.parentNode.insertBefore(b, p); layStore(b.parentNode); b.scrollIntoView({ block: 'nearest' }); },
+    'lay-down': t => { const b = t.closest('.blk'), n = b.nextElementSibling; if (n) b.parentNode.insertBefore(n, b); layStore(b.parentNode); b.scrollIntoView({ block: 'nearest' }); },
+    'lay-eye': t => { const b = t.closest('.blk'); b.classList.toggle('off'); t.innerHTML = b.classList.contains('off') ? I.eyeOff : I.eye; layStore(b.parentNode); },
     'rt-edit': t => {   // Kachel wird zum Eingabefeld
       const box = t.closest('.rt'), inp = box && $('input', box);
       if (!inp || box.classList.contains('fixed')) return;
