@@ -3,7 +3,7 @@
 Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engine.js`,
 `exercises.js`, `howto.js`, `figures.js`. `node pwa/build.js` baut nach `pwa/dist`, danach
 `pwa/dist/*` nach `docs/` kopieren (GitHub Pages läuft aus `main:/docs`).
-Achtung: `docs/toleranzen/` und `docs/stunden/` gehören zu anderen Apps – nie löschen oder überschreiben
+Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
@@ -66,3 +66,13 @@ Tagesform aus Garmin-Werten wurde gebaut und auf Wunsch des Nutzers wieder entfe
 Trainingsbereitschaft, Body Battery und (wahrscheinlich) HRV nicht an Apple Health weiter, nur
 Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`dayForm` in
 `recommend`) und dem Wochen-Check-in. Nur wieder einbauen, wenn der Nutzer es ausdrücklich will.
+
+## Kochwerk (eigene App in `kochwerk/`)
+Abnehm-App ohne Tracking, wird in Etappen gebaut (1 Rezepte, 2 Tages-/Wochenplan, 3 Einkauf, 4 Kochsession/Boxen,
+5 Abgleich iPad über privates GitHub-Repo + Export/Import). Vor jeder Etappe Plan zeigen und auf OK warten.
+- Satzwerk dafür nie anfassen. Speicher nur mit Präfix `kochwerk_`. Keine Fotos speichern.
+- Deploy: Dateien aus `kochwerk/` nach `docs/kochwerk/` kopieren (ohne `test.js`, `IMPORT-FORMAT.md`),
+  `CACHE` in `kochwerk/sw.js` hochzählen. Tests: `node kochwerk/test.js`.
+- Import-Format: `kochwerk/IMPORT-FORMAT.md`, passt zum Chat-Skill „kochwerk-rezept“. Format nur zusammen ändern.
+- Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
+  `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.

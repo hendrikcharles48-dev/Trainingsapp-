@@ -68,3 +68,22 @@ Eigenständige App im iOS-Design (dunkel als Standard) für einen Minijob, im Or
 
 ## Auf dem iPhone nutzen
 Nach Änderungen `stunden/` nach `docs/stunden/` kopieren und `CACHE` in `stunden/sw.js` hochzählen. Mit GitHub Pages liegt die App unter `…/stunden/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.
+
+---
+
+# Kochwerk
+
+Eigenständige App im iOS-Design (hell und dunkel nach Systemeinstellung) zum Abnehmen ohne Tracking, im Ordner `kochwerk/`. Prinzip: einmal beim Rezept rechnen statt täglich tracken. Wird in Etappen gebaut.
+
+- **Etappe 1 (fertig):** Einrichtung (Größe, Gewicht, Alter, Aktivität, Abnehmtempo, Protein 180 g, normale Mahlzeit, Kochtag, Portion Freundin), Kalorienziel, Rezept-Import als Text-Block aus dem Chat (Format in `kochwerk/IMPORT-FORMAT.md`, Skill „kochwerk-rezept“), Rezeptbuch mit Suche, Filtern, Bearbeiten (Formular oder als Text), von Hand anlegen, löschen, teilen, Bewertung „satt?“ und „lecker?“ mit „Zum Aussortieren“.
+- **Kalorienziel:** Grundumsatz nach Mifflin-St Jeor × Aktivität (1,2–1,725). Defizit aus dem Tempo (langsam 0,25 %, moderat 0,5 %, zügig 0,75 % des Körpergewichts pro Woche, 1 kg ≈ 7700 kcal), höchstens 25 % des Verbrauchs, Ziel nie unter dem Grundumsatz (`calcTargets` in `core.js`).
+- Daten nur in `localStorage` unter `kochwerk_data` (Gerätekennung `kochwerk_device`, Darstellung `kochwerk_ui`). Jeder Eintrag hat `id` und `t` (letzte Änderung), Gelöschtes bleibt als `{id, del:true, t}` stehen, damit der spätere Abgleich mit dem iPad Eintrag für Eintrag zusammenführen kann (`merge` in `core.js`). Keine Fotos.
+
+## Dateien
+- `core.js`: Datenmodell, Import-Parser, Nährwerte, Kalorienziel, Zusammenführen (läuft auch in Node)
+- `app.js`, `style.css`, `index.html`: Oberfläche
+- `IMPORT-FORMAT.md`: Import-Format, `beispiel-rezept.txt`: Beispielrezepte
+- `test.js`: `node kochwerk/test.js`
+
+## Auf dem iPhone nutzen
+Nach Änderungen `kochwerk/` nach `docs/kochwerk/` kopieren (ohne `test.js` und `IMPORT-FORMAT.md`) und `CACHE` in `kochwerk/sw.js` hochzählen. Mit GitHub Pages liegt die App unter `…/kochwerk/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.
