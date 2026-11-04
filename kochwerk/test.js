@@ -343,5 +343,55 @@ const txt = S.shareText('Einkauf', S.weekList(E, W2).items);
 eq('Teilen-Text mit Bereichen', /Fleisch & Fisch\n☐ /.test(txt), true);
 eq('Teilen ganze Packungen', /☐ \d × Hähnchenbrustfilet \(Packung 1 kg\)|☐ Hähnchenbrustfilet \(Packung 1 kg\)/.test(txt), true);
 
+{
+// ---------- Kochsession, Boxen (cook.js) ----------
+const C = require('./cook.js');
+const rA = KW.parseRecipes(sample)[0].recipe;
+const sch = C.schedule([{ r: rA, pots: 1 }]);
+eq('alle Schritte im Ablauf', sch.steps.length, rA.steps.length);
+eq('Reihenfolge im Rezept bleibt', sch.steps.map(s => s.n), [1, 2, 3, 4, 5, 6, 7]);
+eq('Schneiden während der Reis köchelt', sch.steps.find(s => s.n === 3).start < sch.steps.find(s => s.n === 2).end, true);
+eq('Reis erst, wenn das Wasser kocht', sch.steps.find(s => s.n === 2).start >= sch.steps.find(s => s.n === 1).end, true);
+eq('letzter Schritt wartet auf alles', sch.steps[6].start >= Math.max(...sch.steps.slice(0, 6).filter(s => s.passive).map(s => s.end)), true);
+eq('schneller als nacheinander', sch.total < sch.sequential, true);
+const rB = { id: 'b', name: 'Ofengemüse', steps: [{ text: 'Schneiden', min: 10 }, { text: 'Ofen', min: 30, passive: true }, { text: 'Verteilen', min: 3 }] };
+const twoS = C.schedule([{ r: rA }, { r: rB }]);
+eq('zwei Rezepte: alle Schritte', twoS.steps.length, 10);
+eq('zwei Rezepte gleichzeitig schneller', twoS.total < twoS.sequential, true);
+eq('Hände nie doppelt belegt', (() => { let t = 0; for (const s of twoS.steps) { if (s.start < t - 1e-9) return false; t = s.start + (s.passive ? Math.min(1, s.min || 3) : (s.min || 3)); } return true; })(), true);
+
+// Boxen: Kochtag So 8.11., Hähnchen 3 Tage haltbar, einfrierbar
+const B = KW.emptyDb();
+const hb = KW.importRecipe(B, KW.parseRecipes(sample)[0].recipe, 'new');
+const wB = '2026-11-09';
+for (let k = 0; k < 5; k++) { const d = P.addDays(wB, k); P.setMeal(B, d, 'box', true); P.update(B, P.mainId(d, 'box'), { recipeId: hb.id }); }
+const bx = C.boxes(B, wB);
+eq('Kochtag', bx.cookDate, '2026-11-08');
+eq('Mo–Mi Kühlschrank, Do–Fr Gefrierfach', bx.list.map(b => b.place), ['fridge', 'fridge', 'fridge', 'freezer', 'freezer']);
+eq('Auftauen am Vorabend', bx.list[3].thaw, '2026-11-11');
+eq('2 Töpfe für 5 Portionen: 3 Reserve', bx.reserve[0].count, 3);
+const nf = KW.importRecipe(B, Object.assign({}, KW.parseRecipes(sample)[0].recipe, { name: 'Salat', freeze: false, keepDays: 2 }), 'new');
+P.update(B, P.mainId(P.addDays(wB, 4), 'box'), { recipeId: nf.id });
+eq('nicht einfrierbar und zu spät: Warnung', C.boxes(B, wB).list[4].place, 'late');
+P.update(B, P.mainId(P.addDays(wB, 4), 'box'), { recipeId: hb.id });
+eq('vor dem Kochen kein Hinweis', C.thawHints(B, '2026-11-11'), []);
+C.finishCooking(B, wB, '2026-11-08', [hb.id]);
+eq('Auftau-Hinweis am Vorabend', C.thawHints(B, '2026-11-11').map(h => [h.date, h.when]), [['2026-11-12', 'evening']]);
+eq('vergessen: am Tag selbst', C.thawHints(B, '2026-11-12').map(h => h.when), ['today', 'evening']);
+C.thawDone(B, bx.list[3].id);
+eq('erledigt: weg', C.thawHints(B, '2026-11-11'), []);
+
+// Hungerknopf und Notfall
+const H = KW.emptyDb();
+for (const [n, p] of [['Skyr', 25], ['Quark', 30], ['Jerky', 20], ['Riegel', 15], ['Ei', 12]]) KW.importRecipe(H, { name: n, cat: 'hunger', portions: 1, keepDays: 3, freeze: false, box: true, tips: [], steps: [], ingredients: [{ name: n, qty: 100, unit: 'g', per100: { kcal: 150, p, c: 5, f: 3 } }] }, 'new');
+KW.importRecipe(H, { name: 'Linsen-Dal', cat: 'emergency', portions: 2, keepDays: 3, freeze: true, box: true, tips: [], steps: [], ingredients: [{ name: 'Linsen', qty: 200, unit: 'g', per100: { kcal: 340, p: 24, c: 49, f: 1.5 } }] }, 'new');
+const hi3 = C.hungerIdeas(H, '2026-11-04');
+eq('Hungerknopf: 3 Ideen', hi3.length, 3);
+eq('Hungerknopf: nur Hungersnacks', hi3.every(x => x.r.cat === 'hunger'), true);
+eq('Hungerknopf: proteinreich zuerst', hi3[0].t.p >= hi3[2].t.p, true);
+eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
+
+}
+
 console.log(bad ? `\n${bad} Fehler, ${ok} ok` : `Alles ok (${ok} Prüfungen)`);
 process.exit(bad ? 1 : 0);

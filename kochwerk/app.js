@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.2 · Etappe 3';
+  const VERSION = '1.3 · Etappe 4';
 
   // ---------- Speicher ----------
   function load() {
@@ -72,8 +72,8 @@
     return `<div class="card room${rm.rest < -50 ? ' over' : ''}"><span class="lbl">${big ? 'Spielraum für den Rest des Tages' : 'Spielraum'}</span>
       <div class="room-big">${esc(rm.text)}</div>
       <p class="room-sub">${esc(sub)} · <b>${f0(rm.pOpen)} g Protein</b> offen</p>
-      <div class="bars"><div class="bar"><i style="width:${pct}%"></i></div><span>${f0(rm.used)} / ${f0(rm.target)} kcal geplant</span>
-      <div class="bar p"><i style="width:${ppct}%"></i></div><span>${f0(rm.pUsed)} / ${f0(rm.protein)} g Protein geplant</span></div></div>`;
+      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><span>${f0(rm.used)} / ${f0(rm.target)} kcal geplant</span>
+      <div class="meter p"><i style="width:${ppct}%"></i></div><span>${f0(rm.pUsed)} / ${f0(rm.protein)} g Protein geplant</span></div></div>`;
   }
   function entryRow(e, date) {
     const r = P.recipeOf(db, e), m = P.mealById(e.meal), t = r ? P.portionOf(r) : null;
@@ -100,7 +100,18 @@
   function pageHeute() {
     const d = today(), n = recipes().length;
     let h = `<div class="top"><div><div class="eyebrow">${esc(todayLabel())}</div><h1>Heute</h1></div></div>`;
+    for (const t of CO.thawHints(db, d)) {
+      h += t.when === 'evening'
+        ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
+        : `<div class="card thaw today"><span class="em">⏱️</span><div class="mid"><b>Noch im Gefrierfach?</b><span>„${esc(t.name)}“ ist für heute geplant. Sonst in der Mikrowelle auftauen.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Ist raus</button></div>`;
+    }
+    const ckOld = ckLoad();
+    if (ckOld && ckOld.phase === 'run') h += `<button class="card cookcard" data-act="cook" data-week="${ckOld.week}"><span class="em">🍳</span><span class="mid"><b>Kochsession fortsetzen</b><span>KW ${P.isoWeek(ckOld.week)}</span></span><span class="add">›</span></button>`;
+    else for (const wk of [P.weekStart(d), P.addDays(P.weekStart(d), 7)]) {
+      if (P.cookDate(db, wk) === d && !CO.cookedOf(db, wk) && SH3.weekPots(db, wk).length) h += `<button class="card cookcard" data-act="cook" data-week="${wk}"><span class="em">🍳</span><span class="mid"><b>Heute ist Kochtag</b><span>${SH3.weekPots(db, wk).length} Rezepte für KW ${P.isoWeek(wk)} · Kochsession starten</span></span><span class="add">›</span></button>`;
+    }
     h += roomCard(d, true);
+    h += `<div class="btnrow quick"><button class="btn tint" data-act="hunger">🍏 Ich hab Hunger</button><button class="btn plain" data-act="crash">💥 Plan geplatzt</button></div>`;
     h += `<div class="list">${dayList(d, true)}<button class="row addrow" data-act="snack-new" data-date="${d}"><span class="ico">＋</span><span class="mid"><span class="t">Snack einfügen</span></span><span></span></button></div>`;
     if (!n) {
       h += `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Rezepte als Block aus dem Chat einfügen oder das Beispiel laden.</div>
@@ -151,6 +162,9 @@
     const avgP = plannedDays.length ? plannedDays.reduce((s, d) => s + P.dayTotals(db, d).p, 0) / plannedDays.length : 0;
     h += `<div class="card plan2"><div class="inline"><span class="step-n">2</span><span class="mid" style="flex:1"><span class="t">Woche planen</span><span class="s">${es.length ? `${es.length} Mahlzeiten · ${empty ? empty + ' noch leer · ' : ''}Ø ${f0(avgP)} g Protein pro Tag` : 'An den Tagen die Mahlzeiten anwählen, dann vorschlagen lassen.'}</span></span></div>
       <div class="btnrow"><button class="btn" data-act="suggest"${empty ? '' : ' disabled'}>✨ Vorschlagen</button><button class="btn plain" data-act="favs">★ Lieblingswochen</button></div></div>`;
+    const ck = CO.cookedOf(db, start), cdt = P.cookDate(db, start);
+    h += `<div class="card plan2"><div class="inline"><span class="step-n${ck ? ' done' : ''}">${ck ? '✓' : '3'}</span><span class="mid" style="flex:1"><span class="t">Kochen & Boxen</span><span class="s">${ck ? 'Gekocht am ' + esc(P.dayLabel(ck.date)) : 'Kochtag ' + esc(P.dayLabel(cdt)) + ' · einmal vorkochen für die Woche'}</span></span></div>
+      <div class="btnrow"><button class="btn${ck ? ' plain' : ''}" data-act="cook" data-week="${start}"${es.length ? '' : ' disabled'}>🍳 Kochsession</button><button class="btn plain" data-act="boxes"${es.length ? '' : ' disabled'}>🥡 Boxen</button></div></div>`;
     for (const d of days) {
       const t = P.dayTotals(db, d), isToday = d === today(), rm = P.room(db, d);
       const on = new Set(P.entries(db, d).map(e => e.meal));
@@ -360,7 +374,7 @@
       return h + `<div class="card empty"><span class="em">🛒</span><div><b>Noch nichts zu kaufen</b>Für diese Woche ist noch nichts geplant.</div><button class="btn" data-act="tab" data-tab="woche">Woche planen</button></div>` + stockView(L);
     }
     const done = L.items.filter(i => i.done).length;
-    h += `<div class="card prog"><div class="inline"><b>${done} von ${L.items.length} im Wagen</b><span class="hint">ganze Packungen</span></div><div class="bar p"><i style="width:${L.items.length ? done / L.items.length * 100 : 0}%"></i></div></div>`;
+    h += `<div class="card prog"><div class="inline"><b>${done} von ${L.items.length} im Wagen</b><span class="hint">ganze Packungen</span></div><div class="meter p"><i style="width:${L.items.length ? done / L.items.length * 100 : 0}%"></i></div></div>`;
     h += byArea(L.items, it => shopRow(it, start));
     const fresh = L.items.filter(i => i.lateHint && !i.done);
     if (fresh.length) h += `<div class="tip" style="margin-top:-4px">${fresh.length === 1 ? '1 frische Sache wird' : fresh.length + ' frische Sachen werden'} erst später in der Woche gebraucht. Antippen und „Später kaufen“ wählen, dann stehen sie auf der Nachkaufliste.</div>`;
@@ -475,6 +489,134 @@
       if (!its.length) { toast('Nachkaufliste ist leer'); return; }
       shareText('Nachkauf', SH3.shareText('Nachkauf', its));
     }
+  }
+
+  // ---------- Kochsession ----------
+  const CO = KW.C;
+  const KEY_CK = 'kochwerk_session';
+  const COLORS = ['#34C76A', '#FF9F0A', '#5AA9FF', '#BF5AF2', '#FF6961', '#64D2FF'];
+  let CK = null, ckTick = null, wake = null, audio = null;
+  function ckSave() { try { localStorage.setItem(KEY_CK, JSON.stringify(CK)); } catch (e) { /* egal */ } }
+  function ckLoad() { try { return JSON.parse(localStorage.getItem(KEY_CK) || 'null'); } catch (e) { return null; } }
+  function ckPlan() {
+    const pots = SH3.weekPots(db, CK.week).filter(x => CK.sel.includes(x.r.id));
+    return CO.schedule(pots.map(x => ({ r: x.r, pots: x.pots })));
+  }
+  function openCook(week) {
+    const old = ckLoad();
+    if (old && old.week === week && old.phase !== 'pick') CK = old;
+    else CK = { week, phase: 'pick', sel: SH3.weekPots(db, week).map(x => x.r.id), idx: 0, timers: [] };
+    $('#cook').hidden = false; document.body.style.overflow = 'hidden';
+    renderCook();
+  }
+  function closeCook() {
+    $('#cook').hidden = true; $('#cook').innerHTML = ''; document.body.style.overflow = '';
+    clearInterval(ckTick); ckTick = null; releaseWake();
+    if (CK && CK.phase === 'end') { try { localStorage.removeItem(KEY_CK); } catch (e) { /* egal */ } } else ckSave();
+    CK = null; render(true);
+  }
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) { wake = null; }
+  }
+  function releaseWake() { try { if (wake) wake.release(); } catch (e) { /* egal */ } wake = null; }
+  function beep() {
+    try {
+      if (!audio) return;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.connect(g); g.connect(audio.destination); o.frequency.value = 880; g.gain.value = 0.25;
+      o.start(); o.stop(audio.currentTime + 0.6);
+      setTimeout(() => { try { const o2 = audio.createOscillator(); o2.connect(g); o2.frequency.value = 660; o2.start(); o2.stop(audio.currentTime + 0.6); } catch (e) { /* egal */ } }, 750);
+    } catch (e) { /* ohne Ton */ }
+    try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) { /* egal */ }
+  }
+  const mmss = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function timersHtml() {
+    if (!CK.timers.length) return '';
+    const nowT = Date.now();
+    return '<div class="timers">' + CK.timers.map(t => { const left = (t.end - nowT) / 1000; return `<button class="timer${left <= 0 ? ' ring' : ''}" data-act="ck-timer-x" data-id="${t.id}" style="--c:${t.c}"><b>${left <= 0 ? 'Fertig!' : mmss(left)}</b><span>${esc(t.label)}</span></button>`; }).join('') + '</div>';
+  }
+  function tickTimers() {
+    if (!CK) return;
+    const nowT = Date.now();
+    for (const t of CK.timers) if (!t.rang && t.end <= nowT) { t.rang = true; beep(); toast('⏰ ' + t.label + ' ist fertig'); ckSave(); }
+    const el = $('#ck-timers'); if (el) el.innerHTML = timersHtml();
+  }
+  function renderCook() {
+    const el = $('#cook'), start = CK.week;
+    let h = '';
+    if (CK.phase === 'pick') {
+      const pots = SH3.weekPots(db, start), cd = P.cookDate(db, start);
+      const sel = pots.filter(x => CK.sel.includes(x.r.id));
+      const sc = CO.schedule(sel.map(x => ({ r: x.r, pots: x.pots })));
+      h = `<div class="in"><div class="bar"><button class="back" data-act="ck-close">${IC.back}Zurück</button><span></span></div>
+        <h1>Kochsession</h1><p class="lead">KW ${P.isoWeek(start)} · Kochtag ${esc(P.dayLabel(cd))} – welche Rezepte kochst du heute?</p>`;
+      if (!pots.length) h += `<div class="card empty"><span class="em">🍳</span><div><b>Nichts zu kochen</b>Für diese Woche ist noch kein Rezept geplant.</div></div>`;
+      h += '<div class="opts">' + pots.map((x, k) => { const on = CK.sel.includes(x.r.id); return `<button class="opt" data-act="ck-sel" data-id="${x.r.id}" aria-pressed="${on}"><span class="chk">${on ? '✓' : ''}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${x.pots > 1 ? x.pots + ' × Rezept (' + fNum(x.pots * x.r.portions) + ' Portionen)' : fNum(x.r.portions) + ' Portionen'} · ${x.r.steps.length} ${x.r.steps.length === 1 ? 'Schritt' : 'Schritte'}</span></span><span class="dot" style="background:${COLORS[k % COLORS.length]}"></span></button>`; }).join('') + '</div>';
+      if (sel.length) h += `<p class="hint">Alles zusammen etwa ${f0(sc.total)} min${sc.sequential > sc.total + 4 ? ` statt ${f0(sc.sequential)} min nacheinander` : ''}. Die App sagt dir, was als Nächstes dran ist.</p>`;
+      h += `<div class="grow"></div><button class="btn" data-act="ck-start"${sel.length ? '' : ' disabled'}>Los geht’s</button></div>`;
+    } else if (CK.phase === 'run') {
+      const sc = ckPlan(), st = sc.steps[CK.idx];
+      if (!st) { CK.phase = 'end'; return renderCook(); }
+      const ri = SH3.weekPots(db, start).findIndex(x => x.r.id === st.rid);
+      const c = COLORS[(ri < 0 ? st.ri : ri) % COLORS.length];
+      const next = sc.steps.slice(CK.idx + 1, CK.idx + 3);
+      const hasTimer = CK.timers.some(t => t.step === CK.idx);
+      h = `<div class="in"><div class="bar"><button class="back" data-act="ck-close">${IC.back}Pause</button><div class="dots">${sc.steps.map((_, k) => `<i class="${k <= CK.idx ? 'on' : ''}"></i>`).join('')}</div><span class="hint">${CK.idx + 1}/${sc.steps.length}</span></div>
+        <div class="awake">📱 Das Display bleibt an. Timer laufen nur, solange Kochwerk geöffnet ist.</div>
+        <div id="ck-timers">${timersHtml()}</div>
+        <div class="stepcard" style="--c:${c}"><span class="rtag">${esc(st.name)} · Schritt ${st.n}/${st.of}</span>
+          ${st.n === 1 && st.pots > 1 ? `<div class="warnbox">Doppelte Menge: ${st.pots} × Rezept.</div>` : ''}
+          <p class="big-step">${esc(st.text)}</p>
+          ${st.min ? `<span class="badge ${st.passive ? 'ok' : ''}">⏱ ${fNum(st.min)} min${st.passive ? ' · nebenbei, du kannst weitermachen' : ''}</span>` : ''}
+          ${st.tip ? `<div class="tip">${esc(st.tip)}</div>` : ''}</div>
+        ${st.min && !hasTimer ? `<button class="btn tint" data-act="ck-timer" data-min="${st.min}">⏱ Timer ${fNum(st.min)} min starten</button>` : ''}
+        ${next.length ? `<div class="field"><span class="lbl">Danach</span><div class="list">${next.map(n => `<div class="row" style="grid-template-columns:10px minmax(0,1fr)"><span class="dot" style="background:${COLORS[Math.max(0, SH3.weekPots(db, start).findIndex(x => x.r.id === n.rid)) % COLORS.length]}"></span><span class="mid"><span class="t" style="font-weight:500;white-space:normal">${esc(n.text)}</span><span class="s">${esc(n.name)}${n.min ? ' · ' + fNum(n.min) + ' min' : ''}</span></span></div>`).join('')}</div></div>` : ''}
+        <div class="grow"></div><div class="btnrow">${CK.idx ? '<button class="btn plain" style="flex:0 0 30%" data-act="ck-prev">Zurück</button>' : ''}<button class="btn" data-act="ck-next">${CK.idx === sc.steps.length - 1 ? 'Fertig gekocht' : 'Erledigt, weiter'}</button></div></div>`;
+      if (!ckTick) ckTick = setInterval(tickTimers, 1000);
+      keepAwake();
+    } else {
+      const b = CO.boxes(db, start, { cookDate: today(), recipeIds: CK.sel });
+      h = `<div class="in"><div class="bar"><span></span></div><h1>Fertig gekocht! 🎉</h1><p class="lead">So kommt alles in die Boxen. Die Übersicht findest du später unter Woche → Boxen.</p>
+        ${boxesHtml(b)}<div class="grow"></div><button class="btn" data-act="ck-finish">Fertig</button></div>`;
+    }
+    el.innerHTML = h;
+    el.scrollTop = 0;
+  }
+  const PLACE = { fridge: ['🧊', 'Kühlschrank'], freezer: ['❄️', 'Gefrierfach'], late: ['⚠️', 'Hält nicht so lange'] };
+  function boxesHtml(b) {
+    const cnt = k => b.list.filter(x => x.place === k).reduce((s, x) => s + x.count, 0) + b.reserve.filter(x => x.place === k).reduce((s, x) => s + x.count, 0);
+    let h = `<div class="tiles t3"><div><b>${cnt('fridge')}</b><span>🧊 Kühlschrank</span></div><div><b>${cnt('freezer')}</b><span>❄️ Gefrierfach</span></div><div><b>${b.list.reduce((s, x) => s + x.count, 0) + b.reserve.reduce((s, x) => s + x.count, 0)}</b><span>Boxen gesamt</span></div></div>`;
+    if (b.list.some(x => x.place === 'late')) h += `<div class="warnbox">Nicht einfrierbar und hält nicht bis zum geplanten Tag. Lieber früher essen oder in der Woche tauschen.</div>`;
+    h += `<div class="field"><span class="lbl">Box-Reihenfolge (gekocht ${esc(P.dayLabel(b.cookDate))})</span><div class="list">` + b.list.map(x => {
+      const [ic, lb] = PLACE[x.place];
+      const sub = (x.place === 'freezer' ? `auftauen: ${P.DAY_SHORT[P.wd(x.thaw)]} abends in den Kühlschrank` : x.place === 'late' ? `hält nur bis ${P.dayLabel(x.keepUntil)}` : `${lb}, hält bis ${P.dayLabel(x.keepUntil)}`) + (x.partner ? ' · 2 Boxen (mit Freundin)' : '');
+      return `<div class="row"><span class="ico">${ic}</span><span class="mid"><span class="t">${esc(P.dayLabel(x.date))} · ${esc(x.meal === 'snack' ? 'Snack' : P.mealById(x.meal).short)}</span><span class="s" style="white-space:normal">${esc(x.name)} · ${esc(sub)}</span></span><span></span></div>`;
+    }).join('') + '</div></div>';
+    if (b.reserve.length) h += `<div class="field"><span class="lbl">Übrige Portionen (ganze Töpfe)</span><div class="list">${b.reserve.map(x => `<div class="row"><span class="ico">${PLACE[x.place][0]}</span><span class="mid"><span class="t">${x.count} × ${esc(x.name)}</span><span class="s" style="white-space:normal">${x.place === 'freezer' ? 'Reserve ins Gefrierfach' : 'Kühlschrank, bis ' + esc(P.dayLabel(x.keepUntil)) + ' essen'}</span></span><span></span></div>`).join('')}</div></div>`;
+    return h;
+  }
+  function boxSheet() {
+    const b = CO.boxes(db, S.week);
+    return `<div class="sheet-head"><span></span><h2>Boxen</h2><button class="r" data-act="close">Fertig</button></div>` +
+      (b.list.length || b.reserve.length ? boxesHtml(b) : '<div class="card empty">In dieser Woche ist noch nichts geplant.</div>') +
+      (CO.cookedOf(db, S.week) ? '' : '<p class="hint">Vorschau mit Standard-Kochtag. Nach der Kochsession gilt der echte Kochtag.</p>');
+  }
+
+  // ---------- Hunger und Notfall ----------
+  function ideaRows(list) {
+    return '<div class="list">' + list.map(x => `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico">${KW.catById(x.r.cat).icon}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${x.r.time ? f0(x.r.time) + ' min · ' : ''}${esc(KW.catById(x.r.cat).short)}</span></span><span class="right"><b>${f0(x.t.kcal)} kcal</b><span>${f0(x.t.p)} g P</span></span></button>`).join('') + '</div>';
+  }
+  function hungerSheet() {
+    const list = CO.hungerIdeas(db, today());
+    return `<div class="sheet-head"><span></span><h2>Ich hab Hunger</h2><button class="r" data-act="close">OK</button></div>
+      <p style="margin:0">Schnelle Proteinsnacks aus deiner Liste. <b>Nur als Idee</b> – es wird nichts eingetragen oder abgezogen.</p>` +
+      (list.length ? ideaRows(list) : '<div class="card empty">Noch keine Hungersnacks. Im Chat „Kochwerk 3 Hungersnacks“ schreiben und den Block importieren.</div>');
+  }
+  function crashSheet() {
+    const list = CO.emergencyIdeas(db);
+    return `<div class="sheet-head"><span></span><h2>Plan geplatzt</h2><button class="r" data-act="close">OK</button></div>
+      <p style="margin:0">Kein Problem. Gerichte aus haltbaren Vorräten – Zutaten stehen im Grundvorrat.</p>` +
+      (list.length ? ideaRows(list) : '<div class="card empty">Noch keine Notfallgerichte. Im Chat „Kochwerk 3 Notfallgerichte aus Vorrat“ schreiben und importieren.</div>');
   }
 
   // ---------- Rezeptbuch ----------
@@ -1046,6 +1188,26 @@ Schritte:
     moremeal: () => { MM = { meal: 'breakfast', days: new Set() }; openSheet(moreSheet); },
     'mm-meal': b => { MM.meal = b.dataset.v; MM.days = new Set(); refreshSheet(true); },
     'mm-day': b => { const d = b.dataset.v; MM.days.has(d) ? MM.days.delete(d) : MM.days.add(d); refreshSheet(true); },
+    // Kochsession, Boxen, Hunger
+    cook: b => openCook(b.dataset.week || S.week || defaultWeek()),
+    boxes: () => openSheet(boxSheet, { tall: true }),
+    hunger: () => openSheet(hungerSheet),
+    crash: () => openSheet(crashSheet),
+    'thaw-done': b => { CO.thawDone(db, b.dataset.id); save(); render(true); },
+    'ck-close': () => closeCook(),
+    'ck-sel': b => { const id = b.dataset.id; CK.sel = CK.sel.includes(id) ? CK.sel.filter(x => x !== id) : CK.sel.concat(id); renderCook(); },
+    'ck-start': () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } CK.phase = 'run'; CK.idx = 0; CK.timers = []; ckSave(); renderCook(); },
+    'ck-timer': b => {
+      try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) { audio = null; }
+      const st = ckPlan().steps[CK.idx]; if (!st) return;
+      const ri = SH3.weekPots(db, CK.week).findIndex(x => x.r.id === st.rid);
+      CK.timers.push({ id: KW.uid(), step: CK.idx, label: st.name.split(' ').slice(0, 2).join(' ') + ': ' + st.text.split(' ').slice(0, 4).join(' '), end: Date.now() + (+b.dataset.min) * 60000, c: COLORS[Math.max(0, ri) % COLORS.length] });
+      ckSave(); renderCook();
+    },
+    'ck-timer-x': b => { const t = CK.timers.find(x => x.id === b.dataset.id); if (!t) return; if (t.end <= Date.now()) { CK.timers = CK.timers.filter(x => x !== t); ckSave(); tickTimers(); } else toast('Läuft noch ' + mmss((t.end - Date.now()) / 1000)); },
+    'ck-next': () => { const n = ckPlan().steps.length; CK.idx++; if (CK.idx >= n) CK.phase = 'end'; ckSave(); renderCook(); },
+    'ck-prev': () => { CK.idx = Math.max(0, CK.idx - 1); ckSave(); renderCook(); },
+    'ck-finish': () => { CO.finishCooking(db, CK.week, today(), CK.sel); save(); closeCook(); toast('Guten Appetit!'); },
     // Einkauf
     'shop-tab': b => { S.shopTab = b.dataset.v; render(); },
     'shop-week': b => { S.shopOwn = true; S.shopWeek = P.addDays(S.shopWeek || defaultWeek(), +b.dataset.d); render(); },
@@ -1164,6 +1326,7 @@ Schritte:
   let lastDay = today();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    if (CK && CK.phase === 'run') { keepAwake(); tickTimers(); }
     if (lastDay !== today()) { lastDay = today(); if (!SH && !WZ) { S.tab = 'heute'; S.week = null; render(); } }
     askRating();
   });
