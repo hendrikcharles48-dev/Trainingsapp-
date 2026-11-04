@@ -73,24 +73,32 @@ Nach Änderungen `stunden/` nach `docs/stunden/` kopieren und `CACHE` in `stunde
 
 # Kochwerk
 
-Eigenständige App im iOS-Design (hell und dunkel nach Systemeinstellung) zum Abnehmen ohne Tracking, im Ordner `kochwerk/`. Prinzip: einmal beim Rezept rechnen statt täglich tracken. Wird in Etappen gebaut.
+Eigenständige App im iOS-Design (hell und dunkel nach Systemeinstellung) zum Abnehmen ohne Tracking, im Ordner `kochwerk/`. Prinzip: einmal beim Rezept rechnen statt täglich tracken. Alle 5 Etappen sind fertig.
 
 - **Etappe 1 (fertig):** Einrichtung (Größe, Gewicht, Alter, Aktivität, Abnehmtempo, Protein 180 g, normale Mahlzeit, Kochtag, Portion Freundin), Kalorienziel, Rezept-Import als Text-Block aus dem Chat (Format in `kochwerk/IMPORT-FORMAT.md`, Skill „kochwerk-rezept“), Rezeptbuch mit Suche, Filtern, Bearbeiten (Formular oder als Text), von Hand anlegen, löschen, teilen, Bewertung „satt?“ und „lecker?“ mit „Zum Aussortieren“.
 - **Etappe 2 (fertig):** Tagesplan mit Frühstück, Box, Mittag, Abend (pro Tag anwählbar) und eingefügten Snacks. „Heute“ zeigt den Spielraum groß als normale Mahlzeiten, klein als kcal und offenes Protein. Alles Geplante zählt als gegessen, die Portion der Freundin nicht. Woche (Mo–So): Wochen-Check mit Gewicht als Schritt 1, Mahlzeiten-Chips pro Tag, „Vorschlagen“, Tauschen, Lieblingswochen, „Freundin isst mit“. Bewertungsfrage beim Öffnen nach dem letzten geplanten Gericht. Stillstand-Hinweis nach 2 Wochen ohne Abnahme mit „leichter machen“ (Kohlenhydrat-Zutaten −25 %) oder „Mahlzeit mehr“, nur mit OK.
 - **Vorschlagsregel (`suggestWeek` in `plan.js`):** Punkte = Protein pro 100 kcal + Protein pro Portion / 10, gut bewertet +2, schlecht bewertet ausgeschlossen. Ein Rezept füllt der Reihe nach so viele Mahlzeiten, wie es Portionen hat (mit Freundin zusätzlich ihr Anteil), erst dann kommt ein neues. Box nur boxtaugliche Rezepte, nicht einfrierbare nur bis zur Haltbarkeit nach dem Kochtag, möglichst nicht zweimal dasselbe am Tag. Was nicht passt, bleibt leer, und die App sagt warum.
 - **Etappe 3 (fertig):** Einkauf mit Woche · Nachkauf · Reste. Wochenliste aus dem Plan in ganzen Packungen (gekocht wird immer das ganze Rezept, Töpfe = aufgerundete Portionen inkl. Freundin), nach Bereichen, abhaken, teilen. Grundvorrat (Hungerknopf-Snacks, Notfallgerichte, Vorrat-Zutaten) mit „Noch da“/„Kaufen“. Nachkaufliste mit eigenen Einträgen und „Später kaufen“, Hinweis auf frische Sachen, die erst ab Do gebraucht werden. Restekarte = gekauft − verplant plus Korrekturen, Reste werden in der nächsten Wochenliste zuerst verbraucht, Rezepte zum Aufbrauchen. Packungsgrößen (Mehr): rund 90 Standardgrößen, änderbar; eigene Änderung > Packung im Rezept > Standardliste.
 - **Etappe 4 (fertig):** Kochsession als Vollbild: Rezepte der Woche wählen, die App führt durch alle gleichzeitig (Wartezeiten zuerst ansetzen, Handarbeit dazwischen, `schedule` in `cook.js`), Timer mit Ton, Display bleibt wach (Wake Lock), Hinweis, dass Timer nur bei offener App laufen, Pause und Fortsetzen. Am Ende Boxen: Kühlschrank solange die Haltbarkeit ab Kochtag reicht, sonst Gefrierfach (Auftauen am Vorabend), Warnung bei nicht einfrierbar, Reserve aus ganzen Töpfen. Woche → Boxen zeigt die Box-Reihenfolge. Heute: Auftau-Hinweis am Vorabend, Kochtag-Karte, „Ich hab Hunger“ (2–3 Hungersnacks, nur Idee) und „Plan geplatzt“ (Notfallgerichte).
+- **Etappe 5 (fertig):** Abgleich iPhone ↔ iPad über die Datei `kochwerk-daten.json` in einem privaten GitHub-Repository (wie Lernwerk-Techniker): beim Öffnen, 2 s nach jeder Änderung und bei Rückkehr in die App; erst holen und zusammenführen (pro Eintrag gewinnt die neueste Änderung, Löschen kommt mit), dann hochladen, bei 409/422 neu versuchen. Schlüssel nur lokal in `kochwerk_sync`, nie in der Datei oder Sicherung. „Zugang ans iPad schicken“ erzeugt `kochwerk-zugang:<repo>:<token>`, auf dem iPad im Willkommensbildschirm „Schon auf dem anderen Gerät eingerichtet?“. Datensicherung: Export als JSON über das Teilen-Menü, Import zusammenführen oder ersetzen.
 - **Kalorienziel:** Grundumsatz nach Mifflin-St Jeor × Aktivität (1,2–1,725). Defizit aus dem Tempo (langsam 0,25 %, moderat 0,5 %, zügig 0,75 % des Körpergewichts pro Woche, 1 kg ≈ 7700 kcal), höchstens 25 % des Verbrauchs, Ziel nie unter dem Grundumsatz (`calcTargets` in `core.js`).
 - Daten nur in `localStorage` unter `kochwerk_data` (Gerätekennung `kochwerk_device`, Darstellung `kochwerk_ui`). Jeder Eintrag hat `id` und `t` (letzte Änderung), Gelöschtes bleibt als `{id, del:true, t}` stehen, damit der spätere Abgleich mit dem iPad Eintrag für Eintrag zusammenführen kann (`merge` in `core.js`). Keine Fotos.
 
 ## Dateien
 - `core.js`: Datenmodell, Import-Parser, Nährwerte, Kalorienziel, Zusammenführen (läuft auch in Node)
 - `shop.js`: Einkaufsliste, Packungsgrößen, Grundvorrat, Reste (`KW.S`)
+- `sync.js`: Abgleich über GitHub, Sicherung (`KW.Y`)
 - `cook.js`: Kochsession-Ablauf, Boxen, Auftau-Hinweise, Hunger/Notfall (`KW.C`)
 - `plan.js`: Tagesplan, Spielraum, Wochenvorschlag, Tauschen, Lieblingswoche, Wochen-Check (`KW.P`)
 - `app.js`, `style.css`, `index.html`: Oberfläche
 - `IMPORT-FORMAT.md`: Import-Format, `beispiel-rezept.txt`: Beispielrezepte
 - `test.js`: `node kochwerk/test.js`
+
+## Abgleich mit dem iPad einrichten
+1. Auf github.com ein privates Repository anlegen, z. B. `Kochwerk-Daten`.
+2. Fine-grained Token nur für dieses Repository, Permissions: Contents „Read and write“.
+3. iPhone: Mehr → Abgleich mit dem iPad → Repository und Schlüssel → Verbinden. Dann „Zugang ans iPad schicken“.
+4. iPad: Kochwerk öffnen → „Schon auf dem anderen Gerät eingerichtet? Abgleichen“ → Zugang einfügen → Verbinden.
 
 ## Auf dem iPhone nutzen
 Nach Änderungen `kochwerk/` nach `docs/kochwerk/` kopieren (ohne `test.js` und `IMPORT-FORMAT.md`) und `CACHE` in `kochwerk/sw.js` hochzählen. Mit GitHub Pages liegt die App unter `…/kochwerk/`. In Safari öffnen, Teilen, „Zum Home-Bildschirm“.

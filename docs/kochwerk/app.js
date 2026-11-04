@@ -5,15 +5,17 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.3 · Etappe 4';
+  const VERSION = '1.4';
 
   // ---------- Speicher ----------
   function load() {
     try { return KW.upgrade(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { return KW.emptyDb(); }
   }
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Speichern nicht möglich'); }
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch (e) { toast('Speichern nicht möglich'); return false; }
   }
+  // Speichern und kurz danach mit dem anderen Gerät abgleichen
+  function save() { if (persist()) scheduleSync(); }
   function loadUi() { try { return Object.assign({ theme: 'auto' }, JSON.parse(localStorage.getItem(KEY_UI) || '{}')); } catch (e) { return { theme: 'auto' }; } }
   function saveUi() { try { localStorage.setItem(KEY_UI, JSON.stringify(ui)); } catch (e) { /* egal */ } }
   try { if (!localStorage.getItem(KEY_DEV)) localStorage.setItem(KEY_DEV, KW.uid()); } catch (e) { /* ohne Speicher */ }
@@ -619,6 +621,134 @@
       (list.length ? ideaRows(list) : '<div class="card empty">Noch keine Notfallgerichte. Im Chat „Kochwerk 3 Notfallgerichte aus Vorrat“ schreiben und importieren.</div>');
   }
 
+  // ---------- Abgleich mit dem iPad ----------
+  const Y = KW.Y;
+  const KEY_SYNC = 'kochwerk_sync';
+  function loadSync() { try { return Object.assign({ repo: '', token: '', on: false }, JSON.parse(localStorage.getItem(KEY_SYNC) || '{}')); } catch (e) { return { repo: '', token: '', on: false }; } }
+  const SC = loadSync();
+  function saveSync() { try { localStorage.setItem(KEY_SYNC, JSON.stringify(SC)); } catch (e) { /* egal */ } }
+  function deviceName() {
+    const ua = navigator.userAgent || '';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/iPhone/.test(ua)) return 'iPhone';
+    return 'Gerät';
+  }
+  let syncTimer = null, syncing = null, syncAgain = false, fromSetup = false;
+  function scheduleSync(ms) {
+    if (!SC.on) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => runSync(false), ms == null ? 2000 : ms);
+  }
+  async function runSync(manual) {
+    if (!SC.on) return null;
+    if (syncing) { syncAgain = true; return syncing; }
+    syncing = (async () => {
+      const res = await Y.syncOnce(SC, db, null, deviceName());
+      if (res.ok) {
+        SC.last = new Date().toISOString(); SC.err = null;
+        if (res.fromRemote) {
+          // Änderungen, die während des Abgleichs hier entstanden sind, bleiben erhalten
+          const m = KW.merge(db, res.data);
+          db = m.data; persist();
+          if (m.fromLocal) syncAgain = true;
+          afterRemote();
+          if (manual !== 'quiet') toast('Stand vom anderen Gerät übernommen');
+        } else if (manual === true) toast('Abgeglichen');
+      } else {
+        SC.err = res.offline ? null : res.error;
+        if (manual === true) toast(res.error);
+      }
+      saveSync();
+      if (S.tab === 'mehr' && !SH && !WZ && !CK) render(true);
+      if (SH && SH.fn === syncSheet) refreshSheet(true);
+      return res;
+    })();
+    try { return await syncing; } finally {
+      syncing = null;
+      if (syncAgain) { syncAgain = false; scheduleSync(500); }
+    }
+  }
+  function afterRemote() {
+    if (WZ && KW.getSetting(db, 'setupDone')) { closeSetup(); render(); return; }
+    if (CK || WZ) return;
+    if (SH && !SH.modal) refreshSheet(true);
+    render(true);
+  }
+  function whenText(iso) {
+    if (!iso) return 'noch nie';
+    const d = new Date(iso), t = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return KW.isoDate(d) === today() ? 'heute ' + t : d.toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' }) + ' ' + t;
+  }
+  function repoGuess() {
+    const m = /^([a-z0-9-]+)\.github\.io$/i.exec(location.hostname);
+    return (m ? m[1] : 'dein-name') + '/Kochwerk-Daten';
+  }
+  let SYF = null;
+  function syncSheet() {
+    if (SC.on) {
+      return `<div class="sheet-head"><span></span><h2>Abgleich</h2><button class="r" data-act="close">Fertig</button></div>
+        <div class="ecard"><b>${SC.err ? '⚠️ Problem beim Abgleich' : '✓ Verbunden'}</b><span class="hint">${esc(SC.repo)} · zuletzt ${esc(whenText(SC.last))}</span>${SC.err ? `<div class="errbox">${esc(SC.err)}</div>` : ''}</div>
+        <p class="hint" style="margin:0">Abgleich beim Öffnen der App und kurz nach jeder Änderung. Ändert ihr denselben Eintrag auf beiden Geräten, gilt die neueste Änderung.</p>
+        <div class="btns"><button class="btn" data-act="sync-now">Jetzt abgleichen</button>
+        <button class="btn plain" data-act="sync-share">Zugang ans iPad schicken</button>
+        <button class="btn danger" data-act="sync-off">Abgleich trennen</button></div>
+        <p class="hint">Der Zugang enthält den Schlüssel. Nur an dein eigenes Gerät oder das deiner Freundin schicken, z. B. per AirDrop.</p>`;
+    }
+    const f = SYF || { repo: SC.repo || repoGuess(), token: SC.token || '', msg: null, busy: false };
+    SYF = f;
+    return `<div class="sheet-head"><button class="l" data-act="sync-cancel">Abbrechen</button><h2>Abgleich einrichten</h2><span></span></div>
+      <p style="margin:0">So bleiben iPhone und iPad gleich – ohne gemeinsame iCloud. Die Daten liegen in einem privaten GitHub-Repository.</p>
+      <div class="card" style="background:var(--fill-2)"><ol class="howto">
+        <li>Auf <b>github.com</b> ein neues Repository anlegen, z. B. <b>Kochwerk-Daten</b>, Sichtbarkeit <b>Private</b>.</li>
+        <li>Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token. Repository access: nur <b>Kochwerk-Daten</b>. Permissions: <b>Contents: Read and write</b>.</li>
+        <li>Repository und Schlüssel hier eintragen. Auf dem iPad dasselbe – oder dort den Zugang einfügen, den du mit „Zugang ans iPad schicken“ sendest.</li></ol></div>
+      <div class="field"><label for="sy-code">Zugang einfügen (vom anderen Gerät)</label><input id="sy-code" placeholder="kochwerk-zugang:…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label for="sy-repo">Repository</label><input id="sy-repo" value="${esc(f.repo)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label for="sy-token">Schlüssel (Token)</label><input id="sy-token" type="password" value="${esc(f.token)}" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      ${f.msg ? `<div class="errbox">${esc(f.msg)}</div>` : ''}
+      <button class="btn" data-act="sync-connect"${f.busy ? ' disabled' : ''}>${f.busy ? 'Prüfe …' : 'Verbinden'}</button>
+      <p class="hint">Der Schlüssel bleibt nur auf diesem Gerät. Er steht nie in der Datei auf GitHub und nie in einer Sicherung.</p>`;
+  }
+  async function syncConnect() {
+    const code = Y.parseAccess($('#sy-code').value);
+    const repo = code ? code.repo : Y.cleanRepo($('#sy-repo').value), token = code ? code.token : $('#sy-token').value.trim();
+    SYF = { repo, token, msg: null, busy: true };
+    if (!repo || !token || !repo.includes('/')) { SYF.busy = false; SYF.msg = 'Bitte Repository (name/Repository) und Schlüssel eintragen.'; refreshSheet(true); return; }
+    refreshSheet(true);
+    const t = await Y.test({ repo, token });
+    if (!t.ok) { SYF.busy = false; SYF.msg = t.msg; refreshSheet(true); return; }
+    Object.assign(SC, { repo, token, on: true, err: null }); saveSync();
+    SYF = null;
+    const res = await runSync('quiet');
+    refreshSheet();
+    if (res && res.ok) toast(res.fromRemote ? 'Verbunden – Stand vom anderen Gerät übernommen' : 'Verbunden');
+    if (fromSetup) { fromSetup = false; if (KW.getSetting(db, 'setupDone')) closeSheet(); }
+  }
+
+  // ---------- Datensicherung ----------
+  async function exportBackup() {
+    const text = Y.exportText(db), name = 'kochwerk-sicherung-' + today() + '.json';
+    let done = false;
+    try {
+      const file = new File([text], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Kochwerk-Sicherung' }); done = true; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    if (!done) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+    ui.lastBackup = new Date().toISOString(); saveUi(); render(true); toast('Sicherung erstellt');
+  }
+  let BK = null;
+  function backupSheet() {
+    return `<div class="sheet-head"><button class="l" data-act="close">Abbrechen</button><h2>Sicherung importieren</h2><span></span></div>
+      <div class="ecard"><b>${BK.recipes} Rezepte</b><span class="hint">${BK.exported ? 'Gesichert am ' + esc(new Date(BK.exported).toLocaleString('de-DE')) : ''}</span></div>
+      <div class="btns"><button class="btn" data-act="bk-merge">Zusammenführen (empfohlen)</button><button class="btn danger" data-act="bk-replace">Alles hier ersetzen</button></div>
+      <p class="hint">Zusammenführen behält alles, was hier neuer ist. Ersetzen übernimmt nur die Sicherung${SC.on ? ' – beim nächsten Abgleich kommen neuere Einträge vom anderen Gerät aber zurück' : ''}.</p>`;
+  }
+
   // ---------- Rezeptbuch ----------
   function pageRezepte() {
     if (S.recipeId && getRecipe(S.recipeId)) return pageRecipe(getRecipe(S.recipeId));
@@ -737,9 +867,11 @@
       <div class="group-title">Darstellung</div><div class="set">
       <div class="it"><span>Farben</span><div class="seg" style="width:220px">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</div></div></div>
       <div class="group-title">Abgleich & Sicherung</div><div class="set">
-      <div class="it"><span class="muted">Abgleich mit dem iPad und Export/Import kommen in Etappe 5.</span><span></span></div></div>
+      <button class="act" data-act="sync-open"><span>Abgleich mit dem iPad</span><small>${SC.on ? (SC.err ? '⚠️ Problem' : '✓ ' + esc(whenText(SC.last))) : 'aus'}</small></button>
+      <button class="act" data-act="backup-export"><span>Sicherung exportieren</span><small>${ui.lastBackup ? esc(whenText(ui.lastBackup)) : ''}</small></button>
+      <button class="act" data-act="backup-import"><span>Sicherung importieren</span><span class="chev">${IC.chev}</span></button></div>
       <div class="set"><button class="act" data-act="setup"><span>Fragebogen neu durchlaufen</span><span class="chev">${IC.chev}</span></button></div>
-      <p class="hint" style="text-align:center">Kochwerk ${VERSION}<br>Die Daten liegen nur auf diesem Gerät.</p>`;
+      <p class="hint" style="text-align:center">Kochwerk ${VERSION}<br>${SC.on ? 'Abgleich über GitHub ist an.' : 'Die Daten liegen nur auf diesem Gerät.'}</p>`;
     return h;
   }
   const RANGES = { age: [12, 99], height: [120, 230], weight: [35, 250], protein: [40, 400], mealKcal: [150, 1500] };
@@ -1045,7 +1177,8 @@ Schritte:
         <div class="feature"><span class="em">🧮</span><div><b>Einmal rechnen statt täglich tracken</b><span>Die Werte stecken im Rezept, nicht in täglichen Eingaben.</span></div></div>
         <div class="feature"><span class="em">🗓️</span><div><b>Nur planen, was du willst</b><span>Meist 1–2 Mahlzeiten pro Tag. Die App zeigt, wie viel Spielraum bleibt.</span></div></div>
         <div class="feature"><span class="em">🥡</span><div><b>Einmal pro Woche vorkochen</b><span>Mit Einkaufsliste in ganzen Packungen und Boxen für die Woche.</span></div></div>
-        <div class="feature"><span class="em">⚖️</span><div><b>Einmal pro Woche wiegen</b><span>Die einzige regelmäßige Eingabe.</span></div></div></div>`;
+        <div class="feature"><span class="em">⚖️</span><div><b>Einmal pro Woche wiegen</b><span>Die einzige regelmäßige Eingabe.</span></div></div></div>
+        <button class="btn plain" data-act="setup-sync">Schon auf dem anderen Gerät eingerichtet? Abgleichen</button>`;
       next = 'Los geht’s';
     } else if (s === 1) {
       title = 'Über dich';
@@ -1188,6 +1321,18 @@ Schritte:
     moremeal: () => { MM = { meal: 'breakfast', days: new Set() }; openSheet(moreSheet); },
     'mm-meal': b => { MM.meal = b.dataset.v; MM.days = new Set(); refreshSheet(true); },
     'mm-day': b => { const d = b.dataset.v; MM.days.has(d) ? MM.days.delete(d) : MM.days.add(d); refreshSheet(true); },
+    // Abgleich und Sicherung
+    'sync-open': () => { SYF = null; openSheet(syncSheet, { modal: !SC.on }); },
+    'sync-cancel': () => { SYF = null; closeSheet(); if (fromSetup) { fromSetup = false; openSetup(); } },
+    'sync-connect': () => syncConnect(),
+    'sync-now': () => runSync(true),
+    'sync-share': () => shareText('Kochwerk-Zugang', Y.accessCode(SC)),
+    'sync-off': () => confirmSheet('Abgleich trennen?', 'Die Daten bleiben auf diesem Gerät und auf GitHub. Der Schlüssel wird hier gelöscht.', 'Trennen', () => { Object.assign(SC, { on: false, token: '', err: null }); saveSync(); closeSheet(); render(true); toast('Abgleich getrennt'); }),
+    'setup-sync': () => { closeSetup(); fromSetup = true; SYF = null; openSheet(syncSheet, { modal: true }); },
+    'backup-export': () => exportBackup(),
+    'backup-import': () => { const f = $('#bk-file'); f.value = ''; f.click(); },
+    'bk-merge': () => { db = KW.merge(db, BK.data).data; save(); closeSheet(); render(true); toast('Sicherung zusammengeführt'); },
+    'bk-replace': () => confirmSheet('Alles ersetzen?', 'Alle Daten auf diesem Gerät werden durch die Sicherung ersetzt.', 'Ersetzen', () => { db = BK.data; save(); closeSheet(); render(true); toast('Sicherung übernommen'); }),
     // Kochsession, Boxen, Hunger
     cook: b => openCook(b.dataset.week || S.week || defaultWeek()),
     boxes: () => openSheet(boxSheet, { tall: true }),
@@ -1306,6 +1451,10 @@ Schritte:
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset.set) { onSetting(el); return; }
+    if (el.id === 'bk-file' && el.files && el.files[0]) {
+      el.files[0].text().then(t => { const b = Y.parseBackup(t); if (b.error) { toast(b.error); return; } BK = b; openSheet(backupSheet); });
+      return;
+    }
     if (el.dataset.partner) { P.update(db, el.dataset.partner, { partner: el.checked }); save(); render(true); return; }
     if (el.id === 'pk-gap' && PK) { PK.gap = +el.value; return; }
     if (el.dataset.f && ED && el.closest('#sheet') && (el.tagName === 'SELECT' || el.type === 'checkbox')) onEditorInput(el, true);
@@ -1322,11 +1471,14 @@ Schritte:
   S.tab = 'heute';
   render();
   if (!KW.getSetting(db, 'setupDone')) openSetup(); else askRating();
+  if (SC.on) runSync('quiet');
+  addEventListener('online', () => { if (SC.on) runSync('quiet'); });
   // Zurück in die App (z. B. am nächsten Tag): Heute neu zeichnen und einmal nach dem letzten Gericht fragen
   let lastDay = today();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     if (CK && CK.phase === 'run') { keepAwake(); tickTimers(); }
+    if (SC.on && (!SC.last || Date.now() - new Date(SC.last).getTime() > 20000)) runSync('quiet');
     if (lastDay !== today()) { lastDay = today(); if (!SH && !WZ) { S.tab = 'heute'; S.week = null; render(); } }
     askRating();
   });

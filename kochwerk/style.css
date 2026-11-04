@@ -337,3 +337,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .timer.ring{background:var(--c);color:#fff;animation:pulse 1s infinite}
 .timer.ring span{color:#fff}
 @keyframes pulse{50%{opacity:.6}}
+
+/* Etappe 5: Abgleich */
+.howto{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px}
+.ecard .hint{font-size:14px}

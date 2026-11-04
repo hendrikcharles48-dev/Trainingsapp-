@@ -393,5 +393,72 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
 
 }
 
-console.log(bad ? `\n${bad} Fehler, ${ok} ok` : `Alles ok (${ok} Prüfungen)`);
-process.exit(bad ? 1 : 0);
+// ---------- Abgleich (sync.js) mit nachgebautem GitHub ----------
+(async () => {
+  const Y = require('./sync.js');
+  eq('Base64 mit Umlauten', Y.b64decode(Y.b64encode('Hähnchen ½ 🥡')), 'Hähnchen ½ 🥡');
+  eq('Repo aus Link', Y.cleanRepo('https://github.com/hendrik/Kochwerk-Daten/'), 'hendrik/Kochwerk-Daten');
+  eq('Zugang hin und zurück', Y.parseAccess(Y.accessCode({ repo: 'h/K', token: 'github_pat_123' })), { repo: 'h/K', token: 'github_pat_123' });
+  // Nachgebautes GitHub: eine Datei mit sha, PUT nur mit passender sha
+  const gh = { file: null, sha: null, n: 0, beforePut: null, priv: true };
+  const res = (status, body) => ({ status, ok: status >= 200 && status < 300, json: async () => body, text: async () => typeof body === 'string' ? body : JSON.stringify(body) });
+  const fake = async (url, opt = {}) => {
+    const path = url.replace('https://api.github.com', '');
+    if (/^\/repos\/[^/]+\/[^/]+$/.test(path)) return res(200, { private: gh.priv });
+    if (!opt.method) return gh.file == null ? res(404, {}) : res(200, { sha: gh.sha, encoding: 'base64', content: gh.file });
+    if (gh.beforePut) { const f = gh.beforePut; gh.beforePut = null; await f(); }
+    const b = JSON.parse(opt.body);
+    if ((b.sha || null) !== gh.sha) return res(409, {});
+    gh.file = b.content; gh.sha = 's' + (++gh.n);
+    return res(200, { content: { sha: gh.sha } });
+  };
+  const cfg = { repo: 'h/Kochwerk-Daten', token: 't' };
+  eq('Zugang ok, Datei fehlt noch', await Y.test(cfg, fake), { ok: true, exists: false });
+  gh.priv = false; eq('öffentliches Repo abgelehnt', (await Y.test(cfg, fake)).ok, false); gh.priv = true;
+  let A = KW.emptyDb(), B2 = KW.emptyDb();
+  const ra = KW.importRecipe(A, KW.parseRecipes(sample)[0].recipe, 'new');
+  let r1 = await Y.syncOnce(cfg, A, fake, 'iPhone');
+  eq('iPhone lädt hoch', [r1.ok, r1.uploaded, r1.fromRemote], [true, true, false]);
+  let r2 = await Y.syncOnce(cfg, B2, fake, 'iPad');
+  B2 = r2.data;
+  eq('iPad bekommt Rezept', [r2.fromRemote, KW.live(B2, 'recipes').length], [true, 1]);
+  // beide ändern verschiedene Dinge
+  await new Promise(r => setTimeout(r, 5));
+  KW.setSetting(B2, 'protein', 170);
+  P.setMeal(A, '2026-11-09', 'box', true);
+  A = (await Y.syncOnce(cfg, A, fake, 'iPhone')).data;
+  B2 = (await Y.syncOnce(cfg, B2, fake, 'iPad')).data;
+  A = (await Y.syncOnce(cfg, A, fake, 'iPhone')).data;
+  eq('Änderungen beider Geräte zusammengeführt', [KW.getSetting(A, 'protein'), KW.getSetting(B2, 'protein'), !!A.plan[P.mainId('2026-11-09', 'box')], !!B2.plan[P.mainId('2026-11-09', 'box')]], [170, 170, true, true]);
+  // gleicher Eintrag auf beiden Geräten: neueste Änderung gewinnt
+  KW.put(A, 'recipes', Object.assign({}, A.recipes[ra.id], { name: 'Name vom iPhone' }));
+  await new Promise(r => setTimeout(r, 5));
+  KW.put(B2, 'recipes', Object.assign({}, B2.recipes[ra.id], { name: 'Name vom iPad' }));
+  A = (await Y.syncOnce(cfg, A, fake)).data; B2 = (await Y.syncOnce(cfg, B2, fake)).data; A = (await Y.syncOnce(cfg, A, fake)).data;
+  eq('neueste Änderung gewinnt auf beiden', [A.recipes[ra.id].name, B2.recipes[ra.id].name], ['Name vom iPad', 'Name vom iPad']);
+  // Löschen kommt an
+  await new Promise(r => setTimeout(r, 5));
+  KW.remove(A, 'recipes', ra.id);
+  A = (await Y.syncOnce(cfg, A, fake)).data; B2 = (await Y.syncOnce(cfg, B2, fake)).data;
+  eq('Löschen kommt auf dem iPad an', KW.live(B2, 'recipes').length, 0);
+  // Gleichzeitig: iPad lädt zwischen Holen und Hochladen des iPhones hoch → iPhone beginnt neu, nichts geht verloren
+  KW.setSetting(A, 'mealKcal', 650);
+  gh.beforePut = async () => { KW.setSetting(B2, 'cookDay', 3); B2 = (await Y.syncOnce(cfg, B2, fake)).data; };
+  const r3 = await Y.syncOnce(cfg, A, fake); A = r3.data;
+  eq('Konflikt: neu geholt, beides erhalten', [r3.ok, KW.getSetting(A, 'mealKcal'), KW.getSetting(A, 'cookDay')], [true, 650, 3]);
+  B2 = (await Y.syncOnce(cfg, B2, fake)).data;
+  eq('iPad hat danach auch alles', [KW.getSetting(B2, 'mealKcal'), KW.getSetting(B2, 'cookDay')], [650, 3]);
+  const r4 = await Y.syncOnce(cfg, A, fake);
+  eq('nichts Neues: kein Hochladen', r4.uploaded, false);
+  // Offline
+  const r5 = await Y.syncOnce(cfg, A, async () => { throw new Error('offline'); });
+  eq('offline: kein Absturz', [r5.ok, r5.offline], [false, true]);
+  // Schlüssel nie in der Datei
+  eq('Schlüssel nicht in der Datei', Y.b64decode(gh.file).includes('"token"'), false);
+  // Sicherung
+  const bk = Y.parseBackup(Y.exportText(A));
+  eq('Sicherung lesbar', [!bk.error, bk.data.app], [true, 'kochwerk']);
+  eq('fremde Datei abgelehnt', !!Y.parseBackup('{"foo":1}').error, true);
+  console.log(bad ? `\n${bad} Fehler, ${ok} ok` : `Alles ok (${ok} Prüfungen)`);
+  process.exit(bad ? 1 : 0);
+})();

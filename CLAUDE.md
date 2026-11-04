@@ -68,8 +68,8 @@ Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`
 `recommend`) und dem Wochen-Check-in. Nur wieder einbauen, wenn der Nutzer es ausdrücklich will.
 
 ## Kochwerk (eigene App in `kochwerk/`)
-Abnehm-App ohne Tracking, wird in Etappen gebaut (1 Rezepte, 2 Tages-/Wochenplan, 3 Einkauf, 4 Kochsession/Boxen,
-5 Abgleich iPad über privates GitHub-Repo + Export/Import). Vor jeder Etappe Plan zeigen und auf OK warten.
+Abnehm-App ohne Tracking, alle 5 Etappen fertig (Rezepte, Tages-/Wochenplan, Einkauf, Kochsession/Boxen,
+Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änderungen erst kurz den Plan zeigen.
 - Satzwerk dafür nie anfassen. Speicher nur mit Präfix `kochwerk_`. Keine Fotos speichern.
 - Deploy: Dateien aus `kochwerk/` nach `docs/kochwerk/` kopieren (ohne `test.js`, `IMPORT-FORMAT.md`),
   `CACHE` in `kochwerk/sw.js` hochzählen. Tests: `node kochwerk/test.js`.
@@ -80,5 +80,7 @@ Abnehm-App ohne Tracking, wird in Etappen gebaut (1 Rezepte, 2 Tages-/Wochenplan
   `restfix` (Korrektur: Rest = amount + (gerechnet − asOf)), `packs` (eigene Packungsgrößen, gleiche id wie Standard überschreibt).
 - Kochen (`cook.js`): `cooked` (`w<Woche>`, echter Kochtag + Rezepte), `thaw` (`t<planId>` erledigt). Laufende Session nur lokal in
   `kochwerk_session` (nicht abgeglichen).
+- Abgleich (`sync.js`): Datei `kochwerk-daten.json` im privaten Repo des Nutzers, `KW.merge` pro Eintrag, Schlüssel nur in
+  `kochwerk_sync`. `save()` stößt den Abgleich an, `persist()` speichert ohne. Neue Sammlungen werden automatisch mit abgeglichen.
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.
