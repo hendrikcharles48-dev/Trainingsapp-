@@ -76,5 +76,7 @@ Abnehm-App ohne Tracking, wird in Etappen gebaut (1 Rezepte, 2 Tages-/Wochenplan
 - Import-Format: `kochwerk/IMPORT-FORMAT.md`, passt zum Chat-Skill „kochwerk-rezept“. Format nur zusammen ändern.
 - Plan: Sammlung `plan`, ein Eintrag pro Mahlzeit (`id` = `p<Datum>-<meal>` für Hauptmahlzeiten, `s…` für Snacks,
   `pos` 10/20/30/40, Snacks dazwischen). Bewertungsfrage speichert `ratings['r'+planId]` (auch `skip`). Logik in `plan.js`.
+- Einkauf (`shop.js`): `checks` (`c<Woche>|<Zutat>`, speichert gekaufte Packungen), `later`, `pantry`, `extra`,
+  `restfix` (Korrektur: Rest = amount + (gerechnet − asOf)), `packs` (eigene Packungsgrößen, gleiche id wie Standard überschreibt).
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.

@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.1 · Etappe 2';
+  const VERSION = '1.2 · Etappe 3';
 
   // ---------- Speicher ----------
   function load() {
@@ -20,7 +20,7 @@
 
   let db = load();
   const ui = loadUi();
-  const S = { tab: 'heute', recipeId: null, filter: 'all', q: '', week: null };
+  const S = { tab: 'heute', recipeId: null, filter: 'all', q: '', week: null, shopWeek: null, shopTab: 'week' };
 
   // ---------- Kleinigkeiten ----------
   const f0 = n => (n == null || !isFinite(n)) ? '–' : Math.round(n).toLocaleString('de-DE');
@@ -314,8 +314,167 @@
     openSheet(rateSheet);
   }
 
+  // ---------- Einkauf ----------
+  const SH3 = KW.S;
+  const amt = (n, unit, cu) => SH3.amountText(n, unit, cu);
+  function packLine(it) {
+    if (it.pack && it.packs != null) return (it.packs > 1 ? it.packs + ' × ' : '') + it.pack.label;
+    return it.need != null ? amt(it.need, it.unit, it.cntUnit) : '1 ×';
+  }
+  function shopRow(it, week) {
+    const bits = [];
+    if (it.need != null && it.pack) bits.push('braucht ' + amt(it.need, it.unit, it.cntUnit));
+    if (it.rest) bits.push(amt(it.rest, it.unit) + ' aus Resten');
+    if (it.fromPantry) bits.push('Grundvorrat');
+    if (it.lateHint && !it.later) bits.push('erst ab ' + P.DAY_SHORT[P.wd(it.first)] + ' gebraucht');
+    return `<div class="srow${it.done ? ' done' : ''}"><button class="chk" data-act="chk" data-key="${esc(it.key)}" data-week="${week}" aria-pressed="${it.done}" aria-label="Abhaken">${it.done ? '✓' : ''}</button>
+      <button class="mid" data-act="item" data-key="${esc(it.key)}"><span class="t"><span class="nm">${esc(it.name)}</span></span><span class="s"><b class="pk">${esc(packLine(it))}</b>${bits.length ? ' · ' + esc(bits.join(' · ')) : ''}</span></button></div>`;
+  }
+  function byArea(items, rowFn) {
+    let h = '';
+    for (const a of KW.AREAS) {
+      const its = items.filter(i => i.area === a.id);
+      if (!its.length) continue;
+      h += `<div class="group-title">${esc(a.label)}</div><div class="list slist">${its.map(rowFn).join('')}</div>`;
+    }
+    return h;
+  }
+  function extras() { return KW.live(db, 'extra').sort((a, b) => (a.done - b.done) || a.name.localeCompare(b.name, 'de')); }
   function pageEinkauf() {
-    return `<div class="top"><h1>Einkauf</h1></div><div class="card empty"><span class="em">🛒</span><div><b>Einkaufsliste kommt in Etappe 3</b>Ganze Packungen, nach Bereichen sortiert, mit Grundvorrat und Restekarte.</div></div>`;
+    if (!S.shopOwn) S.shopWeek = S.week || defaultWeek();
+    const L = SH3.weekList(db, S.shopWeek);
+    const nLater = L.later.filter(i => !i.done).length + extras().filter(x => !x.done).length;
+    const nRest = Object.keys(SH3.rests(db)).length;
+    const tab = S.shopTab || 'week';
+    let h = `<div class="top"><h1>Einkauf</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
+      <div class="seg big">${[['week', 'Woche'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
+    if (tab === 'week') h += shopWeekView(L);
+    else if (tab === 'later') h += shopLaterView(L);
+    else h += shopRestView();
+    return h;
+  }
+  function shopWeekView(L) {
+    const start = L.week, end = P.addDays(start, 6), cook = P.cookDate(db, start);
+    let h = `<div class="weeknav"><button class="circle" data-act="shop-week" data-d="-7" aria-label="Woche zurück">‹</button><div><b>KW ${P.isoWeek(start)}</b><span class="hint">${P.dayLabel(start)} – ${P.dayLabel(end)} · Kochtag ${P.dayLabel(cook)}</span></div><button class="circle" data-act="shop-week" data-d="7" aria-label="Woche vor">›</button></div>`;
+    if (!L.items.length && !L.fromRest.length && !L.later.length) {
+      return h + `<div class="card empty"><span class="em">🛒</span><div><b>Noch nichts zu kaufen</b>Für diese Woche ist noch nichts geplant.</div><button class="btn" data-act="tab" data-tab="woche">Woche planen</button></div>` + stockView(L);
+    }
+    const done = L.items.filter(i => i.done).length;
+    h += `<div class="card prog"><div class="inline"><b>${done} von ${L.items.length} im Wagen</b><span class="hint">ganze Packungen</span></div><div class="bar p"><i style="width:${L.items.length ? done / L.items.length * 100 : 0}%"></i></div></div>`;
+    h += byArea(L.items, it => shopRow(it, start));
+    const fresh = L.items.filter(i => i.lateHint && !i.done);
+    if (fresh.length) h += `<div class="tip" style="margin-top:-4px">${fresh.length === 1 ? '1 frische Sache wird' : fresh.length + ' frische Sachen werden'} erst später in der Woche gebraucht. Antippen und „Später kaufen“ wählen, dann stehen sie auf der Nachkaufliste.</div>`;
+    h += stockView(L);
+    if (L.fromRest.length) h += `<div class="group-title">Schon da (Reste)</div><div class="list slist">${L.fromRest.map(i => `<div class="srow done"><span class="chk" aria-hidden="true">✓</span><span class="mid"><span class="t"><span class="nm">${esc(i.name)}</span></span><span class="s">braucht ${esc(amt(i.need, i.unit, i.cntUnit))}, Rest reicht</span></span></div>`).join('')}</div>`;
+    return h;
+  }
+  function stockView(L) {
+    if (!L.stock.length) return '';
+    const why = { hunger: 'Hungerknopf', emergency: 'Notfallgericht', vorrat: 'Vorrat fürs Rezept' };
+    const open = L.stock.filter(v => !v.state).length;
+    return `<div class="group-title">Grundvorrat prüfen${open ? ' · ' + open + ' offen' : ''}</div><div class="list slist">${L.stock.map(v => `<div class="srow stock"><span class="mid"><span class="t"><span class="nm">${esc(v.name)}</span></span><span class="s">${esc(why[v.why] || '')}${v.pack ? ' · ' + esc(v.pack.label) : ''}</span></span>
+      <div class="seg mini"><button data-act="pantry" data-key="${esc(v.key)}" data-v="have" aria-pressed="${v.state === 'have'}">Noch da</button><button data-act="pantry" data-key="${esc(v.key)}" data-v="buy" aria-pressed="${v.state === 'buy'}">Kaufen</button></div></div>`).join('')}</div>`;
+  }
+  function shopLaterView(L) {
+    let h = `<p class="hint" style="margin:0 4px">Kleine Liste für unter der Woche, z. B. frische Sachen. Gilt für KW ${P.isoWeek(L.week)}.</p>
+      <div class="addbar"><input id="ex-name" placeholder="Was fehlt?" autocomplete="off"><select id="ex-area">${KW.AREAS.map(a => `<option value="${a.id}">${esc(a.label)}</option>`).join('')}</select><button class="circle" data-act="extra-add" aria-label="Hinzufügen">${IC.plus}</button></div>`;
+    const ex = extras();
+    const all = L.later.map(i => Object.assign({}, i, { kind: 'later' })).concat(ex.map(x => ({ key: x.id, name: x.name, area: x.area, done: x.done, kind: 'extra' })));
+    if (!all.length) return h + `<div class="card empty"><span class="em">🧺</span><div><b>Nachkaufliste ist leer</b>Etwas oben eintragen oder auf der Wochenliste eine Zeile antippen und „Später kaufen“ wählen.</div></div>`;
+    h += byArea(all, it => it.kind === 'later' ? shopRow(it, L.week) : `<div class="srow${it.done ? ' done' : ''}"><button class="chk" data-act="extra-chk" data-id="${it.key}" aria-pressed="${it.done}" aria-label="Abhaken">${it.done ? '✓' : ''}</button><span class="mid"><span class="t"><span class="nm">${esc(it.name)}</span></span></span><button class="x" data-act="extra-del" data-id="${it.key}" aria-label="Löschen">✕</button></div>`);
+    if (ex.some(x => x.done)) h += `<button class="btn plain" data-act="extra-clear">Erledigte entfernen</button>`;
+    return h;
+  }
+  function shopRestView() {
+    const rs = Object.values(SH3.rests(db)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    let h = `<p class="hint" style="margin:0 4px">Angebrochene Packungen: gekauft minus verplant. Stimmt etwas nicht, antippen und korrigieren.</p>`;
+    if (!rs.length) h += `<div class="card empty"><span class="em">🥡</span><div><b>Keine Reste</b>Reste entstehen, wenn du auf der Wochenliste abhakst und eine Packung nicht ganz verplant ist.</div></div>`;
+    else h += `<div class="list slist">${rs.map(x => `<button class="srow" data-act="rest-edit" data-key="${esc(x.key)}"><span class="mid"><span class="t"><span class="nm">${esc(x.name)}</span></span><span class="s">${esc(KW.areaById(x.area).label)}${x.fixed ? ' · korrigiert' : ''}</span></span><b class="amt">${esc(amt(x.amount, x.unit))}</b></button>`).join('')}</div>`;
+    h += `<button class="btn tint" data-act="rest-new">+ Rest eintragen</button>`;
+    const rr = SH3.restRecipes(db);
+    if (rr.length) {
+      h += `<h2 class="sec">Damit aufbrauchen</h2><div class="list">${rr.map(x => { const t = P.portionOf(x.r); return `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico">${KW.catById(x.r.cat).icon}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">nutzt ${esc(x.hits.map(hh => hh.name + ' ' + amt(hh.use, hh.unit)).join(', '))}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`; }).join('')}</div>`;
+    }
+    return h;
+  }
+  function findItem(key, week) {
+    const L = SH3.weekList(db, week || S.shopWeek);
+    return L.items.concat(L.later).find(i => i.key === key) || null;
+  }
+
+  // ---------- Fenster: Zeile der Einkaufsliste ----------
+  let IT = null;
+  function itemSheet() {
+    const it = findItem(IT.key);
+    if (!it) return '<div class="sheet-head"><span></span><h2></h2><button class="r" data-act="close">Fertig</button></div><p>Nicht mehr auf der Liste.</p>';
+    const bits = [];
+    if (it.need != null) bits.push('Die Woche braucht ' + amt(it.need, it.unit, it.cntUnit) + (it.rest ? ', davon ' + amt(it.rest, it.unit) + ' aus Resten' : '') + '.');
+    if (it.recipes && it.recipes.length) bits.push('Für: ' + it.recipes.join(', ') + '.');
+    if (it.pack) bits.push('Packung: ' + it.pack.label + ({ own: ' (deine Packungsliste)', recipe: ' (aus dem Rezept)', list: ' (Standardliste)' })[it.pack.src || 'own'] + '.');
+    return `<div class="sheet-head"><span></span><h2>${esc(it.name)}</h2><button class="r" data-act="close">Fertig</button></div>
+      <div class="ecard"><b style="font-size:20px">${esc(packLine(it))}</b><p class="hint" style="margin:0">${esc(bits.join(' '))}</p></div>
+      <div class="btns"><button class="btn tint" data-act="${it.later ? 'later-off' : 'later-on'}">${it.later ? 'Zurück auf die Wochenliste' : 'Später kaufen (Nachkauf)'}</button>
+      <button class="btn plain" data-act="pack-edit-ing" data-name="${esc(it.name)}" data-area="${esc(it.area)}">Packungsgröße ändern</button></div>`;
+  }
+
+  // ---------- Fenster: Packungsgrößen ----------
+  let PL = null, PE = null;
+  function packsSheet() {
+    const q = KW.norm(PL.q);
+    const list = SH3.packList(db).filter(p => !q || (p.names || [p.name]).some(n => KW.norm(n).includes(q)));
+    let h = `<div class="sheet-head"><button class="l" data-act="pack-new">＋ Neu</button><h2>Packungsgrößen</h2><button class="r" data-act="close">Fertig</button></div>
+      <p class="hint" style="margin:0">Gängige Größen aus deutschen Supermärkten und Discountern. Deine Änderungen haben Vorrang vor der Packung im Rezept und gelten ab jetzt. Schon abgehakte Einkäufe bleiben, wie sie sind.</p>
+      <label class="search">${IC.search}<input type="search" id="ps" placeholder="Suchen" value="${esc(PL.q)}" autocomplete="off"></label><div id="pslist">`;
+    h += packRows(list) + '</div>';
+    return h;
+  }
+  function packRows(list) {
+    let h = '';
+    for (const a of KW.AREAS) {
+      const ps = list.filter(p => p.area === a.id).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+      if (!ps.length) continue;
+      h += `<div class="group-title" style="margin:6px 4px 4px">${esc(a.label)}</div><div class="list slist">${ps.map(p => `<button class="srow" data-act="pack-edit" data-id="${p.id}"><span class="mid"><span class="t"><span class="nm">${esc(p.name)}</span></span>${p.changed || !p.def ? `<span class="s">${p.def ? 'geändert' : 'eigene'}</span>` : ''}</span><b class="amt">${esc(KW.packText(p))}</b></button>`).join('')}</div>`;
+    }
+    return h || '<div class="card empty">Nichts gefunden.</div>';
+  }
+  function openPackEdit(p, back) {
+    PE = p ? { id: p.id, name: p.name, names: p.names, kind: p.kind, size: fNum(p.size), unit: p.unit, area: p.area, def: !!p.def, changed: !!p.changed, back }
+      : { id: null, name: '', kind: 'Packung', size: '', unit: 'g', area: 'sonst', def: false, back };
+    if (SH) { SH.fn = packEditSheet; SH.tall = false; $('#sheet .sheet').classList.remove('tall'); refreshSheet(); } else openSheet(packEditSheet);
+  }
+  function packEditSheet() {
+    const own = PE.id && db.packs[PE.id] && !db.packs[PE.id].del;
+    return `<div class="sheet-head"><button class="l" data-act="pack-back">${PE.back === 'list' ? 'Zurück' : 'Abbrechen'}</button><h2>${PE.id ? 'Packung' : 'Neue Packung'}</h2><button class="r" data-act="pack-save">Sichern</button></div>
+      <div class="field"><label>Name</label><input id="pe-name" value="${esc(PE.name)}"${PE.def ? ' readonly' : ''} placeholder="z. B. Skyr"></div>
+      ${PE.def && PE.names && PE.names.length > 1 ? `<p class="hint" style="margin-top:-8px">Passt auch zu: ${esc(PE.names.slice(1).join(', '))}</p>` : ''}
+      <div class="grid3"><div class="field"><label>Art</label><input id="pe-kind" value="${esc(PE.kind)}" placeholder="Packung"></div>
+        <div class="field"><label>Größe</label><input id="pe-size" inputmode="decimal" value="${esc(PE.size)}"></div>
+        <div class="field"><label>Einheit</label><select id="pe-unit">${['g', 'ml', 'Stück'].map(u => `<option${u === PE.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <div class="field"><label>Bereich</label><select id="pe-area">${KW.AREAS.map(a => `<option value="${a.id}"${a.id === PE.area ? ' selected' : ''}>${esc(a.label)}</option>`).join('')}</select></div>
+      ${PE.def && own ? '<button class="btn plain" data-act="pack-reset">Auf Standard zurücksetzen</button>' : ''}
+      ${PE.id ? `<button class="btn danger" data-act="pack-del">${PE.def ? 'Aus der Liste nehmen' : 'Löschen'}</button>` : ''}`;
+  }
+
+  // ---------- Fenster: Rest ----------
+  let RS = null;
+  function restSheet() {
+    return `<div class="sheet-head"><button class="l" data-act="close">Abbrechen</button><h2>${RS.isNew ? 'Rest eintragen' : esc(RS.name)}</h2><button class="r" data-act="rest-save">Sichern</button></div>
+      ${RS.isNew ? `<div class="field"><label>Zutat</label><input id="rs-name" placeholder="z. B. Haferflocken" value="${esc(RS.name)}"></div>` : ''}
+      <div class="grid2"><div class="field"><label>Menge</label><input id="rs-amt" inputmode="decimal" value="${esc(fNum(RS.amount))}"></div>
+        <div class="field"><label>Einheit</label><select id="rs-unit"${RS.isNew ? '' : ' disabled'}>${['g', 'Stück'].map(u => `<option${u === RS.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      ${RS.isNew ? `<div class="field"><label>Bereich</label><select id="rs-area">${KW.AREAS.map(a => `<option value="${a.id}"${a.id === RS.area ? ' selected' : ''}>${esc(a.label)}</option>`).join('')}</select></div>` : '<button class="btn danger" data-act="rest-gone">Aufgebraucht / weg</button>'}`;
+  }
+  function shopShare() {
+    const L = SH3.weekList(db, S.shopWeek);
+    if ((S.shopTab || 'week') === 'week') {
+      const its = L.items.filter(i => !i.done);
+      if (!its.length) { toast('Alles abgehakt'); return; }
+      shareText('Einkauf KW ' + P.isoWeek(L.week), SH3.shareText('Einkauf KW ' + P.isoWeek(L.week), its));
+    } else {
+      const its = L.later.filter(i => !i.done).concat(extras().filter(x => !x.done).map(x => ({ name: x.name, area: x.area, done: false })));
+      if (!its.length) { toast('Nachkaufliste ist leer'); return; }
+      shareText('Nachkauf', SH3.shareText('Nachkauf', its));
+    }
   }
 
   // ---------- Rezeptbuch ----------
@@ -431,6 +590,7 @@
       <div class="group-title">Rezepte</div><div class="set">
       <button class="act" data-act="format"><span>Import-Format</span><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="sample"><span>Beispielrezepte laden</span><span class="chev">${IC.chev}</span></button>
+      <button class="act" data-act="packs"><span>Packungsgrößen</span><span class="chev">${IC.chev}</span></button>
       ${bad ? `<button class="act" data-act="showbad"><span>Zum Aussortieren</span><small>${bad}</small></button>` : ''}</div>
       <div class="group-title">Darstellung</div><div class="set">
       <div class="it"><span>Farben</span><div class="seg" style="width:220px">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</div></div></div>
@@ -886,6 +1046,44 @@ Schritte:
     moremeal: () => { MM = { meal: 'breakfast', days: new Set() }; openSheet(moreSheet); },
     'mm-meal': b => { MM.meal = b.dataset.v; MM.days = new Set(); refreshSheet(true); },
     'mm-day': b => { const d = b.dataset.v; MM.days.has(d) ? MM.days.delete(d) : MM.days.add(d); refreshSheet(true); },
+    // Einkauf
+    'shop-tab': b => { S.shopTab = b.dataset.v; render(); },
+    'shop-week': b => { S.shopOwn = true; S.shopWeek = P.addDays(S.shopWeek || defaultWeek(), +b.dataset.d); render(); },
+    'shop-share': () => shopShare(),
+    chk: b => { const it = findItem(b.dataset.key, b.dataset.week); if (!it) return; SH3.check(db, b.dataset.week, it, !it.done); save(); render(true); },
+    item: b => { IT = { key: b.dataset.key }; openSheet(itemSheet); },
+    'later-on': () => { SH3.setLater(db, S.shopWeek, IT.key, true); save(); closeSheet(); render(true); toast('Auf der Nachkaufliste'); },
+    'later-off': () => { SH3.setLater(db, S.shopWeek, IT.key, false); save(); closeSheet(); render(true); toast('Zurück auf der Wochenliste'); },
+    pantry: b => { SH3.setPantry(db, S.shopWeek, b.dataset.key, b.dataset.v); save(); render(true); },
+    'extra-add': () => { const n = $('#ex-name').value.trim(); if (!n) { $('#ex-name').focus(); return; } SH3.addExtra(db, n, $('#ex-area').value); save(); render(true); const f = $('#ex-name'); if (f) f.focus(); },
+    'extra-chk': b => { const x = db.extra[b.dataset.id]; if (x) { KW.put(db, 'extra', Object.assign({}, x, { done: !x.done })); save(); render(true); } },
+    'extra-del': b => { KW.remove(db, 'extra', b.dataset.id); save(); render(true); },
+    'extra-clear': () => { for (const x of extras()) if (x.done) KW.remove(db, 'extra', x.id); save(); render(true); },
+    packs: () => { PL = { q: '' }; openSheet(packsSheet, { tall: true }); },
+    'pack-edit': b => openPackEdit(SH3.packList(db).find(p => p.id === b.dataset.id), 'list'),
+    'pack-new': () => openPackEdit(null, 'list'),
+    'pack-edit-ing': b => { const m = SH3.findPack(db, b.dataset.name); openPackEdit(m || { id: null, name: b.dataset.name, kind: 'Packung', size: '', unit: 'g', area: b.dataset.area }, 'item'); if (!m) PE.id = null; },
+    'pack-back': () => { if (PE.back === 'list') { SH.fn = packsSheet; SH.tall = true; $('#sheet .sheet').classList.add('tall'); refreshSheet(); } else if (PE.back === 'item') { SH.fn = itemSheet; refreshSheet(); } else closeSheet(); },
+    'pack-save': () => {
+      const name = $('#pe-name').value.trim(), size = KW.num($('#pe-size').value);
+      if (!name) { toast('Bitte einen Namen eingeben'); return; }
+      if (!(size > 0)) { toast('Bitte eine Größe eingeben'); return; }
+      const id = PE.id || SH3.packKey(name);
+      KW.put(db, 'packs', { id, name: PE.def ? PE.name : name, kind: $('#pe-kind').value.trim() || 'Packung', size, unit: $('#pe-unit').value, area: $('#pe-area').value });
+      save(); toast('Gilt ab jetzt'); ACT['pack-back'](); render(true);
+    },
+    'pack-reset': () => { KW.remove(db, 'packs', PE.id); save(); toast('Standard wiederhergestellt'); ACT['pack-back'](); render(true); },
+    'pack-del': () => { if (PE.def) KW.put(db, 'packs', { id: PE.id, name: PE.name, off: true }); else KW.remove(db, 'packs', PE.id); save(); ACT['pack-back'](); render(true); },
+    'rest-edit': b => { const x = SH3.rests(db)[b.dataset.key]; if (!x) return; RS = { key: x.key, name: x.name, area: x.area, unit: x.unit, amount: x.amount }; openSheet(restSheet); },
+    'rest-new': () => { RS = { isNew: true, name: '', area: 'trocken', unit: 'g', amount: '' }; openSheet(restSheet); },
+    'rest-save': () => {
+      const a = KW.num($('#rs-amt').value);
+      if (!(a >= 0)) { toast('Bitte eine Menge eingeben'); return; }
+      if (RS.isNew) { const n = $('#rs-name').value.trim(); if (!n) { toast('Bitte eine Zutat eingeben'); return; } SH3.setRest(db, KW.norm(n), n, $('#rs-area').value, $('#rs-unit').value, a); }
+      else SH3.setRest(db, RS.key, RS.name, RS.area, RS.unit, a);
+      save(); closeSheet(); render(true);
+    },
+    'rest-gone': () => { SH3.setRest(db, RS.key, RS.name, RS.area, RS.unit, 0); save(); closeSheet(); render(true); toast('Als aufgebraucht markiert'); },
     'more-ok': () => { for (const d of MM.days) P.setMeal(db, d, MM.meal, true); ACT['stall-ack'](); closeSheet(); runSuggest(); },
     showbad: () => { S.tab = 'rezepte'; S.recipeId = null; S.filter = 'bad'; render(); },
     format: () => openSheet(formatSheet),
@@ -937,6 +1135,7 @@ Schritte:
   document.addEventListener('input', e => {
     const el = e.target;
     if (el.id === 'pq' && PK) { PK.q = el.value; const meal = PK.entryId ? db.plan[PK.entryId].meal : 'snack'; $('#pklist').innerHTML = pickList(PK.all ? KW.CATS.map(c => c.id) : P.catsFor(meal), meal); return; }
+    if (el.id === 'ps' && PL) { PL.q = el.value; const q = KW.norm(PL.q); $('#pslist').innerHTML = packRows(SH3.packList(db).filter(p => !q || (p.names || [p.name]).some(n => KW.norm(n).includes(q)))); return; }
     if (el.id === 'q') { S.q = el.value; const l = $('#rlist'); if (l) l.innerHTML = recipeList(); return; }
     if (el.id === 'im-text' && IM) { IM.text = el.value; return; }
     if (el.dataset.w && WZ) { WZ.p[el.dataset.w] = el.value; const n = $('#wnext'); if (n) n.disabled = !wValid(); return; }
@@ -951,6 +1150,7 @@ Schritte:
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && SH && !SH.modal) closeSheet();
+    if (e.key === 'Enter' && e.target.id === 'ex-name') { e.preventDefault(); ACT['extra-add'](); }
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.set) e.target.blur();
   });
 

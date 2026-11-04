@@ -445,7 +445,7 @@
   // ---------- Datenbestand ----------
   // Jede Sammlung ist ein Objekt id → Eintrag. Jeder Eintrag hat t (letzte Änderung, ms).
   // Gelöschte Einträge bleiben als { id, del: true, t } stehen, damit der Abgleich das Löschen kennt.
-  const COLLECTIONS = ['recipes', 'ratings', 'weights', 'settings', 'plan', 'favweeks'];
+  const COLLECTIONS = ['recipes', 'ratings', 'weights', 'settings', 'plan', 'favweeks', 'packs', 'checks', 'later', 'pantry', 'restfix', 'extra'];
   function emptyDb() {
     const db = { app: 'kochwerk', v: 1 };
     for (const c of COLLECTIONS) db[c] = {};

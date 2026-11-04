@@ -275,5 +275,73 @@ eq('Reis −25 %', li.recipe.ingredients[0].qty, 190);
 eq('Brötchen −25 %', li.recipe.ingredients[3].qty, 1.5);
 eq('Protein bleibt fast gleich', Math.abs(KW.recipeTotals(li.recipe).portion.p - KW.recipeTotals(rice).portion.p) < 5, true);
 
+// ---------- Einkauf (shop.js) ----------
+const S = require('./shop.js');
+const pk = n => (S.findPack(KW.emptyDb(), n) || {}).name;
+eq('Packung Hähnchenbrustfilet', pk('Hähnchenbrustfilet'), 'Hähnchenbrustfilet');
+eq('Packung TK vor frisch', pk('Brokkoli (TK)'), 'Brokkoli TK');
+eq('Packung frisch', pk('Brokkoli'), 'Brokkoli');
+eq('Packung Ei', pk('Ei'), 'Eier');
+eq('Ei passt nicht zu Eiweißpulver', pk('Eiweißpulver'), undefined);
+eq('Rote Zwiebeln', pk('Rote Zwiebeln'), 'Rote Zwiebeln');
+eq('Zwiebeln', pk('Zwiebeln'), 'Zwiebeln');
+eq('Standardliste groß genug', S.DEFAULT_PACKS.length >= 75, true);
+
+const E = KW.emptyDb();
+KW.setSetting(E, 'partnerFactor', 0.8);
+const pf = KW.importRecipe(E, KW.parseRecipes(sample)[0].recipe, 'new');
+const sk2 = KW.importRecipe(E, KW.parseRecipes(sample)[1].recipe, 'new');
+const W1 = '2026-11-09', W2 = '2026-11-16';
+for (let k = 0; k < 3; k++) { P.setMeal(E, P.addDays(W1, k), 'box', true); P.update(E, P.mainId(P.addDays(W1, k), 'box'), { recipeId: pf.id }); }
+eq('3 Portionen = 1 Topf', S.weekPots(E, W1)[0].pots, 1);
+P.update(E, P.mainId(W1, 'box'), { partner: true });
+eq('mit Freundin 3,8 Portionen = 1 Topf', S.weekPots(E, W1)[0].pots, 1);
+P.setMeal(E, P.addDays(W1, 3), 'box', true); P.update(E, P.mainId(P.addDays(W1, 3), 'box'), { recipeId: pf.id });
+eq('4,8 Portionen = 2 Töpfe', S.weekPots(E, W1)[0].pots, 2);
+P.update(E, P.mainId(W1, 'box'), { partner: false });
+const L1 = S.weekList(E, W1);
+const it = n => L1.items.find(i => i.name.startsWith(n));
+eq('Hähnchen 2 × 500 g (Rezept-Packung)', [it('Hähnchen').packs, it('Hähnchen').pack.size, it('Hähnchen').need], [2, 500, 1000]);
+eq('Reis halbe Packung = 1 Packung', it('Basmati').packs, 1);
+eq('Paprika in Stück', [it('Paprika').packs, it('Paprika').unit, it('Paprika').need], [1, 'Stück', 3]);
+eq('Zwiebeln Stück in g umgerechnet', [it('Zwiebeln').need, it('Zwiebeln').packs], [160, 1]);
+eq('Vorrat nicht auf der Liste', L1.items.some(i => i.name === 'Olivenöl'), false);
+eq('Grundvorrat: Vorrat-Zutaten + Hungersnack', L1.stock.map(v => v.name).sort(), ['Beerenmischung (TK)', 'Gemüsebrühe (Pulver)', 'Olivenöl', 'Paprikapulver edelsüß', 'Skyr natur']);
+eq('sortiert nach Bereichen', L1.items[0].area, 'obst');
+eq('frisch erst ab Do: Hinweis', L1.items.filter(i => i.lateHint).map(i => i.name), []);
+// eigene Packungsgröße gilt ab dann
+KW.put(E, 'packs', { id: S.packKey('Hähnchenbrustfilet'), name: 'Hähnchenbrustfilet', kind: 'Packung', size: 400, unit: 'g', area: 'fleisch' });
+eq('eigene Packung hat Vorrang', S.weekList(E, W1).items.find(i => i.name.startsWith('Hähnchen')).packs, 3);
+// Abhaken, Nachkauf, Grundvorrat kaufen
+for (const i of S.weekList(E, W1).items) S.check(E, W1, i, true);
+KW.put(E, 'packs', { id: S.packKey('Hähnchenbrustfilet'), name: 'Hähnchenbrustfilet', kind: 'Packung', size: 1000, unit: 'g', area: 'fleisch' });
+eq('abgehakt bleibt gekaufte Menge', S.weekList(E, W1).items.find(i => i.name.startsWith('Hähnchen')).packs, 3);
+S.setPantry(E, W1, KW.norm('Skyr natur'), 'buy');
+eq('Grundvorrat „kaufen“ kommt auf die Liste', S.weekList(E, W1).items.some(i => i.name === 'Skyr natur' && i.packs === 1), true);
+S.setPantry(E, W1, KW.norm('Skyr natur'), 'have');
+S.setLater(E, W1, KW.norm('Paprika'), true);
+eq('später kaufen → Nachkauf', [S.weekList(E, W1).items.some(i => i.name === 'Paprika'), S.weekList(E, W1).later.map(i => i.name)], [false, ['Paprika']]);
+// Reste
+const R = S.rests(E);
+eq('Rest Reis', R[KW.norm('Basmatireis (roh)')].amount, 250);
+eq('Rest Hähnchen 3×400 − 1000', R[KW.norm('Hähnchenbrustfilet')].amount, 200);
+eq('Rest Zwiebeln', R[KW.norm('Zwiebeln')].amount, 840);
+eq('kein Rest bei Paprika', R[KW.norm('Paprika')], undefined);
+// Nächste Woche: Reste werden zuerst verbraucht
+P.setMeal(E, W2, 'box', true); P.update(E, P.mainId(W2, 'box'), { recipeId: pf.id });
+const L2 = S.weekList(E, W2);
+eq('Reis aus Resten', L2.fromRest.map(i => i.name).includes('Basmatireis (roh)'), true);
+eq('Hähnchen nur Rest abziehen', L2.items.find(i => i.name.startsWith('Hähnchen')).buy, 800);
+// Rest von Hand: Zwiebeln weg
+S.setRest(E, KW.norm('Zwiebeln'), 'Zwiebeln', 'obst', 'g', 0);
+eq('Rest weg', S.rests(E)[KW.norm('Zwiebeln')], undefined);
+S.setRest(E, KW.norm('Haferflocken'), 'Haferflocken', 'trocken', 'g', 300);
+eq('Rest von Hand ergänzt', S.rests(E)[KW.norm('Haferflocken')].amount, 300);
+eq('Restekarte schlägt Rezept vor', S.restRecipes(E)[0].r.id, pf.id);
+// Teilen
+const txt = S.shareText('Einkauf', S.weekList(E, W2).items);
+eq('Teilen-Text mit Bereichen', /Fleisch & Fisch\n☐ /.test(txt), true);
+eq('Teilen ganze Packungen', /☐ \d × Hähnchenbrustfilet \(Packung 1 kg\)|☐ Hähnchenbrustfilet \(Packung 1 kg\)/.test(txt), true);
+
 console.log(bad ? `\n${bad} Fehler, ${ok} ok` : `Alles ok (${ok} Prüfungen)`);
 process.exit(bad ? 1 : 0);
