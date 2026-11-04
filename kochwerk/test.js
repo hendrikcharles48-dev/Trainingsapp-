@@ -167,5 +167,113 @@ eq('schlecht bewertet', KW.ratingSummary(D, 'x').bad, true);
 KW.put(D, 'ratings', { recipeId: 'y', satt: 1, lecker: 1 });
 eq('gut bewertet', KW.ratingSummary(D, 'y').good, true);
 
+// ---------- Planung (plan.js) ----------
+const P = require('./plan.js');
+eq('Wochentag Mo', P.wd('2026-11-09'), 0);
+eq('Wochentag So', P.wd('2026-11-08'), 6);
+eq('Wochenstart', P.weekStart('2026-11-08'), '2026-11-02');
+eq('Tage addieren über Monatsende', P.addDays('2026-10-30', 3), '2026-11-02');
+eq('Sommerzeit egal', P.addDays('2026-03-28', 2), '2026-03-30');
+eq('KW', P.isoWeek('2026-11-04'), 45);
+eq('KW Jahreswechsel', P.isoWeek('2027-01-01'), 53);
+eq('Tag kurz', P.dayLabel('2026-11-09'), 'Mo 9.11.');
+
+const Q = KW.emptyDb();
+KW.setSetting(Q, 'age', 25); KW.setSetting(Q, 'height', 180); KW.setWeight(Q, 85, '2026-11-02');
+KW.setSetting(Q, 'activity', 1.55); KW.setSetting(Q, 'cookDay', 0);
+const mk = (name, kcal, p, opt = {}) => { const r = Object.assign({ name, cat: 'main', portions: 4, keepDays: 4, freeze: false, box: true, tips: [], steps: [] }, opt);
+  r.ingredients = [{ name: name + ' Zutat', qty: 100 * r.portions, unit: 'g', g: 100 * r.portions, pack: null, pantry: false, area: 'sonst', per100: { kcal, p, c: 10, f: 5 } }];
+  return KW.importRecipe(Q, r, 'new'); };
+const hi = mk('Protein hoch', 500, 55), mid = mk('Protein mittel', 600, 40, { freeze: true }), lowR = mk('Kaum Protein', 700, 10, { box: false });
+mk('Protein gut', 550, 45, { freeze: true });
+const snack = mk('Quark', 200, 25, { cat: 'snack', portions: 1 });
+const day = '2026-11-09';
+P.setMeal(Q, day, 'box', true); P.setMeal(Q, day, 'dinner', true);
+eq('Mahlzeiten angewählt', P.entries(Q, day).map(e => e.meal), ['box', 'dinner']);
+P.setMeal(Q, day, 'box', true);
+eq('doppelt anwählen bleibt eins', P.entries(Q, day).length, 2);
+P.update(Q, P.mainId(day, 'box'), { recipeId: hi.id });
+P.addSnack(Q, day, 25, snack.id);
+eq('Snack an der richtigen Stelle', P.entries(Q, day).map(e => e.meal), ['box', 'snack', 'dinner']);
+const rm = P.room(Q, day);
+eq('Spielraum kcal', Math.round(rm.used), 700);
+eq('Ziel', rm.target, 2410);
+eq('Mahlzeiten frei', rm.meals, 2.5);
+eq('Text', rm.text, 'Noch Platz für etwa 2½ normale Mahlzeiten');
+eq('Protein offen', Math.round(rm.pOpen), 100);
+P.update(Q, P.mainId(day, 'dinner'), { recipeId: mid.id, partner: true });
+eq('Freundin zählt nicht', Math.round(P.room(Q, day).used), 1300);
+eq('über dem Ziel', P.roomText(-300, 0), 'Heute schon etwa 300 kcal über dem Ziel');
+eq('kleiner Snack', P.roomText(200, 0), 'Noch Platz für einen kleinen Snack');
+eq('eine Mahlzeit', P.roomText(650, 1), 'Noch Platz für etwa eine normale Mahlzeit');
+P.setMeal(Q, day, 'dinner', false);
+eq('abwählen', P.entries(Q, day).map(e => e.meal), ['box', 'snack']);
+
+// Wochenvorschlag: Mo–Fr Box + Abend, Box schon mit „Protein hoch“ belegt
+const wk = P.weekStart(day);
+eq('Kochtag Sonntag vor der Woche', P.cookDate(Q, wk), '2026-11-08');
+for (let k = 0; k < 5; k++) { const d = P.addDays(wk, k); P.setMeal(Q, d, 'box', true); P.setMeal(Q, d, 'dinner', true); }
+const sugAll = P.suggestWeek(Q, wk), sug = sugAll.fill;
+eq('nichts offen', sugAll.open, []);
+eq('9 leere Plätze gefüllt', sug.length, 9);
+eq('Box nur boxtauglich', sug.filter(s => s.id.endsWith('box')).every(s => Q.recipes[s.recipeId].box), true);
+eq('kein Rezept mit wenig Protein, solange genug da', sug.some(s => s.recipeId === lowR.id), false);
+const cnt = {}; for (const s of sug) cnt[s.recipeId] = (cnt[s.recipeId] || 0) + 1;
+eq('wenige Rezepte pro Woche (Meal-Prep)', Object.keys(cnt).length <= 3, true);
+eq('erster Topf wird erst leer gegessen', (cnt[hi.id] || 0) + 1, 4);
+eq('nicht zweimal dasselbe am selben Tag', [...new Set(sug.map(s => s.date))].every(d => { const ids = sug.filter(s => s.date === d).map(s => s.recipeId).concat(P.entries(Q, d).map(e => e.recipeId).filter(Boolean)); return new Set(ids).size === ids.length; }), true);
+P.applySuggestions(Q, sug);
+eq('alles belegt', P.weekEntries(Q, wk).filter(e => P.isMain(e) && !e.recipeId).length, 0);
+// Haltbarkeit: nicht einfrierbar, 2 Tage haltbar → nicht für Freitag
+const shortR = mk('Kurz haltbar', 400, 60, { keepDays: 2 });
+const Fr = P.addDays(wk, 4); P.setMeal(Q, Fr, 'lunch', true);
+eq('Haltbarkeit beachtet', P.suggestWeek(Q, wk).fill.every(s => s.recipeId !== shortR.id), true);
+const Z = KW.emptyDb(); KW.importRecipe(Z, Object.assign({}, KW.parseRecipes(sample)[0].recipe, { freeze: false }), 'new');
+P.setMeal(Z, P.addDays(wk, 4), 'dinner', true);
+eq('offen mit Grund Haltbarkeit', P.suggestWeek(Z, wk).open.map(o => o.why), ['keep']);
+
+// Tauschen
+const opt = P.swapOptions(Q, P.entries(Q, day)[0]);
+eq('Tauschen ohne aktuelles Rezept', opt.every(o => o.r.id !== hi.id), true);
+eq('Tauschen nur boxtauglich', opt.every(o => o.r.box), true);
+eq('Tauschen ähnliche kcal', opt.every(o => Math.abs(o.dk) <= 500 * 0.35 + 1), true);
+
+// Lieblingswoche
+const fav = P.saveFavWeek(Q, wk, 'Schulwoche');
+const next = P.addDays(wk, 7);
+P.applyFavWeek(Q, fav, next);
+eq('Lieblingswoche übernommen', P.weekEntries(Q, next).length, P.weekEntries(Q, wk).length);
+eq('Lieblingswoche gleiche Rezepte', P.weekEntries(Q, next).map(e => e.recipeId).join(), P.weekEntries(Q, wk).map(e => e.recipeId).join());
+
+// Bewertungsfrage
+eq('Frage nach letztem Gericht', P.ratingCandidate(Q, P.addDays(wk, 5)).date, Fr);
+const cand = P.ratingCandidate(Q, P.addDays(wk, 5));
+KW.put(Q, 'ratings', { id: 'r' + cand.id, recipeId: cand.recipeId, skip: true });
+eq('nur einmal fragen', (P.ratingCandidate(Q, P.addDays(wk, 5)) || {}).id !== cand.id, true);
+eq('übersprungen zählt nicht', KW.ratingSummary(Q, cand.recipeId).n, 0);
+
+// Wochen-Check
+const W = KW.emptyDb();
+KW.setWeight(W, 88, '2026-10-19'); KW.setWeight(W, 87.5, '2026-10-26'); KW.setWeight(W, 87.6, '2026-11-02'); KW.setWeight(W, 87.9, '2026-11-09');
+eq('Wochenwerte', P.weeklyWeights(W).map(w => w.kg), [88, 87.5, 87.6, 87.9]);
+eq('Stillstand erkannt', !!P.stall(W, '2026-11-10'), true);
+KW.setWeight(W, 87.0, '2026-11-11');
+eq('kein Stillstand bei Abnahme', P.stall(W, '2026-11-11'), null);
+KW.setWeight(W, 87.9, '2026-11-11');
+KW.setSetting(W, 'stallAck', P.stall(W, '2026-11-11').last.id);
+eq('Hinweis weggeklickt', P.stall(W, '2026-11-11'), null);
+
+// Leichter machen
+const rice = { name: 'R', portions: 2, ingredients: [
+  { name: 'Reis', qty: 250, unit: 'g', per100: { kcal: 350, p: 7.5, c: 77, f: 0.6 } },
+  { name: 'Hähnchen', qty: 500, unit: 'g', per100: { kcal: 105, p: 23.5, c: 0, f: 1.2 } },
+  { name: 'Linsen', qty: 100, unit: 'g', per100: { kcal: 340, p: 24, c: 49, f: 1.5 } },
+  { name: 'Brötchen', qty: 2, unit: 'Stück', pieceG: 60, per100: { kcal: 270, p: 9, c: 52, f: 2 } }] };
+const li = P.lighten(rice);
+eq('nur Kohlenhydrat-Zutaten', li.changed, ['Reis', 'Brötchen']);
+eq('Reis −25 %', li.recipe.ingredients[0].qty, 190);
+eq('Brötchen −25 %', li.recipe.ingredients[3].qty, 1.5);
+eq('Protein bleibt fast gleich', Math.abs(KW.recipeTotals(li.recipe).portion.p - KW.recipeTotals(rice).portion.p) < 5, true);
+
 console.log(bad ? `\n${bad} Fehler, ${ok} ok` : `Alles ok (${ok} Prüfungen)`);
 process.exit(bad ? 1 : 0);

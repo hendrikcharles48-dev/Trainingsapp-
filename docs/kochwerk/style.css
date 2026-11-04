@@ -235,3 +235,53 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap{animation:none}}
 @media (max-width:370px){.tiles b{font-size:16px}.set .it input,.set .it select{width:120px}}
 .ecard.ehead{flex-direction:row;align-items:center;text-align:left}
+
+/* Etappe 2: Spielraum, Tagesplan, Woche */
+.room{display:flex;flex-direction:column;gap:6px}
+.room-big{font:800 26px/1.15 var(--font);letter-spacing:-.015em}
+.room-sub{margin:0;color:var(--label-2);font-size:15px}
+.room-sub b{color:var(--accent);font-weight:700}
+.room.over .room-big{color:var(--orange)}
+.bars{display:grid;grid-template-columns:1fr;gap:3px;margin-top:6px}
+.bars span{font-size:12px;color:var(--label-2);margin-bottom:4px;font-variant-numeric:tabular-nums}
+.bar{height:7px;border-radius:9px;background:var(--fill);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:9px;background:var(--label-2)}
+.bar.p i{background:var(--accent)}
+.room.over .bar i{background:var(--orange)}
+.row .add{color:var(--accent);font-weight:600;font-size:15px}
+.row.off .ico{opacity:.45}
+.row.off .t{color:var(--label-2);font-weight:500}
+.row.off .s{color:var(--label-3)}
+.addrow .ico{background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
+.addrow .t{color:var(--accent)}
+.check{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.check .mid{flex:1}
+.check.todo{box-shadow:inset 0 0 0 2px var(--accent)}
+.step-n{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 15px var(--round);flex:none}
+.step-n.done{background:var(--accent-soft);color:var(--accent)}
+.spark{width:96px;height:32px;color:var(--accent);flex:none}
+.stall{box-shadow:inset 0 0 0 2px var(--orange)}
+.plan2{display:flex;flex-direction:column;gap:12px}
+.plan2 .inline{justify-content:flex-start;gap:12px}
+.daycard{background:var(--card);border-radius:var(--r);padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px}
+.daycard.today{box-shadow:inset 0 0 0 2px var(--accent-soft)}
+.dayhead{display:flex;align-items:baseline;gap:8px;padding:0 4px}
+.dayhead b{font-size:17px}
+.dsum{margin-left:auto;font-size:14px;color:var(--label-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dsum .pc{color:var(--accent);font-weight:600}
+.mealchips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.mchip{padding:8px 2px;border-radius:11px;background:var(--fill-2);font-size:13px;font-weight:600;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mchip[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.list.inner{background:var(--fill-2);border-radius:14px}
+.list.inner .row{padding:9px 12px;grid-template-columns:36px minmax(0,1fr) auto}
+.list.inner .ico{width:36px;height:36px;font-size:18px;border-radius:10px;background:var(--card)}
+.list.inner .row+.row::before{left:60px}
+.dayfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 4px;min-height:32px}
+.link{color:var(--accent);font-weight:600;font-size:15px;padding:6px 0}
+.right .up{color:var(--orange)}
+.days7 button:disabled{opacity:.35}
+.sheet .days7 button{background:var(--fill-2)}
+.sheet .days7 button[aria-pressed="true"]{background:var(--accent)}
+.sheet .opt{background:var(--fill-2)}
+.set .it .switch input{width:100%;padding:0}
+.dayfoot .link{white-space:nowrap}

@@ -445,7 +445,7 @@
   // ---------- Datenbestand ----------
   // Jede Sammlung ist ein Objekt id → Eintrag. Jeder Eintrag hat t (letzte Änderung, ms).
   // Gelöschte Einträge bleiben als { id, del: true, t } stehen, damit der Abgleich das Löschen kennt.
-  const COLLECTIONS = ['recipes', 'ratings', 'weights', 'settings'];
+  const COLLECTIONS = ['recipes', 'ratings', 'weights', 'settings', 'plan', 'favweeks'];
   function emptyDb() {
     const db = { app: 'kochwerk', v: 1 };
     for (const c of COLLECTIONS) db[c] = {};
@@ -486,7 +486,7 @@
 
   // Bewertungen: satt / lecker je −1 (nein), 0 (geht so), 1 (ja)
   function ratingSummary(db, recipeId) {
-    const rs = live(db, 'ratings').filter(r => r.recipeId === recipeId);
+    const rs = live(db, 'ratings').filter(r => r.recipeId === recipeId && !r.skip);
     if (!rs.length) return { n: 0, satt: null, lecker: null, score: 0, bad: false, good: false };
     const avg = k => rs.reduce((s, r) => s + (+r[k] || 0), 0) / rs.length;
     const satt = avg('satt'), lecker = avg('lecker');
