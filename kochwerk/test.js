@@ -393,6 +393,27 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
 
 }
 
+// ---------- Rezeptpaket aus dem Chat (rezepte-paket.txt) ----------
+{
+  const paket = KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8'));
+  eq('Paket: 13 Rezepte', paket.length, 13);
+  eq('Paket: ohne Fehler und Warnungen', paket.filter(x => x.errors.length || x.warnings.length).map(x => [x.recipe.name, x.errors, x.warnings]), []);
+  // Werte pro Box aus dem Artefakt „Meine Mealprep-Rezepte“ (kcal, Protein) – die Rechnung muss in der Nähe liegen
+  const soll = { 'Asia-Hähnchen-Kohl-Pfanne mit Reis': [540, 54], 'Chili mit Putenhack und Sojagranulat': [405, 41], 'Orientalische Couscous-Pfanne mit Putenhack': [530, 49],
+    'Curry-Hähnchen mit TK-Gemüse': [515, 56], 'Gemüse-Frittata aus dem Ofen': [255, 22], 'Hähnchen-Gyros mit Couscous und Tzatziki': [505, 65], 'Kartoffel-Hack-Pfanne mit Kräuterquark': [620, 58],
+    'Weißkohl-Kartoffel-Eintopf mit Putenhack': [505, 47], 'Linsen-Bolognese mit Putenhack': [550, 41], 'Quark-Beeren-Bowl': [560, 66], 'Seelachs mit Kartoffeln und Senfsoße': [510, 49],
+    'Schnelle Shakshuka mit Feta': [490, 41], 'Thunfisch-Tomaten-Nudeln': [450, 44] };
+  const off = [];
+  for (const x of paket) {
+    const t = KW.recipeTotals(x.recipe).portion, s = soll[x.recipe.name];
+    if (!s) { off.push(x.recipe.name + ': fehlt in der Liste'); continue; }
+    if (Math.abs(t.kcal - s[0]) / s[0] > 0.12 || Math.abs(t.p - s[1]) / s[1] > 0.15) off.push(x.recipe.name + ': ' + Math.round(t.kcal) + ' kcal / ' + Math.round(t.p) + ' g P statt ' + s.join(' / '));
+  }
+  eq('Paket: Werte passen zum Artefakt (±12 % kcal, ±15 % Protein)', off, []);
+  eq('Paket: Notfallgericht dabei', paket.some(x => x.recipe.cat === 'emergency'), true);
+  for (const x of paket) console.log('   ', x.recipe.name.padEnd(46), Math.round(KW.recipeTotals(x.recipe).portion.kcal), 'kcal', Math.round(KW.recipeTotals(x.recipe).portion.p), 'g P');
+}
+
 // ---------- Abgleich (sync.js) mit nachgebautem GitHub ----------
 (async () => {
   const Y = require('./sync.js');

@@ -91,7 +91,7 @@ Eigenständige App im iOS-Design (hell und dunkel nach Systemeinstellung) zum Ab
 - `cook.js`: Kochsession-Ablauf, Boxen, Auftau-Hinweise, Hunger/Notfall (`KW.C`)
 - `plan.js`: Tagesplan, Spielraum, Wochenvorschlag, Tauschen, Lieblingswoche, Wochen-Check (`KW.P`)
 - `app.js`, `style.css`, `index.html`: Oberfläche
-- `IMPORT-FORMAT.md`: Import-Format, `beispiel-rezept.txt`: Beispielrezepte
+- `IMPORT-FORMAT.md`: Import-Format, `beispiel-rezept.txt`: Beispielrezepte, `rezepte-paket.txt`: Rezepte aus dem Chat, die die App beim Öffnen zum Übernehmen anbietet
 - `test.js`: `node kochwerk/test.js`
 
 ## Abgleich mit dem iPad einrichten

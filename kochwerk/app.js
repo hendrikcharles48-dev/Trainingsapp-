@@ -107,6 +107,7 @@
         ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
         : `<div class="card thaw today"><span class="em">⏱️</span><div class="mid"><b>Noch im Gefrierfach?</b><span>„${esc(t.name)}“ ist für heute geplant. Sonst in der Mikrowelle auftauen.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Ist raus</button></div>`;
     }
+    if (PAKET) h += `<button class="card cookcard" data-act="paket"><span class="em">📦</span><span class="mid"><b>${PAKET.list.length} neue Rezepte aus dem Chat</b><span>Antippen, ansehen und übernehmen</span></span><span class="add">›</span></button>`;
     const ckOld = ckLoad();
     if (ckOld && ckOld.phase === 'run') h += `<button class="card cookcard" data-act="cook" data-week="${ckOld.week}"><span class="em">🍳</span><span class="mid"><b>Kochsession fortsetzen</b><span>KW ${P.isoWeek(ckOld.week)}</span></span><span class="add">›</span></button>`;
     else for (const wk of [P.weekStart(d), P.addDays(P.weekStart(d), 7)]) {
@@ -669,7 +670,8 @@
     }
   }
   function afterRemote() {
-    if (WZ && KW.getSetting(db, 'setupDone')) { closeSetup(); render(); return; }
+    if (PAKET) checkPaket();
+    if (WZ && KW.getSetting(db, 'setupDone')) { closeSetup(); render(); checkPaket(); return; }
     if (CK || WZ) return;
     if (SH && !SH.modal) refreshSheet(true);
     render(true);
@@ -1065,8 +1067,28 @@
 
   // ---------- Import ----------
   let IM = null;
-  function openImport(text) {
-    IM = { text: text || '', res: null, modes: [] };
+  // ---------- Rezeptpaket: neue Rezepte, die Claude in rezepte-paket.txt mitliefert ----------
+  let PAKET = null;
+  async function checkPaket() {
+    if (!KW.getSetting(db, 'setupDone')) return;
+    try {
+      const r = await fetch('rezepte-paket.txt', { cache: 'no-cache' });
+      if (!r.ok) return;
+      const done = new Set(KW.getSetting(db, 'paketDone') || []);
+      const list = KW.parseRecipes(await r.text()).filter(x => !x.errors.length && !done.has(x.recipe.name) && !KW.findByName(db, x.recipe.name));
+      const had = !!PAKET;
+      PAKET = list.length ? { list } : null;
+      if ((had || PAKET) && S.tab === 'heute' && !SH && !WZ && !CK) render(true);
+    } catch (e) { /* offline: beim nächsten Mal */ }
+  }
+  function paketDone(names) {
+    const all = new Set(KW.getSetting(db, 'paketDone') || []);
+    for (const n of names) all.add(n);
+    KW.setSetting(db, 'paketDone', [...all]);
+    PAKET = null;
+  }
+  function openImport(text, paket) {
+    IM = { text: text || '', res: null, modes: [], paket: paket || null };
     openSheet(importSheet, { tall: true, modal: true });
     if (text) checkImport();
   }
@@ -1088,12 +1110,15 @@
         <span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></div>`;
       if (res.errors.length) h += `<div class="errbox"><b>Wird nicht übernommen:</b><ul>${res.errors.map(e => '<li>' + esc(e) + '</li>').join('')}</ul></div>`;
       if (res.warnings.length) h += `<div class="warnbox"><b>Bitte prüfen:</b><ul>${res.warnings.map(e => '<li>' + esc(e) + '</li>').join('')}</ul></div>`;
+      if (!res.errors.length && !twin && IM.paket) {
+        h += `<div class="seg">${[['new', 'Übernehmen'], ['skip', 'Überspringen']].map(([v, l]) => `<button data-act="im-mode" data-k="${k}" data-v="${v}" aria-pressed="${IM.modes[k] === v}">${l}</button>`).join('')}</div>`;
+      }
       if (!res.errors.length && twin) {
         h += `<div class="field"><span class="lbl">„${esc(twin.name)}“ gibt es schon</span><div class="seg">${[['replace', 'Ersetzen'], ['new', 'Als neues'], ['skip', 'Überspringen']].map(([v, l]) => `<button data-act="im-mode" data-k="${k}" data-v="${v}" aria-pressed="${IM.modes[k] === v}">${l}</button>`).join('')}</div></div>`;
       }
       h += '</div>';
     });
-    h += `<button class="btn" data-act="im-go"${ok ? '' : ' disabled'}>${ok === 1 ? '1 Rezept übernehmen' : ok + ' Rezepte übernehmen'}</button></div>`;
+    h += `<button class="btn" data-act="im-go"${ok ? '' : ' disabled'}>${ok === 1 ? '1 Rezept übernehmen' : ok + ' Rezepte übernehmen'}</button>${IM.paket ? '<button class="btn plain" data-act="paket-no">Nicht übernehmen</button>' : ''}</div>`;
     return h;
   }
   function checkImport() {
@@ -1110,6 +1135,7 @@
       const twin = KW.findByName(db, res.recipe.name);
       last = KW.importRecipe(db, res.recipe, IM.modes[k] === 'replace' && twin ? 'replace' : 'new'); n++;
     });
+    if (IM.paket) paketDone(IM.paket);
     save(); closeSheet();
     S.tab = 'rezepte'; S.filter = 'all'; S.q = ''; S.recipeId = n === 1 && last ? last.id : null;
     render();
@@ -1239,7 +1265,7 @@ Schritte:
     if (!cur || cur.kg !== Math.round(w * 10) / 10) KW.setWeight(db, w);
     KW.setSetting(db, 'setupDone', true);
     save(); closeSetup();
-    S.tab = 'heute'; render(); askRating();
+    S.tab = 'heute'; render(); askRating(); checkPaket();
   }
 
   // ---------- Ereignisse ----------
@@ -1321,6 +1347,8 @@ Schritte:
     moremeal: () => { MM = { meal: 'breakfast', days: new Set() }; openSheet(moreSheet); },
     'mm-meal': b => { MM.meal = b.dataset.v; MM.days = new Set(); refreshSheet(true); },
     'mm-day': b => { const d = b.dataset.v; MM.days.has(d) ? MM.days.delete(d) : MM.days.add(d); refreshSheet(true); },
+    paket: () => { if (!PAKET) return; openImport(PAKET.list.map(x => KW.recipeToText(x.recipe)).join('\n\n'), PAKET.list.map(x => x.recipe.name)); },
+    'paket-no': () => { paketDone(IM.paket || []); save(); closeSheet(); render(true); toast('Nicht übernommen'); },
     // Abgleich und Sicherung
     'sync-open': () => { SYF = null; openSheet(syncSheet, { modal: !SC.on }); },
     'sync-cancel': () => { SYF = null; closeSheet(); if (fromSetup) { fromSetup = false; openSetup(); } },
@@ -1472,6 +1500,7 @@ Schritte:
   render();
   if (!KW.getSetting(db, 'setupDone')) openSetup(); else askRating();
   if (SC.on) runSync('quiet');
+  checkPaket();
   addEventListener('online', () => { if (SC.on) runSync('quiet'); });
   // Zurück in die App (z. B. am nächsten Tag): Heute neu zeichnen und einmal nach dem letzten Gericht fragen
   let lastDay = today();
