@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.5';
+  const VERSION = '1.6';
 
   // ---------- Speicher ----------
   function load() {
@@ -62,30 +62,44 @@
     v.innerHTML = '<div class="page">' + pages[S.tab]() + '</div>';
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
     window.scrollTo(0, keepScroll ? y : 0);
+    navTitle();
   }
+  // Kompakte Titelleiste wie bei iOS, sobald der große Titel weggescrollt ist
+  function navTitle() {
+    const nb = $('#navbar'), h1 = document.querySelector('#view .top h1');
+    if (!nb) return;
+    nb.querySelector('span').textContent = h1 ? h1.textContent : '';
+    nb.classList.toggle('show', !!h1 && window.scrollY > h1.offsetTop + h1.offsetHeight - 8);
+  }
+  addEventListener('scroll', navTitle, { passive: true });
 
   // ---------- Heute ----------
   const P = KW.P;
   const today = () => KW.isoDate();
+  // Zwei Ringe wie bei iOS: außen Kalorien, innen Eiweiß
+  function ringSvg(kp, pp, over) {
+    const R1 = 50, R2 = 36, c1 = 2 * Math.PI * R1, c2 = 2 * Math.PI * R2;
+    const a = Math.max(0, Math.min(1, kp)), b = Math.max(0, Math.min(1, pp));
+    return `<svg class="rings" viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="60" cy="60" r="${R1}" class="rt k"/><circle cx="60" cy="60" r="${R2}" class="rt p"/>
+      <circle cx="60" cy="60" r="${R1}" class="rv k${over ? ' over' : ''}" stroke-dasharray="${(a * c1).toFixed(1)} ${c1.toFixed(1)}"/>
+      <circle cx="60" cy="60" r="${R2}" class="rv p" stroke-dasharray="${(b * c2).toFixed(1)} ${c2.toFixed(1)}"/></svg>`;
+  }
   function roomCard(date, big) {
-    const rm = P.room(db, date);
-    const pct = rm.target ? Math.min(100, rm.used / rm.target * 100) : 0;
-    const ppct = rm.protein ? Math.min(100, rm.pUsed / rm.protein * 100) : 0;
-    const sub = rm.rest >= 0 ? `etwa ${f0(Math.round(rm.rest / 10) * 10)} kcal frei` : `${f0(-rm.rest)} kcal über dem Ziel`;
-    return `<div class="card room${rm.rest < -50 ? ' over' : ''}"><span class="lbl">${big ? 'Spielraum für den Rest des Tages' : 'Spielraum'}</span>
-      <div class="room-big">${esc(rm.text)}</div>
-      <p class="room-sub">${esc(sub)} · <b>${f0(rm.pOpen)} g Protein</b> offen</p>
-      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><span>${f0(rm.used)} / ${f0(rm.target)} kcal gegessen (Plan + Tagebuch)</span>
-      <div class="meter p"><i style="width:${ppct}%"></i></div><span>${f0(rm.pUsed)} / ${f0(rm.protein)} g Protein gegessen</span></div></div>`;
+    const rm = P.room(db, date), over = rm.rest < -50;
+    return `<div class="card hero2${over ? ' over' : ''}"><div class="ring-wrap">${ringSvg(rm.used / (rm.target || 1), rm.pUsed / (rm.protein || 1), over)}
+      <div class="ring-in"><b class="num${Math.abs(rm.rest) >= 995 ? ' long' : ''}">${f0(Math.abs(Math.round(rm.rest / 10) * 10))}</b><span>${rm.rest >= 0 ? 'kcal frei' : 'kcal drüber'}</span></div></div>
+      <div class="hero-txt"><span class="lbl">${big ? 'Spielraum heute' : 'Spielraum'}</span><div class="room-big">${esc(rm.text)}</div>
+      <div class="legend2"><span><i class="lg k"></i><b class="num">${f0(rm.used)}</b> / ${f0(rm.target)} kcal</span><span><i class="lg p"></i><b class="num">${f0(rm.pUsed)}</b> / ${f0(rm.protein)} g Eiweiß</span></div></div></div>`;
   }
   function entryRow(e, date) {
     const r = P.recipeOf(db, e), m = P.mealById(e.meal), t = r ? P.portionOf(r) : null;
     const lab = e.meal === 'snack' ? 'Snack' : m.label;
     const sub = lab + (e.partner ? ' · 👫 mit Freundin' : '');
     if (!r) {
-      return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico">${m.icon}</span><span class="mid"><span class="t muted">${e.recipeId ? 'Rezept gelöscht' : 'Noch kein Rezept'}</span><span class="s">${esc(sub)}</span></span><span class="add">Wählen</span></button>`;
+      return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t muted">${e.recipeId ? 'Rezept gelöscht' : 'Noch kein Rezept'}</span><span class="s">${esc(sub)}</span></span><span class="add">Wählen</span></button>`;
     }
-    return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico">${m.icon}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub)}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`;
+    return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub)}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`;
   }
   function dayList(date, withOff) {
     const es = P.entries(db, date);
@@ -95,7 +109,7 @@
       while (k < es.length && es[k].pos < m.pos) { if (es[k].meal === 'snack') rows += entryRow(es[k], date); k++; }
       const e = es.find(x => x.meal === m.id);
       if (e) rows += entryRow(e, date);
-      else if (withOff) rows += `<button class="row off" data-act="meal-on" data-date="${date}" data-meal="${m.id}"><span class="ico">${m.icon}</span><span class="mid"><span class="t">${esc(m.label)}</span><span class="s">nicht geplant</span></span><span class="add">＋</span></button>`;
+      else if (withOff) withOff.push(m);
     }
     for (; k < es.length; k++) if (es[k].meal === 'snack' && es[k].pos > 40) rows += entryRow(es[k], date);
     return rows;
@@ -115,9 +129,10 @@
       if (P.cookDate(db, wk) === d && !CO.cookedOf(db, wk) && SH3.weekPots(db, wk).length) h += `<button class="card cookcard" data-act="cook" data-week="${wk}"><span class="em">🍳</span><span class="mid"><b>Heute ist Kochtag</b><span>${SH3.weekPots(db, wk).length} Rezepte für KW ${P.isoWeek(wk)} · Kochsession starten</span></span><span class="add">›</span></button>`;
     }
     h += roomCard(d, true);
-    h += `<div class="btnrow quick"><button class="btn tint" data-act="hunger">🍏 Ich hab Hunger</button><button class="btn plain" data-act="crash">💥 Plan geplatzt</button></div>
-      <button class="btn plain" data-act="tb-quick">📒 Ungeplantes eintragen</button>`;
-    h += `<div class="list">${dayList(d, true)}<button class="row addrow" data-act="snack-new" data-date="${d}"><span class="ico">＋</span><span class="mid"><span class="t">Snack einfügen</span></span><span></span></button></div>`;
+    h += `<div class="quick3"><button data-act="hunger"><span class="qi" style="--c:var(--accent)">🍏</span>Ich hab Hunger</button><button data-act="crash"><span class="qi" style="--c:var(--orange)">💥</span>Plan geplatzt</button><button data-act="tb-quick"><span class="qi" style="--c:var(--blue)">📒</span>Eintragen</button></div>`;
+    const offMeals = [], rowsToday = dayList(d, offMeals);
+    h += `<div class="sect"><h2 class="sec">Heute geplant</h2></div><div class="list">${rowsToday || '<div class="empty" style="padding:18px">Für heute ist noch nichts geplant.</div>'}
+      <div class="addchips">${offMeals.map(m => `<button data-act="meal-on" data-date="${d}" data-meal="${m.id}">＋ ${esc(m.short === 'Frühst.' ? 'Frühstück' : m.short)}</button>`).join('')}<button data-act="snack-new" data-date="${d}">＋ Snack</button></div></div>`;
     if (!n) {
       h += `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Rezepte als Block aus dem Chat einfügen oder das Beispiel laden.</div>
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispiel laden</button></div></div>`;
@@ -143,6 +158,12 @@
   }
   function weekSeg() {
     return `<div class="seg big">${[['plan', '🗓️ Plan'], ['shop', '🛒 Einkauf']].map(([v, l]) => `<button data-act="week-view" data-v="${v}" aria-pressed="${(S.weekView || 'plan') === v}">${l}</button>`).join('')}</div>`;
+  }
+  // Kurzform für die Tageskarten: „≈ 2½ Mahlzeiten frei“
+  function shortRoom(rm) {
+    if (rm.rest < -50) return f0(-rm.rest) + ' kcal über dem Ziel';
+    if (rm.rest < 100) return 'Tagesziel erreicht';
+    return rm.meals >= 0.5 ? '≈ ' + P.half(rm.meals) + (rm.meals === 1 ? ' Mahlzeit' : ' Mahlzeiten') + ' frei' : 'Platz für einen Snack';
   }
   function pageWoche() {
     if (S.weekView === 'shop') return pageEinkauf();
@@ -170,19 +191,19 @@
     const plannedDays = days.filter(d => P.dayTotals(db, d).n);
     const avgP = plannedDays.length ? plannedDays.reduce((s, d) => s + P.dayTotals(db, d).p, 0) / plannedDays.length : 0;
     h += `<div class="card plan2"><div class="inline"><span class="step-n">2</span><span class="mid" style="flex:1"><span class="t">Woche planen</span><span class="s">${es.length ? `${es.length} Mahlzeiten · ${empty ? empty + ' noch leer · ' : ''}Ø ${f0(avgP)} g Protein pro Tag` : 'An den Tagen die Mahlzeiten anwählen, dann vorschlagen lassen.'}</span></span></div>
-      <div class="btnrow"><button class="btn" data-act="suggest"${empty ? '' : ' disabled'}>✨ Vorschlagen</button><button class="btn plain" data-act="favs">★ Lieblingswochen</button></div></div>`;
+      <div class="pills"><button class="pill-btn${empty ? ' pri' : ''}" data-act="suggest"${empty ? '' : ' disabled'}>✨ Vorschlagen</button><button class="pill-btn" data-act="favs">★ Favoriten</button></div></div>`;
     const ck = CO.cookedOf(db, start), cdt = P.cookDate(db, start);
     h += `<div class="card plan2"><div class="inline"><span class="step-n${ck ? ' done' : ''}">${ck ? '✓' : '3'}</span><span class="mid" style="flex:1"><span class="t">Kochen & Boxen</span><span class="s">${ck ? 'Gekocht am ' + esc(P.dayLabel(ck.date)) : 'Kochtag ' + esc(P.dayLabel(cdt)) + ' · einmal vorkochen für die Woche'}</span></span></div>
-      <div class="btnrow"><button class="btn${ck ? ' plain' : ''}" data-act="cook" data-week="${start}"${es.length ? '' : ' disabled'}>🍳 Kochsession</button><button class="btn plain" data-act="boxes"${es.length ? '' : ' disabled'}>🥡 Boxen</button></div></div>`;
+      <div class="pills"><button class="pill-btn${ck || !es.length ? '' : ' pri'}" data-act="cook" data-week="${start}"${es.length ? '' : ' disabled'}>🍳 Kochsession</button><button class="pill-btn" data-act="boxes"${es.length ? '' : ' disabled'}>🥡 Boxen</button></div></div>`;
     for (const d of days) {
       const t = P.dayTotals(db, d), isToday = d === today(), rm = P.room(db, d);
       const on = new Set(P.entries(db, d).map(e => e.meal));
-      h += `<div class="daycard${isToday ? ' today' : ''}"><div class="dayhead"><b>${esc(P.DAY_LONG[P.wd(d)])} <span class="muted">${Number(d.slice(8))}.${Number(d.slice(5, 7))}.</span></b>${isToday ? '<span class="badge ok">Heute</span>' : ''}
+      h += `<div class="daycard${isToday ? ' today' : ''}"><div class="dayhead"><span class="dnum${isToday ? ' on' : ''}"><small>${P.DAY_SHORT[P.wd(d)]}</small>${Number(d.slice(8))}</span><b>${isToday ? 'Heute' : esc(P.DAY_LONG[P.wd(d)])}</b>
         <span class="dsum">${t.n ? f0(t.kcal) + ' kcal · <span class="pc">' + f0(t.p) + ' g P</span>' : ''}</span></div>
         <div class="mealchips">${P.MEALS.map(m => `<button class="mchip" data-act="meal-toggle" data-date="${d}" data-meal="${m.id}" aria-pressed="${on.has(m.id)}">${m.icon} ${esc(m.short)}</button>`).join('')}</div>`;
       const rows = dayList(d, false);
       if (rows) h += `<div class="list inner">${rows}</div>`;
-      h += `<div class="dayfoot"><span class="hint">${on.size ? esc(rm.text) : 'Nichts geplant'}</span><button class="link" data-act="snack-new" data-date="${d}">＋ Snack</button></div></div>`;
+      h += `<div class="dayfoot"><span class="hint">${on.size ? esc(shortRoom(rm)) : 'Nichts geplant'}</span><button class="link" data-act="snack-new" data-date="${d}">＋ Snack</button></div></div>`;
     }
     return h;
   }
@@ -370,7 +391,7 @@
     const nRest = Object.keys(SH3.rests(db)).length;
     const tab = S.shopTab || 'week';
     let h = `<div class="top"><h1>Woche</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
-      ${weekSeg()}<div class="seg">${[['week', 'Liste'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
+      ${weekSeg()}<div class="seg sm">${[['week', 'Liste'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
     if (tab === 'week') h += shopWeekView(L);
     else if (tab === 'later') h += shopLaterView(L);
     else h += shopRestView();
@@ -394,9 +415,14 @@
   function stockView(L) {
     if (!L.stock.length) return '';
     const why = { hunger: 'Hungerknopf', emergency: 'Notfallgericht', vorrat: 'Vorrat fürs Rezept' };
-    const open = L.stock.filter(v => !v.state).length;
-    return `<div class="group-title">Grundvorrat prüfen${open ? ' · ' + open + ' offen' : ''}</div><div class="list slist">${L.stock.map(v => `<div class="srow stock"><span class="mid"><span class="t"><span class="nm">${esc(v.name)}</span></span><span class="s">${esc(why[v.why] || '')}${v.pack ? ' · ' + esc(v.pack.label) : ''}</span></span>
+    const open = L.stock.filter(v => !v.state).length, buy = L.stock.filter(v => v.state === 'buy').length;
+    let h = `<button class="card stockhead" data-act="stock-toggle" aria-expanded="${!!S.stockOpen}"><span class="ico c-emergency">🥫</span><span class="mid"><span class="t">Grundvorrat prüfen</span>
+      <span class="s">${open ? open + ' offen · ' : ''}${buy ? buy + ' auf der Liste · ' : ''}${L.stock.length} Sachen</span></span><span class="chev2">${S.stockOpen ? '⌃' : '⌄'}</span></button>`;
+    if (!S.stockOpen) return h;
+    h += `<div class="list slist">${L.stock.map(v => `<div class="srow stock"><span class="mid"><span class="t"><span class="nm">${esc(v.name)}</span></span><span class="s">${esc(why[v.why] || '')}${v.pack ? ' · ' + esc(v.pack.label) : ''}</span></span>
       <div class="seg mini"><button data-act="pantry" data-key="${esc(v.key)}" data-v="have" aria-pressed="${v.state === 'have'}">Noch da</button><button data-act="pantry" data-key="${esc(v.key)}" data-v="buy" aria-pressed="${v.state === 'buy'}">Kaufen</button></div></div>`).join('')}</div>`;
+    if (open) h += '<button class="btn plain small" style="align-self:center" data-act="stock-all">Rest ist alles noch da</button>';
+    return h;
   }
   function shopLaterView(L) {
     let h = `<p class="hint" style="margin:0 4px">Kleine Liste für unter der Woche, z. B. frische Sachen. Gilt für KW ${P.isoWeek(L.week)}.</p>
@@ -780,18 +806,19 @@
       <button class="circle" data-act="tb-scan" aria-label="Barcode scannen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>
       <button class="circle" data-act="tb-add" data-meal="" aria-label="Eintragen">${IC.plus}</button></div></div>
       <div class="weeknav"><button class="circle" data-act="tb-day" data-d="-1" aria-label="Tag zurück">‹</button><div><b>${esc(dayName(d))}</b>${d !== today() ? '<button class="link" data-act="tb-today" style="padding:0">Zu heute</button>' : ''}</div><button class="circle" data-act="tb-day" data-d="1" aria-label="Tag vor">›</button></div>`;
-    const pct = target ? Math.min(100, tt.kcal / target * 100) : 0, ppct = prof.protein ? Math.min(100, tt.p / prof.protein * 100) : 0;
+    const pct = target ? tt.kcal / target * 100 : 0;
     const pm = k => tt.partial[k] ? '≥ ' : '';
-    h += `<div class="card room${rest < -50 ? ' over' : ''}"><span class="lbl">Gegessen</span>
-      <div class="room-big num">${f0(tt.kcal)} <small class="muted" style="font-size:17px;font-weight:600">von ${f0(target)} kcal</small></div>
-      <p class="room-sub">${rest >= 0 ? 'noch ' + f0(rest) + ' kcal frei' : f0(-rest) + ' kcal über dem Ziel'} · <b>${f0(tt.p)} / ${f0(prof.protein)} g Eiweiß</b></p>
-      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><div class="meter p"><i style="width:${ppct}%"></i></div></div>
-      <div class="tiles" style="margin-top:6px"><div><b>${f0(tt.c)}<small> g</small></b><span>KH</span></div><div><b>${pm('sug')}${f0(tt.sug)}<small> g</small></b><span>Zucker</span></div><div><b>${f0(tt.f)}<small> g</small></b><span>Fett</span></div><div><b>${pm('fib')}${f0(tt.fib)}<small> g</small></b><span>Ballastst.</span></div></div>
+    const over = rest < -50;
+    h += `<div class="card hero2 col${over ? ' over' : ''}"><div class="hero-row"><div class="ring-wrap">${ringSvg(tt.kcal / (target || 1), tt.p / (prof.protein || 1), over)}
+      <div class="ring-in"><b class="num${tt.kcal >= 1000 ? ' long' : ''}">${f0(tt.kcal)}</b><span>von ${f0(target)}</span></div></div>
+      <div class="hero-txt"><span class="lbl">Gegessen</span><div class="room-big">${rest >= 0 ? 'Noch ' + f0(rest) + ' kcal frei' : f0(-rest) + ' kcal über dem Ziel'}</div>
+      <div class="legend2"><span><i class="lg k"></i>Kalorien ${f0(pct)} %</span><span><i class="lg p"></i><b class="num">${f0(tt.p)}</b> / ${f0(prof.protein)} g Eiweiß</span></div></div></div>
+      <div class="tiles"><div><b>${f0(tt.c)}<small> g</small></b><span>KH</span></div><div><b>${pm('sug')}${f0(tt.sug)}<small> g</small></b><span>Zucker</span></div><div><b>${f0(tt.f)}<small> g</small></b><span>Fett</span></div><div><b>${pm('fib')}${f0(tt.fib)}<small> g</small></b><span>Ballastst.</span></div></div>
       <button class="link" data-act="tb-all" style="align-self:flex-start">Alle Nährwerte ›</button></div>`;
     for (const m of T.MEALS) {
       const its = items.filter(i => i.meal === m.id);
       const kc = its.reduce((s, i) => s + (i.plan && !i.eaten ? 0 : T.nutr(i.per100, i.grams).kcal || 0), 0);
-      h += `<div class="group-title">${m.icon} ${esc(m.label)}${kc ? ' · ' + f0(kc) + ' kcal' : ''}</div><div class="list">`;
+      h += `<div class="sect"><h2 class="sec"><span class="ico sm m-${m.id}">${m.icon}</span>${esc(m.label)}</h2><span class="sect-r">${kc ? f0(kc) + ' kcal' : ''}</span></div><div class="list">`;
       for (const it of its) {
         const v = T.nutr(it.per100, it.grams), off = it.plan && !it.eaten;
         h += `<button class="row tb${off ? ' off' : ''}" data-act="tb-item" data-id="${it.id}"><span class="mid"><span class="t">${esc(it.name)}${it.brand ? ' <span class="muted" style="font-weight:500">· ' + esc(it.brand) + '</span>' : ''}</span>
@@ -990,16 +1017,21 @@
     let h = '';
     if (S.filter === 'bad') h += '<p class="hint" style="margin:0 4px 10px">Diese Rezepte waren nicht satt machend oder nicht lecker. Löschen oder im Chat verbessern lassen.</p>';
     if (!list.length) return h + '<div class="card empty">Nichts gefunden.</div>';
-    return h + '<div class="list">' + list.map(r => {
+    const row = r => {
       const c = KW.catById(r.cat), t = KW.recipeTotals(r).portion, rs = KW.ratingSummary(db, r.id);
-      const bits = [c.short, fNum(r.portions) + ' Port.', fNum(r.keepDays) + ' Tage'];
+      const bits = [fNum(r.portions) + ' Port.', fNum(r.keepDays) + ' Tage'];
       if (r.freeze) bits.push('❄️');
-      if (r.box) bits.push('Box');
+      if (r.box) bits.push('🥡');
       if (rs.good) bits.push('👍'); else if (rs.bad) bits.push('👎');
-      return `<button class="row" data-act="open" data-id="${r.id}"><span class="ico">${c.icon}</span>
+      return `<button class="row rrow" data-act="open" data-id="${r.id}"><span class="ico c-${r.cat}">${c.icon}</span>
         <span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span>
-        <span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`;
-    }).join('') + '</div>';
+        <span class="right"><b>${f0(t.kcal)}</b><span>${f0(t.p)} g P</span></span></button>`;
+    };
+    // „Alle“ ohne Suche: nach Kategorie gruppiert
+    if (S.filter === 'all' && !q) {
+      return KW.CATS.map(c => { const l = list.filter(r => r.cat === c.id); return l.length ? `<div class="sect"><h2 class="sec">${esc(c.label)}</h2><span class="sect-r">${l.length}</span></div><div class="list">${l.map(row).join('')}</div>` : ''; }).join('');
+    }
+    return h + '<div class="list">' + list.map(row).join('') + '</div>';
   }
 
   const SATT = [{ v: -1, e: '😕', l: 'Nicht satt' }, { v: 0, e: '😐', l: 'Geht so' }, { v: 1, e: '😋', l: 'Satt' }];
@@ -1009,7 +1041,7 @@
   function pageRecipe(r) {
     const c = KW.catById(r.cat), T = KW.recipeTotals(r), t = T.portion, rs = KW.ratingSummary(db, r.id);
     let h = `<div><button class="back" data-act="back">${IC.back}Rezepte</button></div>
-      <div class="rhead"><span class="eyebrow">${c.icon} ${esc(c.label)}</span><h1>${esc(r.name)}</h1>
+      <div class="rhead"><span class="rhero ico c-${r.cat}">${c.icon}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
       <div class="facts"><span class="fact">🍽️ ${fNum(r.portions)} ${r.portions === 1 ? 'Portion' : 'Portionen'}</span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
       <span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
@@ -1056,31 +1088,31 @@
         <p class="hint">Damit etwa ${f1(t.kgWeek)} kg weniger pro Woche. Grundumsatz ${f0(t.bmr)} kcal.${t.capped ? ' Das Defizit ist auf 25 % gedeckelt, damit die Muskeln bleiben.' : ''}${t.floored ? ' Das Ziel bleibt beim Grundumsatz, tiefer wäre zu wenig.' : ''}</p></div>`;
     }
     h += `<div class="group-title">Körper</div><div class="set">
-      <div class="it"><span>Geschlecht</span><div class="seg"><button data-act="setv" data-k="sex" data-v="m" aria-pressed="${p.sex === 'm'}">Mann</button><button data-act="setv" data-k="sex" data-v="w" aria-pressed="${p.sex === 'w'}">Frau</button></div></div>
-      <div class="it"><label for="s-age">Alter</label><input id="s-age" data-set="age" inputmode="numeric" value="${esc(p.age)}"></div>
-      <div class="it"><label for="s-height">Größe (cm)</label><input id="s-height" data-set="height" inputmode="numeric" value="${esc(p.height)}"></div>
-      <div class="it"><label for="s-weight">Gewicht (kg)</label><input id="s-weight" data-set="weight" inputmode="decimal" value="${esc(fNum(p.weight))}"></div>
-      <div class="it"><label for="s-act">Aktivität</label><select id="s-act" data-set="activity">${opt(KW.ACTIVITY, p.activity, o => o.v, o => o.label)}</select></div>
-      <div class="it"><label for="s-tempo">Abnehmtempo</label><select id="s-tempo" data-set="tempo">${opt(KW.TEMPO, p.tempo, o => o.id, o => o.label)}</select></div></div>
+      <div class="it"><span class="sl"><span class="si" style="--c:#8E8E93">🧍</span>Geschlecht</span><div class="seg"><button data-act="setv" data-k="sex" data-v="m" aria-pressed="${p.sex === 'm'}">Mann</button><button data-act="setv" data-k="sex" data-v="w" aria-pressed="${p.sex === 'w'}">Frau</button></div></div>
+      <div class="it"><label for="s-age"><span class="si" style="--c:#FF9F0A">🎂</span>Alter</label><input id="s-age" data-set="age" inputmode="numeric" value="${esc(p.age)}"></div>
+      <div class="it"><label for="s-height"><span class="si" style="--c:#5AC8FA">📏</span>Größe (cm)</label><input id="s-height" data-set="height" inputmode="numeric" value="${esc(p.height)}"></div>
+      <div class="it"><label for="s-weight"><span class="si" style="--c:#34C759">⚖️</span>Gewicht (kg)</label><input id="s-weight" data-set="weight" inputmode="decimal" value="${esc(fNum(p.weight))}"></div>
+      <div class="it"><label for="s-act"><span class="si" style="--c:#FF3B30">🏃</span>Aktivität</label><select id="s-act" data-set="activity">${opt(KW.ACTIVITY, p.activity, o => o.v, o => o.label)}</select></div>
+      <div class="it"><label for="s-tempo"><span class="si" style="--c:#AF52DE">📉</span>Abnehmtempo</label><select id="s-tempo" data-set="tempo">${opt(KW.TEMPO, p.tempo, o => o.id, o => o.label)}</select></div></div>
       <div class="group-title">Ziele</div><div class="set">
-      <div class="it"><label for="s-prot">Protein pro Tag (g)</label><input id="s-prot" data-set="protein" inputmode="numeric" value="${esc(p.protein)}"></div>
-      <div class="it"><label for="s-meal">Normale Mahlzeit (kcal)</label><input id="s-meal" data-set="mealKcal" inputmode="numeric" value="${esc(p.mealKcal)}"></div></div>
+      <div class="it"><label for="s-prot"><span class="si" style="--c:#34C759">🥚</span>Protein pro Tag (g)</label><input id="s-prot" data-set="protein" inputmode="numeric" value="${esc(p.protein)}"></div>
+      <div class="it"><label for="s-meal"><span class="si" style="--c:#FF9F0A">🍽️</span>Mahlzeit (kcal)</label><input id="s-meal" data-set="mealKcal" inputmode="numeric" value="${esc(p.mealKcal)}"></div></div>
       <p class="hint" style="margin:-12px 4px 0">Mit der normalen Mahlzeit zeigt „Heute“ den Spielraum an, z. B. „noch Platz für etwa 2 normale Mahlzeiten“.</p>
       <div class="group-title">Kochen</div><div class="set">
-      <div class="it"><label for="s-day">Standard-Kochtag</label><select id="s-day" data-set="cookDay">${opt(days, p.cookDay, d => d, d => KW.WEEKDAYS[d])}</select></div>
-      <div class="it"><label for="s-fac">Portion Freundin</label><select id="s-fac" data-set="partnerFactor">${opt(facs, p.partnerFactor, f => f, f => Math.round(f * 100) + ' %')}</select></div></div>
+      <div class="it"><label for="s-day"><span class="si" style="--c:#FF9500">🍳</span>Standard-Kochtag</label><select id="s-day" data-set="cookDay">${opt(days, p.cookDay, d => d, d => KW.WEEKDAYS[d])}</select></div>
+      <div class="it"><label for="s-fac"><span class="si" style="--c:#FF2D55">👫</span>Portion Freundin</label><select id="s-fac" data-set="partnerFactor">${opt(facs, p.partnerFactor, f => f, f => Math.round(f * 100) + ' %')}</select></div></div>
       <div class="group-title">Rezepte</div><div class="set">
-      <button class="act" data-act="format"><span>Import-Format</span><span class="chev">${IC.chev}</span></button>
-      <button class="act" data-act="sample"><span>Beispielrezepte laden</span><span class="chev">${IC.chev}</span></button>
-      <button class="act" data-act="packs"><span>Packungsgrößen</span><span class="chev">${IC.chev}</span></button>
-      ${bad ? `<button class="act" data-act="showbad"><span>Zum Aussortieren</span><small>${bad}</small></button>` : ''}</div>
+      <button class="act" data-act="format"><span class="sl"><span class="si" style="--c:#007AFF">📄</span>Import-Format</span><span class="chev">${IC.chev}</span></button>
+      <button class="act" data-act="sample"><span class="sl"><span class="si" style="--c:#34C759">📖</span>Beispielrezepte laden</span><span class="chev">${IC.chev}</span></button>
+      <button class="act" data-act="packs"><span class="sl"><span class="si" style="--c:#A2845E">📦</span>Packungsgrößen</span><span class="chev">${IC.chev}</span></button>
+      ${bad ? `<button class="act" data-act="showbad"><span class="sl"><span class="si" style="--c:#FF3B30">👎</span>Zum Aussortieren</span><small>${bad}</small></button>` : ''}</div>
       <div class="group-title">Darstellung</div><div class="set">
-      <div class="it"><span>Farben</span><div class="seg" style="width:220px">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</div></div></div>
+      <div class="it"><span class="sl"><span class="si" style="--c:#5856D6">🎨</span>Farben</span><div class="seg" style="width:220px">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</div></div></div>
       <div class="group-title">Abgleich & Sicherung</div><div class="set">
-      <button class="act" data-act="sync-open"><span>Abgleich mit dem iPad</span><small>${SC.on ? (SC.err ? '⚠️ Problem' : '✓ ' + esc(whenText(SC.last))) : 'aus'}</small></button>
-      <button class="act" data-act="backup-export"><span>Sicherung exportieren</span><small>${ui.lastBackup ? esc(whenText(ui.lastBackup)) : ''}</small></button>
-      <button class="act" data-act="backup-import"><span>Sicherung importieren</span><span class="chev">${IC.chev}</span></button></div>
-      <div class="set"><button class="act" data-act="setup"><span>Fragebogen neu durchlaufen</span><span class="chev">${IC.chev}</span></button></div>
+      <button class="act" data-act="sync-open"><span class="sl"><span class="si" style="--c:#007AFF">🔄</span>Abgleich mit dem iPad</span><small>${SC.on ? (SC.err ? '⚠️ Problem' : '✓ ' + esc(whenText(SC.last))) : 'aus'}</small></button>
+      <button class="act" data-act="backup-export"><span class="sl"><span class="si" style="--c:#34C759">📤</span>Sicherung exportieren</span><small>${ui.lastBackup ? esc(whenText(ui.lastBackup)) : ''}</small></button>
+      <button class="act" data-act="backup-import"><span class="sl"><span class="si" style="--c:#FF9500">📥</span>Sicherung importieren</span><span class="chev">${IC.chev}</span></button></div>
+      <div class="set"><button class="act" data-act="setup"><span class="sl"><span class="si" style="--c:#8E8E93">📝</span>Fragebogen neu durchlaufen</span><span class="chev">${IC.chev}</span></button></div>
       <p class="hint" style="text-align:center">Kochwerk ${VERSION}<br>${SC.on ? 'Abgleich über GitHub ist an.' : 'Die Daten liegen nur auf diesem Gerät.'}</p>`;
     return h;
   }
@@ -1413,12 +1445,13 @@ Schritte:
     let title = '', lead = '', body = '', next = 'Weiter';
     if (s === 0) {
       title = 'Willkommen bei Kochwerk';
-      lead = 'Abnehmen, ohne Essen zu tracken. Ein paar Fragen, dann rechnet die App dein Ziel aus.';
+      lead = 'Abnehmen mit Plan: einmal beim Rezept rechnen, den Rest zeigt die App. Ein paar Fragen, dann steht dein Ziel.';
       body = `<div class="card" style="display:flex;flex-direction:column;gap:16px">
-        <div class="feature"><span class="em">🧮</span><div><b>Einmal rechnen statt täglich tracken</b><span>Die Werte stecken im Rezept, nicht in täglichen Eingaben.</span></div></div>
+        <div class="feature"><span class="em">🧮</span><div><b>Einmal rechnen statt täglich zählen</b><span>Die Werte stecken im Rezept. Geplantes zählt automatisch als gegessen.</span></div></div>
         <div class="feature"><span class="em">🗓️</span><div><b>Nur planen, was du willst</b><span>Meist 1–2 Mahlzeiten pro Tag. Die App zeigt, wie viel Spielraum bleibt.</span></div></div>
         <div class="feature"><span class="em">🥡</span><div><b>Einmal pro Woche vorkochen</b><span>Mit Einkaufsliste in ganzen Packungen und Boxen für die Woche.</span></div></div>
-        <div class="feature"><span class="em">⚖️</span><div><b>Einmal pro Woche wiegen</b><span>Die einzige regelmäßige Eingabe.</span></div></div></div>
+        <div class="feature"><span class="em">📒</span><div><b>Tagebuch, wenn du willst</b><span>Ungeplantes eintragen, mit Barcode und Lebensmittel-Datenbank.</span></div></div>
+        <div class="feature"><span class="em">⚖️</span><div><b>Einmal pro Woche wiegen</b><span>Der Wochen-Check zeigt, ob es läuft.</span></div></div></div>
         <button class="btn plain" data-act="setup-sync">Schon auf dem anderen Gerät eingerichtet? Abgleichen</button>`;
       next = 'Los geht’s';
     } else if (s === 1) {
@@ -1487,6 +1520,8 @@ Schritte:
   const ACT = {
     tab: b => { let t = b.dataset.tab; if (t === 'einkauf') { t = 'woche'; S.weekView = 'shop'; } if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'tagebuch' && S.tab !== 'tagebuch') S.day = null; S.tab = t; render(); },
     'week-view': b => { S.weekView = b.dataset.v; render(); },
+    'stock-toggle': () => { S.stockOpen = !S.stockOpen; render(true); },
+    'stock-all': () => { for (const v of SH3.weekList(db, S.shopWeek).stock) if (!v.state) SH3.setPantry(db, S.shopWeek, v.key, 'have'); save(); render(true); },
     // Tagebuch
     'tb-add': b => openAdd(b.dataset.meal || ''),
     'tb-quick': () => { S.day = null; openAdd(''); },
