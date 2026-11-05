@@ -478,3 +478,16 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .set .it .seg{width:150px}
 .rhero{width:64px;height:64px;border-radius:18px;font-size:34px;margin-bottom:4px}
 .rhead .eyebrow{margin-top:2px}
+
+/* Heute: Mahlzeiten mit Plan und Tagebuch */
+.mealempty{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 14px;min-height:52px}
+.mealempty .t{flex:1;color:var(--label-2);font-weight:600}
+.mealempty .add{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:18px;font-weight:700}
+.mealhead{display:flex;align-items:center;gap:10px;padding:11px 12px 6px 14px}
+.mealhead b{flex:1;font-size:16px}
+.mh-add{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:18px;font-weight:700;display:grid;place-items:center}
+.mealcard .row:first-of-type::before{display:none}
+.mealcard .row{padding-top:9px;padding-bottom:9px}
+.opt:disabled{opacity:.45}
+.opt .qi{flex:none}
+

@@ -316,11 +316,12 @@
   // ---------- Tagebuch ----------
   const MEALS = [
     { id: 'breakfast', label: 'Frühstück', icon: '🥣' },
+    { id: 'box', label: 'Box', icon: '🥡' },
     { id: 'lunch', label: 'Mittag', icon: '🍽️' },
     { id: 'dinner', label: 'Abendessen', icon: '🌙' },
     { id: 'snack', label: 'Snacks', icon: '🍏' }
   ];
-  const mealOfPlan = m => m === 'box' ? 'lunch' : (m === 'breakfast' || m === 'lunch' || m === 'dinner') ? m : 'snack';
+  const mealOfPlan = m => (m === 'breakfast' || m === 'box' || m === 'lunch' || m === 'dinner') ? m : 'snack';
   function mealByTime(h) { return h < 10 ? 'breakfast' : h < 15 ? 'lunch' : h < 17 ? 'snack' : h < 22 ? 'dinner' : 'snack'; }
   function nutr(per100, g) {
     const o = {};

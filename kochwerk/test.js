@@ -456,7 +456,7 @@ eq('Packung 1 Stück', KW.parsePack('Packung 1 Stück').pack, { kind: 'Stück', 
   const apfel = T.findFood(D2, 'b:apfel');
   T.addLog(D2, d, 'snack', apfel, 150, '1 Stück');
   const items = T.dayItems(D2, d);
-  eq('Tag: Plan + Apfel', items.map(i => [i.name, i.meal]), [['Hähnchen-Paprika-Pfanne mit Reis', 'lunch'], ['Apfel', 'snack']]);
+  eq('Tag: Plan + Apfel', items.map(i => [i.name, i.meal]), [['Hähnchen-Paprika-Pfanne mit Reis', 'box'], ['Apfel', 'snack']]);
   const tt = T.dayTotals(D2, d);
   near('Tag kcal = Rezeptportion + Apfel', tt.kcal, KW.recipeTotals(pf).portion.kcal + 78, 1);
   eq('Zucker beim Rezept unbekannt', tt.partial.sug, true);

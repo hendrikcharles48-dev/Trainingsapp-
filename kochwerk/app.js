@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.6';
+  const VERSION = '1.7';
 
   // ---------- Speicher ----------
   function load() {
@@ -82,8 +82,8 @@
     const a = Math.max(0, Math.min(1, kp)), b = Math.max(0, Math.min(1, pp));
     return `<svg class="rings" viewBox="0 0 120 120" aria-hidden="true">
       <circle cx="60" cy="60" r="${R1}" class="rt k"/><circle cx="60" cy="60" r="${R2}" class="rt p"/>
-      <circle cx="60" cy="60" r="${R1}" class="rv k${over ? ' over' : ''}" stroke-dasharray="${(a * c1).toFixed(1)} ${c1.toFixed(1)}"/>
-      <circle cx="60" cy="60" r="${R2}" class="rv p" stroke-dasharray="${(b * c2).toFixed(1)} ${c2.toFixed(1)}"/></svg>`;
+      ${a > 0.005 ? `<circle cx="60" cy="60" r="${R1}" class="rv k${over ? ' over' : ''}" stroke-dasharray="${(a * c1).toFixed(1)} ${c1.toFixed(1)}"/>` : ''}
+      ${b > 0.005 ? `<circle cx="60" cy="60" r="${R2}" class="rv p" stroke-dasharray="${(b * c2).toFixed(1)} ${c2.toFixed(1)}"/>` : ''}</svg>`;
   }
   function roomCard(date, big) {
     const rm = P.room(db, date), over = rm.rest < -50;
@@ -99,7 +99,9 @@
     if (!r) {
       return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t muted">${e.recipeId ? 'Rezept gelöscht' : 'Noch kein Rezept'}</span><span class="s">${esc(sub)}</span></span><span class="add">Wählen</span></button>`;
     }
-    return `<button class="row" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub)}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`;
+    const ov = db.log && db.log['lp' + e.id], fac = ov && !ov.del && ov.factor != null ? ov.factor : 1;
+    const sub2 = sub + (fac === 0 ? ' · nicht gegessen' : fac !== 1 ? ' · ' + fNum(fac) + ' Portion' : '');
+    return `<button class="row${fac === 0 ? ' tb off' : ''}" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub2)}</span></span><span class="right"><b>${fac === 0 ? '–' : f0(t.kcal * fac) + ' kcal'}</b><span>${fac === 0 ? '' : f0(t.p * fac) + ' g P'}</span></span></button>`;
   }
   function dayList(date, withOff) {
     const es = P.entries(db, date);
@@ -113,6 +115,45 @@
     }
     for (; k < es.length; k++) if (es[k].meal === 'snack' && es[k].pos > 40) rows += entryRow(es[k], date);
     return rows;
+  }
+  // Heute: pro Mahlzeit das geplante Rezept und alles einzeln Eingetragene
+  function trackRow(e) {
+    const v = T.nutr(e.per100, e.grams);
+    return `<button class="row tb" data-act="tb-item" data-id="${e.id}"><span class="mid"><span class="t">${esc(e.name)}${e.brand ? ' <span class="muted" style="font-weight:500">· ' + esc(e.brand) + '</span>' : ''}</span>
+      <span class="s">${esc(e.portion ? e.portion + ' (' + Math.round(e.grams) + ' g)' : Math.round(e.grams) + ' g')} · eingetragen</span></span><span class="right"><b>${f0(v.kcal)} kcal</b><span>${fv(v.p)} g P</span></span></button>`;
+  }
+  // Geplante Mahlzeit in der Mahlzeit-Karte: ohne eigenes Symbol, mit Hinweis „geplant“
+  function planRow(e) {
+    const r = P.recipeOf(db, e);
+    if (!r) return `<button class="row tb" data-act="slot" data-id="${e.id}"><span class="mid"><span class="t muted">${e.recipeId ? 'Rezept gelöscht' : 'Noch kein Rezept'}</span><span class="s">geplant${e.meal === 'snack' ? ' · Snack' : ''}</span></span><span class="add">Wählen</span></button>`;
+    const t = P.portionOf(r), ov = db.log && db.log['lp' + e.id], fac = ov && !ov.del && ov.factor != null ? ov.factor : 1;
+    const sub = (fac === 0 ? 'nicht gegessen' : fac !== 1 ? fNum(fac) + ' Portion' : '1 Portion') + ' · geplant' + (e.partner ? ' · 👫' : '');
+    return `<button class="row tb${fac === 0 ? ' off' : ''}" data-act="slot" data-id="${e.id}"><span class="mid"><span class="t">🍲 ${esc(r.name)}</span><span class="s">${esc(sub)}</span></span>
+      <span class="right"><b>${fac === 0 ? '–' : f0(t.kcal * fac) + ' kcal'}</b><span>${fac === 0 ? '' : f0(t.p * fac) + ' g P'}</span></span></button>`;
+  }
+  function todayMeals(d) {
+    const plan = P.entries(db, d), logs = KW.live(db, 'log').filter(e => e.date === d && !e.planId);
+    let h = `<div class="sect"><h2 class="sec">Mahlzeiten</h2><span class="sect-r">${f0(P.room(db, d).used)} kcal</span></div>`;
+    for (const m of T.MEALS) {
+      const pe = plan.filter(e => T.mealOfPlan(e.meal) === m.id), le = logs.filter(e => e.meal === m.id);
+      if (!pe.length && !le.length) {
+        h += `<button class="card mealempty" data-act="meal-add" data-meal="${m.id}"><span class="ico sm m-${m.id}">${m.icon}</span><span class="t">${esc(m.label === 'Box' ? 'Box in der Schule' : m.label)}</span><span class="add">＋</span></button>`;
+        continue;
+      }
+      const kc = T.dayItems(db, d).filter(i => i.meal === m.id && !(i.plan && !i.eaten)).reduce((s, i) => s + (T.nutr(i.per100, i.grams).kcal || 0), 0);
+      h += `<div class="list mealcard"><div class="mealhead"><span class="ico sm m-${m.id}">${m.icon}</span><b>${esc(m.label === 'Box' ? 'Box in der Schule' : m.label)}</b><span class="sect-r">${f0(kc)} kcal</span>
+        <button class="mh-add" data-act="meal-add" data-meal="${m.id}" aria-label="${esc(m.label)} ergänzen">＋</button></div>`;
+      h += pe.map(e => planRow(e, d)).join('') + le.map(trackRow).join('') + '</div>';
+    }
+    return h;
+  }
+  // „＋“ bei einer Mahlzeit: Rezept einplanen oder einzelne Lebensmittel eintragen
+  let MC = null;
+  function mealChoiceSheet() {
+    const m = T.MEALS.find(x => x.id === MC.meal), planned = MC.meal !== 'snack' && P.entries(db, MC.date).some(e => e.meal === MC.meal);
+    return `<div class="sheet-head"><span></span><h2>${esc(m.label === 'Box' ? 'Box in der Schule' : m.label)}</h2><button class="r" data-act="close">Abbrechen</button></div>
+      <div class="opts"><button class="opt" data-act="mc-track"><span class="qi" style="--c:var(--blue)">📒</span><span class="mid"><span class="t">Lebensmittel eintragen</span><span class="s">Einzeln, z. B. 2 Brötchen, Käse und Kaffee – mit Suche, Barcode und Favoriten</span></span></button>
+      <button class="opt" data-act="mc-plan"><span class="qi" style="--c:var(--accent)">🍲</span><span class="mid"><span class="t">Rezept einplanen</span><span class="s">${planned ? 'Für diese Mahlzeit ist schon ein Rezept geplant – antippen zum Tauschen' : 'Eine Portion aus deinem Rezeptbuch'}</span></span></button></div>`;
   }
   function pageHeute() {
     const d = today(), n = recipes().length;
@@ -130,14 +171,12 @@
     }
     h += roomCard(d, true);
     h += `<div class="quick3"><button data-act="hunger"><span class="qi" style="--c:var(--accent)">🍏</span>Ich hab Hunger</button><button data-act="crash"><span class="qi" style="--c:var(--orange)">💥</span>Plan geplatzt</button><button data-act="tb-quick"><span class="qi" style="--c:var(--blue)">📒</span>Eintragen</button></div>`;
-    const offMeals = [], rowsToday = dayList(d, offMeals);
-    h += `<div class="sect"><h2 class="sec">Heute geplant</h2></div><div class="list">${rowsToday || '<div class="empty" style="padding:18px">Für heute ist noch nichts geplant.</div>'}
-      <div class="addchips">${offMeals.map(m => `<button data-act="meal-on" data-date="${d}" data-meal="${m.id}">＋ ${esc(m.short === 'Frühst.' ? 'Frühstück' : m.short)}</button>`).join('')}<button data-act="snack-new" data-date="${d}">＋ Snack</button></div></div>`;
+    h += todayMeals(d);
     if (!n) {
       h += `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Rezepte als Block aus dem Chat einfügen oder das Beispiel laden.</div>
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispiel laden</button></div></div>`;
     }
-    h += `<p class="hint" style="text-align:center">Alles Geplante zählt als gegessen, Ungeplantes trägst du im Tagebuch ein. Die Portion deiner Freundin zählt nicht mit.</p>`;
+    h += `<p class="hint" style="text-align:center">Geplantes zählt automatisch als gegessen. Mit ＋ trägst du bei jeder Mahlzeit einzelne Lebensmittel ein. Die Portion deiner Freundin zählt nicht mit.</p>`;
     return h;
   }
 
@@ -1520,6 +1559,15 @@ Schritte:
   const ACT = {
     tab: b => { let t = b.dataset.tab; if (t === 'einkauf') { t = 'woche'; S.weekView = 'shop'; } if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'tagebuch' && S.tab !== 'tagebuch') S.day = null; S.tab = t; render(); },
     'week-view': b => { S.weekView = b.dataset.v; render(); },
+    'meal-add': b => { MC = { meal: b.dataset.meal, date: today() }; openSheet(mealChoiceSheet); },
+    'mc-track': () => { const m = MC.meal; closeSheet(); S.day = null; openAdd(m); },
+    'mc-plan': () => {
+      const d = MC.date, m = MC.meal; closeSheet();
+      if (m === 'snack') { openPicker({ date: d, gap: defaultGap(d) }); return; }
+      const ex = db.plan[P.mainId(d, m)];
+      if (ex && !ex.del && P.recipeOf(db, ex)) { openSlot(ex.id); return; }
+      P.setMeal(db, d, m, true); save(); render(true); openPicker({ entryId: P.mainId(d, m) });
+    },
     'stock-toggle': () => { S.stockOpen = !S.stockOpen; render(true); },
     'stock-all': () => { for (const v of SH3.weekList(db, S.shopWeek).stock) if (!v.state) SH3.setPantry(db, S.shopWeek, v.key, 'have'); save(); render(true); },
     // Tagebuch

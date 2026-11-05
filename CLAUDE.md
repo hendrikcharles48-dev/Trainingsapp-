@@ -88,6 +88,8 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Tagebuch (`track.js`, Wunsch des Nutzers ab 5.11.): Reiter Heute · Tagebuch · Woche (Plan | Einkauf) · Rezepte · Mehr.
   `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
   `foods` (eigene + aus Open Food Facts gespeicherte, `fav:<id>` = Favorit aus der Grundliste). `P.room` zählt Plan + Tagebuch.
-  Open Food Facts direkt aus dem Browser (kein Schlüssel). Kamera nur für Barcodes, keine Bilder speichern.
+  Open Food Facts direkt aus dem Browser (kein Schlüssel).
+  „Heute“ zeigt pro Mahlzeit (Frühstück, Box, Mittag, Abend, Snacks) Plan + Eingetragenes; „＋“ fragt Rezept einplanen
+  oder Lebensmittel eintragen (Nutzerwunsch). Tagebuch-Mahlzeit `box` ist eigener Abschnitt. Kamera nur für Barcodes, keine Bilder speichern.
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.
