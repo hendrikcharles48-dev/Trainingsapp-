@@ -71,7 +71,7 @@ Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`
 Abnehm-App ohne Tracking, alle 5 Etappen fertig (Rezepte, Tages-/Wochenplan, Einkauf, Kochsession/Boxen,
 Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änderungen erst kurz den Plan zeigen.
 - Satzwerk dafür nie anfassen. Speicher nur mit Präfix `kochwerk_`. Keine Fotos speichern.
-- Deploy: Dateien aus `kochwerk/` nach `docs/kochwerk/` kopieren (ohne `test.js`, `IMPORT-FORMAT.md`),
+- Deploy: Dateien aus `kochwerk/` (inkl. `vendor/`) nach `docs/kochwerk/` kopieren (ohne `test.js`, `IMPORT-FORMAT.md`),
   `CACHE` in `kochwerk/sw.js` hochzählen. Tests: `node kochwerk/test.js`.
 - Import-Format: `kochwerk/IMPORT-FORMAT.md`, passt zum Chat-Skill „kochwerk-rezept“. Format nur zusammen ändern.
 - Plan: Sammlung `plan`, ein Eintrag pro Mahlzeit (`id` = `p<Datum>-<meal>` für Hauptmahlzeiten, `s…` für Snacks,
@@ -85,5 +85,9 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Rezeptpaket: `kochwerk/rezepte-paket.txt` (im Import-Format). Die App bietet beim Öffnen neue Rezepte daraus an
   (Karte auf „Heute“), Übernommenes/Abgelehntes merkt sie in der Einstellung `paketDone`. Neue Rezepte aus dem Chat
   oder einem Artefakt hier anhängen (Werte pro 100 g, Packungen, Vorrat) – Test vergleicht kcal/Protein mit Sollwerten.
+- Tagebuch (`track.js`, Wunsch des Nutzers ab 5.11.): Reiter Heute · Tagebuch · Woche (Plan | Einkauf) · Rezepte · Mehr.
+  `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
+  `foods` (eigene + aus Open Food Facts gespeicherte, `fav:<id>` = Favorit aus der Grundliste). `P.room` zählt Plan + Tagebuch.
+  Open Food Facts direkt aus dem Browser (kein Schlüssel). Kamera nur für Barcodes, keine Bilder speichern.
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.

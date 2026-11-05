@@ -437,6 +437,54 @@ eq('Packung 1 Stück', KW.parsePack('Packung 1 Stück').pack, { kind: 'Stück', 
   eq('Chat-Rezepte im Paket ohne Warnung', p2.filter(x => x.warnings.length || x.errors.length).map(x => x.recipe.name + ': ' + x.warnings.concat(x.errors).join('; ')), []);
 }
 
+// ---------- Tagebuch (track.js) ----------
+{
+  const T = require('./track.js');
+  eq('Grundliste groß', T.BASE.length >= 170, true);
+  eq('Grundliste: alle 8 Werte', T.BASE.filter(f => T.FIELDS.some(k => f.per100[k] == null || !isFinite(f.per100[k]))).map(f => f.name), []);
+  eq('Grundliste: kcal passen zu Nährstoffen (±25 %)', T.BASE.filter(f => { const v = f.per100, e = v.p * 4 + v.c * 4 + v.f * 9 + v.fib * 2; return f.name !== 'Bier' && v.kcal > 20 && Math.abs(e - v.kcal) / v.kcal > 0.25; }).map(f => f.name), []);
+  eq('Grundliste: ids eindeutig', new Set(T.BASE.map(f => f.id)).size, T.BASE.length);
+  const D2 = KW.emptyDb();
+  KW.setSetting(D2, 'age', 25); KW.setSetting(D2, 'height', 180); KW.setWeight(D2, 85, '2026-11-02');
+  eq('Suche Karotte findet Möhre', T.search(D2, 'karotte')[0].name, 'Möhre');
+  eq('Suche Anfang zuerst', T.search(D2, 'Ei')[0].name, 'Ei');
+  eq('Suche Döner', T.search(D2, 'döner')[0].name, 'Döner Kebab');
+  const pf = KW.importRecipe(D2, KW.parseRecipes(sample)[0].recipe, 'new');
+  eq('Rezept als Lebensmittel', T.search(D2, 'hähnchen-paprika')[0].src, 'recipe');
+  const d = '2026-11-09';
+  P.setMeal(D2, d, 'box', true); P.update(D2, P.mainId(d, 'box'), { recipeId: pf.id });
+  const apfel = T.findFood(D2, 'b:apfel');
+  T.addLog(D2, d, 'snack', apfel, 150, '1 Stück');
+  const items = T.dayItems(D2, d);
+  eq('Tag: Plan + Apfel', items.map(i => [i.name, i.meal]), [['Hähnchen-Paprika-Pfanne mit Reis', 'lunch'], ['Apfel', 'snack']]);
+  const tt = T.dayTotals(D2, d);
+  near('Tag kcal = Rezeptportion + Apfel', tt.kcal, KW.recipeTotals(pf).portion.kcal + 78, 1);
+  eq('Zucker beim Rezept unbekannt', tt.partial.sug, true);
+  eq('Spielraum zieht Getracktes ab', Math.round(P.room(D2, d).used), Math.round(tt.kcal));
+  T.setPlanFactor(D2, P.mainId(d, 'box'), d, 0);
+  near('nicht gegessen zählt nicht', T.dayTotals(D2, d).kcal, 78, 0.5);
+  T.setPlanFactor(D2, P.mainId(d, 'box'), d, 0.5);
+  near('halbe Portion', T.dayTotals(D2, d).kcal, KW.recipeTotals(pf).portion.kcal / 2 + 78, 1);
+  eq('Zuletzt gegessen', T.recent(D2).map(f => f.name), ['Apfel']);
+  T.toggleFav(D2, apfel);
+  eq('Favorit Grundliste', [T.isFav(D2, apfel), T.favorites(D2).map(f => f.name)], [true, ['Apfel']]);
+  eq('Favorit-Marke taucht nicht als Lebensmittel auf', T.search(D2, 'apfel').filter(f => f.name === 'Apfel').length, 1);
+  const own = T.saveFood(D2, { name: 'Omas Kuchen', per100: { kcal: 350, p: 5, c: 45, sug: 30, f: 16, sat: 9, fib: 1, salt: 0.3 }, portions: [{ label: '1 Stück', g: 90 }] });
+  eq('Eigenes Lebensmittel suchbar', T.search(D2, 'omas')[0].id, own.id);
+  // Open Food Facts (nachgebaute Antworten)
+  const prod = { code: '4061458061727', product_name: 'Skyr Natur', brands: 'Milbona,Lidl', quantity: '500 g', serving_size: '150 g', serving_quantity: 150,
+    nutriments: { 'energy-kcal_100g': 63, proteins_100g: 11, carbohydrates_100g: 4, sugars_100g: 4, fat_100g: 0.2, 'saturated-fat_100g': 0.1, fiber_100g: 0, salt_100g: 0.1 } };
+  const fakeOff = async url => ({ ok: true, status: 200, json: async () => /product\//.test(url) ? (url.includes('4061458061727') ? { status: 1, product: prod } : { status: 0 }) : { products: [prod, { code: '1', product_name: 'ohne Werte' }] } });
+  (async () => {
+    const f = await T.offBarcode('4061458061727', fakeOff);
+    eq('OFF Barcode', [f.name, f.brand, f.per100.p, f.per100.salt, f.portions.map(p => p.g)], ['Skyr Natur', 'Milbona', 11, 0.1, [150, 500]]);
+    eq('OFF Barcode unbekannt', await T.offBarcode('123', fakeOff), null);
+    eq('OFF Suche ohne kaputte Treffer', (await T.offSearch('skyr', fakeOff)).length, 1);
+    eq('OFF kJ umgerechnet', T.fromOff({ code: '2', product_name: 'X', nutriments: { energy_100g: 418.4 } }).per100.kcal, 100);
+  })();
+  eq('Barcode erkannt', [T.isBarcode('4061458061727'), T.isBarcode('skyr')], [true, false]);
+}
+
 // ---------- Abgleich (sync.js) mit nachgebautem GitHub ----------
 (async () => {
   const Y = require('./sync.js');

@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.4';
+  const VERSION = '1.5';
 
   // ---------- Speicher ----------
   function load() {
@@ -57,7 +57,8 @@
   function render(keepScroll) {
     const y = window.scrollY;
     const v = $('#view');
-    const pages = { heute: pageHeute, woche: pageWoche, rezepte: pageRezepte, einkauf: pageEinkauf, mehr: pageMehr };
+    if (S.tab === 'einkauf') { S.tab = 'woche'; S.weekView = 'shop'; }
+    const pages = { heute: pageHeute, tagebuch: pageTagebuch, woche: pageWoche, rezepte: pageRezepte, mehr: pageMehr };
     v.innerHTML = '<div class="page">' + pages[S.tab]() + '</div>';
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
     window.scrollTo(0, keepScroll ? y : 0);
@@ -74,8 +75,8 @@
     return `<div class="card room${rm.rest < -50 ? ' over' : ''}"><span class="lbl">${big ? 'Spielraum für den Rest des Tages' : 'Spielraum'}</span>
       <div class="room-big">${esc(rm.text)}</div>
       <p class="room-sub">${esc(sub)} · <b>${f0(rm.pOpen)} g Protein</b> offen</p>
-      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><span>${f0(rm.used)} / ${f0(rm.target)} kcal geplant</span>
-      <div class="meter p"><i style="width:${ppct}%"></i></div><span>${f0(rm.pUsed)} / ${f0(rm.protein)} g Protein geplant</span></div></div>`;
+      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><span>${f0(rm.used)} / ${f0(rm.target)} kcal gegessen (Plan + Tagebuch)</span>
+      <div class="meter p"><i style="width:${ppct}%"></i></div><span>${f0(rm.pUsed)} / ${f0(rm.protein)} g Protein gegessen</span></div></div>`;
   }
   function entryRow(e, date) {
     const r = P.recipeOf(db, e), m = P.mealById(e.meal), t = r ? P.portionOf(r) : null;
@@ -114,13 +115,14 @@
       if (P.cookDate(db, wk) === d && !CO.cookedOf(db, wk) && SH3.weekPots(db, wk).length) h += `<button class="card cookcard" data-act="cook" data-week="${wk}"><span class="em">🍳</span><span class="mid"><b>Heute ist Kochtag</b><span>${SH3.weekPots(db, wk).length} Rezepte für KW ${P.isoWeek(wk)} · Kochsession starten</span></span><span class="add">›</span></button>`;
     }
     h += roomCard(d, true);
-    h += `<div class="btnrow quick"><button class="btn tint" data-act="hunger">🍏 Ich hab Hunger</button><button class="btn plain" data-act="crash">💥 Plan geplatzt</button></div>`;
+    h += `<div class="btnrow quick"><button class="btn tint" data-act="hunger">🍏 Ich hab Hunger</button><button class="btn plain" data-act="crash">💥 Plan geplatzt</button></div>
+      <button class="btn plain" data-act="tb-quick">📒 Ungeplantes eintragen</button>`;
     h += `<div class="list">${dayList(d, true)}<button class="row addrow" data-act="snack-new" data-date="${d}"><span class="ico">＋</span><span class="mid"><span class="t">Snack einfügen</span></span><span></span></button></div>`;
     if (!n) {
       h += `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Rezepte als Block aus dem Chat einfügen oder das Beispiel laden.</div>
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispiel laden</button></div></div>`;
     }
-    h += `<p class="hint" style="text-align:center">Alles Geplante zählt als gegessen. Die Portion deiner Freundin zählt nicht mit.</p>`;
+    h += `<p class="hint" style="text-align:center">Alles Geplante zählt als gegessen, Ungeplantes trägst du im Tagebuch ein. Die Portion deiner Freundin zählt nicht mit.</p>`;
     return h;
   }
 
@@ -139,12 +141,16 @@
     const W = 120, H = 36, pts = v.map((x, k) => [k * W / (v.length - 1), H - 4 - (x.kg - min) / span * (H - 8)]);
     return `<svg class="spark" viewBox="-3 -3 ${W + 6} ${H + 6}" aria-hidden="true"><polyline points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3.5" fill="currentColor"/></svg>`;
   }
+  function weekSeg() {
+    return `<div class="seg big">${[['plan', '🗓️ Plan'], ['shop', '🛒 Einkauf']].map(([v, l]) => `<button data-act="week-view" data-v="${v}" aria-pressed="${(S.weekView || 'plan') === v}">${l}</button>`).join('')}</div>`;
+  }
   function pageWoche() {
+    if (S.weekView === 'shop') return pageEinkauf();
     if (!S.week) S.week = defaultWeek();
     const start = S.week, days = P.weekDays(start), end = days[6];
     const range = Number(start.slice(8)) + '.' + (start.slice(5, 7) !== end.slice(5, 7) ? Number(start.slice(5, 7)) + '.' : '') + '–' + Number(end.slice(8)) + '.' + Number(end.slice(5, 7)) + '.';
     let h = `<div class="top"><div><div class="eyebrow">KW ${P.isoWeek(start)} · ${range}</div><h1>Woche</h1></div><div class="acts">
-      <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>`;
+      <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>` + weekSeg();
     // Schritt 1: Wochen-Check
     const w = recentWeight(), ws = P.weeklyWeights(db);
     if (!w) {
@@ -363,8 +369,8 @@
     const nLater = L.later.filter(i => !i.done).length + extras().filter(x => !x.done).length;
     const nRest = Object.keys(SH3.rests(db)).length;
     const tab = S.shopTab || 'week';
-    let h = `<div class="top"><h1>Einkauf</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
-      <div class="seg big">${[['week', 'Woche'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
+    let h = `<div class="top"><h1>Woche</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
+      ${weekSeg()}<div class="seg">${[['week', 'Liste'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
     if (tab === 'week') h += shopWeekView(L);
     else if (tab === 'later') h += shopLaterView(L);
     else h += shopRestView();
@@ -751,6 +757,208 @@
       <p class="hint">Zusammenführen behält alles, was hier neuer ist. Ersetzen übernimmt nur die Sicherung${SC.on ? ' – beim nächsten Abgleich kommen neuere Einträge vom anderen Gerät aber zurück' : ''}.</p>`;
   }
 
+  // ---------- Tagebuch ----------
+  const T = KW.T;
+  const SRC = { base: 'Grundliste', off: 'Open Food Facts', own: 'Eigenes', recipe: 'Rezept' };
+  const fv = (v, k) => v == null ? '–' : k === 'kcal' ? f0(v) : (v < 10 ? f1(v) : f0(v));
+  function amountLabel(it) {
+    const g = Math.round(it.grams);
+    if (it.plan) return it.factor === 1 ? '1 Portion (' + g + ' g)' : it.factor ? fNum(it.factor) + ' Portion (' + g + ' g)' : 'nicht gegessen';
+    return it.portion ? it.portion + ' (' + g + ' g)' : g + ' g';
+  }
+  function dayName(d) {
+    const t = today(), diff = P.diffDays(d, t);
+    const lbl = diff === 0 ? 'Heute' : diff === 1 ? 'Gestern' : diff === -1 ? 'Morgen' : P.DAY_LONG[P.wd(d)];
+    return lbl + ', ' + Number(d.slice(8)) + '.' + Number(d.slice(5, 7)) + '.';
+  }
+  function pageTagebuch() {
+    const d = S.day || today();
+    const tt = T.dayTotals(db, d), prof = KW.profile(db), tg = KW.calcTargets(prof);
+    const target = tg ? tg.target : 0, rest = target - tt.kcal;
+    const items = T.dayItems(db, d);
+    let h = `<div class="top"><h1>Tagebuch</h1><div class="acts">
+      <button class="circle" data-act="tb-scan" aria-label="Barcode scannen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>
+      <button class="circle" data-act="tb-add" data-meal="" aria-label="Eintragen">${IC.plus}</button></div></div>
+      <div class="weeknav"><button class="circle" data-act="tb-day" data-d="-1" aria-label="Tag zurück">‹</button><div><b>${esc(dayName(d))}</b>${d !== today() ? '<button class="link" data-act="tb-today" style="padding:0">Zu heute</button>' : ''}</div><button class="circle" data-act="tb-day" data-d="1" aria-label="Tag vor">›</button></div>`;
+    const pct = target ? Math.min(100, tt.kcal / target * 100) : 0, ppct = prof.protein ? Math.min(100, tt.p / prof.protein * 100) : 0;
+    const pm = k => tt.partial[k] ? '≥ ' : '';
+    h += `<div class="card room${rest < -50 ? ' over' : ''}"><span class="lbl">Gegessen</span>
+      <div class="room-big num">${f0(tt.kcal)} <small class="muted" style="font-size:17px;font-weight:600">von ${f0(target)} kcal</small></div>
+      <p class="room-sub">${rest >= 0 ? 'noch ' + f0(rest) + ' kcal frei' : f0(-rest) + ' kcal über dem Ziel'} · <b>${f0(tt.p)} / ${f0(prof.protein)} g Eiweiß</b></p>
+      <div class="bars"><div class="meter"><i style="width:${pct}%"></i></div><div class="meter p"><i style="width:${ppct}%"></i></div></div>
+      <div class="tiles" style="margin-top:6px"><div><b>${f0(tt.c)}<small> g</small></b><span>KH</span></div><div><b>${pm('sug')}${f0(tt.sug)}<small> g</small></b><span>Zucker</span></div><div><b>${f0(tt.f)}<small> g</small></b><span>Fett</span></div><div><b>${pm('fib')}${f0(tt.fib)}<small> g</small></b><span>Ballastst.</span></div></div>
+      <button class="link" data-act="tb-all" style="align-self:flex-start">Alle Nährwerte ›</button></div>`;
+    for (const m of T.MEALS) {
+      const its = items.filter(i => i.meal === m.id);
+      const kc = its.reduce((s, i) => s + (i.plan && !i.eaten ? 0 : T.nutr(i.per100, i.grams).kcal || 0), 0);
+      h += `<div class="group-title">${m.icon} ${esc(m.label)}${kc ? ' · ' + f0(kc) + ' kcal' : ''}</div><div class="list">`;
+      for (const it of its) {
+        const v = T.nutr(it.per100, it.grams), off = it.plan && !it.eaten;
+        h += `<button class="row tb${off ? ' off' : ''}" data-act="tb-item" data-id="${it.id}"><span class="mid"><span class="t">${esc(it.name)}${it.brand ? ' <span class="muted" style="font-weight:500">· ' + esc(it.brand) + '</span>' : ''}</span>
+          <span class="s">${esc(amountLabel(it))}${it.plan ? ' · aus dem Plan' : ''}</span></span><span class="right"><b>${off ? '–' : f0(v.kcal) + ' kcal'}</b><span>${off ? '' : fv(v.p) + ' g P'}</span></span></button>`;
+      }
+      h += `<button class="row addrow" data-act="tb-add" data-meal="${m.id}"><span class="mid"><span class="t">＋ Hinzufügen</span></span><span></span></button></div>`;
+    }
+    // Woche
+    const ws = T.weekStats(db, P.weekStart(d)), withData = ws.filter(x => x.n);
+    const max = Math.max(target, ...ws.map(x => x.kcal), 1);
+    h += `<div class="card"><span class="lbl">Diese Woche</span><div class="wbars">${ws.map(x => `<button class="wb${x.date === d ? ' on' : ''}" data-act="tb-goto" data-d="${x.date}"><span class="bar-o"><i style="height:${x.kcal / max * 100}%" class="${x.kcal > target + 50 ? 'over' : ''}"></i><em style="bottom:${target / max * 100}%"></em></span><small>${P.DAY_SHORT[P.wd(x.date)]}</small></button>`).join('')}</div>
+      <p class="hint">${withData.length ? `Ø ${f0(withData.reduce((s, x) => s + x.kcal, 0) / withData.length)} kcal und ${f0(withData.reduce((s, x) => s + x.p, 0) / withData.length)} g Eiweiß an ${withData.length} ${withData.length === 1 ? 'Tag' : 'Tagen'} mit Einträgen. Linie = Tagesziel.` : 'Noch keine Einträge in dieser Woche.'}</p></div>`;
+    return h;
+  }
+  function allNutrSheet() {
+    const d = S.day || today(), tt = T.dayTotals(db, d);
+    return `<div class="sheet-head"><span></span><h2>Nährwerte ${esc(dayName(d))}</h2><button class="r" data-act="close">Fertig</button></div>
+      <div class="list">${T.FIELDS.map(k => `<div class="row nt${k === 'sug' || k === 'sat' ? ' sub' : ''}"><span class="mid"><span class="t">${esc(T.LABELS[k])}</span></span><span class="right"><b>${tt.partial[k] ? '≥ ' : ''}${fv(tt[k], k)} ${k === 'kcal' ? 'kcal' : 'g'}</b></span></div>`).join('')}</div>
+      ${Object.keys(tt.partial).length ? '<p class="hint">≥ heißt: Bei Rezepten sind nur kcal, Eiweiß, Kohlenhydrate und Fett hinterlegt. Zucker, gesättigte Fettsäuren, Ballaststoffe und Salz fehlen dort, der echte Wert ist also etwas höher.</p>' : ''}`;
+  }
+
+  // Hinzufügen: Suche in Grundliste, eigenen Lebensmitteln, Rezepten und Open Food Facts
+  let TB = null;
+  function openAdd(meal) {
+    const d = S.day || today();
+    TB = { date: d, meal: meal || (d === today() ? T.mealByTime(new Date().getHours()) : 'lunch'), q: '', tab: 'recent', off: null };
+    openSheet(addSheet, { tall: true });
+  }
+  function foodRow(f) {
+    const v = f.per100;
+    return `<button class="row tb" data-act="tb-food" data-id="${esc(f.id)}"><span class="mid"><span class="t">${esc(f.name)}</span><span class="s">${esc([f.brand, SRC[f.src]].filter(Boolean).join(' · '))}</span></span><span class="right"><b>${fv(v.kcal, 'kcal')} kcal</b><span>${fv(v.p)} g P · 100 g</span></span></button>`;
+  }
+  function addResults() {
+    const q = TB.q.trim();
+    let list;
+    if (q) list = T.search(db, q, 30);
+    else if (TB.tab === 'fav') list = T.favorites(db);
+    else if (TB.tab === 'own') list = KW.live(db, 'foods').filter(f => !f.hidden && f.src === 'own');
+    else list = T.recent(db, 25);
+    let h = list.length ? '<div class="list">' + list.map(foodRow).join('') + '</div>'
+      : `<div class="card empty">${q ? 'Nichts in der Grundliste gefunden.' : TB.tab === 'fav' ? 'Noch keine Favoriten. Beim Eintragen den Stern antippen.' : TB.tab === 'own' ? 'Noch keine eigenen Lebensmittel.' : 'Noch nichts gegessen. Oben suchen.'}</div>`;
+    if (q.length >= 2) {
+      const o = TB.off && TB.off.q === q ? TB.off : null;
+      h += `<div class="group-title" style="margin:6px 4px 4px">Open Food Facts</div>`;
+      if (!o) h += `<button class="btn tint" data-act="tb-off">🔎 ${T.isBarcode(q) ? 'Barcode' : '„' + esc(q) + '“'} in Open Food Facts suchen</button>`;
+      else if (o.loading) h += '<div class="card empty">Suche läuft …</div>';
+      else if (o.err) h += `<div class="errbox">${esc(o.err)}</div>`;
+      else if (!o.res.length) h += '<div class="card empty">Nichts gefunden. Anderes Wort probieren oder selbst anlegen.</div>';
+      else h += '<div class="list">' + o.res.map(foodRow).join('') + '</div>';
+    }
+    return h;
+  }
+  function addSheet() {
+    return `<div class="sheet-head"><button class="l" data-act="close">Abbrechen</button><h2>Eintragen</h2><button class="r" data-act="tb-scan">Scannen</button></div>
+      <div class="seg">${T.MEALS.map(m => `<button data-act="tb-meal" data-v="${m.id}" aria-pressed="${TB.meal === m.id}">${esc(m.label === 'Abendessen' ? 'Abend' : m.label)}</button>`).join('')}</div>
+      <label class="search">${IC.search}<input type="search" id="tbq" placeholder="Lebensmittel oder Barcode" value="${esc(TB.q)}" autocomplete="off" enterkeyhint="search"></label>
+      ${TB.q ? '' : `<div class="chips">${[['recent', 'Zuletzt'], ['fav', '★ Favoriten'], ['own', 'Eigene']].map(([v, l]) => `<button class="chip" data-act="tb-tab" data-v="${v}" aria-pressed="${TB.tab === v}">${l}</button>`).join('')}</div>`}
+      <div id="tbres">${addResults()}</div>
+      <button class="btn plain" data-act="tb-own">Eigenes Lebensmittel anlegen</button>`;
+  }
+  async function runOff() {
+    const q = TB.q.trim();
+    TB.off = { q, loading: true };
+    const el = $('#tbres'); if (el) el.innerHTML = addResults();
+    try {
+      const res = T.isBarcode(q) ? [await T.offBarcode(q)].filter(Boolean) : await T.offSearch(q);
+      TB.off = { q, res };
+      offCache = Object.assign(offCache || {}, Object.fromEntries(res.map(f => [f.id, f])));
+    } catch (e) { TB.off = { q, err: navigator.onLine === false ? 'Keine Internetverbindung. Open Food Facts braucht Internet.' : 'Open Food Facts antwortet gerade nicht. Gleich noch einmal versuchen.' }; }
+    if (SH && SH.fn === addSheet) { const r = $('#tbres'); if (r) r.innerHTML = addResults(); }
+  }
+  let offCache = {};
+  const getFood = id => T.findFood(db, id) || offCache[id] || null;
+
+  // Menge wählen
+  let AM = null;
+  function openAmount(food, opt = {}) {
+    const p = food.portions && food.portions[0];
+    AM = Object.assign({ food, meal: TB ? TB.meal : 'snack', date: S.day || today(), unit: p ? 0 : -1, qty: p ? 1 : 100, edit: null }, opt);
+    if (SH) { SH.fn = amountSheet; SH.tall = true; $('#sheet .sheet').classList.add('tall'); refreshSheet(); } else openSheet(amountSheet, { tall: true });
+  }
+  const amGrams = () => AM.unit < 0 ? AM.qty : AM.qty * AM.food.portions[AM.unit].g;
+  function amTable() {
+    const g = amGrams(), v = T.nutr(AM.food.per100, g);
+    return `<div class="list">${T.FIELDS.map(k => `<div class="row nt${k === 'sug' || k === 'sat' ? ' sub' : ''}"><span class="mid"><span class="t">${esc(T.LABELS[k])}</span></span><span class="right"><b>${fv(v[k], k)} ${k === 'kcal' ? 'kcal' : 'g'}</b><span class="muted" style="font-weight:500;color:var(--label-2)">${fv(AM.food.per100[k], k)} / 100 g</span></span></div>`).join('')}</div>`;
+  }
+  function amountSheet() {
+    const f = AM.food, fav = f.src !== 'recipe' && T.isFav(db, f);
+    return `<div class="sheet-head"><button class="l" data-act="${AM.edit ? 'close' : 'tb-back'}">${AM.edit ? 'Abbrechen' : 'Zurück'}</button><h2>${esc(f.name)}</h2><button class="r" data-act="tb-save">${AM.edit ? 'Sichern' : 'Eintragen'}</button></div>
+      <div class="inline"><span class="hint">${esc([f.brand, SRC[f.src]].filter(Boolean).join(' · '))}</span>${f.src !== 'recipe' ? `<button class="link" data-act="tb-fav">${fav ? '★ Favorit' : '☆ Favorit'}</button>` : ''}</div>
+      <div class="grid2"><div class="field"><label for="am-qty">Menge</label><input id="am-qty" inputmode="decimal" value="${esc(fNum(AM.qty))}"></div>
+        <div class="field"><label for="am-unit">Einheit</label><select id="am-unit"><option value="-1"${AM.unit < 0 ? ' selected' : ''}>g</option>${(f.portions || []).map((p, k) => `<option value="${k}"${AM.unit === k ? ' selected' : ''}>${esc(p.label)} (${f0(p.g)} g)</option>`).join('')}</select></div></div>
+      <div class="seg">${T.MEALS.map(m => `<button data-act="am-meal" data-v="${m.id}" aria-pressed="${AM.meal === m.id}">${esc(m.label === 'Abendessen' ? 'Abend' : m.label)}</button>`).join('')}</div>
+      <div id="amtab">${amTable()}</div>
+      ${AM.edit ? '<button class="btn danger" data-act="tb-del">Eintrag löschen</button>' : ''}`;
+  }
+  // Geplante Mahlzeit anpassen
+  let PI = null;
+  function planItemSheet() {
+    const it = T.plannedItems(db, PI.date).find(x => x.planId === PI.planId);
+    if (!it) return '<div class="sheet-head"><span></span><h2></h2><button class="r" data-act="close">Fertig</button></div>';
+    const opt = [[1, 'Ganze Portion'], [0.5, 'Halbe'], [1.5, 'Anderthalb'], [0, 'Nicht gegessen']];
+    return `<div class="sheet-head"><span></span><h2>${esc(it.name)}</h2><button class="r" data-act="close">Fertig</button></div>
+      <p class="hint" style="margin:0">Aus dem Plan (${esc(P.mealById(it.planMeal).label)}). Geplantes zählt automatisch als gegessen – hier anpassen, wenn es anders war.</p>
+      <div class="grid2">${opt.map(([v, l]) => `<button class="opt" style="justify-content:center" data-act="pi-f" data-v="${v}" aria-pressed="${it.factor === v}">${l}</button>`).join('')}</div>
+      <div class="field"><label for="pi-f">Andere Menge (Portionen)</label><input id="pi-f" inputmode="decimal" value="${esc(fNum(it.factor))}"></div>
+      <button class="btn plain" data-act="view" data-id="${it.foodId.slice(2)}">Rezept ansehen</button>`;
+  }
+
+  // Eigenes Lebensmittel
+  let OF = null;
+  function ownSheet() {
+    return `<div class="sheet-head"><button class="l" data-act="tb-back">Zurück</button><h2>Eigenes Lebensmittel</h2><button class="r" data-act="of-save">Sichern</button></div>
+      <div class="field"><label for="of-name">Name</label><input id="of-name" value="${esc(OF.name)}" placeholder="z. B. Omas Kartoffelsalat"></div>
+      <div class="grid2"><div class="field"><label for="of-brand">Marke (optional)</label><input id="of-brand" value="${esc(OF.brand)}"></div>
+        <div class="field"><label for="of-code">Barcode (optional)</label><input id="of-code" inputmode="numeric" value="${esc(OF.code)}"></div></div>
+      <span class="lbl">Nährwerte pro 100 g (von der Packung)</span>
+      <div class="grid2">${T.FIELDS.map(k => `<div class="field"><label for="of-${k}">${esc(T.LABELS[k])}${k === 'kcal' ? '' : ' (g)'}</label><input id="of-${k}" inputmode="decimal" value="${esc(fNum(OF.per100[k]))}"></div>`).join('')}</div>
+      <div class="grid2"><div class="field"><label for="of-pl">Portion (optional)</label><input id="of-pl" value="${esc(OF.pl)}" placeholder="z. B. 1 Stück"></div>
+        <div class="field"><label for="of-pg">Gramm pro Portion</label><input id="of-pg" inputmode="decimal" value="${esc(fNum(OF.pg))}"></div></div>`;
+  }
+
+  // ---------- Barcode scannen (Kamera, es werden keine Bilder gespeichert) ----------
+  let SC2 = null, zxReader = null;
+  function loadZxing() {
+    if (window.ZXing) return Promise.resolve();
+    return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = 'vendor/zxing.min.js'; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+  }
+  function stopScan() { try { if (zxReader) zxReader.reset(); } catch (e) { /* egal */ } zxReader = null; }
+  function scanSheet() {
+    return `<div class="sheet-head"><button class="l" data-act="scan-close">Abbrechen</button><h2>Barcode scannen</h2><span></span></div>
+      <div class="scanbox"><video id="scanvid" playsinline muted autoplay></video><i class="scanline"></i></div>
+      <p class="hint" id="scanmsg" style="text-align:center">${esc(SC2.msg || 'Strichcode der Packung in den Rahmen halten.')}</p>
+      ${SC2.notFound ? `<div class="warnbox">Barcode ${esc(SC2.notFound)} ist nicht in Open Food Facts. Werte von der Packung selbst eintragen?</div><button class="btn" data-act="scan-own">Selbst anlegen</button>` : ''}
+      <div class="addbar" style="grid-template-columns:minmax(0,1fr) 44px"><input id="scancode" inputmode="numeric" placeholder="oder Nummer eintippen"><button class="circle" data-act="scan-go" aria-label="Nachschlagen">›</button></div>
+      <p class="hint">Die Kamera liest nur den Strichcode. Es werden keine Bilder gespeichert.</p>`;
+  }
+  async function openScan() {
+    stopScan();
+    SC2 = { msg: null, notFound: null, busy: false };
+    if (SH) { SH.fn = scanSheet; SH.tall = true; SH.modal = true; $('#sheet .sheet').classList.add('tall'); refreshSheet(); } else openSheet(scanSheet, { tall: true, modal: true });
+    try {
+      await loadZxing();
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E]);
+      zxReader = new ZXing.BrowserMultiFormatReader(hints);
+      await zxReader.decodeFromVideoDevice(undefined, 'scanvid', res => { if (res && SC2 && !SC2.busy) { SC2.busy = true; stopScan(); lookupCode(res.getText()); } });
+    } catch (e) {
+      SC2.msg = 'Kamera nicht verfügbar. Kochwerk braucht die Erlaubnis für die Kamera – oder die Nummer unten eintippen.';
+      const m = $('#scanmsg'); if (m) m.textContent = SC2.msg;
+    }
+  }
+  async function lookupCode(code) {
+    code = String(code || '').replace(/\D/g, '');
+    if (!T.isBarcode(code)) { toast('Bitte 8 bis 14 Ziffern'); if (SC2) SC2.busy = false; return; }
+    const own = KW.live(db, 'foods').find(f => f.code === code && !f.hidden);
+    if (own) { stopScan(); openAmount(own); return; }
+    const m = $('#scanmsg'); if (m) m.textContent = 'Schlage ' + code + ' nach …';
+    try {
+      const f = await T.offBarcode(code);
+      if (f) { offCache[f.id] = f; stopScan(); openAmount(f); return; }
+      SC2.notFound = code; SC2.msg = null; refreshSheet(true);
+    } catch (e) {
+      SC2.msg = 'Keine Verbindung zu Open Food Facts. Internet prüfen.'; SC2.busy = false; refreshSheet(true);
+    }
+  }
+
   // ---------- Rezeptbuch ----------
   function pageRezepte() {
     if (S.recipeId && getRecipe(S.recipeId)) return pageRecipe(getRecipe(S.recipeId));
@@ -903,7 +1111,7 @@
     el.innerHTML = '<div class="grab"></div>' + SH.fn();
     if (keep) el.scrollTop = y;
   }
-  function closeSheet() { SH = null; const w = $('#sheet'); w.hidden = true; w.innerHTML = ''; document.body.style.overflow = ''; }
+  function closeSheet() { stopScan(); SH = null; const w = $('#sheet'); w.hidden = true; w.innerHTML = ''; document.body.style.overflow = ''; }
   $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet' && SH && !SH.modal) closeSheet(); });
   function confirmSheet(title, text, okLabel, onOk) {
     openSheet(() => `<div class="sheet-head"><span></span><h2>${esc(title)}</h2><span></span></div>
@@ -1277,7 +1485,64 @@ Schritte:
 
   // ---------- Ereignisse ----------
   const ACT = {
-    tab: b => { const t = b.dataset.tab; if (t === S.tab && t === 'rezepte') S.recipeId = null; S.tab = t; render(); },
+    tab: b => { let t = b.dataset.tab; if (t === 'einkauf') { t = 'woche'; S.weekView = 'shop'; } if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'tagebuch' && S.tab !== 'tagebuch') S.day = null; S.tab = t; render(); },
+    'week-view': b => { S.weekView = b.dataset.v; render(); },
+    // Tagebuch
+    'tb-add': b => openAdd(b.dataset.meal || ''),
+    'tb-quick': () => { S.day = null; openAdd(''); },
+    'tb-day': b => { S.day = P.addDays(S.day || today(), +b.dataset.d); render(); },
+    'tb-today': () => { S.day = null; render(); },
+    'tb-goto': b => { S.day = b.dataset.d; render(true); },
+    'tb-all': () => openSheet(allNutrSheet),
+    'tb-meal': b => { TB.meal = b.dataset.v; refreshSheet(true); },
+    'tb-tab': b => { TB.tab = b.dataset.v; refreshSheet(true); },
+    'tb-off': () => runOff(),
+    'tb-food': b => { const f = getFood(b.dataset.id); if (f) openAmount(f, { meal: TB.meal, date: TB.date }); },
+    'tb-back': () => { stopScan(); if (!TB || AM && AM.edit) { closeSheet(); return; } SH.fn = addSheet; SH.modal = false; refreshSheet(); },
+    'tb-fav': () => {
+      let f = AM.food;
+      if (f.src === 'off' && !(db.foods[f.id] && !db.foods[f.id].del)) f = T.saveFood(db, f);
+      T.toggleFav(db, T.findFood(db, f.id) || f); AM.food = T.findFood(db, f.id) || f; save(); refreshSheet(true);
+    },
+    'am-meal': b => { AM.meal = b.dataset.v; refreshSheet(true); },
+    'tb-save': () => {
+      const qty = KW.num($('#am-qty').value);
+      if (!(qty > 0)) { toast('Bitte eine Menge eingeben'); return; }
+      AM.qty = qty; AM.unit = +$('#am-unit').value;
+      let f = AM.food;
+      if (f.src === 'off' && !(db.foods[f.id] && !db.foods[f.id].del)) f = T.saveFood(db, f); // für „Zuletzt“ und offline
+      const pp = AM.unit >= 0 ? f.portions[AM.unit] : null;
+      const pl = pp ? (AM.qty === 1 ? pp.label : fNum(AM.qty) + ' × ' + pp.label.replace(/^1\s+/, '')) : null;
+      if (AM.edit) { const e = db.log[AM.edit]; KW.put(db, 'log', Object.assign({}, e, { grams: Math.round(amGrams() * 10) / 10, portion: pl, meal: AM.meal })); }
+      else T.addLog(db, AM.date, AM.meal, f, amGrams(), pl);
+      const ed = AM.edit; save(); closeSheet(); render(true); toast(ed ? 'Gesichert' : 'Eingetragen');
+    },
+    'tb-del': () => { KW.remove(db, 'log', AM.edit); save(); closeSheet(); render(true); toast('Gelöscht'); },
+    'tb-item': b => {
+      const id = b.dataset.id;
+      if (id.startsWith('lp')) { PI = { planId: id.slice(2), date: S.day || today() }; openSheet(planItemSheet); return; }
+      const e = db.log[id]; if (!e || e.del) return;
+      const base = T.findFood(db, e.foodId) || { id: e.foodId, name: e.name, brand: e.brand, src: e.src, portions: [] };
+      TB = null;
+      openAmount(Object.assign({}, base, { per100: e.per100 }), { edit: id, meal: e.meal, date: e.date, unit: -1, qty: e.grams });
+    },
+    'pi-f': b => { T.setPlanFactor(db, PI.planId, PI.date, +b.dataset.v); save(); refreshSheet(true); render(true); },
+    'tb-own': () => { OF = { name: TB.q && !T.isBarcode(TB.q) ? TB.q.trim() : '', brand: '', code: T.isBarcode(TB.q) ? TB.q.trim() : '', per100: {}, pl: '', pg: null }; SH.fn = ownSheet; refreshSheet(); },
+    'of-save': () => {
+      const name = $('#of-name').value.trim(), kcal = KW.num($('#of-kcal').value);
+      if (!name) { toast('Bitte einen Namen eingeben'); return; }
+      if (!(kcal >= 0)) { toast('Bitte kcal pro 100 g eingeben'); return; }
+      const per100 = {}; for (const k of T.FIELDS) { const v = KW.num($('#of-' + k).value); per100[k] = isFinite(v) ? v : (k === 'kcal' ? 0 : null); }
+      const pl = $('#of-pl').value.trim(), pg = KW.num($('#of-pg').value);
+      const code = $('#of-code').value.replace(/\D/g, '');
+      const f = T.saveFood(db, { name, brand: $('#of-brand').value.trim(), code: code || null, per100, portions: pl && pg > 0 ? [{ label: /^\d/.test(pl) ? pl : '1 ' + pl, g: pg }] : [], src: 'own' });
+      save(); if (!TB) TB = { date: S.day || today(), meal: T.mealByTime(new Date().getHours()), q: '', tab: 'recent', off: null };
+      SH.modal = false; openAmount(f, { meal: TB.meal, date: TB.date });
+    },
+    'tb-scan': () => { if (!TB || !SH) TB = { date: S.day || today(), meal: T.mealByTime(new Date().getHours()), q: '', tab: 'recent', off: null }; openScan(); },
+    'scan-close': () => { stopScan(); closeSheet(); },
+    'scan-go': () => { if (SC2) SC2.busy = true; stopScan(); lookupCode($('#scancode').value); },
+    'scan-own': () => { stopScan(); OF = { name: '', brand: '', code: SC2.notFound, per100: {}, pl: '', pg: null }; SH.fn = ownSheet; refreshSheet(); },
     open: b => { S.recipeId = b.dataset.id; render(); },
     back: () => { S.recipeId = null; render(); },
     filter: b => { S.filter = b.dataset.f; render(true); },
@@ -1476,6 +1741,8 @@ Schritte:
   });
   document.addEventListener('input', e => {
     const el = e.target;
+    if (el.id === 'tbq' && TB) { TB.q = el.value; const r = $('#tbres'); if (r) r.innerHTML = addResults(); return; }
+    if (el.id === 'am-qty' && AM) { const q = KW.num(el.value); if (q > 0) { AM.qty = q; const t = $('#amtab'); if (t) t.innerHTML = amTable(); } return; }
     if (el.id === 'pq' && PK) { PK.q = el.value; const meal = PK.entryId ? db.plan[PK.entryId].meal : 'snack'; $('#pklist').innerHTML = pickList(PK.all ? KW.CATS.map(c => c.id) : P.catsFor(meal), meal); return; }
     if (el.id === 'ps' && PL) { PL.q = el.value; const q = KW.norm(PL.q); $('#pslist').innerHTML = packRows(SH3.packList(db).filter(p => !q || (p.names || [p.name]).some(n => KW.norm(n).includes(q)))); return; }
     if (el.id === 'q') { S.q = el.value; const l = $('#rlist'); if (l) l.innerHTML = recipeList(); return; }
@@ -1490,6 +1757,12 @@ Schritte:
       el.files[0].text().then(t => { const b = Y.parseBackup(t); if (b.error) { toast(b.error); return; } BK = b; openSheet(backupSheet); });
       return;
     }
+    if (el.id === 'am-unit' && AM) {
+      const g = amGrams(), u = +el.value;
+      AM.unit = u; AM.qty = u < 0 ? Math.round(g) : Math.max(0.5, Math.round(g / AM.food.portions[u].g * 2) / 2);
+      refreshSheet(true); return;
+    }
+    if (el.id === 'pi-f' && PI) { const f = KW.num(el.value); if (f >= 0) { T.setPlanFactor(db, PI.planId, PI.date, f); save(); refreshSheet(true); render(true); } return; }
     if (el.dataset.partner) { P.update(db, el.dataset.partner, { partner: el.checked }); save(); render(true); return; }
     if (el.id === 'pk-gap' && PK) { PK.gap = +el.value; return; }
     if (el.dataset.f && ED && el.closest('#sheet') && (el.tagName === 'SELECT' || el.type === 'checkbox')) onEditorInput(el, true);
@@ -1497,6 +1770,8 @@ Schritte:
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && SH && !SH.modal) closeSheet();
     if (e.key === 'Enter' && e.target.id === 'ex-name') { e.preventDefault(); ACT['extra-add'](); }
+    if (e.key === 'Enter' && e.target.id === 'tbq' && TB && TB.q.trim().length >= 2) { e.preventDefault(); e.target.blur(); runOff(); }
+    if (e.key === 'Enter' && e.target.id === 'scancode') { e.preventDefault(); ACT['scan-go'](); }
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.set) e.target.blur();
   });
 

@@ -73,7 +73,8 @@
   }
   function room(db, date) {
     const prof = KW.profile(db), tg = KW.calcTargets(prof);
-    const t = dayTotals(db, date);
+    // Mit Tagebuch: Geplantes (anpassbar) plus Eingetragenes, sonst nur Geplantes
+    const t = KW.T ? KW.T.dayTotals(db, date) : dayTotals(db, date);
     const target = tg ? tg.target : 0, rest = target - t.kcal;
     const meals = Math.floor(Math.max(0, rest) / prof.mealKcal * 2) / 2;
     return { target, used: t.kcal, rest, meals, pOpen: Math.max(0, prof.protein - t.p), protein: prof.protein, pUsed: t.p, totals: t, mealKcal: prof.mealKcal, text: roomText(rest, meals) };

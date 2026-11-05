@@ -341,3 +341,27 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 /* Etappe 5: Abgleich */
 .howto{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px}
 .ecard .hint{font-size:14px}
+
+/* Tagebuch */
+.room-big small{font-variant-numeric:tabular-nums}
+.row.tb{grid-template-columns:minmax(0,1fr) auto}
+.row.tb + .row::before,.list .row.tb::before{left:16px}
+.row.tb.off .t{color:var(--label-3);text-decoration:line-through}
+.list .addrow .t{color:var(--accent);font-weight:600}
+.list .addrow{grid-template-columns:minmax(0,1fr) auto;min-height:44px}
+.row.nt{grid-template-columns:minmax(0,1fr) auto;padding:9px 16px}
+.row.nt.sub .t{padding-left:14px;font-weight:400;color:var(--label-2)}
+.row.nt .t{font-weight:500}
+.wbars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:8px 0 4px}
+.wb{display:flex;flex-direction:column;align-items:center;gap:4px}
+.wb .bar-o{position:relative;width:100%;height:80px;background:var(--fill-2);border-radius:8px;overflow:hidden;display:flex;align-items:flex-end}
+.wb .bar-o i{display:block;width:100%;background:var(--accent);border-radius:8px 8px 0 0}
+.wb .bar-o i.over{background:var(--orange)}
+.wb .bar-o em{position:absolute;left:0;right:0;border-top:1.5px dashed var(--label-3)}
+.wb small{font-size:12px;color:var(--label-2);font-weight:600}
+.wb.on small{color:var(--accent)}
+.scanbox{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:4/3}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanline{position:absolute;left:12%;right:12%;top:50%;height:2px;background:#FF453A;box-shadow:0 0 12px #FF453A}
+.tabbar button{font-size:10px}
+.list .row.tb::before,.list .row.nt::before,.list .addrow::before{left:16px!important}
