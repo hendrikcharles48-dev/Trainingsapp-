@@ -107,7 +107,7 @@
         ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
         : `<div class="card thaw today"><span class="em">⏱️</span><div class="mid"><b>Noch im Gefrierfach?</b><span>„${esc(t.name)}“ ist für heute geplant. Sonst in der Mikrowelle auftauen.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Ist raus</button></div>`;
     }
-    if (PAKET) h += `<button class="card cookcard" data-act="paket"><span class="em">📦</span><span class="mid"><b>${PAKET.list.length} neue Rezepte aus dem Chat</b><span>Antippen, ansehen und übernehmen</span></span><span class="add">›</span></button>`;
+    if (PAKET) h += `<button class="card cookcard" data-act="paket"><span class="em">📦</span><span class="mid"><b>${PAKET.list.length} ${PAKET.list.length === 1 ? 'Rezept' : 'Rezepte'} aus dem Chat</b><span>Antippen, ansehen und übernehmen</span></span><span class="add">›</span></button>`;
     const ckOld = ckLoad();
     if (ckOld && ckOld.phase === 'run') h += `<button class="card cookcard" data-act="cook" data-week="${ckOld.week}"><span class="em">🍳</span><span class="mid"><b>Kochsession fortsetzen</b><span>KW ${P.isoWeek(ckOld.week)}</span></span><span class="add">›</span></button>`;
     else for (const wk of [P.weekStart(d), P.addDays(P.weekStart(d), 7)]) {
@@ -1075,7 +1075,14 @@
       const r = await fetch('rezepte-paket.txt', { cache: 'no-cache' });
       if (!r.ok) return;
       const done = new Set(KW.getSetting(db, 'paketDone') || []);
-      const list = KW.parseRecipes(await r.text()).filter(x => !x.errors.length && !done.has(x.recipe.name) && !KW.findByName(db, x.recipe.name));
+      // Neu, oder schon da, aber früher ohne erkannte Packungen importiert → zum Ersetzen anbieten
+      const broken = old => old.ingredients.some(i => !i.pack && !i.pantry);
+      const list = KW.parseRecipes(await r.text()).filter(x => {
+        if (x.errors.length) return false;
+        const old = KW.findByName(db, x.recipe.name);
+        if (!old) return !done.has(x.recipe.name);
+        return broken(old) && x.recipe.ingredients.every(i => i.pack || i.pantry) && !done.has('fix:' + x.recipe.name);
+      });
       const had = !!PAKET;
       PAKET = list.length ? { list } : null;
       if ((had || PAKET) && S.tab === 'heute' && !SH && !WZ && !CK) render(true);
@@ -1083,7 +1090,7 @@
   }
   function paketDone(names) {
     const all = new Set(KW.getSetting(db, 'paketDone') || []);
-    for (const n of names) all.add(n);
+    for (const n of names) { all.add(n); all.add('fix:' + n); }
     KW.setSetting(db, 'paketDone', [...all]);
     PAKET = null;
   }

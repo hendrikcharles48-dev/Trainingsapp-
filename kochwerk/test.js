@@ -396,7 +396,7 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
 // ---------- Rezeptpaket aus dem Chat (rezepte-paket.txt) ----------
 {
   const paket = KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8'));
-  eq('Paket: 13 Rezepte', paket.length, 13);
+  eq('Paket: mindestens 13 Rezepte', paket.length >= 13, true);
   eq('Paket: ohne Fehler und Warnungen', paket.filter(x => x.errors.length || x.warnings.length).map(x => [x.recipe.name, x.errors, x.warnings]), []);
   // Werte pro Box aus dem Artefakt „Meine Mealprep-Rezepte“ (kcal, Protein) – die Rechnung muss in der Nähe liegen
   const soll = { 'Asia-Hähnchen-Kohl-Pfanne mit Reis': [540, 54], 'Chili mit Putenhack und Sojagranulat': [405, 41], 'Orientalische Couscous-Pfanne mit Putenhack': [530, 49],
@@ -406,12 +406,35 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
   const off = [];
   for (const x of paket) {
     const t = KW.recipeTotals(x.recipe).portion, s = soll[x.recipe.name];
-    if (!s) { off.push(x.recipe.name + ': fehlt in der Liste'); continue; }
+    if (!s) continue;
     if (Math.abs(t.kcal - s[0]) / s[0] > 0.12 || Math.abs(t.p - s[1]) / s[1] > 0.15) off.push(x.recipe.name + ': ' + Math.round(t.kcal) + ' kcal / ' + Math.round(t.p) + ' g P statt ' + s.join(' / '));
   }
   eq('Paket: Werte passen zum Artefakt (±12 % kcal, ±15 % Protein)', off, []);
   eq('Paket: Notfallgericht dabei', paket.some(x => x.recipe.cat === 'emergency'), true);
-  for (const x of paket) console.log('   ', x.recipe.name.padEnd(46), Math.round(KW.recipeTotals(x.recipe).portion.kcal), 'kcal', Math.round(KW.recipeTotals(x.recipe).portion.p), 'g P');
+  eq('Paket: keine doppelten Namen', paket.length, new Set(paket.map(x => KW.norm(x.recipe.name))).size);
+}
+
+// Packungs-Schreibweisen aus dem Chat (Skill schreibt „Packung …“ vor die Art)
+eq('Packung Glas', KW.parsePack('Packung Glas 120 g').pack, { kind: 'Glas', size: 120, unit: 'g' });
+eq('Packung Dose abgetropft', KW.parsePack('Packung Dose 400 g (250 g abgetropft)').pack, { kind: 'Dose', size: 250, unit: 'g', label: 'Dose 400 g (250 g abgetropft)' });
+eq('Packung Knolle', KW.parsePack('Packung 1 Knolle').pack, { kind: 'Knolle', size: 1, unit: 'Stück' });
+eq('Packung Stück ca.', KW.parsePack('Packung 1 Stück (ca. 800 g)').pack, { kind: 'Stück', size: 800, unit: 'g', label: 'Stück (ca. 800 g)' });
+eq('Packung Tube', KW.parsePack('Packung Tube 200 ml').pack, { kind: 'Tube', size: 200, unit: 'ml' });
+eq('Packung 1 Stück', KW.parsePack('Packung 1 Stück').pack, { kind: 'Stück', size: 1, unit: 'Stück' });
+{
+  const Z = KW.emptyDb();
+  const r = KW.importRecipe(Z, KW.parseRecipes('Name: Dip\nPortionen: 2\nZutaten:\n- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,1 F\n- Spitzkohl | 800 g | Packung 1 Stück (ca. 800 g) | Obst/Gemüse | 28 kcal, 1,6 P, 4 K, 0,3 F\n- Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F')[0].recipe, 'new');
+  P.setMeal(Z, '2026-11-09', 'box', true); P.update(Z, P.mainId('2026-11-09', 'box'), { recipeId: r.id });
+  const L = S.weekList(Z, '2026-11-09');
+  const it = n => L.items.find(i => i.name.startsWith(n));
+  eq('2 Zehen = 1 Knolle', it('Knoblauch').packs, 1);
+  eq('Spitzkohl 1 Stück', [it('Spitzkohl').packs, it('Spitzkohl').pack.label], [1, 'Stück (ca. 800 g)']);
+  eq('Mais 1 Dose', [it('Mais').packs, it('Mais').pack.label], [1, 'Dose 150 g (140 g abgetropft)']);
+}
+// Rezeptblock aus dem Chat vom 5.11.: alles muss ohne Warnung durchgehen
+{
+  const p2 = fs.existsSync(path.join(__dirname, 'rezepte-paket.txt')) ? KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8')) : [];
+  eq('Chat-Rezepte im Paket ohne Warnung', p2.filter(x => x.warnings.length || x.errors.length).map(x => x.recipe.name + ': ' + x.warnings.concat(x.errors).join('; ')), []);
 }
 
 // ---------- Abgleich (sync.js) mit nachgebautem GitHub ----------

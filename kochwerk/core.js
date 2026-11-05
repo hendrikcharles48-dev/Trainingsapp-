@@ -113,22 +113,44 @@
       const p = /\d/.test(rest) ? parsePack(rest) : { pack: null };
       return { pack: p.pack || null, pantry: true };
     }
+    // Klammer merken: „(250 g abgetropft)“ oder „(ca. 800 g)“
+    let paren = null;
+    s = s.replace(/\(([^)]*)\)/g, (all, x) => { paren = x.trim(); return ' '; }).replace(/\s+/g, ' ').trim();
     s = s.replace(/^\d+\s*[x×]\s*/i, '');
-    const m = new RegExp('^([A-Za-zÄÖÜäöüß-]+)?\\s*' + NUM + '?\\s*(g|kg|ml|l|stück|stk|st)?\\.?$', 'i').exec(s);
-    if (!m || (!m[1] && !m[2])) return { pack: null, pantry: false, warn: 'Packung nicht erkannt: „' + str + '“' };
-    const kind = m[1] ? m[1][0].toUpperCase() + m[1].slice(1) : 'Packung';
-    let size = m[2] ? num(m[2]) : 1, unit;
-    const u = norm(m[3] || '');
+    // „Packung“ als Füllwort: „Packung Glas 120 g“, „Packung Dose 400 g“, „Packung 1 Knolle“, „Packung Tube 200 ml“
+    if (/^packung\s+\S/i.test(s) && !new RegExp('^packung\\s+' + NUM + '\\s*(g|kg|ml|l|stück|stk|st)?\\.?$', 'i').test(s)) s = s.replace(/^packung\s+/i, '');
+    let kind = null, size = null, u = '';
+    let m = new RegExp('^([A-Za-zÄÖÜäöüß-]+)?\\s*' + NUM + '?\\s*(g|kg|ml|l|stück|stk|st)?\\.?$', 'i').exec(s);
+    if (m && (m[1] || m[2])) { kind = m[1] || null; size = m[2] ? num(m[2]) : 1; u = norm(m[3] || ''); }
+    else if ((m = new RegExp('^' + NUM + '\\s+([A-Za-zÄÖÜäöüß-]+)$', 'i').exec(s))) { kind = m[2]; size = num(m[1]); u = 'stuck'; } // „1 Knolle“, „1 Bund“
+    else return { pack: null, pantry: false, warn: 'Packung nicht erkannt: „' + str + '“' };
+    let unit;
     if (u === 'g') unit = 'g';
     else if (u === 'kg') { unit = 'g'; size *= 1000; }
     else if (u === 'ml') unit = 'ml';
     else if (u === 'l') { unit = 'ml'; size *= 1000; }
     else unit = 'Stück';
     if (!isFinite(size) || size <= 0) return { pack: null, pantry: false, warn: 'Packungsgröße nicht erkannt: „' + str + '“' };
-    return { pack: { kind, size: round(size, 2), unit }, pantry: false };
+    if (!kind) kind = unit === 'Stück' && size === 1 ? 'Stück' : 'Packung';
+    kind = kind[0].toUpperCase() + kind.slice(1);
+    if (kind === 'Packung' && unit === 'Stück' && size === 1) kind = 'Stück';
+    const pack = { kind, size: round(size, 2), unit };
+    if (paren) {
+      const pm = new RegExp(NUM + '\\s*(g|kg|ml|l)\\b', 'i').exec(paren);
+      const pg = pm ? num(pm[1]) * (/^(kg|l)$/i.test(pm[2]) ? 1000 : 1) : null;
+      if (pg && /abgetropft|abtropf/i.test(paren)) {
+        // Gerechnet wird mit dem Abtropfgewicht, angezeigt wird die ganze Dose
+        pack.label = packText(pack) + ' (' + paren + ')'; pack.size = round(pg, 2); pack.unit = 'g';
+      } else if (pg && unit === 'Stück' && size === 1) {
+        // „1 Stück (ca. 800 g)“: ein Stück mit ungefährem Gewicht
+        pack.label = kind + ' (' + paren + ')'; pack.size = round(pg, 2); pack.unit = /ml|l/i.test(pm[2]) ? 'ml' : 'g';
+      } else pack.label = packText(pack) + ' (' + paren + ')';
+    }
+    return { pack, pantry: false };
   }
   function packText(p) {
     if (!p) return '';
+    if (p.label) return p.label;
     if (p.unit === 'Stück') return p.size === 1 ? p.kind : p.kind + ' ' + fmtNum(p.size) + ' Stück';
     if (p.unit === 'g' && p.size >= 1000) return p.kind + ' ' + fmtNum(p.size / 1000) + ' kg';
     if (p.unit === 'ml' && p.size >= 1000) return p.kind + ' ' + fmtNum(p.size / 1000) + ' l';

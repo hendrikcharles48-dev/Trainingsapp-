@@ -73,6 +73,9 @@ Fünf Spalten, getrennt mit `|`.
 Discountern bekommt:
 - `Packung 500 g`, `Dose 400 g`, `Becher 500 g`, `Netz 1 kg`, `Flasche 500 ml`
 - `Packung 10 Stück` (Eier), `Beutel 3 Stück` (Paprika), `Bund`, `Stück`
+- Auch erkannt: `Packung Glas 120 g`, `Packung Tube 200 ml`, `Packung 1 Knolle` (das Wort „Packung“ davor stört nicht),
+  `Packung Dose 400 g (250 g abgetropft)` – gerechnet wird mit dem Abtropfgewicht – und `Packung 1 Stück (ca. 800 g)`
+  für Kohl, Lauch oder Bund mit ungefährem Gewicht. Knoblauch in Zehen: eine Knolle reicht für etwa 10 Zehen.
 - `Vorrat` oder `Packung Vorrat` für Sachen, die man ohnehin im Haus hat (Öl, Brühe, Gewürze).
   Sie kommen nicht auf die Wocheneinkaufsliste.
 - Ganze Packungen: Die Mengen so wählen, dass jede gekaufte Packung aufgebraucht wird. Geht eine

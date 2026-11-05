@@ -228,6 +228,11 @@
       const pk = packFor(db, n.ing);
       const unit = pk ? pk.unit : (n.cnt && !n.g ? 'Stück' : 'g');
       let amt = amountIn(n, unit);
+      // Zähleinheit passt nicht zur Packung (z. B. 2 Zehen, Packung Knolle): eine Knolle hat etwa 10 Zehen,
+      // Löffel und Prisen aus einer Stück-Packung brauchen höchstens eine Packung
+      if (pk && unit === 'Stück' && n.cntUnit && n.cntUnit !== 'Stück' && KW.norm(n.cntUnit) !== KW.norm(pk.kind) && !n.g) {
+        amt = n.cntUnit === 'Zehe' ? n.cnt / 10 : Math.min(n.cnt, pk.size);
+      }
       const rs = rest[n.key] && rest[n.key].unit === unit ? rest[n.key].amount : 0;
       const buy = amt == null ? null : Math.max(0, amt - rs);
       const packs = pk && buy != null ? Math.ceil(buy / pk.size - 0.02) : null;
