@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.7';
+  const VERSION = '1.8';
 
   // ---------- Speicher ----------
   function load() {
@@ -57,8 +57,8 @@
   function render(keepScroll) {
     const y = window.scrollY;
     const v = $('#view');
-    if (S.tab === 'einkauf') { S.tab = 'woche'; S.weekView = 'shop'; }
-    const pages = { heute: pageHeute, tagebuch: pageTagebuch, woche: pageWoche, rezepte: pageRezepte, mehr: pageMehr };
+    if (S.tab === 'tagebuch') S.tab = 'heute';
+    const pages = { heute: pageHeute, woche: pageWoche, einkauf: pageEinkauf, rezepte: pageRezepte, mehr: pageMehr };
     v.innerHTML = '<div class="page">' + pages[S.tab]() + '</div>';
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
     window.scrollTo(0, keepScroll ? y : 0);
@@ -90,7 +90,8 @@
     return `<div class="card hero2${over ? ' over' : ''}"><div class="ring-wrap">${ringSvg(rm.used / (rm.target || 1), rm.pUsed / (rm.protein || 1), over)}
       <div class="ring-in"><b class="num${Math.abs(rm.rest) >= 995 ? ' long' : ''}">${f0(Math.abs(Math.round(rm.rest / 10) * 10))}</b><span>${rm.rest >= 0 ? 'kcal frei' : 'kcal drüber'}</span></div></div>
       <div class="hero-txt"><span class="lbl">${big ? 'Spielraum heute' : 'Spielraum'}</span><div class="room-big">${esc(rm.text)}</div>
-      <div class="legend2"><span><i class="lg k"></i><b class="num">${f0(rm.used)}</b> / ${f0(rm.target)} kcal</span><span><i class="lg p"></i><b class="num">${f0(rm.pUsed)}</b> / ${f0(rm.protein)} g Eiweiß</span></div></div></div>`;
+      <div class="legend2"><span><i class="lg k"></i><b class="num">${f0(rm.used)}</b> / ${f0(rm.target)} kcal</span><span><i class="lg p"></i><b class="num">${f0(rm.pUsed)}</b> / ${f0(rm.protein)} g Eiweiß</span></div>
+      <button class="link" data-act="tb-all" style="align-self:flex-start;padding:2px 0">Alle Nährwerte ›</button></div></div>`;
   }
   function entryRow(e, date) {
     const r = P.recipeOf(db, e), m = P.mealById(e.meal), t = r ? P.portionOf(r) : null;
@@ -141,9 +142,14 @@
         continue;
       }
       const kc = T.dayItems(db, d).filter(i => i.meal === m.id && !(i.plan && !i.eaten)).reduce((s, i) => s + (T.nutr(i.per100, i.grams).kcal || 0), 0);
-      h += `<div class="list mealcard"><div class="mealhead"><span class="ico sm m-${m.id}">${m.icon}</span><b>${esc(m.label === 'Box' ? 'Box in der Schule' : m.label)}</b><span class="sect-r">${f0(kc)} kcal</span>
+      const open = !!(S.openMeals && S.openMeals[m.id]);
+      const names = pe.map(e => (P.recipeOf(db, e) || {}).name || 'Noch kein Rezept').concat(le.map(e => e.name));
+      h += `<div class="list mealcard${open ? ' open' : ''}"><div class="mealhead"><button class="mh-tog" data-act="meal-tog" data-meal="${m.id}" aria-expanded="${open}"><span class="ico sm m-${m.id}">${m.icon}</span>
+        <span class="mid"><b>${esc(m.label === 'Box' ? 'Box in der Schule' : m.label)}</b>${open ? '' : `<span class="s">${esc(names.join(', '))}</span>`}</span>
+        <span class="sect-r">${f0(kc)} kcal</span><span class="chev2">${open ? '⌃' : '⌄'}</span></button>
         <button class="mh-add" data-act="meal-add" data-meal="${m.id}" aria-label="${esc(m.label)} ergänzen">＋</button></div>`;
-      h += pe.map(e => planRow(e, d)).join('') + le.map(trackRow).join('') + '</div>';
+      if (open) h += pe.map(e => planRow(e, d)).join('') + le.map(trackRow).join('');
+      h += '</div>';
     }
     return h;
   }
@@ -156,8 +162,11 @@
       <button class="opt" data-act="mc-plan"><span class="qi" style="--c:var(--accent)">🍲</span><span class="mid"><span class="t">Rezept einplanen</span><span class="s">${planned ? 'Für diese Mahlzeit ist schon ein Rezept geplant – antippen zum Tauschen' : 'Eine Portion aus deinem Rezeptbuch'}</span></span></button></div>`;
   }
   function pageHeute() {
-    const d = today(), n = recipes().length;
-    let h = `<div class="top"><div><div class="eyebrow">${esc(todayLabel())}</div><h1>Heute</h1></div></div>`;
+    const d = S.day || today(), n = recipes().length, isT = d === today();
+    let h = `<div class="top"><h1>${isT ? 'Heute' : esc(dayName(d).split(',')[0])}</h1><div class="acts">
+      <button class="circle" data-act="tb-scan" aria-label="Barcode scannen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button></div></div>
+      <div class="weeknav"><button class="circle" data-act="tb-day" data-d="-1" aria-label="Tag zurück">‹</button><div><b>${esc(dayName(d))}</b>${isT ? '' : '<button class="link" data-act="tb-today" style="padding:0">Zu heute</button>'}</div><button class="circle" data-act="tb-day" data-d="1" aria-label="Tag vor">›</button></div>`;
+    if (isT) {
     for (const t of CO.thawHints(db, d)) {
       h += t.when === 'evening'
         ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
@@ -169,9 +178,10 @@
     else for (const wk of [P.weekStart(d), P.addDays(P.weekStart(d), 7)]) {
       if (P.cookDate(db, wk) === d && !CO.cookedOf(db, wk) && SH3.weekPots(db, wk).length) h += `<button class="card cookcard" data-act="cook" data-week="${wk}"><span class="em">🍳</span><span class="mid"><b>Heute ist Kochtag</b><span>${SH3.weekPots(db, wk).length} Rezepte für KW ${P.isoWeek(wk)} · Kochsession starten</span></span><span class="add">›</span></button>`;
     }
+    }
     h += roomCard(d, true);
     h += `<div class="quick3"><button data-act="hunger"><span class="qi" style="--c:var(--accent)">🍏</span>Ich hab Hunger</button><button data-act="crash"><span class="qi" style="--c:var(--orange)">💥</span>Plan geplatzt</button><button data-act="tb-quick"><span class="qi" style="--c:var(--blue)">📒</span>Eintragen</button></div>`;
-    h += todayMeals(d);
+    h += todayMeals(d) + weekCard(d);
     if (!n) {
       h += `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Rezepte als Block aus dem Chat einfügen oder das Beispiel laden.</div>
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispiel laden</button></div></div>`;
@@ -205,12 +215,11 @@
     return rm.meals >= 0.5 ? '≈ ' + P.half(rm.meals) + (rm.meals === 1 ? ' Mahlzeit' : ' Mahlzeiten') + ' frei' : 'Platz für einen Snack';
   }
   function pageWoche() {
-    if (S.weekView === 'shop') return pageEinkauf();
     if (!S.week) S.week = defaultWeek();
     const start = S.week, days = P.weekDays(start), end = days[6];
     const range = Number(start.slice(8)) + '.' + (start.slice(5, 7) !== end.slice(5, 7) ? Number(start.slice(5, 7)) + '.' : '') + '–' + Number(end.slice(8)) + '.' + Number(end.slice(5, 7)) + '.';
     let h = `<div class="top"><div><div class="eyebrow">KW ${P.isoWeek(start)} · ${range}</div><h1>Woche</h1></div><div class="acts">
-      <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>` + weekSeg();
+      <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>`;
     // Schritt 1: Wochen-Check
     const w = recentWeight(), ws = P.weeklyWeights(db);
     if (!w) {
@@ -262,6 +271,10 @@
         <div class="btns"><button class="btn tint" data-act="swap">⇄ Tauschen</button><div class="btnrow"><button class="btn plain" data-act="pick">Anderes Rezept</button><button class="btn plain" data-act="view" data-id="${r.id}">Rezept ansehen</button></div></div>`;
     } else {
       h += `<div class="btns"><button class="btn" data-act="pick">Rezept wählen</button>${e.meal !== 'snack' ? '<button class="btn tint" data-act="slot-suggest">✨ Vorschlag nehmen</button>' : ''}</div>`;
+    }
+    if (r) {
+      const ov = db.log && db.log['lp' + e.id], fac = ov && !ov.del && ov.factor != null ? ov.factor : 1;
+      h += `<div class="field"><span class="lbl">Gegessen</span><div class="seg">${[[1, 'Ganz'], [0.5, 'Halb'], [1.5, '1½'], [0, 'Nicht']].map(([v, l]) => `<button data-act="sl-f" data-v="${v}" aria-pressed="${fac === v}">${l}</button>`).join('')}</div></div>`;
     }
     h += `<div class="set"><div class="it"><span>👫 Freundin isst mit</span><label class="switch"><input type="checkbox" data-partner="${e.id}"${e.partner ? ' checked' : ''}><span></span></label></div></div>
       <p class="hint" style="margin-top:-8px">Ihre Portion (${f0(KW.getSetting(db, 'partnerFactor') * 100)} %) kommt auf die Einkaufsliste, zählt aber nicht zu deinem Spielraum.</p>
@@ -429,8 +442,8 @@
     const nLater = L.later.filter(i => !i.done).length + extras().filter(x => !x.done).length;
     const nRest = Object.keys(SH3.rests(db)).length;
     const tab = S.shopTab || 'week';
-    let h = `<div class="top"><h1>Woche</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
-      ${weekSeg()}<div class="seg sm">${[['week', 'Liste'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
+    let h = `<div class="top"><h1>Einkauf</h1><div class="acts">${tab !== 'rest' ? `<button class="circle" data-act="shop-share" aria-label="Teilen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5v9h14v-9h-1"/></svg></button>` : ''}</div></div>
+      <div class="seg big">${[['week', 'Liste'], ['later', 'Nachkauf' + (nLater ? ' ' + nLater : '')], ['rest', 'Reste' + (nRest ? ' ' + nRest : '')]].map(([v, l]) => `<button data-act="shop-tab" data-v="${v}" aria-pressed="${tab === v}">${l}</button>`).join('')}</div>`;
     if (tab === 'week') h += shopWeekView(L);
     else if (tab === 'later') h += shopLaterView(L);
     else h += shopRestView();
@@ -865,7 +878,11 @@
       }
       h += `<button class="row addrow" data-act="tb-add" data-meal="${m.id}"><span class="mid"><span class="t">＋ Hinzufügen</span></span><span></span></button></div>`;
     }
-    // Woche
+    return h;
+  }
+  function weekCard(d) {
+    const prof = KW.profile(db), tg = KW.calcTargets(prof), target = tg ? tg.target : 0;
+    let h = '';
     const ws = T.weekStats(db, P.weekStart(d)), withData = ws.filter(x => x.n);
     const max = Math.max(target, ...ws.map(x => x.kcal), 1);
     h += `<div class="card"><span class="lbl">Diese Woche</span><div class="wbars">${ws.map(x => `<button class="wb${x.date === d ? ' on' : ''}" data-act="tb-goto" data-d="${x.date}"><span class="bar-o"><i style="height:${x.kcal / max * 100}%" class="${x.kcal > target + 50 ? 'over' : ''}"></i><em style="bottom:${target / max * 100}%"></em></span><small>${P.DAY_SHORT[P.wd(x.date)]}</small></button>`).join('')}</div>
@@ -1557,10 +1574,12 @@ Schritte:
 
   // ---------- Ereignisse ----------
   const ACT = {
-    tab: b => { let t = b.dataset.tab; if (t === 'einkauf') { t = 'woche'; S.weekView = 'shop'; } if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'tagebuch' && S.tab !== 'tagebuch') S.day = null; S.tab = t; render(); },
+    tab: b => { let t = b.dataset.tab; if (t === 'tagebuch') t = 'heute'; if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'heute' && S.tab !== 'heute') S.day = null; S.tab = t; render(); },
     'week-view': b => { S.weekView = b.dataset.v; render(); },
-    'meal-add': b => { MC = { meal: b.dataset.meal, date: today() }; openSheet(mealChoiceSheet); },
-    'mc-track': () => { const m = MC.meal; closeSheet(); S.day = null; openAdd(m); },
+    'sl-f': b => { const e = db.plan[SL.id]; T.setPlanFactor(db, e.id, e.date, +b.dataset.v); save(); refreshSheet(true); render(true); },
+    'meal-tog': b => { S.openMeals = S.openMeals || {}; S.openMeals[b.dataset.meal] = !S.openMeals[b.dataset.meal]; render(true); },
+    'meal-add': b => { MC = { meal: b.dataset.meal, date: S.day || today() }; openSheet(mealChoiceSheet); },
+    'mc-track': () => { const m = MC.meal; closeSheet(); openAdd(m); },
     'mc-plan': () => {
       const d = MC.date, m = MC.meal; closeSheet();
       if (m === 'snack') { openPicker({ date: d, gap: defaultGap(d) }); return; }
@@ -1572,7 +1591,7 @@ Schritte:
     'stock-all': () => { for (const v of SH3.weekList(db, S.shopWeek).stock) if (!v.state) SH3.setPantry(db, S.shopWeek, v.key, 'have'); save(); render(true); },
     // Tagebuch
     'tb-add': b => openAdd(b.dataset.meal || ''),
-    'tb-quick': () => { S.day = null; openAdd(''); },
+    'tb-quick': () => openAdd(''),
     'tb-day': b => { S.day = P.addDays(S.day || today(), +b.dataset.d); render(); },
     'tb-today': () => { S.day = null; render(); },
     'tb-goto': b => { S.day = b.dataset.d; render(true); },

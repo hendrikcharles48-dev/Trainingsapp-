@@ -1,6 +1,6 @@
 // Netz zuerst (Updates kommen sofort an), ohne Netz aus dem Zwischenspeicher.
 // Löscht nur eigene Caches (kochwerk-…), nie die anderen Apps unter derselben Adresse.
-const CACHE = 'kochwerk-v10';
+const CACHE = 'kochwerk-v11';
 const FILES = ['./', './index.html', './style.css', './core.js', './plan.js', './track.js', './shop.js', './cook.js', './sync.js', './app.js', './beispiel-rezept.txt', './rezepte-paket.txt', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './vendor/zxing.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

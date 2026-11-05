@@ -85,7 +85,8 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Rezeptpaket: `kochwerk/rezepte-paket.txt` (im Import-Format). Die App bietet beim Öffnen neue Rezepte daraus an
   (Karte auf „Heute“), Übernommenes/Abgelehntes merkt sie in der Einstellung `paketDone`. Neue Rezepte aus dem Chat
   oder einem Artefakt hier anhängen (Werte pro 100 g, Packungen, Vorrat) – Test vergleicht kcal/Protein mit Sollwerten.
-- Tagebuch (`track.js`, Wunsch des Nutzers ab 5.11.): Reiter Heute · Tagebuch · Woche (Plan | Einkauf) · Rezepte · Mehr.
+- Tagebuch (`track.js`, Wunsch des Nutzers ab 5.11.): Reiter Heute · Woche · Einkauf · Rezepte · Mehr. Das Tagebuch ist in „Heute“
+  aufgegangen (Tag mit ‹ › wählbar, Mahlzeiten zugeklappt, Antippen klappt auf; `pageTagebuch` wird nicht mehr angezeigt).
   `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
   `foods` (eigene + aus Open Food Facts gespeicherte, `fav:<id>` = Favorit aus der Grundliste). `P.room` zählt Plan + Tagebuch.
   Open Food Facts direkt aus dem Browser (kein Schlüssel).
