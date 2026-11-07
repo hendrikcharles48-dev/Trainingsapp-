@@ -497,3 +497,10 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .mh-tog .mid b{font-size:16px}
 .mh-tog .s{font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mealcard:not(.open) .mealhead{padding-bottom:8px}
+/* Kochwerk 2.0: Schalter als Knopf, Wischen vom Rand */
+button.switch{padding:0;border:0;background:none}
+button.switch[aria-checked="true"] span{background:var(--accent)}
+button.switch[aria-checked="true"] span::after{transform:translateX(20px)}
+#view{will-change:auto}
+body.swiping #view{box-shadow:-8px 0 24px rgba(0,0,0,.18);background:var(--bg);min-height:100vh;will-change:transform}
+body.swiping{overflow-x:hidden}

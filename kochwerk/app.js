@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '1.8';
+  const VERSION = '2.0';
 
   // ---------- Speicher ----------
   function load() {
@@ -22,7 +22,7 @@
 
   let db = load();
   const ui = loadUi();
-  const S = { tab: 'heute', recipeId: null, filter: 'all', q: '', week: null, shopWeek: null, shopTab: 'week' };
+  const S = { tab: 'rezepte', recipeId: null, filter: 'all', q: '', week: null, shopWeek: null, shopTab: 'week' };
 
   // ---------- Kleinigkeiten ----------
   const f0 = n => (n == null || !isFinite(n)) ? '–' : Math.round(n).toLocaleString('de-DE');
@@ -58,10 +58,12 @@
     const y = window.scrollY;
     const v = $('#view');
     if (S.tab === 'tagebuch') S.tab = 'heute';
-    const pages = { heute: pageHeute, woche: pageWoche, einkauf: pageEinkauf, rezepte: pageRezepte, mehr: pageMehr };
+    const pages = { heute: pageHeute, woche: pageWoche, einkauf: pageEinkauf, rezepte: pageRezepte, kochen: pageKochen, mehr: pageMehr };
+    if (!pages[S.tab]) S.tab = 'rezepte';
     v.innerHTML = '<div class="page">' + pages[S.tab]() + '</div>';
-    document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
-    window.scrollTo(0, keepScroll ? y : 0);
+    const cur = TAB_OF[S.tab] || S.tab;
+    document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === cur ? 'page' : 'false'));
+    window.scrollTo(0, typeof keepScroll === 'number' ? keepScroll : keepScroll ? y : 0);
     navTitle();
   }
   // Kompakte Titelleiste wie bei iOS, sobald der große Titel weggescrollt ist
@@ -72,6 +74,82 @@
     nb.classList.toggle('show', !!h1 && window.scrollY > h1.offsetTop + h1.offsetHeight - 8);
   }
   addEventListener('scroll', navTitle, { passive: true });
+
+  // ---------- Navigation: „Seite davor“ (Zurück-Knopf und Wischen vom linken Rand) ----------
+  // Unterseiten gehören zu einem Reiter: Wochenplan → Kochen, Tagebuch → Mehr
+  const TAB_OF = { woche: 'kochen', heute: 'mehr' };
+  const HIST = [];
+  const snap = () => ({ tab: S.tab, recipeId: S.recipeId, week: S.week, day: S.day, y: window.scrollY });
+  function go(ch) {
+    const before = snap();
+    Object.assign(S, ch);
+    if (before.tab === S.tab && before.recipeId === S.recipeId) { render(); return; }
+    HIST.push(before); if (HIST.length > 40) HIST.shift();
+    render();
+  }
+  function parentOf() {
+    if (S.tab === 'rezepte' && S.recipeId) return { tab: 'rezepte', recipeId: null };
+    if (S.tab === 'woche') return { tab: 'kochen', recipeId: null };
+    if (S.tab === 'heute') return { tab: 'mehr', recipeId: null };
+    return null;
+  }
+  const canBack = () => HIST.length > 0 || !!parentOf();
+  function goBack() {
+    const prev = HIST.pop();
+    if (prev) { const y = prev.y; delete prev.y; Object.assign(S, prev); render(y || 0); return true; }
+    const par = parentOf();
+    if (par) { Object.assign(S, par); render(); return true; }
+    return false;
+  }
+  function backBtn(label) { return `<div><button class="back" data-act="back">${IC.back}${esc(label)}</button></div>`; }
+  function backLabel(fallback) {
+    const prev = HIST[HIST.length - 1];
+    if (!prev) return fallback;
+    if (prev.tab === 'rezepte') return prev.recipeId && getRecipe(prev.recipeId) ? 'Zurück' : 'Rezepte';
+    return { kochen: 'Kochen', einkauf: 'Einkauf', mehr: 'Mehr', woche: 'Wochenplan', heute: 'Tagebuch' }[prev.tab] || fallback;
+  }
+  // Wischen vom linken Rand zur Mitte: Seite folgt dem Finger, ab ~⅓ Breite geht es zurück
+  (function edgeSwipe() {
+    let sx = 0, sy = 0, on = false, drag = false, dx = 0;
+    const view = () => $('#view');
+    const blocked = () => SH || WZ || CK || !$('#setup').hidden || !$('#cook').hidden;
+    addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      on = e.touches.length === 1 && t.clientX <= 28 && !blocked() && canBack();
+      drag = false; dx = 0; sx = t.clientX; sy = t.clientY;
+    }, { passive: true });
+    addEventListener('touchmove', e => {
+      if (!on) return;
+      const t = e.touches[0]; dx = t.clientX - sx; const dy = t.clientY - sy;
+      if (!drag) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > dx) { on = false; return; }
+        if (dx < 10) return;
+        drag = true; document.body.classList.add('swiping');
+      }
+      e.preventDefault();
+      view().style.transition = 'none';
+      view().style.transform = `translateX(${Math.max(0, dx)}px)`;
+    }, { passive: false });
+    const end = () => {
+      if (!on) return; on = false;
+      if (!drag) return;
+      const v = view(), w = window.innerWidth;
+      v.style.transition = 'transform .22s ease-out';
+      if (dx > Math.min(120, w / 3)) {
+        v.style.transform = `translateX(${w}px)`;
+        setTimeout(() => {
+          v.style.transition = 'none'; v.style.transform = '';
+          document.body.classList.remove('swiping');
+          goBack();
+        }, 200);
+      } else {
+        v.style.transform = '';
+        setTimeout(() => { v.style.transition = ''; document.body.classList.remove('swiping'); }, 230);
+      }
+    };
+    addEventListener('touchend', end, { passive: true });
+    addEventListener('touchcancel', end, { passive: true });
+  })();
 
   // ---------- Heute ----------
   const P = KW.P;
@@ -163,22 +241,9 @@
   }
   function pageHeute() {
     const d = S.day || today(), n = recipes().length, isT = d === today();
-    let h = `<div class="top"><h1>${isT ? 'Heute' : esc(dayName(d).split(',')[0])}</h1><div class="acts">
+    let h = backBtn(backLabel('Mehr')) + `<div class="top"><h1>${isT ? 'Heute' : esc(dayName(d).split(',')[0])}</h1><div class="acts">
       <button class="circle" data-act="tb-scan" aria-label="Barcode scannen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button></div></div>
       <div class="weeknav"><button class="circle" data-act="tb-day" data-d="-1" aria-label="Tag zurück">‹</button><div><b>${esc(dayName(d))}</b>${isT ? '' : '<button class="link" data-act="tb-today" style="padding:0">Zu heute</button>'}</div><button class="circle" data-act="tb-day" data-d="1" aria-label="Tag vor">›</button></div>`;
-    if (isT) {
-    for (const t of CO.thawHints(db, d)) {
-      h += t.when === 'evening'
-        ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
-        : `<div class="card thaw today"><span class="em">⏱️</span><div class="mid"><b>Noch im Gefrierfach?</b><span>„${esc(t.name)}“ ist für heute geplant. Sonst in der Mikrowelle auftauen.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Ist raus</button></div>`;
-    }
-    if (PAKET) h += `<button class="card cookcard" data-act="paket"><span class="em">📦</span><span class="mid"><b>${PAKET.list.length} ${PAKET.list.length === 1 ? 'Rezept' : 'Rezepte'} aus dem Chat</b><span>Antippen, ansehen und übernehmen</span></span><span class="add">›</span></button>`;
-    const ckOld = ckLoad();
-    if (ckOld && ckOld.phase === 'run') h += `<button class="card cookcard" data-act="cook" data-week="${ckOld.week}"><span class="em">🍳</span><span class="mid"><b>Kochsession fortsetzen</b><span>KW ${P.isoWeek(ckOld.week)}</span></span><span class="add">›</span></button>`;
-    else for (const wk of [P.weekStart(d), P.addDays(P.weekStart(d), 7)]) {
-      if (P.cookDate(db, wk) === d && !CO.cookedOf(db, wk) && SH3.weekPots(db, wk).length) h += `<button class="card cookcard" data-act="cook" data-week="${wk}"><span class="em">🍳</span><span class="mid"><b>Heute ist Kochtag</b><span>${SH3.weekPots(db, wk).length} Rezepte für KW ${P.isoWeek(wk)} · Kochsession starten</span></span><span class="add">›</span></button>`;
-    }
-    }
     h += roomCard(d, true);
     h += `<div class="quick3"><button data-act="hunger"><span class="qi" style="--c:var(--accent)">🍏</span>Ich hab Hunger</button><button data-act="crash"><span class="qi" style="--c:var(--orange)">💥</span>Plan geplatzt</button><button data-act="tb-quick"><span class="qi" style="--c:var(--blue)">📒</span>Eintragen</button></div>`;
     h += todayMeals(d) + weekCard(d);
@@ -187,6 +252,49 @@
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispiel laden</button></div></div>`;
     }
     h += `<p class="hint" style="text-align:center">Geplantes zählt automatisch als gegessen. Mit ＋ trägst du bei jeder Mahlzeit einzelne Lebensmittel ein. Die Portion deiner Freundin zählt nicht mit.</p>`;
+    return h;
+  }
+
+  // ---------- Kochen (Meal Prep der Woche) ----------
+  function pageKochen() {
+    if (!S.week) S.week = defaultWeek();
+    const start = S.week, d = today(), days = P.weekDays(start), end = days[6];
+    const range = Number(start.slice(8)) + '.' + (start.slice(5, 7) !== end.slice(5, 7) ? Number(start.slice(5, 7)) + '.' : '') + '–' + Number(end.slice(8)) + '.' + Number(end.slice(5, 7)) + '.';
+    let h = `<div class="top"><div><div class="eyebrow">KW ${P.isoWeek(start)} · ${range}</div><h1>Kochen</h1></div><div class="acts">
+      <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>`;
+    for (const t of CO.thawHints(db, d)) {
+      h += t.when === 'evening'
+        ? `<div class="card thaw"><span class="em">❄️</span><div class="mid"><b>Heute Abend auftauen</b><span>„${esc(t.name)}“ für morgen (${esc(P.dayLabel(t.date))} · ${esc(t.meal === 'snack' ? 'Snack' : P.mealById(t.meal).short)}) aus dem Gefrierfach in den Kühlschrank.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Erledigt</button></div>`
+        : `<div class="card thaw today"><span class="em">⏱️</span><div class="mid"><b>Noch im Gefrierfach?</b><span>„${esc(t.name)}“ ist für heute geplant. Sonst in der Mikrowelle auftauen.</span></div><button class="btn tint small" data-act="thaw-done" data-id="${t.id}">Ist raus</button></div>`;
+    }
+    const ckOld = ckLoad();
+    if (ckOld && ckOld.phase === 'run') h += `<button class="card cookcard" data-act="cook" data-week="${ckOld.week}"><span class="em">🍳</span><span class="mid"><b>Kochsession fortsetzen</b><span>KW ${P.isoWeek(ckOld.week)}</span></span><span class="add">›</span></button>`;
+    const pots = SH3.weekPots(db, start), ck = CO.cookedOf(db, start), cdt = P.cookDate(db, start);
+    const isCookDay = cdt === d && !ck && pots.length;
+    // Was wird vorgekocht?
+    h += `<div class="sect"><h2 class="sec">Diese Woche vorkochen</h2><span class="sect-r">${pots.length ? pots.reduce((s, x) => s + Math.round(x.portions), 0) + ' Boxen' : ''}</span></div>`;
+    if (!pots.length) {
+      h += `<div class="card empty"><span class="em">🥡</span><div><b>Noch nichts geplant</b>Im Wochenplan die Mahlzeiten anwählen und Rezepte vorschlagen lassen – oder eine Lieblingswoche übernehmen.</div>
+        <div class="btns" style="width:100%"><button class="btn" data-act="tab" data-tab="woche">🗓️ Wochenplan öffnen</button><button class="btn plain" data-act="favs">★ Lieblingswoche</button></div></div>`;
+    } else {
+      h += '<div class="list">' + pots.map(x => {
+        const c = KW.catById(x.r.cat), t = KW.recipeTotals(x.r).portion;
+        const bits = [x.pots === 1 ? '1 Topf' : x.pots + ' Töpfe', P.half(x.portions) + ' Portionen', fNum(x.r.keepDays) + ' Tage haltbar'];
+        if (x.r.freeze) bits.push('❄️');
+        return `<button class="row rrow" data-act="open" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${c.icon}</span>
+          <span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span>
+          <span class="right"><b>${f0(t.kcal)}</b><span>${f0(t.p)} g P</span></span></button>`;
+      }).join('') + '</div>';
+      h += `<div class="card plan2"><div class="inline"><span class="step-n${ck ? ' done' : ''}">${ck ? '✓' : '🍳'}</span><span class="mid" style="flex:1"><span class="t">${ck ? 'Gekocht am ' + esc(P.dayLabel(ck.date)) : isCookDay ? 'Heute ist Kochtag' : 'Kochtag ' + esc(P.dayLabel(cdt))}</span>
+        <span class="s">${ck ? 'Die Boxen stehen im Kühlschrank und Gefrierfach.' : 'Alles in einer Session: Reihenfolge, Timer, Boxen.'}</span></span></div>
+        <div class="pills"><button class="pill-btn${ck ? '' : ' pri'}" data-act="cook" data-week="${start}">🍳 Kochsession</button><button class="pill-btn" data-act="boxes">🥡 Boxen</button><button class="pill-btn" data-act="tab" data-tab="einkauf">🛒 Einkauf</button></div></div>`;
+    }
+    h += `<div class="set"><button class="act" data-act="tab" data-tab="woche"><span class="sl"><span class="si" style="--c:#FF9500">🗓️</span>Wochenplan</span><small>welches Gericht wann</small><span class="chev">${IC.chev}</span></button>
+      <button class="act" data-act="favs"><span class="sl"><span class="si" style="--c:#FFCC00">★</span>Lieblingswochen</span><span class="chev">${IC.chev}</span></button></div>`;
+    if (ui.track) {
+      const rm = P.room(db, d);
+      h += `<button class="card cookcard" data-act="tab" data-tab="heute"><span class="em">📒</span><span class="mid"><b>Tagebuch heute</b><span>${esc(rm.text)}</span></span><span class="add">›</span></button>`;
+    }
     return h;
   }
 
@@ -218,7 +326,7 @@
     if (!S.week) S.week = defaultWeek();
     const start = S.week, days = P.weekDays(start), end = days[6];
     const range = Number(start.slice(8)) + '.' + (start.slice(5, 7) !== end.slice(5, 7) ? Number(start.slice(5, 7)) + '.' : '') + '–' + Number(end.slice(8)) + '.' + Number(end.slice(5, 7)) + '.';
-    let h = `<div class="top"><div><div class="eyebrow">KW ${P.isoWeek(start)} · ${range}</div><h1>Woche</h1></div><div class="acts">
+    let h = backBtn(backLabel('Kochen')) + `<div class="top"><div><div class="eyebrow">KW ${P.isoWeek(start)} · ${range}</div><h1>Wochenplan</h1></div><div class="acts">
       <button class="circle" data-act="week" data-d="-7" aria-label="Woche zurück">‹</button><button class="circle" data-act="week" data-d="7" aria-label="Woche vor">›</button></div></div>`;
     // Schritt 1: Wochen-Check
     const w = recentWeight(), ws = P.weeklyWeights(db);
@@ -1052,22 +1160,34 @@
     let h = `<div class="top"><h1>Rezepte</h1><div class="acts">
       <button class="circle" data-act="import" aria-label="Rezepte einfügen">${IC.imp}</button>
       <button class="circle" data-act="new" aria-label="Rezept anlegen">${IC.plus}</button></div></div>`;
+    if (PAKET) h += `<button class="card cookcard" data-act="paket"><span class="em">📦</span><span class="mid"><b>${PAKET.list.length} ${PAKET.list.length === 1 ? 'neues Rezept' : 'neue Rezepte'} aus dem Chat</b><span>Antippen, ansehen und übernehmen</span></span><span class="add">›</span></button>`;
     if (!all.length) {
       return h + `<div class="card empty"><span class="em">📖</span><div><b>Noch keine Rezepte</b>Im Claude-Chat „Kochwerk“ und ein Gericht schreiben, den Block kopieren und hier einfügen.</div>
         <div class="btns" style="width:100%"><button class="btn" data-act="import">Rezepte einfügen</button><button class="btn plain" data-act="sample">Beispielrezepte laden</button><button class="btn plain" data-act="new">Von Hand anlegen</button></div></div>`;
     }
     h += `<label class="search">${IC.search}<input type="search" id="q" placeholder="Rezept oder Zutat suchen" value="${esc(S.q)}" autocomplete="off"></label>`;
     const count = id => all.filter(r => r.cat === id).length;
+    const prepN = k => all.filter(PREP[k].f).length;
     h += '<div class="chips">' + `<button class="chip" data-act="filter" data-f="all" aria-pressed="${S.filter === 'all'}">Alle ${all.length}</button>` +
+      Object.keys(PREP).filter(k => prepN(k)).map(k => `<button class="chip" data-act="filter" data-f="${k}" aria-pressed="${S.filter === k}">${PREP[k].l} ${prepN(k)}</button>`).join('') +
       KW.CATS.filter(c => count(c.id)).map(c => `<button class="chip" data-act="filter" data-f="${c.id}" aria-pressed="${S.filter === c.id}">${c.icon} ${esc(c.short)} ${count(c.id)}</button>`).join('') +
       (bad.length ? `<button class="chip warn" data-act="filter" data-f="bad" aria-pressed="${S.filter === 'bad'}">👎 Zum Aussortieren ${bad.length}</button>` : '') + '</div>';
     h += '<div id="rlist">' + recipeList() + '</div>';
     return h;
   }
+  // Meal-Prep-Filter: was sich gut vorkochen lässt
+  const PREP = {
+    frz: { l: '❄️ Einfrierbar', f: r => !!r.freeze },
+    keep: { l: '🧊 4+ Tage', f: r => r.keepDays >= 4 },
+    big: { l: '🥡 4+ Boxen', f: r => r.portions >= 4 },
+    prot: { l: '💪 Viel Protein', f: r => KW.recipeTotals(r).portion.p >= 35 },
+    fast: { l: '⚡ Schnell', f: r => r.time && r.time <= 30 }
+  };
   function recipeList() {
     const q = KW.norm(S.q);
     let list = recipes();
     if (S.filter === 'bad') list = list.filter(r => KW.ratingSummary(db, r.id).bad);
+    else if (PREP[S.filter]) list = list.filter(PREP[S.filter].f);
     else if (S.filter !== 'all') list = list.filter(r => r.cat === S.filter);
     if (q) list = list.filter(r => KW.norm(r.name).includes(q) || r.ingredients.some(i => KW.norm(i.name).includes(q)));
     let h = '';
@@ -1075,9 +1195,9 @@
     if (!list.length) return h + '<div class="card empty">Nichts gefunden.</div>';
     const row = r => {
       const c = KW.catById(r.cat), t = KW.recipeTotals(r).portion, rs = KW.ratingSummary(db, r.id);
-      const bits = [fNum(r.portions) + ' Port.', fNum(r.keepDays) + ' Tage'];
+      const bits = ['🥡 ' + fNum(r.portions) + (r.portions === 1 ? ' Box' : ' Boxen'), '🧊 ' + fNum(r.keepDays) + ' Tage'];
+      if (r.time) bits.push('⏱ ' + f0(r.time) + ' min');
       if (r.freeze) bits.push('❄️');
-      if (r.box) bits.push('🥡');
       if (rs.good) bits.push('👍'); else if (rs.bad) bits.push('👎');
       return `<button class="row rrow" data-act="open" data-id="${r.id}"><span class="ico c-${r.cat}">${c.icon}</span>
         <span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span>
@@ -1096,7 +1216,7 @@
 
   function pageRecipe(r) {
     const c = KW.catById(r.cat), T = KW.recipeTotals(r), t = T.portion, rs = KW.ratingSummary(db, r.id);
-    let h = `<div><button class="back" data-act="back">${IC.back}Rezepte</button></div>
+    let h = backBtn(backLabel('Rezepte')) + `
       <div class="rhead"><span class="rhero ico c-${r.cat}">${c.icon}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
       <div class="facts"><span class="fact">🍽️ ${fNum(r.portions)} ${r.portions === 1 ? 'Portion' : 'Portionen'}</span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
@@ -1153,7 +1273,7 @@
       <div class="group-title">Ziele</div><div class="set">
       <div class="it"><label for="s-prot"><span class="si" style="--c:#34C759">🥚</span>Protein pro Tag (g)</label><input id="s-prot" data-set="protein" inputmode="numeric" value="${esc(p.protein)}"></div>
       <div class="it"><label for="s-meal"><span class="si" style="--c:#FF9F0A">🍽️</span>Mahlzeit (kcal)</label><input id="s-meal" data-set="mealKcal" inputmode="numeric" value="${esc(p.mealKcal)}"></div></div>
-      <p class="hint" style="margin:-12px 4px 0">Mit der normalen Mahlzeit zeigt „Heute“ den Spielraum an, z. B. „noch Platz für etwa 2 normale Mahlzeiten“.</p>
+      <p class="hint" style="margin:-12px 4px 0">Danach rechnet der Wochenplan die Portionen. Mit der normalen Mahlzeit zeigt das Tagebuch den Spielraum an, z. B. „noch Platz für etwa 2 normale Mahlzeiten“.</p>
       <div class="group-title">Kochen</div><div class="set">
       <div class="it"><label for="s-day"><span class="si" style="--c:#FF9500">🍳</span>Standard-Kochtag</label><select id="s-day" data-set="cookDay">${opt(days, p.cookDay, d => d, d => KW.WEEKDAYS[d])}</select></div>
       <div class="it"><label for="s-fac"><span class="si" style="--c:#FF2D55">👫</span>Portion Freundin</label><select id="s-fac" data-set="partnerFactor">${opt(facs, p.partnerFactor, f => f, f => Math.round(f * 100) + ' %')}</select></div></div>
@@ -1162,6 +1282,10 @@
       <button class="act" data-act="sample"><span class="sl"><span class="si" style="--c:#34C759">📖</span>Beispielrezepte laden</span><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="packs"><span class="sl"><span class="si" style="--c:#A2845E">📦</span>Packungsgrößen</span><span class="chev">${IC.chev}</span></button>
       ${bad ? `<button class="act" data-act="showbad"><span class="sl"><span class="si" style="--c:#FF3B30">👎</span>Zum Aussortieren</span><small>${bad}</small></button>` : ''}</div>
+      <div class="group-title">Kalorien-Tagebuch</div><div class="set">
+      <div class="it"><span class="sl"><span class="si" style="--c:#007AFF">📒</span>Tagebuch & Tracking</span><button class="switch" data-act="track-on" role="switch" aria-checked="${!!ui.track}" aria-label="Tagebuch an oder aus"><span></span></button></div>
+      ${ui.track ? `<button class="act" data-act="tab" data-tab="heute"><span class="sl"><span class="si" style="--c:#34C759">🍽️</span>Tagebuch öffnen</span><small>${esc(P.room(db, today()).text)}</small><span class="chev">${IC.chev}</span></button>` : ''}</div>
+      <p class="hint" style="margin:-12px 4px 0">Optional: einzelne Lebensmittel eintragen, Barcode scannen, Spielraum pro Tag. Deine Einträge bleiben auch ausgeschaltet erhalten.</p>
       <div class="group-title">Darstellung</div><div class="set">
       <div class="it"><span class="sl"><span class="si" style="--c:#5856D6">🎨</span>Farben</span><div class="seg" style="width:220px">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</div></div></div>
       <div class="group-title">Abgleich & Sicherung</div><div class="set">
@@ -1346,8 +1470,7 @@
     KW.put(db, 'recipes', r);
     save();
     closeSheet();
-    S.tab = 'rezepte'; S.recipeId = r.id;
-    render(!ED.isNew);
+    if (ED.isNew || S.tab !== 'rezepte' || S.recipeId !== r.id) go({ tab: 'rezepte', recipeId: r.id }); else render(true);
     toast(ED.isNew ? 'Rezept angelegt' : 'Gesichert');
     ED = null;
   }
@@ -1381,7 +1504,7 @@
       });
       const had = !!PAKET;
       PAKET = list.length ? { list } : null;
-      if ((had || PAKET) && S.tab === 'heute' && !SH && !WZ && !CK) render(true);
+      if ((had || PAKET) && S.tab === 'rezepte' && !S.recipeId && !SH && !WZ && !CK) render(true);
     } catch (e) { /* offline: beim nächsten Mal */ }
   }
   function paketDone(names) {
@@ -1440,8 +1563,7 @@
     });
     if (IM.paket) paketDone(IM.paket);
     save(); closeSheet();
-    S.tab = 'rezepte'; S.filter = 'all'; S.q = ''; S.recipeId = n === 1 && last ? last.id : null;
-    render();
+    S.filter = 'all'; S.q = ''; go({ tab: 'rezepte', recipeId: n === 1 && last ? last.id : null });
     toast(n === 1 ? '1 Rezept übernommen' : n + ' Rezepte übernommen');
   }
   async function sampleText() {
@@ -1569,12 +1691,22 @@ Schritte:
     if (!cur || cur.kg !== Math.round(w * 10) / 10) KW.setWeight(db, w);
     KW.setSetting(db, 'setupDone', true);
     save(); closeSetup();
-    S.tab = 'heute'; render(); askRating(); checkPaket();
+    S.tab = 'rezepte'; render(); askRating(); checkPaket();
   }
 
   // ---------- Ereignisse ----------
   const ACT = {
-    tab: b => { let t = b.dataset.tab; if (t === 'tagebuch') t = 'heute'; if (t === S.tab && t === 'rezepte') S.recipeId = null; if (t === 'heute' && S.tab !== 'heute') S.day = null; S.tab = t; render(); },
+    tab: b => {
+      let t = b.dataset.tab; if (t === 'tagebuch') t = 'heute';
+      const fromBar = !!b.closest('.tabbar');
+      // Nochmal auf den aktiven Reiter: zurück zu dessen Startseite
+      if (fromBar && (TAB_OF[S.tab] || S.tab) === t && (S.tab !== t || S.recipeId)) { go({ tab: t, recipeId: null }); return; }
+      if (t === S.tab && !S.recipeId) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      const ch = { tab: t, recipeId: null };
+      if (t === 'heute' && S.tab !== 'heute') ch.day = null;
+      go(ch);
+    },
+    'track-on': () => { ui.track = !ui.track; saveUi(); render(true); },
     'week-view': b => { S.weekView = b.dataset.v; render(); },
     'sl-f': b => { const e = db.plan[SL.id]; T.setPlanFactor(db, e.id, e.date, +b.dataset.v); save(); refreshSheet(true); render(true); },
     'meal-tog': b => { S.openMeals = S.openMeals || {}; S.openMeals[b.dataset.meal] = !S.openMeals[b.dataset.meal]; render(true); },
@@ -1645,8 +1777,8 @@ Schritte:
     'scan-close': () => { stopScan(); closeSheet(); },
     'scan-go': () => { if (SC2) SC2.busy = true; stopScan(); lookupCode($('#scancode').value); },
     'scan-own': () => { stopScan(); OF = { name: '', brand: '', code: SC2.notFound, per100: {}, pl: '', pg: null }; SH.fn = ownSheet; refreshSheet(); },
-    open: b => { S.recipeId = b.dataset.id; render(); },
-    back: () => { S.recipeId = null; render(); },
+    open: b => go({ tab: 'rezepte', recipeId: b.dataset.id }),
+    back: () => { if (!goBack()) { S.recipeId = null; render(); } },
     filter: b => { S.filter = b.dataset.f; render(true); },
     import: () => openImport(),
     sample: async () => {
@@ -1691,7 +1823,7 @@ Schritte:
     'snack-new': b => openPicker({ date: b.dataset.date, gap: defaultGap(b.dataset.date) }),
     swap: () => { SH.fn = swapSheet; refreshSheet(); },
     'swap-r': b => { P.update(db, SL.id, { recipeId: b.dataset.id }); save(); closeSheet(); render(true); toast('Getauscht'); },
-    view: b => { closeSheet(); S.tab = 'rezepte'; S.recipeId = b.dataset.id; render(); },
+    view: b => { closeSheet(); go({ tab: 'rezepte', recipeId: b.dataset.id }); },
     // Woche
     week: b => { S.week = P.addDays(S.week || defaultWeek(), +b.dataset.d); render(); },
     weight: () => openWeight(null),
@@ -1794,7 +1926,7 @@ Schritte:
     },
     'rest-gone': () => { SH3.setRest(db, RS.key, RS.name, RS.area, RS.unit, 0); save(); closeSheet(); render(true); toast('Als aufgebraucht markiert'); },
     'more-ok': () => { for (const d of MM.days) P.setMeal(db, d, MM.meal, true); ACT['stall-ack'](); closeSheet(); runSuggest(); },
-    showbad: () => { S.tab = 'rezepte'; S.recipeId = null; S.filter = 'bad'; render(); },
+    showbad: () => { S.filter = 'bad'; go({ tab: 'rezepte', recipeId: null }); },
     format: () => openSheet(formatSheet),
     'copy-format': async () => { try { await navigator.clipboard.writeText(FORMAT_SHORT); toast('Kopiert'); } catch (e) { toast('Kopieren nicht möglich'); } },
     setv: b => { const k = b.dataset.k; KW.setSetting(db, k, b.dataset.v); save(); render(true); },
@@ -1880,7 +2012,7 @@ Schritte:
   // ---------- Start ----------
   applyTheme();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* egal */ }
-  S.tab = 'heute';
+  S.tab = 'rezepte';
   render();
   if (!KW.getSetting(db, 'setupDone')) openSetup(); else askRating();
   if (SC.on) runSync('quiet');
@@ -1892,7 +2024,7 @@ Schritte:
     if (document.visibilityState !== 'visible') return;
     if (CK && CK.phase === 'run') { keepAwake(); tickTimers(); }
     if (SC.on && (!SC.last || Date.now() - new Date(SC.last).getTime() > 20000)) runSync('quiet');
-    if (lastDay !== today()) { lastDay = today(); if (!SH && !WZ) { S.tab = 'heute'; S.week = null; render(); } }
+    if (lastDay !== today()) { lastDay = today(); if (!SH && !WZ) { S.week = null; S.day = null; render(true); } }
     askRating();
   });
   // Für Tests im Browser

@@ -85,12 +85,13 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Rezeptpaket: `kochwerk/rezepte-paket.txt` (im Import-Format). Die App bietet beim Öffnen neue Rezepte daraus an
   (Karte auf „Heute“), Übernommenes/Abgelehntes merkt sie in der Einstellung `paketDone`. Neue Rezepte aus dem Chat
   oder einem Artefakt hier anhängen (Werte pro 100 g, Packungen, Vorrat) – Test vergleicht kcal/Protein mit Sollwerten.
-- Tagebuch (`track.js`, Wunsch des Nutzers ab 5.11.): Reiter Heute · Woche · Einkauf · Rezepte · Mehr. Das Tagebuch ist in „Heute“
-  aufgegangen (Tag mit ‹ › wählbar, Mahlzeiten zugeklappt, Antippen klappt auf; `pageTagebuch` wird nicht mehr angezeigt).
+- Ausrichtung ab 2.0 (Nutzerwunsch 7.11.): in erster Linie Meal-Prep-Rezepte. Reiter Rezepte · Kochen · Einkauf · Mehr (Start: Rezepte).
+  „Kochen“ = Woche vorkochen (Töpfe/Boxen der Woche, Kochsession, Boxen, Auftauhinweise); der Wochenplan (`pageWoche`) ist Unterseite von Kochen.
+  Navigation über `go()`/`goBack()` mit Verlauf `HIST`; Wischen vom linken Rand (≤28 px) zur Mitte = Seite davor (Nutzerwunsch).
+  Rezeptfilter `PREP` (Einfrierbar, 4+ Tage, 4+ Boxen, Viel Protein, Schnell). Paket-Karte steht auf „Rezepte“.
+- Tagebuch (`track.js`) ist optional: Schalter in „Mehr“ (`ui.track`, nur lokal, Standard aus), Seite `pageHeute` als Unterseite von Mehr.
   `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
-  `foods` (eigene + aus Open Food Facts gespeicherte, `fav:<id>` = Favorit aus der Grundliste). `P.room` zählt Plan + Tagebuch.
-  Open Food Facts direkt aus dem Browser (kein Schlüssel).
-  „Heute“ zeigt pro Mahlzeit (Frühstück, Box, Mittag, Abend, Snacks) Plan + Eingetragenes; „＋“ fragt Rezept einplanen
-  oder Lebensmittel eintragen (Nutzerwunsch). Tagebuch-Mahlzeit `box` ist eigener Abschnitt. Kamera nur für Barcodes, keine Bilder speichern.
+  `foods` (eigene + Open Food Facts, `fav:<id>` = Favorit). `P.room` zählt Plan + Tagebuch. Mahlzeiten dort zugeklappt, „＋“ fragt
+  Rezept einplanen oder Lebensmittel eintragen. Kamera nur für Barcodes, keine Bilder speichern.
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.
