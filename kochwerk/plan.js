@@ -31,7 +31,7 @@
     { id: 'lunch', label: 'Mittag', short: 'Mittag', pos: 30, icon: '🍽️' },
     { id: 'dinner', label: 'Abendessen', short: 'Abend', pos: 40, icon: '🌙' }
   ];
-  const mealById = id => MEALS.find(m => m.id === id) || { id: 'snack', label: 'Snack', short: 'Snack', pos: 0, icon: '🥪' };
+  const mealById = id => MEALS.find(m => m.id === id) || { id: 'snack', label: 'Snack', short: 'Snack', pos: 0, icon: '🍎' };
   // Lücken für Snacks: vor dem Frühstück (5), danach (15) … nach dem Abendessen (45)
   const GAPS = [
     { pos: 5, label: 'Vor dem Frühstück' }, { pos: 15, label: 'Vormittags' }, { pos: 25, label: 'Nach der Box' },
@@ -118,7 +118,15 @@
     if (!slots.length) return { fill: [], open: [] };
     const factor = KW.getSetting(db, 'partnerFactor');
     const cook = cookDate(db, start);
-    const pool = KW.live(db, 'recipes').filter(r => r.cat === 'main').map(r => ({ r, s: score(db, r) })).filter(x => x.s > -Infinity).sort((a, b) => b.s - a.s);
+    const rank = list => list.map(r => ({ r, s: score(db, r) })).filter(x => x.s > -Infinity).sort((a, b) => b.s - a.s);
+    const all = KW.live(db, 'recipes');
+    const mains = rank(all.filter(r => r.cat === 'main'));
+    // Frühstück: lieber Frühstücksgerichte (Bowl, Oats, Frittata …), sonst wie die anderen Mahlzeiten
+    const bfast = rank(all.filter(r => r.cat !== 'emergency' && isBreakfast(r))).sort((a, b) => (a.r.cat === 'main' ? 0 : 1) - (b.r.cat === 'main' ? 0 : 1));
+    const lunchy = mains.filter(x => !isBreakfast(x.r));
+    const pool = lunchy.length ? lunchy : mains.length ? mains : bfast;
+    const isBf = e => e.meal === 'breakfast' && bfast.length > 0;
+    const poolFor = e => isBf(e) ? bfast : pool;
     if (!pool.length) return { fill: [], open: slots.map(e => ({ id: e.id, date: e.date, why: 'none' })) };
     // Rezepte, die in der Woche schon stehen, laufen als angebrochene Töpfe weiter
     const batches = [];
@@ -126,7 +134,7 @@
     for (const e of weekEntries(db, start)) {
       const r = recipeOf(db, e); if (!r || !isMain(e)) continue;
       let b = batches.find(x => x.r.id === r.id);
-      if (!b) { b = { r, left: r.portions }; batches.push(b); }
+      if (!b) { b = { r, left: r.portions, bf: isBf(e) }; batches.push(b); }
       b.left -= need(e);
     }
     const used = new Set(batches.map(b => b.r.id));
@@ -134,16 +142,37 @@
     const out = [], open = [];
     const dayHas = (date, rid) => out.some(o => o.date === date && o.recipeId === rid) || entries(db, date).some(x => x.recipeId === rid);
     for (const e of slots) {
-      let b = batches.find(x => x.left >= need(e) - 0.01 && fits(x.r, e) && !dayHas(e.date, x.r.id));
+      let b = batches.find(x => x.left >= need(e) - 0.01 && fits(x.r, e) && !dayHas(e.date, x.r.id) && !!x.bf === isBf(e));
       if (!b) {
-        const pick = pool.find(x => !used.has(x.r.id) && fits(x.r, e)) || pool.find(x => fits(x.r, e) && !dayHas(e.date, x.r.id)) || pool.find(x => fits(x.r, e));
+        const choose = pl => pl.find(x => !used.has(x.r.id) && fits(x.r, e)) || pl.find(x => fits(x.r, e) && !dayHas(e.date, x.r.id)) || pl.find(x => fits(x.r, e));
+        let pick = choose(poolFor(e));
+        // Frühstück ohne passendes Frühstücksrezept (z. B. Haltbarkeit): erst eine angebrochene Frühstücks-Charge, dann normale Rezepte
+        if (!pick && isBf(e)) pick = choose(pool);
         if (!pick) { open.push({ id: e.id, date: e.date, why: pool.some(x => (e.meal !== 'box' || x.r.box)) ? 'keep' : 'box' }); continue; }
-        b = { r: pick.r, left: pick.r.portions }; batches.push(b); used.add(pick.r.id);
+        b = { r: pick.r, left: pick.r.portions, bf: isBf(e) }; batches.push(b); used.add(pick.r.id);
       }
       b.left -= need(e);
       out.push({ id: e.id, date: e.date, recipeId: b.r.id });
     }
     return { fill: out, open };
+  }
+  const BREAKFAST_RE = /frühstück|bowl|porridge|oats|haferflocken|müsli|granola|overnight|frittata|omelett|shakshuka|rührei|pancake|pfannkuchen|waffel|quark|skyr|joghurt|brot|toast|bagel|muffin/;
+  const NOT_BREAKFAST_RE = /fajita|gyros|burrito|hack|hähnchen|pute|fisch|lachs|thunfisch|kartoffel|reis|nudel|curry|chili|sticks/;
+  const isBreakfast = r => { const n = String(r.name || '').toLowerCase(); return BREAKFAST_RE.test(n) && !NOT_BREAKFAST_RE.test(n); };
+
+  // Automatisch planen: gewählte Mahlzeiten an gewählten Tagen anlegen und füllen (Meal Prep: ein Topf reicht für mehrere Tage).
+  // fresh = vorhandene Rezepte dieser Mahlzeiten vorher herausnehmen (neu planen).
+  function autoPlan(db, start, meals, wdays, fresh) {
+    for (const d of weekDays(start)) {
+      if (!wdays.includes(wd(d))) continue;
+      for (const m of meals) {
+        setMeal(db, d, m, true);
+        if (fresh) { const e = db.plan[mainId(d, m)]; if (e && e.recipeId) update(db, e.id, { recipeId: null }); }
+      }
+    }
+    const res = suggestWeek(db, start);
+    applySuggestions(db, res.fill);
+    return res;
   }
   function applySuggestions(db, list) { for (const s of list) update(db, s.id, { recipeId: s.recipeId }); }
 
@@ -257,7 +286,7 @@
   return {
     addDays, diffDays, wd, weekStart, weekDays, isoWeek, DAY_SHORT, DAY_LONG, dayLabel,
     MEALS, mealById, GAPS, mainId, isMain, entries, weekEntries, recipeOf, portionOf,
-    setMeal, addSnack, update, dayTotals, room, roomText, half, score, catsFor, cookDate,
+    setMeal, addSnack, autoPlan, isBreakfast, update, dayTotals, room, roomText, half, score, catsFor, cookDate,
     suggestWeek, applySuggestions, swapOptions, saveFavWeek, applyFavWeek, ratingCandidate,
     weeklyWeights, stall, isCarb, lighten, lightenPreview
   };

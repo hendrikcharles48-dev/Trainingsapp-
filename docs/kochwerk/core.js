@@ -23,11 +23,33 @@
   // ---------- Feste Listen ----------
   const CATS = [
     { id: 'main', label: 'Hauptmahlzeit', short: 'Haupt', icon: '🍲' },
-    { id: 'snack', label: 'Snack / kleine Mahlzeit', short: 'Snack', icon: '🥪' },
+    { id: 'snack', label: 'Snack / kleine Mahlzeit', short: 'Snack', icon: '🍎' },
     { id: 'hunger', label: 'Snack für den Hungerknopf', short: 'Hungerknopf', icon: '🥜' },
     { id: 'emergency', label: 'Notfallgericht aus Vorrat', short: 'Notfall', icon: '🥫' }
   ];
   const catById = id => CATS.find(c => c.id === id) || CATS[0];
+  // Passendes Symbol pro Rezept aus dem Namen (Reihenfolge zählt: „Thunfisch-Bohnen-Salat“ → Salat, „Seelachs-Curry“ → Curry)
+  const ICON_RULES = [
+    [/salat/, '🥗'], [/wrap|fajita|burrito|gyros|döner/, '🌯'], [/taco/, '🌮'], [/burger/, '🍔'], [/pizza/, '🍕'],
+    [/suppe|eintopf|topf|dal\b|ramen/, '🍲'], [/curry/, '🍛'], [/chili/, '🌶️'],
+    [/nudel|pasta|spaghetti|lasagne|bolognese|penne/, '🍝'], [/auflauf|gratin|ofenblech|blech/, '🥘'],
+    [/frittata|omelett|shakshuka|rührei|spiegelei|bauernfrühstück|eier/, '🍳'],
+    [/pancake|pfannkuchen|waffel/, '🥞'], [/porridge|oats|haferflocken|müsli|granola|overnight/, '🥣'],
+    [/muffin|kuchen|brownie|cookie|keks/, '🧁'], [/riegel|balls|kugeln|schoko/, '🍫'], [/shake|smoothie/, '🥤'],
+    [/sandwich|brot|toast|brötchen|bagel/, '🥪'], [/bowl/, '🥣'],
+    [/lachs|seelachs|fisch|thunfisch|kabeljau|garnele/, '🐟'],
+    [/pfanne|geschnetzelt|ragout|gulasch/, '🥘'], [/reis/, '🍚'], [/kartoffel/, '🥔'],
+    [/hähnchen|huhn|pute|chicken/, '🍗'], [/hack|frikadell|bulette/, '🍖'],
+    [/sticks|rohkost/, '🥕'], [/beere/, '🫐'], [/apfel/, '🍎'], [/banane/, '🍌'], [/quark|skyr|joghurt/, '🥛'],
+    [/nuss|nüsse|mandel|erdnuss/, '🥜'], [/edamame|bohnen|linsen|kichererbsen/, '🫘'],
+    [/kohl|brokkoli|gemüse|zucchini|spinat/, '🥦'], [/käse/, '🧀']
+  ];
+  function recipeIcon(r) {
+    if (!r) return '🍲';
+    const n = String(r.name || '').toLowerCase();
+    for (const [re, ic] of ICON_RULES) if (re.test(n)) return ic;
+    return catById(r.cat).icon;
+  }
 
   // Bereiche im Supermarkt, in der Reihenfolge eines typischen Rundgangs
   const AREAS = [
@@ -549,7 +571,7 @@
   }
 
   const KW = {
-    uid, num, round, norm, isoDate, fmtNum, CATS, catById, AREAS, areaById, ACTIVITY, TEMPO, WEEKDAYS, DEFAULTS, COUNT_UNITS,
+    uid, num, round, norm, isoDate, fmtNum, CATS, catById, recipeIcon, AREAS, areaById, ACTIVITY, TEMPO, WEEKDAYS, DEFAULTS, COUNT_UNITS,
     parseAmount, parsePack, packText, parseNutr, parseCat, parseArea, parseBool, parseStepMeta, parseRecipes,
     ingGrams, recipeTotals, calcTargets, amountText, nutrText, recipeToText,
     COLLECTIONS, emptyDb, upgrade, live, put, remove, getSetting, setSetting, profile, latestWeight, setWeight,

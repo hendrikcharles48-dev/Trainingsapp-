@@ -504,3 +504,6 @@ button.switch[aria-checked="true"] span::after{transform:translateX(20px)}
 #view{will-change:auto}
 body.swiping #view{box-shadow:-8px 0 24px rgba(0,0,0,.18);background:var(--bg);min-height:100vh;will-change:transform}
 body.swiping{overflow-x:hidden}
+.plan2.auto .lbl{margin-top:2px}
+.mealchips.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.mealchips.days .mchip{min-width:0;padding-left:0;padding-right:0;justify-content:center}

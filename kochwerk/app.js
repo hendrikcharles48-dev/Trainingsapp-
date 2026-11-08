@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.0';
+  const VERSION = '2.1';
 
   // ---------- Speicher ----------
   function load() {
@@ -180,7 +180,7 @@
     }
     const ov = db.log && db.log['lp' + e.id], fac = ov && !ov.del && ov.factor != null ? ov.factor : 1;
     const sub2 = sub + (fac === 0 ? ' · nicht gegessen' : fac !== 1 ? ' · ' + fNum(fac) + ' Portion' : '');
-    return `<button class="row${fac === 0 ? ' tb off' : ''}" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${m.icon}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub2)}</span></span><span class="right"><b>${fac === 0 ? '–' : f0(t.kcal * fac) + ' kcal'}</b><span>${fac === 0 ? '' : f0(t.p * fac) + ' g P'}</span></span></button>`;
+    return `<button class="row${fac === 0 ? ' tb off' : ''}" data-act="slot" data-id="${e.id}"><span class="ico m-${e.meal}">${KW.recipeIcon(r)}</span><span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(sub2)}</span></span><span class="right"><b>${fac === 0 ? '–' : f0(t.kcal * fac) + ' kcal'}</b><span>${fac === 0 ? '' : f0(t.p * fac) + ' g P'}</span></span></button>`;
   }
   function dayList(date, withOff) {
     const es = P.entries(db, date);
@@ -207,7 +207,7 @@
     if (!r) return `<button class="row tb" data-act="slot" data-id="${e.id}"><span class="mid"><span class="t muted">${e.recipeId ? 'Rezept gelöscht' : 'Noch kein Rezept'}</span><span class="s">geplant${e.meal === 'snack' ? ' · Snack' : ''}</span></span><span class="add">Wählen</span></button>`;
     const t = P.portionOf(r), ov = db.log && db.log['lp' + e.id], fac = ov && !ov.del && ov.factor != null ? ov.factor : 1;
     const sub = (fac === 0 ? 'nicht gegessen' : fac !== 1 ? fNum(fac) + ' Portion' : '1 Portion') + ' · geplant' + (e.partner ? ' · 👫' : '');
-    return `<button class="row tb${fac === 0 ? ' off' : ''}" data-act="slot" data-id="${e.id}"><span class="mid"><span class="t">🍲 ${esc(r.name)}</span><span class="s">${esc(sub)}</span></span>
+    return `<button class="row tb${fac === 0 ? ' off' : ''}" data-act="slot" data-id="${e.id}"><span class="mid"><span class="t">${KW.recipeIcon(r)} ${esc(r.name)}</span><span class="s">${esc(sub)}</span></span>
       <span class="right"><b>${fac === 0 ? '–' : f0(t.kcal * fac) + ' kcal'}</b><span>${fac === 0 ? '' : f0(t.p * fac) + ' g P'}</span></span></button>`;
   }
   function todayMeals(d) {
@@ -274,14 +274,14 @@
     // Was wird vorgekocht?
     h += `<div class="sect"><h2 class="sec">Diese Woche vorkochen</h2><span class="sect-r">${pots.length ? pots.reduce((s, x) => s + Math.round(x.portions), 0) + ' Boxen' : ''}</span></div>`;
     if (!pots.length) {
-      h += `<div class="card empty"><span class="em">🥡</span><div><b>Noch nichts geplant</b>Im Wochenplan die Mahlzeiten anwählen und Rezepte vorschlagen lassen – oder eine Lieblingswoche übernehmen.</div>
-        <div class="btns" style="width:100%"><button class="btn" data-act="tab" data-tab="woche">🗓️ Wochenplan öffnen</button><button class="btn plain" data-act="favs">★ Lieblingswoche</button></div></div>`;
+      h += `<div class="card empty"><span class="em">🥡</span><div><b>Noch nichts geplant</b>Im Wochenplan z. B. „Mittag“ für die ganze Woche wählen – die App verteilt deine Meal-Prep-Rezepte automatisch.</div>
+        <div class="btns" style="width:100%"><button class="btn" data-act="tab" data-tab="woche">✨ Woche planen</button><button class="btn plain" data-act="favs">★ Lieblingswoche</button></div></div>`;
     } else {
       h += '<div class="list">' + pots.map(x => {
         const c = KW.catById(x.r.cat), t = KW.recipeTotals(x.r).portion;
         const bits = [x.pots === 1 ? '1 Topf' : x.pots + ' Töpfe', P.half(x.portions) + ' Portionen', fNum(x.r.keepDays) + ' Tage haltbar'];
         if (x.r.freeze) bits.push('❄️');
-        return `<button class="row rrow" data-act="open" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${c.icon}</span>
+        return `<button class="row rrow" data-act="open" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${KW.recipeIcon(x.r)}</span>
           <span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span>
           <span class="right"><b>${f0(t.kcal)}</b><span>${f0(t.p)} g P</span></span></button>`;
       }).join('') + '</div>';
@@ -346,8 +346,14 @@
     const es = P.weekEntries(db, start), empty = es.filter(e => P.isMain(e) && !P.recipeOf(db, e)).length;
     const plannedDays = days.filter(d => P.dayTotals(db, d).n);
     const avgP = plannedDays.length ? plannedDays.reduce((s, d) => s + P.dayTotals(db, d).p, 0) / plannedDays.length : 0;
-    h += `<div class="card plan2"><div class="inline"><span class="step-n">2</span><span class="mid" style="flex:1"><span class="t">Woche planen</span><span class="s">${es.length ? `${es.length} Mahlzeiten · ${empty ? empty + ' noch leer · ' : ''}Ø ${f0(avgP)} g Protein pro Tag` : 'An den Tagen die Mahlzeiten anwählen, dann vorschlagen lassen.'}</span></span></div>
-      <div class="pills"><button class="pill-btn${empty ? ' pri' : ''}" data-act="suggest"${empty ? '' : ' disabled'}>✨ Vorschlagen</button><button class="pill-btn" data-act="favs">★ Favoriten</button></div></div>`;
+    const am = autoMeals(), ad = autoDays();
+    h += `<div class="card plan2 auto"><div class="inline"><span class="step-n">2</span><span class="mid" style="flex:1"><span class="t">Woche automatisch planen</span><span class="s">${es.length ? `${es.length} Mahlzeiten · ${empty ? empty + ' noch leer · ' : ''}Ø ${f0(avgP)} g Protein pro Tag` : 'Wähle, was du vorgekocht essen willst – der Rest kommt von selbst.'}</span></span></div>
+      <span class="lbl">Mahlzeiten</span>
+      <div class="mealchips">${P.MEALS.map(m => `<button class="mchip" data-act="auto-meal" data-meal="${m.id}" aria-pressed="${am.includes(m.id)}">${m.icon} ${esc(m.short)}</button>`).join('')}</div>
+      <span class="lbl">Tage</span>
+      <div class="mealchips days">${[0, 1, 2, 3, 4, 5, 6].map(k => `<button class="mchip" data-act="auto-day" data-k="${k}" aria-pressed="${ad.includes(k)}">${P.DAY_SHORT[k]}</button>`).join('')}</div>
+      <button class="btn" data-act="auto-go"${am.length && ad.length ? '' : ' disabled'}>✨ ${empty ? 'Leere Plätze füllen' : es.some(e => P.isMain(e) && P.recipeOf(db, e)) ? 'Fehlende ergänzen' : 'Ganze Woche planen'}</button>
+      <div class="pills">${es.some(e => P.isMain(e) && P.recipeOf(db, e)) ? '<button class="pill-btn" data-act="auto-redo">↻ Neu planen</button>' : ''}<button class="pill-btn" data-act="favs">★ Favoriten</button></div></div>`;
     const ck = CO.cookedOf(db, start), cdt = P.cookDate(db, start);
     h += `<div class="card plan2"><div class="inline"><span class="step-n${ck ? ' done' : ''}">${ck ? '✓' : '3'}</span><span class="mid" style="flex:1"><span class="t">Kochen & Boxen</span><span class="s">${ck ? 'Gekocht am ' + esc(P.dayLabel(ck.date)) : 'Kochtag ' + esc(P.dayLabel(cdt)) + ' · einmal vorkochen für die Woche'}</span></span></div>
       <div class="pills"><button class="pill-btn${ck || !es.length ? '' : ' pri'}" data-act="cook" data-week="${start}"${es.length ? '' : ' disabled'}>🍳 Kochsession</button><button class="pill-btn" data-act="boxes"${es.length ? '' : ' disabled'}>🥡 Boxen</button></div></div>`;
@@ -420,7 +426,7 @@
       if (meal === 'box' && !x.r.box) bits.push('nicht boxtauglich');
       if (x.rs.good) bits.push('👍'); else if (x.rs.bad) bits.push('👎');
       if (k < 3 && x.s > -Infinity && !q) bits.unshift('✨ Empfohlen');
-      return `<button class="row" data-act="pick-r" data-id="${x.r.id}"><span class="ico">${KW.catById(x.r.cat).icon}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span><span class="right"><b>${f0(x.t.kcal)} kcal</b><span>${f0(x.t.p)} g P</span></span></button>`;
+      return `<button class="row" data-act="pick-r" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${KW.recipeIcon(x.r)}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span><span class="right"><b>${f0(x.t.kcal)} kcal</b><span>${f0(x.t.p)} g P</span></span></button>`;
     }).join('') + '</div>';
   }
   function pickRecipe(rid) {
@@ -436,7 +442,7 @@
       <p class="hint" style="margin:0">Rezepte mit ähnlichen Werten. Oben stehen die, deren Zutaten diese Woche schon gekauft werden.</p>`;
     if (!opts.length) return h + '<div class="card empty">Kein Rezept mit ähnlichen Werten gefunden.</div>';
     const sign = n => (n > 0 ? '+' : n < 0 ? '−' : '±') + f0(Math.abs(n));
-    return h + '<div class="list">' + opts.map(o => `<button class="row" data-act="swap-r" data-id="${o.r.id}"><span class="ico">${KW.catById(o.r.cat).icon}</span>
+    return h + '<div class="list">' + opts.map(o => `<button class="row" data-act="swap-r" data-id="${o.r.id}"><span class="ico c-${o.r.cat}">${KW.recipeIcon(o.r)}</span>
       <span class="mid"><span class="t">${esc(o.r.name)}</span><span class="s">${sign(o.dk)} kcal · ${sign(o.dp)} g P${o.shared ? ' · 🛒 ' + o.shared + (o.shared === 1 ? ' Zutat' : ' Zutaten') + ' schon da' : ''}</span></span>
       <span class="right"><b>${f0(o.t.kcal)} kcal</b><span>${f0(o.t.p)} g P</span></span></button>`).join('') + '</div>';
   }
@@ -497,9 +503,19 @@
   }
 
   // ---------- Vorschlagen ----------
+  const autoMeals = () => { const v = KW.getSetting(db, 'autoMeals'); return Array.isArray(v) ? v : ['lunch']; };
+  const autoDays = () => { const v = KW.getSetting(db, 'autoDays'); return Array.isArray(v) ? v : [0, 1, 2, 3, 4, 5, 6]; };
+  const toggleIn = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : arr.concat([x]);
+  function runAuto(fresh) {
+    const res = P.autoPlan(db, S.week, autoMeals(), autoDays(), fresh);
+    showSuggest(res);
+  }
   function runSuggest() {
     const res = P.suggestWeek(db, S.week);
     P.applySuggestions(db, res.fill);
+    showSuggest(res);
+  }
+  function showSuggest(res) {
     save(); render(true);
     if (res.open.length) {
       const why = { keep: 'Kein passendes Rezept hält bis dahin. Ein einfrierbares Rezept anlegen oder von Hand wählen.', box: 'Kein boxtaugliches Hauptgericht im Rezeptbuch.', none: 'Im Rezeptbuch gibt es noch keine Hauptmahlzeit.' };
@@ -602,7 +618,7 @@
     h += `<button class="btn tint" data-act="rest-new">+ Rest eintragen</button>`;
     const rr = SH3.restRecipes(db);
     if (rr.length) {
-      h += `<h2 class="sec">Damit aufbrauchen</h2><div class="list">${rr.map(x => { const t = P.portionOf(x.r); return `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico">${KW.catById(x.r.cat).icon}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">nutzt ${esc(x.hits.map(hh => hh.name + ' ' + amt(hh.use, hh.unit)).join(', '))}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`; }).join('')}</div>`;
+      h += `<h2 class="sec">Damit aufbrauchen</h2><div class="list">${rr.map(x => { const t = P.portionOf(x.r); return `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${KW.recipeIcon(x.r)}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">nutzt ${esc(x.hits.map(hh => hh.name + ' ' + amt(hh.use, hh.unit)).join(', '))}</span></span><span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></button>`; }).join('')}</div>`;
     }
     return h;
   }
@@ -799,7 +815,7 @@
 
   // ---------- Hunger und Notfall ----------
   function ideaRows(list) {
-    return '<div class="list">' + list.map(x => `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico">${KW.catById(x.r.cat).icon}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${x.r.time ? f0(x.r.time) + ' min · ' : ''}${esc(KW.catById(x.r.cat).short)}</span></span><span class="right"><b>${f0(x.t.kcal)} kcal</b><span>${f0(x.t.p)} g P</span></span></button>`).join('') + '</div>';
+    return '<div class="list">' + list.map(x => `<button class="row" data-act="view" data-id="${x.r.id}"><span class="ico c-${x.r.cat}">${KW.recipeIcon(x.r)}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${x.r.time ? f0(x.r.time) + ' min · ' : ''}${esc(KW.catById(x.r.cat).short)}</span></span><span class="right"><b>${f0(x.t.kcal)} kcal</b><span>${f0(x.t.p)} g P</span></span></button>`).join('') + '</div>';
   }
   function hungerSheet() {
     const list = CO.hungerIdeas(db, today());
@@ -1199,7 +1215,7 @@
       if (r.time) bits.push('⏱ ' + f0(r.time) + ' min');
       if (r.freeze) bits.push('❄️');
       if (rs.good) bits.push('👍'); else if (rs.bad) bits.push('👎');
-      return `<button class="row rrow" data-act="open" data-id="${r.id}"><span class="ico c-${r.cat}">${c.icon}</span>
+      return `<button class="row rrow" data-act="open" data-id="${r.id}"><span class="ico c-${r.cat}">${KW.recipeIcon(r)}</span>
         <span class="mid"><span class="t">${esc(r.name)}</span><span class="s">${esc(bits.join(' · '))}</span></span>
         <span class="right"><b>${f0(t.kcal)}</b><span>${f0(t.p)} g P</span></span></button>`;
     };
@@ -1217,7 +1233,7 @@
   function pageRecipe(r) {
     const c = KW.catById(r.cat), T = KW.recipeTotals(r), t = T.portion, rs = KW.ratingSummary(db, r.id);
     let h = backBtn(backLabel('Rezepte')) + `
-      <div class="rhead"><span class="rhero ico c-${r.cat}">${c.icon}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
+      <div class="rhead"><span class="rhero ico c-${r.cat}">${KW.recipeIcon(r)}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
       <div class="facts"><span class="fact">🍽️ ${fNum(r.portions)} ${r.portions === 1 ? 'Portion' : 'Portionen'}</span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
       <span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
@@ -1531,7 +1547,7 @@
     if (!IM.res.length) h += '<div class="errbox">Kein Rezept gefunden. Der Block beginnt mit „=== KOCHWERK REZEPT ===“ oder mit „Name: …“.</div>';
     IM.res.forEach((res, k) => {
       const r = res.recipe, c = KW.catById(r.cat), t = KW.recipeTotals(r).portion, twin = r.name && KW.findByName(db, r.name);
-      h += `<div class="ecard"><div class="ehead wrap"><span class="ico">${c.icon}</span><span class="mid"><span class="t">${esc(r.name || 'Ohne Namen')}</span>
+      h += `<div class="ecard"><div class="ehead wrap"><span class="ico">${KW.recipeIcon(r)}</span><span class="mid"><span class="t">${esc(r.name || 'Ohne Namen')}</span>
         <span class="s">${esc(c.short)} · ${fNum(r.portions)} Port. · ${r.ingredients.length} Zutaten · ${r.steps.length} Schritte</span></span>
         <span class="right"><b>${f0(t.kcal)} kcal</b><span>${f0(t.p)} g P</span></span></div>`;
       if (res.errors.length) h += `<div class="errbox"><b>Wird nicht übernommen:</b><ul>${res.errors.map(e => '<li>' + esc(e) + '</li>').join('')}</ul></div>`;
@@ -1831,8 +1847,12 @@ Schritte:
       const kg = KW.num($('#wg-kg').value);
       if (!(kg >= 35 && kg <= 250)) { toast('Bitte ein Gewicht eingeben'); return; }
       KW.setWeight(db, kg); save(); const cont = WG.cont; closeSheet(); render(true);
-      if (cont === 'suggest') runSuggest(); else toast('Gewicht gespeichert');
+      if (cont === 'suggest') runSuggest(); else if (cont === 'auto') runAuto(false); else toast('Gewicht gespeichert');
     },
+    'auto-meal': b => { KW.setSetting(db, 'autoMeals', toggleIn(autoMeals(), b.dataset.meal)); save(); render(true); },
+    'auto-day': b => { KW.setSetting(db, 'autoDays', toggleIn(autoDays(), +b.dataset.k).sort()); save(); render(true); },
+    'auto-go': () => { if (!recentWeight() && S.week >= P.weekStart(today())) { openWeight('auto'); return; } runAuto(false); },
+    'auto-redo': () => confirmSheet('Woche neu planen?', 'Die Rezepte bei ' + autoMeals().map(m => P.mealById(m).short).join(', ') + ' werden neu vorgeschlagen.', 'Neu planen', () => { closeSheet(); runAuto(true); }),
     suggest: () => { if (!recentWeight() && S.week >= P.weekStart(today())) { openWeight('suggest'); return; } runSuggest(); },
     favs: () => openSheet(favSheet),
     'fav-save': () => { const n = ($('#fav-name').value || '').trim() || 'Woche KW ' + P.isoWeek(S.week); P.saveFavWeek(db, S.week, n); save(); refreshSheet(); toast('Als Lieblingswoche gespeichert'); },
