@@ -411,9 +411,18 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
   }
   eq('Paket: Werte passen zum Artefakt (±12 % kcal, ±15 % Protein)', off, []);
   eq('Paket: Notfallgericht dabei', paket.some(x => x.recipe.cat === 'emergency'), true);
+  eq('Paket: 20 Monsieur-Cuisine-Rezepte', paket.filter(x => x.recipe.mc).length, 20);
+  eq('Paket: MC-Rezepte günstig und leicht (≤ 600 kcal pro Portion)', paket.filter(x => x.recipe.mc && KW.recipeTotals(x.recipe).portion.kcal > 600).map(x => x.recipe.name), []);
   eq('Paket: keine doppelten Namen', paket.length, new Set(paket.map(x => KW.norm(x.recipe.name))).size);
 }
 
+// Gerät: Monsieur Cuisine
+{
+  const g = KW.parseRecipes('Name: MC-Test\nKategorie: Snack\nPortionen: 1\nHaltbar: 1 Tag\nEinfrierbar: nein\nBoxtauglich: ja\nGerät: Monsieur Cuisine\nZutaten:\n- Skyr natur | 250 g | Becher 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F\nSchritte:\n1. 10 Sek./Stufe 4 rühren. [1 min]')[0];
+  eq('Gerät erkannt', [g.recipe.mc, g.warnings], [true, []]);
+  eq('Gerät im Text', /Gerät: Monsieur Cuisine/.test(KW.recipeToText(g.recipe)), true);
+  eq('ohne Gerät: kein MC', KW.parseRecipes('Name: X\nZutaten:\n- Skyr | 100 g | Becher 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F')[0].recipe.mc, false);
+}
 // Packungs-Schreibweisen aus dem Chat (Skill schreibt „Packung …“ vor die Art)
 eq('Packung Glas', KW.parsePack('Packung Glas 120 g').pack, { kind: 'Glas', size: 120, unit: 'g' });
 eq('Packung Dose abgetropft', KW.parsePack('Packung Dose 400 g (250 g abgetropft)').pack, { kind: 'Dose', size: 250, unit: 'g', label: 'Dose 400 g (250 g abgetropft)' });

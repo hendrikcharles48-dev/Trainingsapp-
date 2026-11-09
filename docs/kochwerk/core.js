@@ -265,6 +265,7 @@
     ['box', /^(boxtauglich|box|schulbox|box tauglich)$/],
     ['time', /^(zeit|dauer|gesamtzeit|arbeitszeit)$/],
     ['note', /^(notiz|hinweis|anmerkung)$/],
+    ['device', /^(gerat|kuchengerat|kuchenmaschine|geraet)$/],
     ['tip', /^(tipp|spartipp|spar tipp|tipps|energie tipp|energietipp)$/],
     ['ings', /^(zutaten)$/],
     ['steps', /^(schritte|zubereitung|anleitung)$/]
@@ -286,7 +287,7 @@
   }
 
   function blankRecipe() {
-    return { id: null, name: '', cat: null, portions: null, keepDays: null, freeze: null, box: null, time: null, note: '', tips: [], ingredients: [], steps: [] };
+    return { id: null, name: '', cat: null, portions: null, keepDays: null, freeze: null, box: null, time: null, mc: false, note: '', tips: [], ingredients: [], steps: [] };
   }
 
   function parseIngredient(line, warn) {
@@ -367,6 +368,8 @@
           case 'box': r.box = parseBool(v); continue;
           case 'time': { const m = /(\d+)/.exec(v); r.time = m ? +m[1] * (/std|h\b|stunde/i.test(v) && !/min/i.test(v) ? 60 : 1) : null; continue; }
           case 'note': r.note = (r.note ? r.note + '\n' : '') + v; continue;
+          // Gerät: Monsieur Cuisine (Lidl-Küchenmaschine, auch „Thermomix“ wird so erkannt)
+          case 'device': r.mc = /monsieur|cuisine|\bmc\b|thermomix|kuchenmaschine|ja/.test(norm(v)); if (!r.mc && v && !/^(nein|kein|herd|-)/i.test(v)) warn('Gerät „' + v + '“ unbekannt'); continue;
           case 'tip':
             if (mode === 'steps' && r.steps.length) { const s = r.steps[r.steps.length - 1]; s.tip = (s.tip ? s.tip + ' ' : '') + v; }
             else r.tips.push(v);
@@ -470,6 +473,7 @@
     const L = ['=== KOCHWERK REZEPT ===', 'Name: ' + r.name, 'Kategorie: ' + ({ main: 'Hauptmahlzeit', snack: 'Snack', hunger: 'Hungersnack', emergency: 'Notfall' })[r.cat],
       'Portionen: ' + fmtNum(r.portions), 'Haltbar: ' + fmtNum(r.keepDays) + (r.keepDays === 1 ? ' Tag' : ' Tage'), 'Einfrierbar: ' + (r.freeze ? 'ja' : 'nein'), 'Boxtauglich: ' + (r.box ? 'ja' : 'nein')];
     if (r.time) L.push('Zeit: ' + r.time + ' min');
+    if (r.mc) L.push('Gerät: Monsieur Cuisine');
     if (r.note) L.push('Notiz: ' + r.note.replace(/\n/g, ' '));
     for (const t of r.tips || []) L.push('Tipp: ' + t);
     L.push('Zutaten:');

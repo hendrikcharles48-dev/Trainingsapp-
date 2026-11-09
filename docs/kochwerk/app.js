@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.1';
+  const VERSION = '2.2';
 
   // ---------- Speicher ----------
   function load() {
@@ -1193,6 +1193,7 @@
   }
   // Meal-Prep-Filter: was sich gut vorkochen lässt
   const PREP = {
+    mc: { l: '🤖 Monsieur Cuisine', f: r => !!r.mc },
     frz: { l: '❄️ Einfrierbar', f: r => !!r.freeze },
     keep: { l: '🧊 4+ Tage', f: r => r.keepDays >= 4 },
     big: { l: '🥡 4+ Boxen', f: r => r.portions >= 4 },
@@ -1212,6 +1213,7 @@
     const row = r => {
       const c = KW.catById(r.cat), t = KW.recipeTotals(r).portion, rs = KW.ratingSummary(db, r.id);
       const bits = ['🥡 ' + fNum(r.portions) + (r.portions === 1 ? ' Box' : ' Boxen'), '🧊 ' + fNum(r.keepDays) + ' Tage'];
+      if (r.mc) bits.unshift('🤖 MC');
       if (r.time) bits.push('⏱ ' + f0(r.time) + ' min');
       if (r.freeze) bits.push('❄️');
       if (rs.good) bits.push('👍'); else if (rs.bad) bits.push('👎');
@@ -1236,7 +1238,7 @@
       <div class="rhead"><span class="rhero ico c-${r.cat}">${KW.recipeIcon(r)}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
       <div class="facts"><span class="fact">🍽️ ${fNum(r.portions)} ${r.portions === 1 ? 'Portion' : 'Portionen'}</span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
-      <span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
+      ${r.mc ? '<span class="fact mc">🤖 Monsieur Cuisine</span>' : ''}<span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
       ${r.time ? `<span class="fact">⏱️ ${f0(r.time)} min</span>` : ''}</div></div>`;
     h += `<div class="card" style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Pro Portion</span>
       <div class="tiles"><div><b>${f0(t.kcal)}</b><span>kcal</span></div><div class="p"><b>${f0(t.p)}<small> g</small></b><span>Protein</span></div>
@@ -1401,7 +1403,8 @@
         <div class="field"><label>Haltbar (Tage)</label><input data-f="keepDays" inputmode="decimal" value="${esc(fNum(d.keepDays))}"></div>
         <div class="field"><label>Zeit (min)</label><input data-f="time" inputmode="numeric" value="${esc(d.time || '')}"></div></div>
       <div class="set"><div class="it"><span>❄️ Einfrierbar</span><label class="switch"><input type="checkbox" data-f="freeze"${d.freeze ? ' checked' : ''}><span></span></label></div>
-        <div class="it"><span>🥡 Boxtauglich</span><label class="switch"><input type="checkbox" data-f="box"${d.box ? ' checked' : ''}><span></span></label></div></div>
+        <div class="it"><span>🥡 Boxtauglich</span><label class="switch"><input type="checkbox" data-f="box"${d.box ? ' checked' : ''}><span></span></label></div>
+        <div class="it"><span>🤖 Monsieur Cuisine</span><label class="switch"><input type="checkbox" data-f="mc"${d.mc ? ' checked' : ''}><span></span></label></div></div>
       <div class="field"><label>Notiz</label><textarea data-f="note" rows="2" placeholder="optional">${esc(d.note)}</textarea></div>
       <h2 class="sec" style="margin-bottom:-4px">Zutaten</h2>`;
     d.ingredients.forEach((i, k) => {

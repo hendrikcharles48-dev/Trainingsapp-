@@ -19,6 +19,7 @@ Haltbar: <Zahl> Tage
 Einfrierbar: <ja | nein>
 Boxtauglich: <ja | nein>
 Zeit: <Zahl> min                      (optional, Gesamtzeit)
+Gerät: Monsieur Cuisine               (optional, nur bei Rezepten für die Küchenmaschine)
 Notiz: <Text>                         (optional, z. B. was von Packungen übrig bleibt)
 Zutaten:
 - <Zutat> | <Menge> | <Packung> | <Bereich> | <kcal> kcal, <Protein> P, <Kohlenhydrate> K, <Fett> F
@@ -46,6 +47,7 @@ Schritte:
 | `Einfrierbar` | ja | `ja` / `nein` | Ehrlich angeben (Eier, Salate, gekochte Kartoffeln, rohe Gurken und Tomaten eignen sich schlecht). |
 | `Boxtauglich` | ja | `ja` / `nein` | Lässt sich gut in Boxen packen und aufwärmen oder kalt essen. |
 | `Zeit` | nein | Zahl `min` | Gesamtzeit. |
+| `Gerät` | nein | `Monsieur Cuisine` | Rezept für die Lidl-Küchenmaschine (Monsieur Cuisine, Thermomix-Art). Die App kennzeichnet es mit 🤖 und hat einen eigenen Filter. Die Schritte nennen dann Zeit, Temperatur und Stufe, z. B. `20 Min./100 °C/Linkslauf/Stufe 1`. |
 | `Notiz` | nein | Text | Freier Hinweis. |
 | `Zutaten:` | ja | Liste | Eine Zutat pro Zeile, beginnt mit `- `. |
 | `Schritte:` | ja | Liste | Nummeriert `1.`, `2.` … |
