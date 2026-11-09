@@ -184,14 +184,14 @@
     const weekIngs = new Set();
     for (const e of weekEntries(db, weekStart(entry.date))) {
       const r = recipeOf(db, e); if (!r || (cur && r.id === cur.id && e.id === entry.id)) continue;
-      for (const i of r.ingredients) if (!i.pantry) weekIngs.add(KW.norm(i.name));
+      for (const i of r.ingredients) if (!KW.isBasic(i)) weekIngs.add(KW.norm(i.name));
     }
     const all = KW.live(db, 'recipes').filter(r => cats.includes(r.cat) && (!cur || r.id !== cur.id) && (entry.meal !== 'box' || r.box));
     const rate = (tol) => all.map(r => {
       const t = portionOf(r), s = score(db, r);
       if (s === -Infinity) return null;
       if (base && base.kcal > 0 && Math.abs(t.kcal - base.kcal) > base.kcal * tol) return null;
-      const shared = r.ingredients.filter(i => !i.pantry && weekIngs.has(KW.norm(i.name))).length;
+      const shared = r.ingredients.filter(i => !KW.isBasic(i) && weekIngs.has(KW.norm(i.name))).length;
       return { r, t, shared, s, dk: base ? t.kcal - base.kcal : 0, dp: base ? t.p - base.p : 0 };
     }).filter(Boolean);
     let list = rate(0.2);
@@ -262,7 +262,7 @@
   }
 
   // Leichter machen: Zutaten mit vielen Kohlenhydraten (≥ 15 g/100 g und mehr als 2,5 × so viel wie Protein) um 25 % kürzen.
-  const isCarb = i => i.per100 && i.per100.c != null && i.per100.c >= 15 && i.per100.c > 2.5 * (i.per100.p || 0) && !i.pantry;
+  const isCarb = i => i.per100 && i.per100.c != null && i.per100.c >= 15 && i.per100.c > 2.5 * (i.per100.p || 0) && !KW.isBasic(i);
   function lighten(r, factor = 0.75) {
     const n = JSON.parse(JSON.stringify(r));
     const changed = [];

@@ -469,6 +469,23 @@
     const v = k => p && p[k] != null ? fmtNum(p[k]) : '?';
     return v('kcal') + ' kcal, ' + v('p') + ' P, ' + v('c') + ' K, ' + v('f') + ' F';
   }
+  // Grundzutaten = was wirklich jeder zu Hause hat (Nutzerwunsch 10.11.): Öl, Salz, Pfeffer, getrocknete Gewürze, Mehl, Zucker,
+  // Stärke, Essig, Brühe. Alles andere kommt auf die Einkaufsliste, auch wenn ein Rezept „Vorrat“ schreibt.
+  const BASIC_ANY = /gewürz|brühe|brühwürfel|bouillon/;
+  const BASIC_START = /^(öl|rapsöl|olivenöl|sonnenblumenöl|speiseöl|salz|pfeffer|mehl|weizenmehl|zucker|speisestärke|stärke|essig|backpulver|natron|zimt|kreuzkümmel|kümmel|oregano|thymian|majoran|muskat|kurkuma|lorbeer|currypulver|curry|paprikapulver|chilipulver|chiliflocken|knoblauchpulver|zwiebelpulver|süßstoff|wasser)(?![a-zäöüß])/;
+  function isBasic(i) {
+    const n = String(i && typeof i === 'object' ? i.name : i || '').toLowerCase().trim();
+    return BASIC_ANY.test(n) || BASIC_START.test(n);
+  }
+  // Packung für Zutaten, die ein Rezept nur als „Vorrat“ führt, die aber gekauft werden müssen
+  const FALLBACK_PACKS = [[/knoblauch/, { kind: 'Knolle', size: 1, unit: 'Stück' }], [/tomatenmark/, { kind: 'Tube', size: 200, unit: 'g' }],
+    [/honig/, { kind: 'Glas', size: 500, unit: 'g' }], [/zitronensaft/, { kind: 'Flasche', size: 200, unit: 'ml' }],
+    [/sojaso/, { kind: 'Flasche', size: 250, unit: 'ml' }], [/senf/, { kind: 'Tube', size: 200, unit: 'ml' }], [/kakao/, { kind: 'Packung', size: 250, unit: 'g' }]];
+  function fallbackPack(i) {
+    const n = String(i.name || '').toLowerCase();
+    for (const [re, p] of FALLBACK_PACKS) if (re.test(n)) return Object.assign({}, p);
+    return null;
+  }
   // Fingerabdruck eines Rezepts (Name + Zutatenmengen + Portionen): erkennt, ob ein Paket-Rezept unverändert übernommen wurde
   function recipeFp(r) {
     const str = norm(r.name) + '#' + r.portions + '#' + (r.ingredients || []).map(i => norm(i.name) + ':' + Math.round(ingGrams(i))).join(',');
@@ -583,7 +600,7 @@
   const KW = {
     uid, num, round, norm, isoDate, fmtNum, CATS, catById, recipeIcon, AREAS, areaById, ACTIVITY, TEMPO, WEEKDAYS, DEFAULTS, COUNT_UNITS,
     parseAmount, parsePack, packText, parseNutr, parseCat, parseArea, parseBool, parseStepMeta, parseRecipes,
-    ingGrams, recipeTotals, calcTargets, amountText, nutrText, recipeToText, recipeFp,
+    ingGrams, recipeTotals, calcTargets, amountText, nutrText, recipeToText, recipeFp, isBasic, fallbackPack,
     COLLECTIONS, emptyDb, upgrade, live, put, remove, getSetting, setSetting, profile, latestWeight, setWeight,
     ratingSummary, merge, findByName, importRecipe
   };

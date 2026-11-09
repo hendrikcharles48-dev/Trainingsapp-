@@ -134,6 +134,8 @@
     if (m && (m.changed || !m.def)) return { kind: m.kind, size: m.size, unit: m.unit === 'ml' ? 'g' : m.unit, label: KW.packText(m), src: 'own' };
     if (ing.pack) return { kind: ing.pack.kind, size: ing.pack.size, unit: ing.pack.unit === 'ml' ? 'g' : ing.pack.unit, label: KW.packText(ing.pack), src: 'recipe' };
     if (m) return { kind: m.kind, size: m.size, unit: m.unit === 'ml' ? 'g' : m.unit, label: KW.packText(m), src: 'list' };
+    const fb = KW.fallbackPack(ing);
+    if (fb) return { kind: fb.kind, size: fb.size, unit: fb.unit === 'ml' ? 'g' : fb.unit, label: KW.packText(fb), src: 'list' };
     return null;
   }
 
@@ -160,7 +162,7 @@
         const n = need[k] = need[k] || { key: k, name: i.name, area: i.area, g: 0, cnt: 0, cntUnit: null, pieceG: null, pantry: true, first: pot.first, recipes: [], ing: i };
         if (isCount(i)) { n.cnt += i.qty * pot.pots; n.cntUnit = n.cntUnit || i.unit; if (i.pieceG && !n.pieceG) n.pieceG = i.pieceG; }
         else n.g += i.qty * pot.pots;
-        if (!i.pantry) { n.pantry = false; if (n.ing.pantry) n.ing = i; }
+        if (!KW.isBasic(i)) { n.pantry = false; if (KW.isBasic(n.ing)) n.ing = i; }
         if (pot.first < n.first) n.first = pot.first;
         if (!n.recipes.includes(pot.r.name)) n.recipes.push(pot.r.name);
       }
@@ -242,9 +244,8 @@
       if (it.done && chk.packs != null) it.packs = chk.packs; // abgehakt: gekaufte Menge bleibt, auch wenn sich Packungen ändern
       if (buy === 0 && !it.done) fromRest.push(it); else items.push(it);
     }
-    // Grundvorrat: Zutaten der Hungerknopf-Snacks und Notfallgerichte, dazu Vorrat-Zutaten der geplanten Rezepte
+    // Grundvorrat: nur echte Grundzutaten der geplanten Rezepte (Öl, Gewürze, Mehl, Brühe …)
     const pantry = {};
-    for (const r of KW.live(db, 'recipes').filter(r => r.cat === 'hunger' || r.cat === 'emergency')) for (const i of r.ingredients) pantry[ingKey(i.name)] = pantry[ingKey(i.name)] || { key: ingKey(i.name), name: i.name, area: i.area, ing: i, why: r.cat };
     for (const n of Object.values(need)) if (n.pantry) pantry[n.key] = pantry[n.key] || { key: n.key, name: n.name, area: n.area, ing: n.ing, why: 'vorrat' };
     const stock = [];
     for (const v of Object.values(pantry)) {
@@ -300,7 +301,7 @@
       const hits = [];
       for (const i of r.ingredients) {
         const x = rs[ingKey(i.name)];
-        if (!x || i.pantry) continue;
+        if (!x || KW.isBasic(i)) continue;
         const nd = amountIn({ g: isCount(i) ? 0 : i.qty, cnt: isCount(i) ? i.qty : 0, pieceG: i.pieceG }, x.unit);
         if (!nd) continue;
         hits.push({ name: x.name, use: Math.min(nd, x.amount), unit: x.unit, share: Math.min(1, nd / x.amount) });

@@ -12,11 +12,11 @@ Zutaten:
 - Weißkohl | 1 Stück à 1000 g | Stück | Obst/Gemüse | 25 kcal, 1,4 P, 4,2 K, 0,2 F
 - Paprika | 4 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Basmatireis | 250 g | Packung 500 g | Trockenware | 350 kcal, 7,5 P, 77 K, 0,6 F
 - Öl | 2 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
-- Sojasoße | 6 EL à 15 g | Vorrat, Flasche 250 ml | Gewürze/Saucen | 60 kcal, 8 P, 6 K, 0 F
-- Honig | 1 EL à 20 g | Vorrat | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
+- Sojasoße | 6 EL à 15 g | Flasche 250 ml | Gewürze/Saucen | 60 kcal, 8 P, 6 K, 0 F
+- Honig | 1 EL à 20 g | Packung Glas 500 g | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
 - Speisestärke | 1 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
 Schritte:
 1. Wasser im Wasserkocher erhitzen und den Reis damit im Topf garen. [12 min nebenbei]
@@ -143,7 +143,7 @@ Zutaten:
 - Gyrosgewürz | 2 EL à 6 g | Vorrat | Gewürze/Saucen | 250 kcal, 10 P, 35 K, 6 F
 - Magerquark | 500 g | Becher 500 g | Kühlregal | 67 kcal, 12 P, 4 K, 0,2 F
 - Gurke | 3 Stück à 400 g | Stück | Obst/Gemüse | 12 kcal, 0,6 P, 1,8 K, 0,2 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Cherrytomaten | 750 g | Schale 250 g | Obst/Gemüse | 22 kcal, 1 P, 3,5 K, 0,3 F
 Schritte:
 1. Couscous mit 250 ml heißem Wasser aus dem Wasserkocher übergießen und quellen lassen. [10 min nebenbei]
@@ -264,7 +264,7 @@ Zutaten:
 - Kartoffeln (festkochend) | 1500 g | Beutel 2,5 kg | Obst/Gemüse | 70 kcal, 2 P, 15 K, 0,1 F
 - Brokkoli (TK) | 750 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
 - Kochsahne light | 200 ml | Packung 200 ml | Kühlregal | 150 kcal, 3 P, 4 K, 15 F
-- Senf (mittelscharf) | 3 EL à 15 g | Vorrat | Gewürze/Saucen | 90 kcal, 6 P, 6 K, 4 F
+- Senf (mittelscharf) | 3 EL à 15 g | Packung Tube 200 ml | Gewürze/Saucen | 90 kcal, 6 P, 6 K, 4 F
 - Speisestärke | 1 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
 Schritte:
 1. Kartoffeln in Stücke schneiden und in Wasser aus dem Wasserkocher kochen. Den Brokkoli die letzten 5 Minuten mit in den Topf geben. [15 min nebenbei]
@@ -313,7 +313,7 @@ Zutaten:
 - Gehackte Tomaten | 550 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Zucchini | 1 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 1 Zehe à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 1 Zehe à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 TL à 4 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 Schritte:
 1. Nudeln in Wasser aus dem Wasserkocher garen. [10 min nebenbei]
@@ -922,7 +922,7 @@ Zutaten:
 - Brokkoli (TK) | 1000 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
 - Hähnchenbrustfilet | 800 g | Packung 400 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Currypulver | 2 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Kokosmilch light | 200 ml | Packung 400 ml | Konserven | 85 kcal, 1 P, 2 K, 8 F
@@ -950,7 +950,7 @@ Notiz: Die roten Linsen verkochen in der Soße und machen sie sämig und eiweiß
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Möhren | 3 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putenhack | 650 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Rote Linsen | 100 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
@@ -979,14 +979,14 @@ Gerät: Monsieur Cuisine
 Notiz: Ohne Reis schon satt machend. Wer mehr braucht: ein Klecks Skyr obendrauf statt Saurer Sahne. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putenhack | 1000 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Kidneybohnen, abgetropft | 250 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
 - Gehackte Tomaten | 1200 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
-- Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
+- Tomatenmark | 2 EL à 15 g | Packung Tube 200 g | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Chili-Gewürz | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 300 kcal, 12 P, 30 K, 12 F
 Schritte:
@@ -1009,7 +1009,7 @@ Gerät: Monsieur Cuisine
 Notiz: Sehr günstig. Vegetarisch geht auch: Hähnchen weglassen und dafür 150 g Linsen mehr nehmen. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Currypulver | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Rote Linsen | 200 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
@@ -1045,7 +1045,7 @@ Zutaten:
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 - Speisestärke | 2 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
-- Zitronensaft | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 25 kcal, 0,4 P, 2,4 K, 0,1 F
+- Zitronensaft | 1 EL à 10 g | Flasche 200 ml | Gewürze/Saucen | 25 kcal, 0,4 P, 2,4 K, 0,1 F
 Schritte:
 1. 700 ml Wasser mit Brühpulver in den Mixtopf. Hähnchen am Stück und Möhren in Scheiben dazu, Reis im Garkörbchen einsetzen. 20 Min./100 °C/Stufe 1 garen. [22 min nebenbei]
 2. Reis herausnehmen, Hähnchen herausnehmen und in Würfel schneiden. Die Brühe bleibt im Mixtopf. [4 min]
@@ -1122,7 +1122,7 @@ Zutaten:
 - Paprika | 9 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putengeschnetzeltes | 800 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
-- Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
+- Tomatenmark | 2 EL à 15 g | Packung Tube 200 g | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 - Paprikapulver edelsüß | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 330 kcal, 14 P, 20 K, 13 F
@@ -1174,7 +1174,7 @@ Gerät: Monsieur Cuisine
 Notiz: Ohne Reis, die Kichererbsen machen satt. Dazu passt ein Löffel Joghurt. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Currypulver | 2 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Hähnchenbrustfilet | 800 g | Packung 400 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
@@ -1205,7 +1205,7 @@ Zutaten:
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putengeschnetzeltes | 800 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
 - Paprika | 6 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
-- Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
+- Tomatenmark | 2 EL à 15 g | Packung Tube 200 g | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
 - Paprikapulver edelsüß | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 330 kcal, 14 P, 20 K, 13 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kartoffeln, festkochend | 700 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
@@ -1328,7 +1328,7 @@ Zutaten:
 - Milch 1,5 % | 500 ml | Packung 1 l | Kühlregal | 47 kcal, 3,4 P, 4,8 K, 1,5 F
 - Backkakao | 25 g | Packung 250 g | Trockenware | 360 kcal, 20 P, 11 K, 21 F
 - Speisestärke | 3 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
-- Honig | 1 EL à 20 g | Vorrat | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
+- Honig | 1 EL à 20 g | Packung Glas 500 g | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
 - Skyr natur | 700 g | Packung 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F
 Schritte:
 1. Milch, Kakao, Stärke und Honig in den Mixtopf, 7 Min./90 °C/Stufe 3 kochen. [7 min nebenbei]
@@ -1370,8 +1370,8 @@ Notiz: Skyr statt Tahini und Öl: deutlich weniger Fett und mehr Eiweiß. Mit Gu
 Zutaten:
 - Kichererbsen, abgetropft | 240 g | Packung Dose 400 g (240 g abgetropft) | Konserven | 120 kcal, 7 P, 15 K, 2,6 F
 - Skyr natur | 150 g | Packung 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F
-- Knoblauch | 1 Zehe à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
-- Zitronensaft | 2 EL à 10 g | Vorrat | Gewürze/Saucen | 25 kcal, 0,4 P, 2,4 K, 0,1 F
+- Knoblauch | 1 Zehe à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
+- Zitronensaft | 2 EL à 10 g | Flasche 200 ml | Gewürze/Saucen | 25 kcal, 0,4 P, 2,4 K, 0,1 F
 - Öl | 1 TL à 4 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Kreuzkümmel | 1 TL à 2 g | Vorrat | Gewürze/Saucen | 375 kcal, 18 P, 44 K, 22 F
 Schritte:
@@ -1393,7 +1393,7 @@ Zutaten:
 - Beerenmischung (TK) | 300 g | Beutel 750 g | Tiefkühl | 40 kcal, 1 P, 6 K, 0,4 F
 - Magerquark | 500 g | Becher 500 g | Kühlregal | 67 kcal, 12 P, 4 K, 0,2 F
 - Milch 1,5 % | 50 ml | Packung 1 l | Kühlregal | 47 kcal, 3,4 P, 4,8 K, 1,5 F
-- Honig | 1 TL à 7 g | Vorrat | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
+- Honig | 1 TL à 7 g | Packung Glas 500 g | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
 Schritte:
 1. Gefrorene Beeren in den Mixtopf, 10 Sek./Stufe 8 zerkleinern. [1 min]
 2. Quark, Milch und Honig dazu, 20 Sek./Stufe 5 cremig rühren. [1 min]

@@ -100,7 +100,12 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
   Paket-Rezepte still aktualisieren: `kochwerk/paket-alt.json` = Fingerabdrücke (`KW.recipeFp`) der VORHERIGEN Paket-Fassung.
   `checkPaket` ersetzt ein vorhandenes Rezept nur, wenn es noch genau der alten Fassung entspricht (vom Nutzer geänderte bleiben).
   Vor jeder Änderung bestehender Paket-Rezepte `paket-alt.json` aus der alten Fassung neu erzeugen (bisherige Einträge behalten).
-  Rezeptseite: −/＋ bei „Boxen“ verteilt dieselben Zutaten auf weniger/mehr Boxen (`r-port`).
+  Rezeptseite: Karte „Boxengröße“ mit „Größere Boxen“/„Kleinere Boxen“ verteilt dieselben Zutaten auf weniger/mehr Boxen (`r-port`).
+- Grundzutaten (Nutzerwunsch 10.11.): nur was wirklich jeder hat – `KW.isBasic` (Öl, Salz, Pfeffer, getrocknete Gewürze, Mehl,
+  Zucker, Stärke, Essig, Brühe). Das „Vorrat“-Flag im Rezept zählt nur dafür; alles andere kommt auf die Einkaufsliste
+  (`KW.fallbackPack` für Knoblauch, Honig, Tomatenmark …). Grundvorrat enthält keine Hungersnack-/Notfall-Zutaten mehr.
+- Kochsession: Standard „Nacheinander“ (`CK.mode = 'one'`): pro Rezept erst Zutaten bereitlegen, dann Schritt für Schritt,
+  danach nächstes Rezept. „Gleichzeitig“ (`'all'`) = alte verschachtelte Planung (`CO.schedule`). Start über „Kochen starten“ im Reiter Kochen.
 - Tagebuch (`track.js`) ist optional: Schalter in „Mehr“ (`ui.track`, nur lokal, Standard aus), Seite `pageHeute` als Unterseite von Mehr.
   `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
   `foods` (eigene + Open Food Facts, `fav:<id>` = Favorit). `P.room` zählt Plan + Tagebuch. Mahlzeiten dort zugeklappt, „＋“ fragt

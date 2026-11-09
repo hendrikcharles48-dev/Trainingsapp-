@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.3';
+  const VERSION = '2.4';
 
   // ---------- Speicher ----------
   function load() {
@@ -286,8 +286,9 @@
           <span class="right"><b>${f0(t.kcal)}</b><span>${f0(t.p)} g P</span></span></button>`;
       }).join('') + '</div>';
       h += `<div class="card plan2"><div class="inline"><span class="step-n${ck ? ' done' : ''}">${ck ? '✓' : '🍳'}</span><span class="mid" style="flex:1"><span class="t">${ck ? 'Gekocht am ' + esc(P.dayLabel(ck.date)) : isCookDay ? 'Heute ist Kochtag' : 'Kochtag ' + esc(P.dayLabel(cdt))}</span>
-        <span class="s">${ck ? 'Die Boxen stehen im Kühlschrank und Gefrierfach.' : 'Alles in einer Session: Reihenfolge, Timer, Boxen.'}</span></span></div>
-        <div class="pills"><button class="pill-btn${ck ? '' : ' pri'}" data-act="cook" data-week="${start}">🍳 Kochsession</button><button class="pill-btn" data-act="boxes">🥡 Boxen</button><button class="pill-btn" data-act="tab" data-tab="einkauf">🛒 Einkauf</button></div></div>`;
+        <span class="s">${ck ? 'Die Boxen stehen im Kühlschrank und Gefrierfach.' : 'Ein Rezept nach dem anderen, Schritt für Schritt, mit Timer.'}</span></span></div>
+        <button class="btn${ck ? ' tint' : ''}" data-act="cook" data-week="${start}">🍳 ${ck ? 'Nochmal kochen' : 'Kochen starten'}</button>
+        <div class="pills"><button class="pill-btn" data-act="boxes">🥡 Boxen</button><button class="pill-btn" data-act="tab" data-tab="einkauf">🛒 Einkauf</button></div></div>`;
     }
     h += `<div class="set"><button class="act" data-act="tab" data-tab="woche"><span class="sl"><span class="si" style="--c:#FF9500">🗓️</span>Wochenplan</span><small>welches Gericht wann</small><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="favs"><span class="sl"><span class="si" style="--c:#FFCC00">★</span>Lieblingswochen</span><span class="chev">${IC.chev}</span></button></div>`;
@@ -545,7 +546,7 @@
     const bits = [];
     if (it.need != null && it.pack) bits.push('braucht ' + amt(it.need, it.unit, it.cntUnit));
     if (it.rest) bits.push(amt(it.rest, it.unit) + ' aus Resten');
-    if (it.fromPantry) bits.push('Grundvorrat');
+    if (it.fromPantry) bits.push('Grundzutat');
     if (it.lateHint && !it.later) bits.push('erst ab ' + P.DAY_SHORT[P.wd(it.first)] + ' gebraucht');
     return `<div class="srow${it.done ? ' done' : ''}"><button class="chk" data-act="chk" data-key="${esc(it.key)}" data-week="${week}" aria-pressed="${it.done}" aria-label="Abhaken">${it.done ? '✓' : ''}</button>
       <button class="mid" data-act="item" data-key="${esc(it.key)}"><span class="t"><span class="nm">${esc(it.name)}</span></span><span class="s"><b class="pk">${esc(packLine(it))}</b>${bits.length ? ' · ' + esc(bits.join(' · ')) : ''}</span></button></div>`;
@@ -590,9 +591,9 @@
   }
   function stockView(L) {
     if (!L.stock.length) return '';
-    const why = { hunger: 'Hungerknopf', emergency: 'Notfallgericht', vorrat: 'Vorrat fürs Rezept' };
+    const why = { vorrat: 'Grundzutat fürs Rezept' };
     const open = L.stock.filter(v => !v.state).length, buy = L.stock.filter(v => v.state === 'buy').length;
-    let h = `<button class="card stockhead" data-act="stock-toggle" aria-expanded="${!!S.stockOpen}"><span class="ico c-emergency">🥫</span><span class="mid"><span class="t">Grundvorrat prüfen</span>
+    let h = `<button class="card stockhead" data-act="stock-toggle" aria-expanded="${!!S.stockOpen}"><span class="ico c-emergency">🥫</span><span class="mid"><span class="t">Grundzutaten prüfen</span>
       <span class="s">${open ? open + ' offen · ' : ''}${buy ? buy + ' auf der Liste · ' : ''}${L.stock.length} Sachen</span></span><span class="chev2">${S.stockOpen ? '⌃' : '⌄'}</span></button>`;
     if (!S.stockOpen) return h;
     h += `<div class="list slist">${L.stock.map(v => `<div class="srow stock"><span class="mid"><span class="t"><span class="nm">${esc(v.name)}</span></span><span class="s">${esc(why[v.why] || '')}${v.pack ? ' · ' + esc(v.pack.label) : ''}</span></span>
@@ -709,14 +710,21 @@
   let CK = null, ckTick = null, wake = null, audio = null;
   function ckSave() { try { localStorage.setItem(KEY_CK, JSON.stringify(CK)); } catch (e) { /* egal */ } }
   function ckLoad() { try { return JSON.parse(localStorage.getItem(KEY_CK) || 'null'); } catch (e) { return null; } }
+  // Standard: ein Rezept nach dem anderen (erst Zutaten bereitlegen, dann Schritt für Schritt). „Gleichzeitig“ verschachtelt alle.
   function ckPlan() {
     const pots = SH3.weekPots(db, CK.week).filter(x => CK.sel.includes(x.r.id));
-    return CO.schedule(pots.map(x => ({ r: x.r, pots: x.pots })));
+    if (CK.mode === 'all') return CO.schedule(pots.map(x => ({ r: x.r, pots: x.pots })));
+    const steps = [];
+    pots.forEach((x, ri) => {
+      steps.push({ intro: true, ri, rid: x.r.id, name: x.r.name, pots: x.pots, no: ri + 1, count: pots.length });
+      x.r.steps.forEach((st, k) => steps.push({ ri, rid: x.r.id, name: x.r.name, k, n: k + 1, of: x.r.steps.length, text: st.text, tip: st.tip || '', min: st.min || null, passive: !!st.passive, pots: x.pots, no: ri + 1, count: pots.length }));
+    });
+    return { steps, total: steps.reduce((s, x) => s + (x.min || 0), 0) };
   }
   function openCook(week) {
     const old = ckLoad();
     if (old && old.week === week && old.phase !== 'pick') CK = old;
-    else CK = { week, phase: 'pick', sel: SH3.weekPots(db, week).map(x => x.r.id), idx: 0, timers: [] };
+    else CK = { week, phase: 'pick', mode: 'one', sel: SH3.weekPots(db, week).map(x => x.r.id), idx: 0, timers: [] };
     $('#cook').hidden = false; document.body.style.overflow = 'hidden';
     renderCook();
   }
@@ -763,11 +771,15 @@
         <h1>Kochsession</h1><p class="lead">KW ${P.isoWeek(start)} · Kochtag ${esc(P.dayLabel(cd))} – welche Rezepte kochst du heute?</p>`;
       if (!pots.length) h += `<div class="card empty"><span class="em">🍳</span><div><b>Nichts zu kochen</b>Für diese Woche ist noch kein Rezept geplant.</div></div>`;
       h += '<div class="opts">' + pots.map((x, k) => { const on = CK.sel.includes(x.r.id); return `<button class="opt" data-act="ck-sel" data-id="${x.r.id}" aria-pressed="${on}"><span class="chk">${on ? '✓' : ''}</span><span class="mid"><span class="t">${esc(x.r.name)}</span><span class="s">${x.pots > 1 ? x.pots + ' × Rezept (' + fNum(x.pots * x.r.portions) + ' Portionen)' : fNum(x.r.portions) + ' Portionen'} · ${x.r.steps.length} ${x.r.steps.length === 1 ? 'Schritt' : 'Schritte'}</span></span><span class="dot" style="background:${COLORS[k % COLORS.length]}"></span></button>`; }).join('') + '</div>';
-      if (sel.length) h += `<p class="hint">Alles zusammen etwa ${f0(sc.total)} min${sc.sequential > sc.total + 4 ? ` statt ${f0(sc.sequential)} min nacheinander` : ''}. Die App sagt dir, was als Nächstes dran ist.</p>`;
-      h += `<div class="grow"></div><button class="btn" data-act="ck-start"${sel.length ? '' : ' disabled'}>Los geht’s</button></div>`;
+      if (sel.length > 1) {
+        h += `<div class="seg big">${[['one', 'Nacheinander'], ['all', 'Gleichzeitig']].map(([v, l]) => `<button data-act="ck-mode" data-v="${v}" aria-pressed="${(CK.mode || 'one') === v}">${l}</button>`).join('')}</div>`;
+        h += `<p class="hint">${(CK.mode || 'one') === 'one' ? 'Ein Rezept nach dem anderen: erst die Zutaten bereitlegen, dann Schritt für Schritt. Danach kommt das nächste Rezept.' : `Alle Rezepte verschachtelt, die App sagt dir, was als Nächstes dran ist. Etwa ${f0(sc.total)} min statt ${f0(sc.sequential)} min nacheinander.`}</p>`;
+      }
+      h += `<div class="grow"></div><button class="btn" data-act="ck-start"${sel.length ? '' : ' disabled'}>${sel.length && (CK.mode || 'one') === 'one' ? 'Mit „' + esc(sel[0].r.name) + '“ anfangen' : 'Los geht’s'}</button></div>`;
     } else if (CK.phase === 'run') {
       const sc = ckPlan(), st = sc.steps[CK.idx];
       if (!st) { CK.phase = 'end'; return renderCook(); }
+      if (st.intro || (CK.mode || 'one') === 'one') { el.innerHTML = cookOneHtml(sc, st); el.scrollTop = 0; if (!ckTick) ckTick = setInterval(tickTimers, 1000); keepAwake(); return; }
       const ri = SH3.weekPots(db, start).findIndex(x => x.r.id === st.rid);
       const c = COLORS[(ri < 0 ? st.ri : ri) % COLORS.length];
       const next = sc.steps.slice(CK.idx + 1, CK.idx + 3);
@@ -792,6 +804,35 @@
     }
     el.innerHTML = h;
     el.scrollTop = 0;
+  }
+  // Kochsession „Nacheinander“: Zutaten bereitlegen, dann Schritt für Schritt
+  function cookOneHtml(sc, st) {
+    const r = getRecipe(st.rid), c = COLORS[st.ri % COLORS.length];
+    const mine = sc.steps.filter(x => x.rid === st.rid && !x.intro);
+    const head = `<div class="bar"><button class="back" data-act="ck-close">${IC.back}Pause</button><div class="dots">${mine.map(x => `<i class="${!st.intro && x.n <= st.n ? 'on' : ''}"></i>`).join('')}</div><span class="hint">${st.count > 1 ? 'Rezept ' + st.no + '/' + st.count : ''}</span></div>`;
+    if (st.intro) {
+      const ings = r ? r.ingredients.map(i => { const x = Object.assign({}, i, { qty: i.qty * (st.pots || 1) }); return `<div class="row ingchk"><span class="mid"><span class="t">${esc(i.name)}</span>${KW.isBasic(i) ? '<span class="s">Grundzutat</span>' : ''}</span><span class="right"><b>${esc(KW.amountText(x))}</b></span></div>`; }).join('') : '';
+      return `<div class="in">${head}
+        <div class="stepcard" style="--c:${c}"><span class="rtag">${st.count > 1 ? 'Rezept ' + st.no + ' von ' + st.count : 'Dein Rezept'}${r && r.mc ? ' · 🤖 Monsieur Cuisine' : ''}</span>
+          <p class="big-step">${esc(st.name)}</p>
+          <span class="badge">🥡 ${fNum((r ? r.portions : 1) * (st.pots || 1))} Boxen · ${mine.length} Schritte${r && r.time ? ' · ca. ' + f0(r.time) + ' min' : ''}</span>
+          ${st.pots > 1 ? `<div class="warnbox">Doppelte Menge: ${st.pots} × Rezept – die Mengen unten sind schon verdoppelt.</div>` : ''}</div>
+        <div class="field"><span class="lbl">Erst alles bereitlegen</span><div class="list">${ings}</div></div>
+        <div class="grow"></div><div class="btnrow">${CK.idx ? '<button class="btn plain" style="flex:0 0 30%" data-act="ck-prev">Zurück</button>' : ''}<button class="btn" data-act="ck-next">Alles da – Schritt 1</button></div></div>`;
+    }
+    const nextIn = mine.find(x => x.n === st.n + 1), nextRec = sc.steps[CK.idx + 1];
+    const hasTimer = CK.timers.some(t => t.step === CK.idx);
+    const last = !nextIn;
+    return `<div class="in">${head}
+      <div class="awake">📱 Das Display bleibt an. Timer laufen nur, solange Kochwerk geöffnet ist.</div>
+      <div id="ck-timers">${timersHtml()}</div>
+      <div class="stepcard" style="--c:${c}"><span class="rtag">${esc(st.name)} · Schritt ${st.n} von ${st.of}</span>
+        <p class="big-step">${esc(st.text)}</p>
+        ${st.min ? `<span class="badge ${st.passive ? 'ok' : ''}">⏱ ${fNum(st.min)} min${st.passive ? ' · läuft nebenbei' : ''}</span>` : ''}
+        ${st.tip ? `<div class="tip">${esc(st.tip)}</div>` : ''}</div>
+      ${st.min && !hasTimer ? `<button class="btn tint" data-act="ck-timer" data-min="${st.min}">⏱ Timer ${fNum(st.min)} min starten</button>` : ''}
+      ${nextIn ? `<div class="field"><span class="lbl">Danach</span><div class="list"><div class="row" style="grid-template-columns:minmax(0,1fr)"><span class="mid"><span class="t" style="font-weight:500;white-space:normal">${esc(nextIn.text)}</span></span></div></div></div>` : ''}
+      <div class="grow"></div><div class="btnrow">${CK.idx ? '<button class="btn plain" style="flex:0 0 30%" data-act="ck-prev">Zurück</button>' : ''}<button class="btn" data-act="ck-next">${!last ? 'Erledigt, weiter' : nextRec ? 'Fertig – nächstes Rezept' : 'Fertig gekocht'}</button></div></div>`;
   }
   const PLACE = { fridge: ['🧊', 'Kühlschrank'], freezer: ['❄️', 'Gefrierfach'], late: ['⚠️', 'Hält nicht so lange'] };
   function boxesHtml(b) {
@@ -826,7 +867,7 @@
   function crashSheet() {
     const list = CO.emergencyIdeas(db);
     return `<div class="sheet-head"><span></span><h2>Plan geplatzt</h2><button class="r" data-act="close">OK</button></div>
-      <p style="margin:0">Kein Problem. Gerichte aus haltbaren Vorräten – Zutaten stehen im Grundvorrat.</p>` +
+      <p style="margin:0">Kein Problem. Gerichte aus haltbaren Vorräten – am besten ein paar Dosen davon im Schrank haben.</p>` +
       (list.length ? ideaRows(list) : '<div class="card empty">Noch keine Notfallgerichte. Im Chat „Kochwerk 3 Notfallgerichte aus Vorrat“ schreiben und importieren.</div>');
   }
 
@@ -1236,15 +1277,23 @@
     const c = KW.catById(r.cat), T = KW.recipeTotals(r), t = T.portion, rs = KW.ratingSummary(db, r.id);
     let h = backBtn(backLabel('Rezepte')) + `
       <div class="rhead"><span class="rhero ico c-${r.cat}">${KW.recipeIcon(r)}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
-      <div class="facts"><span class="fact stepper"><button data-act="r-port" data-id="${r.id}" data-d="-1" aria-label="Weniger Boxen, dafür größere">−</button>🥡 ${fNum(r.portions)} ${r.portions === 1 ? 'Box' : 'Boxen'}<button data-act="r-port" data-id="${r.id}" data-d="1" aria-label="Mehr Boxen, dafür kleinere">＋</button></span>
+      <div class="facts"><span class="fact">🥡 ${fNum(r.portions)} ${r.portions === 1 ? 'Box' : 'Boxen'}</span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
       ${r.mc ? '<span class="fact mc">🤖 Monsieur Cuisine</span>' : ''}<span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
       ${r.time ? `<span class="fact">⏱️ ${f0(r.time)} min</span>` : ''}</div></div>`;
-    h += `<div class="card" style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Pro Portion</span>
+    h += `<div class="card" style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Pro Box</span>
       <div class="tiles"><div><b>${f0(t.kcal)}</b><span>kcal</span></div><div class="p"><b>${f0(t.p)}<small> g</small></b><span>Protein</span></div>
       <div><b>${f0(t.c)}<small> g</small></b><span>Kohlenhydr.</span></div><div><b>${f0(t.f)}<small> g</small></b><span>Fett</span></div></div>
-      <p class="hint">Eine Box wiegt etwa ${f0(t.g)} g. Mit − oben verteilst du dieselben Zutaten auf weniger Boxen, jede wird größer; mit ＋ auf mehr, kleinere Boxen. Gesamt ${f0(T.total.kcal)} kcal und ${f0(T.total.p)} g Protein.</p>
+      <p class="hint">Eine Box wiegt etwa ${f0(t.g)} g. Gesamt ${f0(T.total.kcal)} kcal und ${f0(T.total.p)} g Protein.</p>
       ${T.missing ? '<div class="warnbox">Bei einigen Zutaten fehlen Werte. Die Zahlen sind deshalb zu niedrig.</div>' : ''}</div>`;
+    {
+      const alt = n => { const x = Object.assign({}, r, { portions: n }); return KW.recipeTotals(x).portion; };
+      const big = r.portions > 1 ? alt(r.portions - 1) : null, small = alt(r.portions + 1);
+      h += `<div class="card boxsize"><span class="lbl">Boxengröße</span>
+        <p class="hint" style="margin:0">Das Rezept ergibt <b>${fNum(r.portions)} ${r.portions === 1 ? 'Box' : 'Boxen'}</b> mit je ${f0(t.g)} g und ${f0(t.kcal)} kcal. Zu wenig für dich? Dann dieselben Zutaten auf weniger Boxen verteilen – jede wird größer.</p>
+        <div class="btnrow">${big ? `<button class="btn tint" data-act="r-port" data-id="${r.id}" data-d="-1">Größere Boxen<small>${fNum(r.portions - 1)} × ${f0(big.g)} g · ${f0(big.kcal)} kcal</small></button>` : ''}
+        <button class="btn plain" data-act="r-port" data-id="${r.id}" data-d="1">Kleinere Boxen<small>${fNum(r.portions + 1)} × ${f0(small.g)} g · ${f0(small.kcal)} kcal</small></button></div></div>`;
+    }
     h += `<div class="card rate"><div><span class="lbl">Bewertung</span><div class="face">${rs.n
       ? `${word(SATT, rs.satt).e} ${word(SATT, rs.satt).l} · ${word(LECKER, rs.lecker).e} ${word(LECKER, rs.lecker).l} <span class="muted">(${rs.n}×)</span>`
       : '<span class="muted">Noch nicht bewertet</span>'}</div></div><button class="btn tint small" data-act="rate" data-id="${r.id}">Bewerten</button></div>`;
@@ -1253,7 +1302,8 @@
     for (const tip of r.tips || []) h += `<div class="tip">${esc(tip)}</div>`;
     h += `<h2 class="sec">Zutaten</h2><div class="list ings">` + r.ingredients.map(i => {
       const g = KW.ingGrams(i), k = i.per100 && i.per100.kcal != null ? g * i.per100.kcal / 100 : null;
-      const pk = i.pantry ? 'Vorrat' + (i.pack ? ' · ' + KW.packText(i.pack) : '') : (i.pack ? KW.packText(i.pack) : 'ohne Packung');
+      const fb = !i.pack && KW.fallbackPack(i);
+      const pk = KW.isBasic(i) ? 'Grundzutat' : i.pack ? KW.packText(i.pack) : fb ? KW.packText(fb) : 'ohne Packung';
       return `<div class="row"><span class="mid"><span class="t">${esc(i.name)}</span><span class="s">${esc(pk)} · ${esc(KW.areaById(i.area).label)}</span></span>
         <span class="right"><b>${esc(KW.amountText(i))}</b><span class="muted" style="color:var(--label-2);font-weight:500">${k == null ? 'Werte fehlen' : f0(k) + ' kcal'}</span></span></div>`;
     }).join('') + '</div>';
@@ -1438,7 +1488,8 @@
     return h;
   }
   function packHint(i) {
-    if (i.pantry) return 'Vorrat: kommt nicht auf die Wocheneinkaufsliste.';
+    if (KW.isBasic(i)) return 'Grundzutat (Öl, Gewürze, Mehl, Brühe …): kommt nicht auf die Wocheneinkaufsliste.';
+    if (i.pantry) return '„Vorrat“ gilt nur für echte Grundzutaten wie Öl und Gewürze. Diese Zutat kommt auf die Einkaufsliste.';
     if (!i.pack) return 'Ohne Packung. Beispiele: „Packung 500 g“, „Dose 400 g“, „Packung 10 Stück“, „Bund“, „Vorrat“.';
     const g = KW.ingGrams(i);
     let need = null;
@@ -1916,6 +1967,7 @@ Schritte:
     crash: () => openSheet(crashSheet),
     'thaw-done': b => { CO.thawDone(db, b.dataset.id); save(); render(true); },
     'ck-close': () => closeCook(),
+    'ck-mode': b => { CK.mode = b.dataset.v; renderCook(); },
     'ck-sel': b => { const id = b.dataset.id; CK.sel = CK.sel.includes(id) ? CK.sel.filter(x => x !== id) : CK.sel.concat(id); renderCook(); },
     'ck-start': () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } CK.phase = 'run'; CK.idx = 0; CK.timers = []; ckSave(); renderCook(); },
     'ck-timer': b => {

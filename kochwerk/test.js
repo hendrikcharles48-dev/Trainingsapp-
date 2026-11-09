@@ -306,7 +306,10 @@ eq('Reis halbe Packung = 1 Packung', it('Basmati').packs, 1);
 eq('Paprika in Stück', [it('Paprika').packs, it('Paprika').unit, it('Paprika').need], [1, 'Stück', 3]);
 eq('Zwiebeln Stück in g umgerechnet', [it('Zwiebeln').need, it('Zwiebeln').packs], [160, 1]);
 eq('Vorrat nicht auf der Liste', L1.items.some(i => i.name === 'Olivenöl'), false);
-eq('Grundvorrat: Vorrat-Zutaten + Hungersnack', L1.stock.map(v => v.name).sort(), ['Beerenmischung (TK)', 'Gemüsebrühe (Pulver)', 'Olivenöl', 'Paprikapulver edelsüß', 'Skyr natur']);
+eq('Grundvorrat: nur echte Grundzutaten', L1.stock.map(v => v.name).sort(), ['Gemüsebrühe (Pulver)', 'Olivenöl', 'Paprikapulver edelsüß']);
+eq('Grundzutaten erkannt', ['Öl', 'Rapsöl', 'Salz', 'Pfeffer', 'Mehl', 'Zucker', 'Speisestärke', 'Gemüsebrühe, Pulver', 'Brühwürfel', 'Currypulver', 'Paprikapulver edelsüß', 'Chili-Gewürz', 'Zimt', 'Kreuzkümmel'].filter(n => !KW.isBasic(n)), []);
+eq('keine Grundzutaten', ['Knoblauch', 'Honig', 'Tomatenmark', 'Sojasoße', 'Senf (mittelscharf)', 'Zitronensaft', 'Backkakao', 'Skyr natur', 'Haferflocken', 'Paprika', 'Kräuter (TK)', 'Rote Linsen', 'Thunfisch im eigenen Saft'].filter(n => KW.isBasic(n)), []);
+eq('„Vorrat“-Knoblauch bekommt Packung Knolle', KW.fallbackPack({ name: 'Knoblauch' }).kind, 'Knolle');
 eq('sortiert nach Bereichen', L1.items[0].area, 'obst');
 eq('frisch erst ab Do: Hinweis', L1.items.filter(i => i.lateHint).map(i => i.name), []);
 // eigene Packungsgröße gilt ab dann
@@ -316,9 +319,9 @@ eq('eigene Packung hat Vorrang', S.weekList(E, W1).items.find(i => i.name.starts
 for (const i of S.weekList(E, W1).items) S.check(E, W1, i, true);
 KW.put(E, 'packs', { id: S.packKey('Hähnchenbrustfilet'), name: 'Hähnchenbrustfilet', kind: 'Packung', size: 1000, unit: 'g', area: 'fleisch' });
 eq('abgehakt bleibt gekaufte Menge', S.weekList(E, W1).items.find(i => i.name.startsWith('Hähnchen')).packs, 3);
-S.setPantry(E, W1, KW.norm('Skyr natur'), 'buy');
-eq('Grundvorrat „kaufen“ kommt auf die Liste', S.weekList(E, W1).items.some(i => i.name === 'Skyr natur' && i.packs === 1), true);
-S.setPantry(E, W1, KW.norm('Skyr natur'), 'have');
+S.setPantry(E, W1, KW.norm('Olivenöl'), 'buy');
+eq('Grundvorrat „kaufen“ kommt auf die Liste', S.weekList(E, W1).items.some(i => i.name === 'Olivenöl'), true);
+S.setPantry(E, W1, KW.norm('Olivenöl'), 'have');
 S.setLater(E, W1, KW.norm('Paprika'), true);
 eq('später kaufen → Nachkauf', [S.weekList(E, W1).items.some(i => i.name === 'Paprika'), S.weekList(E, W1).later.map(i => i.name)], [false, ['Paprika']]);
 // Reste

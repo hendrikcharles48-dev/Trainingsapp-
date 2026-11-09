@@ -78,8 +78,9 @@ Discountern bekommt:
 - Auch erkannt: `Packung Glas 120 g`, `Packung Tube 200 ml`, `Packung 1 Knolle` (das Wort „Packung“ davor stört nicht),
   `Packung Dose 400 g (250 g abgetropft)` – gerechnet wird mit dem Abtropfgewicht – und `Packung 1 Stück (ca. 800 g)`
   für Kohl, Lauch oder Bund mit ungefährem Gewicht. Knoblauch in Zehen: eine Knolle reicht für etwa 10 Zehen.
-- `Vorrat` oder `Packung Vorrat` für Sachen, die man ohnehin im Haus hat (Öl, Brühe, Gewürze).
-  Sie kommen nicht auf die Wocheneinkaufsliste.
+- `Vorrat` oder `Packung Vorrat` nur für echte Grundzutaten, die wirklich jeder im Haus hat: Öl, Salz, Pfeffer,
+  getrocknete Gewürze, Mehl, Zucker, Speisestärke, Essig, Brühe. Sie kommen nicht auf die Wocheneinkaufsliste.
+  Knoblauch, Honig, Tomatenmark, Senf, Sojasoße, Zitronensaft usw. bekommen eine echte Packung – die App kauft sie sonst trotzdem ein.
 - Ganze Packungen: Die Mengen so wählen, dass jede gekaufte Packung aufgebraucht wird. Geht eine
   Packung nicht auf, landet der Rest später in der Restekarte.
 
