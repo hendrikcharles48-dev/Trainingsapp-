@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.2';
+  const VERSION = '2.3';
 
   // ---------- Speicher ----------
   function load() {
@@ -1236,14 +1236,14 @@
     const c = KW.catById(r.cat), T = KW.recipeTotals(r), t = T.portion, rs = KW.ratingSummary(db, r.id);
     let h = backBtn(backLabel('Rezepte')) + `
       <div class="rhead"><span class="rhero ico c-${r.cat}">${KW.recipeIcon(r)}</span><span class="eyebrow">${esc(c.label)}</span><h1>${esc(r.name)}</h1>
-      <div class="facts"><span class="fact">🍽️ ${fNum(r.portions)} ${r.portions === 1 ? 'Portion' : 'Portionen'}</span>
+      <div class="facts"><span class="fact stepper"><button data-act="r-port" data-id="${r.id}" data-d="-1" aria-label="Weniger Boxen, dafür größere">−</button>🥡 ${fNum(r.portions)} ${r.portions === 1 ? 'Box' : 'Boxen'}<button data-act="r-port" data-id="${r.id}" data-d="1" aria-label="Mehr Boxen, dafür kleinere">＋</button></span>
       <span class="fact">🧊 ${fNum(r.keepDays)} ${r.keepDays === 1 ? 'Tag' : 'Tage'} haltbar</span>
       ${r.mc ? '<span class="fact mc">🤖 Monsieur Cuisine</span>' : ''}<span class="fact${r.freeze ? '' : ' no'}">❄️ Einfrierbar</span><span class="fact${r.box ? '' : ' no'}">🥡 Boxtauglich</span>
       ${r.time ? `<span class="fact">⏱️ ${f0(r.time)} min</span>` : ''}</div></div>`;
     h += `<div class="card" style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Pro Portion</span>
       <div class="tiles"><div><b>${f0(t.kcal)}</b><span>kcal</span></div><div class="p"><b>${f0(t.p)}<small> g</small></b><span>Protein</span></div>
       <div><b>${f0(t.c)}<small> g</small></b><span>Kohlenhydr.</span></div><div><b>${f0(t.f)}<small> g</small></b><span>Fett</span></div></div>
-      <p class="hint">Eine Portion wiegt etwa ${f0(t.g)} g. Gesamt ${f0(T.total.kcal)} kcal und ${f0(T.total.p)} g Protein.</p>
+      <p class="hint">Eine Box wiegt etwa ${f0(t.g)} g. Mit − oben verteilst du dieselben Zutaten auf weniger Boxen, jede wird größer; mit ＋ auf mehr, kleinere Boxen. Gesamt ${f0(T.total.kcal)} kcal und ${f0(T.total.p)} g Protein.</p>
       ${T.missing ? '<div class="warnbox">Bei einigen Zutaten fehlen Werte. Die Zahlen sind deshalb zu niedrig.</div>' : ''}</div>`;
     h += `<div class="card rate"><div><span class="lbl">Bewertung</span><div class="face">${rs.n
       ? `${word(SATT, rs.satt).e} ${word(SATT, rs.satt).l} · ${word(LECKER, rs.lecker).e} ${word(LECKER, rs.lecker).l} <span class="muted">(${rs.n}×)</span>`
@@ -1513,16 +1513,27 @@
       const r = await fetch('rezepte-paket.txt', { cache: 'no-cache' });
       if (!r.ok) return;
       const done = new Set(KW.getSetting(db, 'paketDone') || []);
+      // Überarbeitete Paket-Rezepte still übernehmen, wenn das alte Rezept noch unverändert ist (Fingerabdruck der alten Fassung)
+      let alt = {};
+      try { const ra = await fetch('paket-alt.json', { cache: 'no-cache' }); if (ra.ok) alt = await ra.json(); } catch (e) { /* ohne */ }
       // Neu, oder schon da, aber früher ohne erkannte Packungen importiert → zum Ersetzen anbieten
       const broken = old => old.ingredients.some(i => !i.pack && !i.pantry);
+      let upd = 0;
       const list = KW.parseRecipes(await r.text()).filter(x => {
         if (x.errors.length) return false;
         const old = KW.findByName(db, x.recipe.name);
+        if (old && alt[old.name] && KW.recipeFp(old) === alt[old.name] && KW.recipeFp(old) !== KW.recipeFp(x.recipe)) {
+          const nr = Object.assign(JSON.parse(JSON.stringify(x.recipe)), { id: old.id, created: old.created });
+          KW.put(db, 'recipes', nr); upd++;
+          return false;
+        }
         if (!old) return !done.has(x.recipe.name);
         return broken(old) && x.recipe.ingredients.every(i => i.pack || i.pantry) && !done.has('fix:' + x.recipe.name);
       });
+      if (upd) { save(); toast(upd === 1 ? '1 Rezept auf große Portionen umgestellt' : upd + ' Rezepte auf große Portionen umgestellt'); }
       const had = !!PAKET;
       PAKET = list.length ? { list } : null;
+      if (upd && !SH && !WZ && !CK) { render(true); return; }
       if ((had || PAKET) && S.tab === 'rezepte' && !S.recipeId && !SH && !WZ && !CK) render(true);
     } catch (e) { /* offline: beim nächsten Mal */ }
   }
@@ -1842,6 +1853,14 @@ Schritte:
     'snack-new': b => openPicker({ date: b.dataset.date, gap: defaultGap(b.dataset.date) }),
     swap: () => { SH.fn = swapSheet; refreshSheet(); },
     'swap-r': b => { P.update(db, SL.id, { recipeId: b.dataset.id }); save(); closeSheet(); render(true); toast('Getauscht'); },
+    'r-port': b => {
+      const r = getRecipe(b.dataset.id); if (!r) return;
+      const n = Math.max(1, Math.min(12, (r.portions || 1) + (+b.dataset.d)));
+      if (n === r.portions) return;
+      KW.put(db, 'recipes', Object.assign({}, r, { portions: n })); save(); render(true);
+      const t = KW.recipeTotals(getRecipe(b.dataset.id)).portion;
+      toast(n + (n === 1 ? ' Box' : ' Boxen') + ' · ' + f0(t.kcal) + ' kcal, ' + f0(t.g) + ' g pro Box');
+    },
     view: b => { closeSheet(); go({ tab: 'rezepte', recipeId: b.dataset.id }); },
     // Woche
     week: b => { S.week = P.addDays(S.week || defaultWeek(), +b.dataset.d); render(); },

@@ -10,7 +10,7 @@ Notiz: Die fünfte Box am besten einfrieren. Mehr Volumen: größerer Kohl oder 
 Zutaten:
 - Hähnchenbrustfilet | 1000 g | Packung 1 kg | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Weißkohl | 1 Stück à 1000 g | Stück | Obst/Gemüse | 25 kcal, 1,4 P, 4,2 K, 0,2 F
-- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Paprika | 4 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Basmatireis | 250 g | Packung 500 g | Trockenware | 350 kcal, 7,5 P, 77 K, 0,6 F
@@ -37,12 +37,12 @@ Boxtauglich: ja
 Zeit: 35 min
 Notiz: Mit 250 g Reis (zweite Hälfte der Packung) etwa 175 kcal mehr pro Box. Lässt sich am besten einfrieren, also für das Ende der Woche einplanen. Sojagranulat gibt es nicht in jedem Lidl, sonst bei dm oder Rewe. Gewürze: Chili, Kreuzkümmel, Paprikapulver.
 Zutaten:
-- Putenhack | 500 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
-- Sojagranulat | 100 g | Packung 250 g | Trockenware | 340 kcal, 50 P, 15 K, 1,5 F
+- Putenhack | 650 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
+- Sojagranulat | 250 g | Packung 250 g | Trockenware | 340 kcal, 50 P, 15 K, 1,5 F
 - Kidneybohnen (abgetropft) | 500 g | Dose 250 g | Konserven | 100 kcal, 7,5 P, 13 K, 0,5 F
 - Mais (abgetropft) | 140 g | Dose 140 g | Konserven | 80 kcal, 2,9 P, 15 K, 1,2 F
-- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
-- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Gehackte Tomaten | 1200 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Paprika | 6 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Brühwürfel | 1 Stück à 10 g | Vorrat | Gewürze/Saucen | 250 kcal, 10 P, 20 K, 15 F
 Schritte:
@@ -67,10 +67,10 @@ Notiz: Die zweite Hälfte Couscous ist für das Gyros-Rezept. Warm essen. Gewür
 Zutaten:
 - Putenhack | 1000 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Couscous | 250 g | Packung 500 g | Trockenware | 355 kcal, 12 P, 72 K, 1,5 F
-- Zucchini | 2 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
-- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Zucchini | 3 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
+- Paprika | 6 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Brühwürfel | 1 Stück à 10 g | Vorrat | Gewürze/Saucen | 250 kcal, 10 P, 20 K, 15 F
 Schritte:
 1. Couscous in eine Schüssel geben, mit 250 ml heißem Wasser aus dem Wasserkocher mit Brühwürfel übergießen, abdecken und quellen lassen. [10 min nebenbei]
@@ -142,9 +142,9 @@ Zutaten:
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Gyrosgewürz | 2 EL à 6 g | Vorrat | Gewürze/Saucen | 250 kcal, 10 P, 35 K, 6 F
 - Magerquark | 500 g | Becher 500 g | Kühlregal | 67 kcal, 12 P, 4 K, 0,2 F
-- Gurke | 1 Stück à 400 g | Stück | Obst/Gemüse | 12 kcal, 0,6 P, 1,8 K, 0,2 F
+- Gurke | 3 Stück à 400 g | Stück | Obst/Gemüse | 12 kcal, 0,6 P, 1,8 K, 0,2 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
-- Cherrytomaten | 250 g | Schale 250 g | Obst/Gemüse | 22 kcal, 1 P, 3,5 K, 0,3 F
+- Cherrytomaten | 750 g | Schale 250 g | Obst/Gemüse | 22 kcal, 1 P, 3,5 K, 0,3 F
 Schritte:
 1. Couscous mit 250 ml heißem Wasser aus dem Wasserkocher übergießen und quellen lassen. [10 min nebenbei]
    Tipp: Couscous braucht keinen Herd, nur heißes Wasser.
@@ -213,12 +213,12 @@ Boxtauglich: ja
 Zeit: 35 min
 Notiz: Die roten Linsen zerfallen und machen die Soße dick und fleischig. Soße lässt sich gut einfrieren. Gewürze: Oregano, Basilikum, Salz, Pfeffer.
 Zutaten:
-- Putenhack | 500 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
+- Putenhack | 700 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Rote Linsen | 250 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
 - Vollkornnudeln | 250 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
-- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
-- Möhren | 2 Stück à 80 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
-- Zucchini | 1 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
+- Gehackte Tomaten | 1600 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Möhren | 4 Stück à 80 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
+- Zucchini | 2 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Brühwürfel | 1 Stück à 10 g | Vorrat | Gewürze/Saucen | 250 kcal, 10 P, 20 K, 15 F
 Schritte:
@@ -310,7 +310,7 @@ Notiz: Fertig in 15 Minuten, fast alles aus dem Vorrat. Die Zucchini kann auch w
 Zutaten:
 - Vollkornnudeln | 125 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
 - Thunfisch im eigenen Saft (abgetropft) | 300 g | Dose 150 g | Konserven | 110 kcal, 25 P, 0 K, 1 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 550 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Zucchini | 1 Stück à 250 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 1 Zehe à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
@@ -332,7 +332,7 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zutaten:
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
-- Brokkoli (TK) | 1000 g | Packung 1000 g | Tiefkühl | 34 kcal, 3 P, 4 K, 0,4 F
+- Brokkoli (TK) | 2000 g | Packung 1000 g | Tiefkühl | 34 kcal, 3 P, 4 K, 0,4 F
 - Basmatireis, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 7 P, 78 K, 0,6 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 - Mozzarella light | 125 g | Packung 125 g | Kühlregal | 160 kcal, 19 P, 1 K, 9 F
@@ -355,9 +355,9 @@ Haltbar: 4 Tage
 Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
-- Putenhackfleisch | 800 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
+- Putenhackfleisch | 1200 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
 - Kartoffeln, festkochend | 1500 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
-- Sauerkraut | 500 g | Packung 500 g | Konserven | 20 kcal, 1,5 P, 1,5 K, 0,3 F
+- Sauerkraut | 1000 g | Packung 500 g | Konserven | 20 kcal, 1,5 P, 1,5 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 10 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
@@ -397,11 +397,11 @@ Haltbar: 4 Tage
 Einfrierbar: ja
 Boxtauglich: ja
 Zutaten:
-- Putenhackfleisch | 800 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
+- Putenhackfleisch | 950 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
 - Kidneybohnen, abgetropft | 500 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
-- Gehackte Tomaten | 800 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
-- Paprika | 3 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
+- Gehackte Tomaten | 1200 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
+- Paprika | 4 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 10 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
@@ -441,8 +441,8 @@ Haltbar: 4 Tage
 Einfrierbar: ja
 Boxtauglich: ja
 Zutaten:
-- Putengeschnetzeltes | 800 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
-- Paprika | 3 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
+- Putengeschnetzeltes | 900 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
+- Paprika | 9 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
 - Zwiebeln | 1 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 - Vollkornnudeln, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
@@ -464,7 +464,7 @@ Boxtauglich: ja
 Zutaten:
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Basmatireis, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 7 P, 78 K, 0,6 F
-- Paprika | 3 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
+- Paprika | 7 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
 - Kidneybohnen, abgetropft | 250 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
@@ -489,9 +489,9 @@ Boxtauglich: ja
 Zutaten:
 - Rote Linsen, trocken | 250 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
-- Möhren | 500 g | Packung 1 kg | Obst/Gemüse | 36 kcal, 0,8 P, 7 K, 0,2 F
-- Lauch | 2 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
-- Passierte Tomaten | 500 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
+- Möhren | 1000 g | Packung 1 kg | Obst/Gemüse | 36 kcal, 0,8 P, 7 K, 0,2 F
+- Lauch | 3 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
+- Passierte Tomaten | 1000 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
 - Gemüsebrühe, Pulver | 20 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
 1. Hähnchen würfeln und im großen Topf ohne Öl anbraten. [6 min]
@@ -510,9 +510,9 @@ Boxtauglich: ja
 Zutaten:
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Vollkornnudeln, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
-- Möhren | 500 g | Packung 1 kg | Obst/Gemüse | 36 kcal, 0,8 P, 7 K, 0,2 F
-- Lauch | 1 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
-- Erbsen (TK) | 450 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
+- Möhren | 1000 g | Packung 1 kg | Obst/Gemüse | 36 kcal, 0,8 P, 7 K, 0,2 F
+- Lauch | 2 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
+- Erbsen (TK) | 900 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
 - Gemüsebrühe, Pulver | 30 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
 1. Hähnchen würfeln und im großen Topf kurz anbraten. [6 min]
@@ -530,8 +530,8 @@ Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
 - Kartoffeln, festkochend | 1500 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
-- Lauch | 2 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
-- Putenhackfleisch | 800 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
+- Lauch | 3 Stück à 250 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
+- Putenhackfleisch | 1200 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
 - Gemüsebrühe, Pulver | 20 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 Schritte:
@@ -572,9 +572,9 @@ Haltbar: 3 Tage
 Einfrierbar: ja
 Boxtauglich: ja
 Zutaten:
-- Seelachsfilet (TK) | 800 g | Packung 400 g | Tiefkühl | 75 kcal, 17 P, 0 K, 0,8 F
+- Seelachsfilet (TK) | 1200 g | Packung 400 g | Tiefkühl | 75 kcal, 17 P, 0 K, 0,8 F
 - Kokosmilch light | 400 ml | Packung 400 ml | Konserven | 85 kcal, 1 P, 2 K, 8 F
-- Gemüsemischung (TK) | 750 g | Packung 750 g | Tiefkühl | 40 kcal, 2 P, 5 K, 0,5 F
+- Gemüsemischung (TK) | 1500 g | Packung 750 g | Tiefkühl | 40 kcal, 2 P, 5 K, 0,5 F
 - Basmatireis, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 7 P, 78 K, 0,6 F
 - Zwiebeln | 1 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 10 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -593,8 +593,8 @@ Haltbar: 4 Tage
 Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
-- Spitzkohl | 800 g | Packung 1 Stück (ca. 800 g) | Obst/Gemüse | 28 kcal, 1,6 P, 4 K, 0,3 F
-- Putenhackfleisch | 800 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
+- Spitzkohl | 1900 g | Packung 1 Stück (ca. 800 g) | Obst/Gemüse | 28 kcal, 1,6 P, 4 K, 0,3 F
+- Putenhackfleisch | 1200 g | Packung 400 g | Fleisch | 145 kcal, 20 P, 0 K, 7 F
 - Vollkornnudeln, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
@@ -616,9 +616,9 @@ Boxtauglich: ja
 Zutaten:
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Basmatireis, trocken | 250 g | Packung 500 g | Trockenware | 350 kcal, 7 P, 78 K, 0,6 F
-- Paprika | 3 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
+- Paprika | 6 Stück à 160 g | Packung 3 Stück | Obst/Gemüse | 30 kcal, 1 P, 5,5 K, 0,3 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
-- Gehackte Tomaten | 800 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 1300 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
 - Gemüsebrühe, Pulver | 15 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
 1. Hähnchen würfeln und im großen Topf ohne Öl anbraten, Zwiebeln und Paprika dazu. [10 min]
@@ -658,8 +658,8 @@ Boxtauglich: ja
 Zutaten:
 - Rote Linsen, trocken | 250 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
 - Hähnchenbrustfilet | 1000 g | Packung 1000 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
-- Blattspinat (TK) | 450 g | Packung 450 g | Tiefkühl | 22 kcal, 2,8 P, 1,2 K, 0,4 F
-- Gehackte Tomaten | 400 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
+- Blattspinat (TK) | 900 g | Packung 450 g | Tiefkühl | 22 kcal, 2,8 P, 1,2 K, 0,4 F
+- Gehackte Tomaten | 800 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
 - Kokosmilch light | 400 ml | Packung 400 ml | Konserven | 85 kcal, 1 P, 2 K, 8 F
 - Zwiebeln | 2 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 10 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -697,12 +697,12 @@ Haltbar: 2 Tage
 Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
-- Thunfisch im eigenen Saft, abgetropft | 300 g | Packung Dose 185 g (150 g abgetropft) | Konserven | 105 kcal, 25 P, 0 K, 0,6 F
+- Thunfisch im eigenen Saft, abgetropft | 450 g | Packung Dose 185 g (150 g abgetropft) | Konserven | 105 kcal, 25 P, 0 K, 0,6 F
 - Kidneybohnen, abgetropft | 250 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
 - Kichererbsen, abgetropft | 240 g | Packung Dose 400 g (240 g abgetropft) | Konserven | 120 kcal, 7 P, 15 K, 2,6 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
 - Salatgurke | 1 Stück à 400 g | Packung 1 Stück | Obst/Gemüse | 15 kcal, 0,6 P, 3 K, 0,1 F
-- Cherrytomaten | 250 g | Packung 250 g | Obst/Gemüse | 20 kcal, 1 P, 3 K, 0,3 F
+- Cherrytomaten | 500 g | Packung 250 g | Obst/Gemüse | 20 kcal, 1 P, 3 K, 0,3 F
 - Zwiebeln | 1 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Rapsöl | 10 g | Packung 1 l | Gewürze/Saucen | 828 kcal, 0 P, 0 K, 92 F
 - Senf, mittelscharf | 10 g | Packung Tube 200 ml | Gewürze/Saucen | 85 kcal, 6 P, 4 K, 4,5 F
@@ -778,7 +778,7 @@ Haltbar: 2 Tage
 Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
-- Eier | 4 Stück à 55 g | Packung 10 Stück | Kühlregal | 140 kcal, 12,5 P, 0,7 K, 9,5 F
+- Eier | 10 Stück à 55 g | Packung 10 Stück | Kühlregal | 140 kcal, 12,5 P, 0,7 K, 9,5 F
 - Joghurt 1,5 % | 150 g | Packung 500 g | Kühlregal | 50 kcal, 4 P, 6 K, 1,5 F
 - Senf, mittelscharf | 10 g | Packung Tube 200 ml | Gewürze/Saucen | 85 kcal, 6 P, 4 K, 4,5 F
 - Frühlingszwiebeln | 100 g | Packung 1 Bund (ca. 100 g) | Obst/Gemüse | 30 kcal, 2 P, 5 K, 0,5 F
@@ -843,7 +843,7 @@ Haltbar: 5 Tage
 Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
-- Eier | 10 Stück à 55 g | Packung 10 Stück | Kühlregal | 140 kcal, 12,5 P, 0,7 K, 9,5 F
+- Eier | 20 Stück à 55 g | Packung 10 Stück | Kühlregal | 140 kcal, 12,5 P, 0,7 K, 9,5 F
 Schritte:
 1. Eier in einen Topf mit 2 cm kochendem Wasser aus dem Wasserkocher legen, Deckel drauf und hart garen. [10 min nebenbei]
    Tipp: Gedämpft mit wenig Wasser statt im vollen Topf.
@@ -860,7 +860,7 @@ Boxtauglich: ja
 Zutaten:
 - Basmatireis, trocken | 125 g | Packung 500 g | Trockenware | 350 kcal, 7 P, 78 K, 0,6 F
 - Thunfisch im eigenen Saft, abgetropft | 300 g | Packung Dose 185 g (150 g abgetropft) | Konserven | 105 kcal, 25 P, 0 K, 0,6 F
-- Gehackte Tomaten | 400 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 800 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
 - Zwiebeln | 1 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 5 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -879,7 +879,7 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zutaten:
 - Rote Linsen, trocken | 250 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
-- Gehackte Tomaten | 800 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 1600 g | Packung 400 g | Konserven | 22 kcal, 1,2 P, 3,5 K, 0,2 F
 - Kidneybohnen, abgetropft | 250 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
 - Zwiebeln | 1 Stück à 80 g | Packung 1 kg | Obst/Gemüse | 33 kcal, 1,2 P, 6 K, 0,2 F
 - Gemüsebrühe, Pulver | 15 g | Packung Glas 120 g | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -898,9 +898,9 @@ Einfrierbar: nein
 Boxtauglich: ja
 Zutaten:
 - Vollkornnudeln, trocken | 125 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
-- Erbsen (TK) | 225 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
+- Erbsen (TK) | 450 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
 - Thunfisch im eigenen Saft, abgetropft | 300 g | Packung Dose 185 g (150 g abgetropft) | Konserven | 105 kcal, 25 P, 0 K, 0,6 F
-- Passierte Tomaten | 500 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
+- Passierte Tomaten | 650 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
 Schritte:
 1. Nudeln in Wasser aus dem Wasserkocher garen, die gefrorenen Erbsen die letzten 3 Minuten mitkochen. [10 min nebenbei]
    Tipp: Erbsen im Nudelwasser mitgaren spart einen Topf.
@@ -916,17 +916,17 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 45 min
 Gerät: Monsieur Cuisine
-Notiz: Reis und Brokkoli garen gleichzeitig: Reis im Garkörbchen, Brokkoli im Dampfgaraufsatz. Die halbe Dose Kokosmilch für das nächste Curry einfrieren.
+Notiz: Reis und Brokkoli garen gleichzeitig: Reis im Garkörbchen, Brokkoli im Dampfgaraufsatz. Die halbe Dose Kokosmilch für das nächste Curry einfrieren. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Basmatireis | 160 g | Packung 500 g | Trockenware | 350 kcal, 7,5 P, 77 K, 0,6 F
-- Brokkoli (TK) | 750 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
+- Brokkoli (TK) | 1000 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
 - Hähnchenbrustfilet | 800 g | Packung 400 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Currypulver | 2 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Kokosmilch light | 200 ml | Packung 400 ml | Konserven | 85 kcal, 1 P, 2 K, 8 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 550 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
 1. 1 l Wasser in den Mixtopf, Reis gewaschen ins Garkörbchen einsetzen, Brokkoli in den Dampfgaraufsatz. 20 Min./Dampfgaren-Stufe/Stufe 1 garen. [22 min nebenbei]
@@ -946,16 +946,16 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 45 min
 Gerät: Monsieur Cuisine
-Notiz: Die roten Linsen verkochen in der Soße und machen sie sämig und eiweißreich, ohne dass man sie schmeckt.
+Notiz: Die roten Linsen verkochen in der Soße und machen sie sämig und eiweißreich, ohne dass man sie schmeckt. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Möhren | 2 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
+- Möhren | 3 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
-- Putenhack | 500 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
+- Putenhack | 650 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Rote Linsen | 100 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
-- Passierte Tomaten | 500 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Passierte Tomaten | 1000 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
+- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Vollkornnudeln | 200 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
 Schritte:
@@ -976,16 +976,16 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Ohne Reis schon satt machend. Wer mehr braucht: ein Klecks Skyr obendrauf statt Saurer Sahne.
+Notiz: Ohne Reis schon satt machend. Wer mehr braucht: ein Klecks Skyr obendrauf statt Saurer Sahne. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
-- Paprika | 2 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
-- Putenhack | 500 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
+- Putenhack | 1000 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
 - Kidneybohnen, abgetropft | 250 g | Packung Dose 400 g (250 g abgetropft) | Konserven | 95 kcal, 7 P, 13 K, 0,5 F
 - Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F
-- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 1200 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Chili-Gewürz | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 300 kcal, 12 P, 30 K, 12 F
@@ -1006,17 +1006,17 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Sehr günstig. Vegetarisch geht auch: Hähnchen weglassen und dafür 150 g Linsen mehr nehmen.
+Notiz: Sehr günstig. Vegetarisch geht auch: Hähnchen weglassen und dafür 150 g Linsen mehr nehmen. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Currypulver | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Rote Linsen | 200 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 900 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Hähnchenbrustfilet | 600 g | Packung 600 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
-- Blattspinat (TK) | 450 g | Packung 450 g | Tiefkühl | 23 kcal, 2,9 P, 1,4 K, 0,4 F
+- Blattspinat (TK) | 1000 g | Packung 450 g | Tiefkühl | 23 kcal, 2,9 P, 1,4 K, 0,4 F
 Schritte:
 1. Zwiebel und Knoblauch in den Mixtopf, 5 Sek./Stufe 5 zerkleinern. [1 min]
 2. Öl und Currypulver dazu, 3 Min./120 °C/Stufe 1 andünsten. [3 min nebenbei]
@@ -1035,13 +1035,13 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 45 min
 Gerät: Monsieur Cuisine
-Notiz: Mit Kochsahne light statt Sahne und Mehlschwitze. Reis gart im Garkörbchen gleich mit.
+Notiz: Mit Kochsahne light statt Sahne und Mehlschwitze. Reis gart im Garkörbchen gleich mit. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Basmatireis | 160 g | Packung 500 g | Trockenware | 350 kcal, 7,5 P, 77 K, 0,6 F
 - Hähnchenbrustfilet | 800 g | Packung 400 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
-- Möhren | 2 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
-- Erbsen (TK) | 200 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
-- Champignons | 250 g | Schale 250 g | Obst/Gemüse | 22 kcal, 3 P, 0,6 K, 0,3 F
+- Möhren | 5 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
+- Erbsen (TK) | 450 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
+- Champignons | 600 g | Schale 250 g | Obst/Gemüse | 22 kcal, 3 P, 0,6 K, 0,3 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kochsahne light 7 % | 200 ml | Packung 200 ml | Kühlregal | 85 kcal, 3 P, 4,5 K, 7 F
 - Speisestärke | 2 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
@@ -1063,10 +1063,10 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Kartoffeln werden püriert, deshalb ist die Suppe nach dem Einfrieren nicht mehlig. Das Hähnchen kommt erst danach in Stücken dazu.
+Notiz: Kartoffeln werden püriert, deshalb ist die Suppe nach dem Einfrieren nicht mehlig. Das Hähnchen kommt erst danach in Stücken dazu. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Lauch | 1 Stück à 300 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
+- Lauch | 3 Stück à 300 g | Packung 1 Stück | Obst/Gemüse | 30 kcal, 2 P, 4 K, 0,3 F
 - Kartoffeln, festkochend | 600 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Gemüsebrühe, Pulver | 3 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -1089,13 +1089,13 @@ Einfrierbar: nein
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Alles in einem Durchgang: Kartoffeln im Garkörbchen, Fisch und Zucchini im Dampfgaraufsatz, Soße im Mixtopf. Fisch nur 2 Tage, deshalb am Kochtag und dem Tag danach essen.
+Notiz: Alles in einem Durchgang: Kartoffeln im Garkörbchen, Fisch und Zucchini im Dampfgaraufsatz, Soße im Mixtopf. Fisch nur 2 Tage, deshalb am Kochtag und dem Tag danach essen. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Passierte Tomaten | 500 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kartoffeln, festkochend | 800 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
-- Seelachsfilet (TK) | 800 g | Packung 400 g | Tiefkühl | 75 kcal, 17 P, 0 K, 0,8 F
+- Seelachsfilet (TK) | 1200 g | Packung 400 g | Tiefkühl | 75 kcal, 17 P, 0 K, 0,8 F
 - Zucchini | 1 Stück à 300 g | Stück | Obst/Gemüse | 19 kcal, 1,6 P, 2,3 K, 0,4 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 Schritte:
@@ -1115,10 +1115,11 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 40 min
 Gerät: Monsieur Cuisine
+Notiz: Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Basmatireis | 160 g | Packung 500 g | Trockenware | 350 kcal, 7,5 P, 77 K, 0,6 F
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
-- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Paprika | 9 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putengeschnetzeltes | 800 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
 - Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
@@ -1143,13 +1144,13 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 40 min
 Gerät: Monsieur Cuisine
-Notiz: Schmeckt wie Kohlrouladen, nur ohne Wickeln. Der Kohl fällt beim Garen stark zusammen, deshalb in zwei Portionen in den Mixtopf geben.
+Notiz: Schmeckt wie Kohlrouladen, nur ohne Wickeln. Der Kohl fällt beim Garen stark zusammen, deshalb in zwei Portionen in den Mixtopf geben. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
-- Putenhack | 500 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
-- Weißkohl | 1 Stück à 800 g | Stück | Obst/Gemüse | 25 kcal, 1,4 P, 4,2 K, 0,2 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Putenhack | 1000 g | Packung 500 g | Fleisch | 140 kcal, 20 P, 0 K, 6,5 F
+- Weißkohl | 2 Stück à 800 g | Stück | Obst/Gemüse | 25 kcal, 1,4 P, 4,2 K, 0,2 F
+- Gehackte Tomaten | 800 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Rote Linsen | 80 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Kümmel | 1 TL à 3 g | Vorrat | Gewürze/Saucen | 375 kcal, 20 P, 50 K, 15 F
@@ -1170,7 +1171,7 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Ohne Reis, die Kichererbsen machen satt. Dazu passt ein Löffel Joghurt.
+Notiz: Ohne Reis, die Kichererbsen machen satt. Dazu passt ein Löffel Joghurt. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Knoblauch | 2 Zehen à 4 g | Vorrat | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,5 F
@@ -1178,9 +1179,9 @@ Zutaten:
 - Currypulver | 2 EL à 7 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 - Hähnchenbrustfilet | 800 g | Packung 400 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Kichererbsen, abgetropft | 240 g | Packung Dose 400 g (240 g abgetropft) | Konserven | 120 kcal, 7 P, 15 K, 2,6 F
-- Passierte Tomaten | 500 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
+- Passierte Tomaten | 1000 g | Packung 500 g | Konserven | 30 kcal, 1,4 P, 5 K, 0,2 F
 - Kokosmilch light | 200 ml | Packung 400 ml | Konserven | 85 kcal, 1 P, 2 K, 8 F
-- Paprika | 1 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Paprika | 3 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Gemüsebrühe, Pulver | 1 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 Schritte:
 1. Zwiebel und Knoblauch in den Mixtopf, 5 Sek./Stufe 5 zerkleinern. [1 min]
@@ -1198,12 +1199,12 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 45 min
 Gerät: Monsieur Cuisine
-Notiz: Kartoffeln garen im Garkörbchen über dem Gulasch und bekommen dadurch etwas vom Aroma ab.
+Notiz: Kartoffeln garen im Garkörbchen über dem Gulasch und bekommen dadurch etwas vom Aroma ab. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 2 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Putengeschnetzeltes | 800 g | Packung 400 g | Fleisch | 105 kcal, 23 P, 0 K, 1,5 F
-- Paprika | 2 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
+- Paprika | 6 Stück à 150 g | Beutel 3 Stück | Obst/Gemüse | 31 kcal, 1 P, 6 K, 0,3 F
 - Tomatenmark | 2 EL à 15 g | Vorrat | Gewürze/Saucen | 80 kcal, 4,5 P, 13 K, 0,5 F
 - Paprikapulver edelsüß | 1 EL à 7 g | Vorrat | Gewürze/Saucen | 330 kcal, 14 P, 20 K, 13 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
@@ -1225,12 +1226,13 @@ Einfrierbar: ja
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
+Notiz: Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Öl | 1 EL à 10 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
-- Möhren | 3 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
+- Möhren | 6 Stück à 100 g | Beutel 1 kg | Obst/Gemüse | 36 kcal, 0,9 P, 7 K, 0,2 F
 - Kartoffeln, festkochend | 400 g | Packung 1,5 kg | Obst/Gemüse | 72 kcal, 2 P, 15 K, 0,1 F
-- Erbsen (TK) | 450 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
+- Erbsen (TK) | 900 g | Packung 450 g | Tiefkühl | 80 kcal, 5,5 P, 11 K, 0,5 F
 - Gemüsebrühe, Pulver | 3 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Hähnchenbrustfilet | 600 g | Packung 600 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Kräuter (TK) | 25 g | Packung 50 g | Tiefkühl | 30 kcal, 2,5 P, 3 K, 0,5 F
@@ -1250,13 +1252,13 @@ Einfrierbar: nein
 Boxtauglich: ja
 Zeit: 35 min
 Gerät: Monsieur Cuisine
-Notiz: Die cremige Soße kommt aus körnigem Frischkäse und Milch, nicht aus Sahne. Nudeln garen direkt in der Soße.
+Notiz: Die cremige Soße kommt aus körnigem Frischkäse und Milch, nicht aus Sahne. Nudeln garen direkt in der Soße. Große Portionen: Der Mixtopf fasst das nicht auf einmal. Das zusätzliche Gemüse im Dampfgaraufsatz mitgaren oder in zwei Durchgängen kochen.
 Zutaten:
 - Hähnchenbrustfilet | 600 g | Packung 600 g | Fleisch | 105 kcal, 23,5 P, 0 K, 1,2 F
 - Vollkornnudeln | 200 g | Packung 500 g | Trockenware | 350 kcal, 13 P, 64 K, 2,5 F
 - Milch 1,5 % | 500 ml | Packung 1 l | Kühlregal | 47 kcal, 3,4 P, 4,8 K, 1,5 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
-- Brokkoli (TK) | 450 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
+- Brokkoli (TK) | 1500 g | Beutel 750 g | Tiefkühl | 34 kcal, 3 P, 2,7 K, 0,4 F
 - Körniger Frischkäse | 200 g | Becher 200 g | Kühlregal | 98 kcal, 12 P, 2,6 K, 4,3 F
 - Reibekäse light | 50 g | Packung 200 g | Kühlregal | 270 kcal, 30 P, 0 K, 16 F
 Schritte:
@@ -1280,7 +1282,7 @@ Zutaten:
 - Haferflocken | 240 g | Packung 500 g | Trockenware | 372 kcal, 13,5 P, 58,7 K, 7 F
 - Milch 1,5 % | 800 ml | Packung 1 l | Kühlregal | 47 kcal, 3,4 P, 4,8 K, 1,5 F
 - Äpfel | 2 Stück à 150 g | Packung 1 Stück | Obst/Gemüse | 52 kcal, 0,3 P, 11,4 K, 0,2 F
-- Magerquark | 500 g | Becher 500 g | Kühlregal | 67 kcal, 12 P, 4 K, 0,2 F
+- Magerquark | 1000 g | Becher 500 g | Kühlregal | 67 kcal, 12 P, 4 K, 0,2 F
 - Zimt | 1 TL à 3 g | Vorrat | Gewürze/Saucen | 250 kcal, 4 P, 50 K, 1 F
 Schritte:
 1. Äpfel in Stücken in den Mixtopf, 4 Sek./Stufe 5 zerkleinern. [2 min]
@@ -1327,7 +1329,7 @@ Zutaten:
 - Backkakao | 25 g | Packung 250 g | Trockenware | 360 kcal, 20 P, 11 K, 21 F
 - Speisestärke | 3 EL à 10 g | Vorrat | Trockenware | 350 kcal, 0,4 P, 86 K, 0,1 F
 - Honig | 1 EL à 20 g | Vorrat | Gewürze/Saucen | 304 kcal, 0,3 P, 82 K, 0 F
-- Skyr natur | 500 g | Packung 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F
+- Skyr natur | 700 g | Packung 500 g | Kühlregal | 63 kcal, 11 P, 4 K, 0,2 F
 Schritte:
 1. Milch, Kakao, Stärke und Honig in den Mixtopf, 7 Min./90 °C/Stufe 3 kochen. [7 min nebenbei]
 2. In eine Schüssel umfüllen, mit Frischhaltefolie direkt auf der Oberfläche abkühlen lassen. [30 min nebenbei]
@@ -1411,7 +1413,7 @@ Zutaten:
 - Zwiebeln | 1 Stück à 80 g | Netz 1 kg | Obst/Gemüse | 40 kcal, 1,2 P, 9 K, 0,1 F
 - Öl | 1 TL à 4 g | Vorrat | Gewürze/Saucen | 884 kcal, 0 P, 0 K, 100 F
 - Rote Linsen | 150 g | Packung 500 g | Trockenware | 340 kcal, 24 P, 49 K, 1,5 F
-- Gehackte Tomaten | 400 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
+- Gehackte Tomaten | 1200 g | Dose 400 g | Konserven | 22 kcal, 1,1 P, 3,5 K, 0,2 F
 - Gemüsebrühe, Pulver | 2 TL à 5 g | Vorrat | Gewürze/Saucen | 230 kcal, 8 P, 25 K, 10 F
 - Currypulver | 1 TL à 3 g | Vorrat | Gewürze/Saucen | 325 kcal, 13 P, 25 K, 14 F
 Schritte:

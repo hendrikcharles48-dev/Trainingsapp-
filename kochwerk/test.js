@@ -398,21 +398,14 @@ eq('Notfall', C.emergencyIdeas(H).map(x => x.r.name), ['Linsen-Dal']);
   const paket = KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8'));
   eq('Paket: mindestens 13 Rezepte', paket.length >= 13, true);
   eq('Paket: ohne Fehler und Warnungen', paket.filter(x => x.errors.length || x.warnings.length).map(x => [x.recipe.name, x.errors, x.warnings]), []);
-  // Werte pro Box aus dem Artefakt „Meine Mealprep-Rezepte“ (kcal, Protein) – die Rechnung muss in der Nähe liegen
-  const soll = { 'Asia-Hähnchen-Kohl-Pfanne mit Reis': [540, 54], 'Chili mit Putenhack und Sojagranulat': [405, 41], 'Orientalische Couscous-Pfanne mit Putenhack': [530, 49],
-    'Curry-Hähnchen mit TK-Gemüse': [515, 56], 'Gemüse-Frittata aus dem Ofen': [255, 22], 'Hähnchen-Gyros mit Couscous und Tzatziki': [505, 65], 'Kartoffel-Hack-Pfanne mit Kräuterquark': [620, 58],
-    'Weißkohl-Kartoffel-Eintopf mit Putenhack': [505, 47], 'Linsen-Bolognese mit Putenhack': [550, 41], 'Quark-Beeren-Bowl': [560, 66], 'Seelachs mit Kartoffeln und Senfsoße': [510, 49],
-    'Schnelle Shakshuka mit Feta': [490, 41], 'Thunfisch-Tomaten-Nudeln': [450, 44] };
-  const off = [];
-  for (const x of paket) {
-    const t = KW.recipeTotals(x.recipe).portion, s = soll[x.recipe.name];
-    if (!s) continue;
-    if (Math.abs(t.kcal - s[0]) / s[0] > 0.12 || Math.abs(t.p - s[1]) / s[1] > 0.15) off.push(x.recipe.name + ': ' + Math.round(t.kcal) + ' kcal / ' + Math.round(t.p) + ' g P statt ' + s.join(' / '));
-  }
-  eq('Paket: Werte passen zum Artefakt (±12 % kcal, ±15 % Protein)', off, []);
+  // Große Portionen (Nutzerwunsch 9.11.): satt werden bei moderaten kcal
+  const mains = paket.filter(x => x.recipe.cat === 'main').map(x => Object.assign({ n: x.recipe.name }, KW.recipeTotals(x.recipe).portion));
+  eq('Paket: Hauptmahlzeiten mind. 550 g und höchstens 700 kcal', mains.filter(t => t.g < 550 || t.kcal > 700).map(t => t.n), []);
+  eq('Paket: Hauptmahlzeiten im Schnitt mind. 680 g', mains.reduce((s, t) => s + t.g, 0) / mains.length >= 680, true);
+  eq('Paket: Fingerabdrücke der alten Fassung vorhanden', Object.keys(JSON.parse(fs.readFileSync(path.join(__dirname, 'paket-alt.json'), 'utf8'))).length >= 62, true);
   eq('Paket: Notfallgericht dabei', paket.some(x => x.recipe.cat === 'emergency'), true);
   eq('Paket: 20 Monsieur-Cuisine-Rezepte', paket.filter(x => x.recipe.mc).length, 20);
-  eq('Paket: MC-Rezepte günstig und leicht (≤ 600 kcal pro Portion)', paket.filter(x => x.recipe.mc && KW.recipeTotals(x.recipe).portion.kcal > 600).map(x => x.recipe.name), []);
+  eq('Paket: MC-Rezepte günstig und leicht (≤ 700 kcal pro Portion)', paket.filter(x => x.recipe.mc && KW.recipeTotals(x.recipe).portion.kcal > 700).map(x => x.recipe.name), []);
   eq('Paket: keine doppelten Namen', paket.length, new Set(paket.map(x => KW.norm(x.recipe.name))).size);
 }
 

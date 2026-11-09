@@ -469,6 +469,12 @@
     const v = k => p && p[k] != null ? fmtNum(p[k]) : '?';
     return v('kcal') + ' kcal, ' + v('p') + ' P, ' + v('c') + ' K, ' + v('f') + ' F';
   }
+  // Fingerabdruck eines Rezepts (Name + Zutatenmengen + Portionen): erkennt, ob ein Paket-Rezept unverändert übernommen wurde
+  function recipeFp(r) {
+    const str = norm(r.name) + '#' + r.portions + '#' + (r.ingredients || []).map(i => norm(i.name) + ':' + Math.round(ingGrams(i))).join(',');
+    let h = 0; for (let k = 0; k < str.length; k++) h = (h * 31 + str.charCodeAt(k)) | 0;
+    return (h >>> 0).toString(36);
+  }
   function recipeToText(r) {
     const L = ['=== KOCHWERK REZEPT ===', 'Name: ' + r.name, 'Kategorie: ' + ({ main: 'Hauptmahlzeit', snack: 'Snack', hunger: 'Hungersnack', emergency: 'Notfall' })[r.cat],
       'Portionen: ' + fmtNum(r.portions), 'Haltbar: ' + fmtNum(r.keepDays) + (r.keepDays === 1 ? ' Tag' : ' Tage'), 'Einfrierbar: ' + (r.freeze ? 'ja' : 'nein'), 'Boxtauglich: ' + (r.box ? 'ja' : 'nein')];
@@ -577,7 +583,7 @@
   const KW = {
     uid, num, round, norm, isoDate, fmtNum, CATS, catById, recipeIcon, AREAS, areaById, ACTIVITY, TEMPO, WEEKDAYS, DEFAULTS, COUNT_UNITS,
     parseAmount, parsePack, packText, parseNutr, parseCat, parseArea, parseBool, parseStepMeta, parseRecipes,
-    ingGrams, recipeTotals, calcTargets, amountText, nutrText, recipeToText,
+    ingGrams, recipeTotals, calcTargets, amountText, nutrText, recipeToText, recipeFp,
     COLLECTIONS, emptyDb, upgrade, live, put, remove, getSetting, setSetting, profile, latestWeight, setWeight,
     ratingSummary, merge, findByName, importRecipe
   };

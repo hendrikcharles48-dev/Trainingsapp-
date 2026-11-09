@@ -83,7 +83,7 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Abgleich (`sync.js`): Datei `kochwerk-daten.json` im privaten Repo des Nutzers, `KW.merge` pro Eintrag, Schlüssel nur in
   `kochwerk_sync`. `save()` stößt den Abgleich an, `persist()` speichert ohne. Neue Sammlungen werden automatisch mit abgeglichen.
 - Rezeptpaket: `kochwerk/rezepte-paket.txt` (im Import-Format). Die App bietet beim Öffnen neue Rezepte daraus an
-  (Karte auf „Heute“), Übernommenes/Abgelehntes merkt sie in der Einstellung `paketDone`. Neue Rezepte aus dem Chat
+  (Karte auf „Rezepte“), Übernommenes/Abgelehntes merkt sie in der Einstellung `paketDone`. Neue Rezepte aus dem Chat
   oder einem Artefakt hier anhängen (Werte pro 100 g, Packungen, Vorrat) – Test vergleicht kcal/Protein mit Sollwerten.
 - Ausrichtung ab 2.0 (Nutzerwunsch 7.11.): in erster Linie Meal-Prep-Rezepte. Reiter Rezepte · Kochen · Einkauf · Mehr (Start: Rezepte).
   „Kochen“ = Woche vorkochen (Töpfe/Boxen der Woche, Kochsession, Boxen, Auftauhinweise); der Wochenplan (`pageWoche`) ist Unterseite von Kochen.
@@ -95,6 +95,12 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
   Monsieur Cuisine (Lidl-Küchenmaschine des Nutzers): optionales Feld `Gerät: Monsieur Cuisine` im Import-Format → `r.mc`,
   Kennzeichen 🤖, Filter „🤖 Monsieur Cuisine“, Schalter im Editor. 20 MC-Rezepte (günstig, ≤ 600 kcal, eiweißreich) im Paket;
   Schritte nennen Zeit/Temperatur/Linkslauf/Stufe. Der Chat-Skill „kochwerk-rezept“ kennt das Feld noch nicht.
+- Große Portionen (Nutzerwunsch 9.11.: großer Mann, viel Hunger, trotzdem wenig kcal): Hauptmahlzeiten ≥ 550 g (Ø ≥ 680 g),
+  ≤ 700 kcal, viel Gemüse + mageres Eiweiß, Stärke sparsam. Gilt auch für neue Rezepte. Test prüft das.
+  Paket-Rezepte still aktualisieren: `kochwerk/paket-alt.json` = Fingerabdrücke (`KW.recipeFp`) der VORHERIGEN Paket-Fassung.
+  `checkPaket` ersetzt ein vorhandenes Rezept nur, wenn es noch genau der alten Fassung entspricht (vom Nutzer geänderte bleiben).
+  Vor jeder Änderung bestehender Paket-Rezepte `paket-alt.json` aus der alten Fassung neu erzeugen (bisherige Einträge behalten).
+  Rezeptseite: −/＋ bei „Boxen“ verteilt dieselben Zutaten auf weniger/mehr Boxen (`r-port`).
 - Tagebuch (`track.js`) ist optional: Schalter in „Mehr“ (`ui.track`, nur lokal, Standard aus), Seite `pageHeute` als Unterseite von Mehr.
   `log` (Einträge mit Nährwert-Schnappschuss pro 100 g; `lp<planId>` = Anpassung einer geplanten Mahlzeit, `factor` 0 = nicht gegessen),
   `foods` (eigene + Open Food Facts, `fav:<id>` = Favorit). `P.room` zählt Plan + Tagebuch. Mahlzeiten dort zugeklappt, „＋“ fragt
