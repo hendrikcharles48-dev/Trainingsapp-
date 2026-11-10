@@ -104,6 +104,9 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 - Grundzutaten (Nutzerwunsch 10.11.): nur was wirklich jeder hat – `KW.isBasic` (Öl, Salz, Pfeffer, getrocknete Gewürze, Mehl,
   Zucker, Stärke, Essig, Brühe). Das „Vorrat“-Flag im Rezept zählt nur dafür; alles andere kommt auf die Einkaufsliste
   (`KW.fallbackPack` für Knoblauch, Honig, Tomatenmark …). Grundvorrat enthält keine Hungersnack-/Notfall-Zutaten mehr.
+  Dazu wählt der Nutzer selbst, was er immer zu Hause hat: Einstellung `homeStock` (Standard Knoblauch, Honig, Tomatenmark, Senf,
+  Sojasoße, Zitronensaft; Auswahl `KW.HOME_CHOICES` + eigene). `KW.isBasic(i, db)` = fest (`isFixedBasic`) oder `isHome`.
+  Fenster „Grundzutaten“ unter Mehr und in Einkauf → Grundzutaten prüfen.
 - Kochsession: Standard „Nacheinander“ (`CK.mode = 'one'`): pro Rezept erst Zutaten bereitlegen, dann Schritt für Schritt,
   danach nächstes Rezept. „Gleichzeitig“ (`'all'`) = alte verschachtelte Planung (`CO.schedule`). Start über „Kochen starten“ im Reiter Kochen.
 - Tagebuch (`track.js`) ist optional: Schalter in „Mehr“ (`ui.track`, nur lokal, Standard aus), Seite `pageHeute` als Unterseite von Mehr.

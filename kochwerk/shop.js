@@ -162,7 +162,7 @@
         const n = need[k] = need[k] || { key: k, name: i.name, area: i.area, g: 0, cnt: 0, cntUnit: null, pieceG: null, pantry: true, first: pot.first, recipes: [], ing: i };
         if (isCount(i)) { n.cnt += i.qty * pot.pots; n.cntUnit = n.cntUnit || i.unit; if (i.pieceG && !n.pieceG) n.pieceG = i.pieceG; }
         else n.g += i.qty * pot.pots;
-        if (!KW.isBasic(i)) { n.pantry = false; if (KW.isBasic(n.ing)) n.ing = i; }
+        if (!KW.isBasic(i, db)) { n.pantry = false; if (KW.isBasic(n.ing, db)) n.ing = i; }
         if (pot.first < n.first) n.first = pot.first;
         if (!n.recipes.includes(pot.r.name)) n.recipes.push(pot.r.name);
       }
@@ -301,7 +301,7 @@
       const hits = [];
       for (const i of r.ingredients) {
         const x = rs[ingKey(i.name)];
-        if (!x || KW.isBasic(i)) continue;
+        if (!x || KW.isBasic(i, db)) continue;
         const nd = amountIn({ g: isCount(i) ? 0 : i.qty, cnt: isCount(i) ? i.qty : 0, pieceG: i.pieceG }, x.unit);
         if (!nd) continue;
         hits.push({ name: x.name, use: Math.min(nd, x.amount), unit: x.unit, share: Math.min(1, nd / x.amount) });

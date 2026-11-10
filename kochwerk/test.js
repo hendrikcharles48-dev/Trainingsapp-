@@ -308,7 +308,13 @@ eq('Zwiebeln Stück in g umgerechnet', [it('Zwiebeln').need, it('Zwiebeln').pack
 eq('Vorrat nicht auf der Liste', L1.items.some(i => i.name === 'Olivenöl'), false);
 eq('Grundvorrat: nur echte Grundzutaten', L1.stock.map(v => v.name).sort(), ['Gemüsebrühe (Pulver)', 'Olivenöl', 'Paprikapulver edelsüß']);
 eq('Grundzutaten erkannt', ['Öl', 'Rapsöl', 'Salz', 'Pfeffer', 'Mehl', 'Zucker', 'Speisestärke', 'Gemüsebrühe, Pulver', 'Brühwürfel', 'Currypulver', 'Paprikapulver edelsüß', 'Chili-Gewürz', 'Zimt', 'Kreuzkümmel'].filter(n => !KW.isBasic(n)), []);
-eq('keine Grundzutaten', ['Knoblauch', 'Honig', 'Tomatenmark', 'Sojasoße', 'Senf (mittelscharf)', 'Zitronensaft', 'Backkakao', 'Skyr natur', 'Haferflocken', 'Paprika', 'Kräuter (TK)', 'Rote Linsen', 'Thunfisch im eigenen Saft'].filter(n => KW.isBasic(n)), []);
+eq('keine Grundzutaten', ['Knoblauch', 'Honig', 'Tomatenmark', 'Sojasoße', 'Senf (mittelscharf)', 'Zitronensaft', 'Backkakao', 'Skyr natur', 'Haferflocken', 'Paprika', 'Kräuter (TK)', 'Rote Linsen', 'Thunfisch im eigenen Saft'].filter(n => KW.isFixedBasic(n)), []);
+{
+  const H = KW.emptyDb();
+  eq('Standard: immer zu Hause', ['Knoblauch', 'Honig', 'Tomatenmark', 'Senf (mittelscharf)', 'Sojasoße', 'Zitronensaft'].filter(n => !KW.isBasic(n, H)), []);
+  KW.setSetting(H, 'homeStock', ['Eier', 'Kräuter (TK)', 'Kokosmilch']);
+  eq('selbst gewählt', [KW.isBasic('Eier', H), KW.isBasic('Kräuter (TK)', H), KW.isBasic('Kokosmilch light', H), KW.isBasic('Eiersalat', H), KW.isBasic('Knoblauch', H)], [true, true, true, false, false]);
+}
 eq('„Vorrat“-Knoblauch bekommt Packung Knolle', KW.fallbackPack({ name: 'Knoblauch' }).kind, 'Knolle');
 eq('sortiert nach Bereichen', L1.items[0].area, 'obst');
 eq('frisch erst ab Do: Hinweis', L1.items.filter(i => i.lateHint).map(i => i.name), []);
@@ -427,7 +433,7 @@ eq('Packung Stück ca.', KW.parsePack('Packung 1 Stück (ca. 800 g)').pack, { ki
 eq('Packung Tube', KW.parsePack('Packung Tube 200 ml').pack, { kind: 'Tube', size: 200, unit: 'ml' });
 eq('Packung 1 Stück', KW.parsePack('Packung 1 Stück').pack, { kind: 'Stück', size: 1, unit: 'Stück' });
 {
-  const Z = KW.emptyDb();
+  const Z = KW.emptyDb(); KW.setSetting(Z, 'homeStock', []);
   const r = KW.importRecipe(Z, KW.parseRecipes('Name: Dip\nPortionen: 2\nZutaten:\n- Knoblauch | 2 Zehen à 4 g | Packung 1 Knolle | Obst/Gemüse | 140 kcal, 6 P, 28 K, 0,1 F\n- Spitzkohl | 800 g | Packung 1 Stück (ca. 800 g) | Obst/Gemüse | 28 kcal, 1,6 P, 4 K, 0,3 F\n- Mais, abgetropft | 140 g | Packung Dose 150 g (140 g abgetropft) | Konserven | 85 kcal, 3 P, 15 K, 1,2 F')[0].recipe, 'new');
   P.setMeal(Z, '2026-11-09', 'box', true); P.update(Z, P.mainId('2026-11-09', 'box'), { recipeId: r.id });
   const L = S.weekList(Z, '2026-11-09');

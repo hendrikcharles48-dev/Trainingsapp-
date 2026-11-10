@@ -184,14 +184,14 @@
     const weekIngs = new Set();
     for (const e of weekEntries(db, weekStart(entry.date))) {
       const r = recipeOf(db, e); if (!r || (cur && r.id === cur.id && e.id === entry.id)) continue;
-      for (const i of r.ingredients) if (!KW.isBasic(i)) weekIngs.add(KW.norm(i.name));
+      for (const i of r.ingredients) if (!KW.isBasic(i, db)) weekIngs.add(KW.norm(i.name));
     }
     const all = KW.live(db, 'recipes').filter(r => cats.includes(r.cat) && (!cur || r.id !== cur.id) && (entry.meal !== 'box' || r.box));
     const rate = (tol) => all.map(r => {
       const t = portionOf(r), s = score(db, r);
       if (s === -Infinity) return null;
       if (base && base.kcal > 0 && Math.abs(t.kcal - base.kcal) > base.kcal * tol) return null;
-      const shared = r.ingredients.filter(i => !KW.isBasic(i) && weekIngs.has(KW.norm(i.name))).length;
+      const shared = r.ingredients.filter(i => !KW.isBasic(i, db) && weekIngs.has(KW.norm(i.name))).length;
       return { r, t, shared, s, dk: base ? t.kcal - base.kcal : 0, dp: base ? t.p - base.p : 0 };
     }).filter(Boolean);
     let list = rate(0.2);

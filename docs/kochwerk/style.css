@@ -515,3 +515,4 @@ body.swiping{overflow-x:hidden}
 .boxsize .btn small{font-size:12px;font-weight:500;opacity:.8}
 .row.ingchk{grid-template-columns:minmax(0,1fr) auto}
 .row.ingchk .t{white-space:normal}
+.chips.wrap{flex-wrap:wrap;overflow:visible;margin:0;padding:0}

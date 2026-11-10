@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.4';
+  const VERSION = '2.5';
 
   // ---------- Speicher ----------
   function load() {
@@ -599,6 +599,7 @@
     h += `<div class="list slist">${L.stock.map(v => `<div class="srow stock"><span class="mid"><span class="t"><span class="nm">${esc(v.name)}</span></span><span class="s">${esc(why[v.why] || '')}${v.pack ? ' · ' + esc(v.pack.label) : ''}</span></span>
       <div class="seg mini"><button data-act="pantry" data-key="${esc(v.key)}" data-v="have" aria-pressed="${v.state === 'have'}">Noch da</button><button data-act="pantry" data-key="${esc(v.key)}" data-v="buy" aria-pressed="${v.state === 'buy'}">Kaufen</button></div></div>`).join('')}</div>`;
     if (open) h += '<button class="btn plain small" style="align-self:center" data-act="stock-all">Rest ist alles noch da</button>';
+    h += '<button class="link" style="align-self:center" data-act="home">Was hast du immer zu Hause? ›</button>';
     return h;
   }
   function shopLaterView(L) {
@@ -645,6 +646,19 @@
 
   // ---------- Fenster: Packungsgrößen ----------
   let PL = null, PE = null;
+  // Grundzutaten: fest (Öl, Gewürze …) + selbst gewählt, was immer zu Hause ist
+  let HM = null;
+  function homeSheet() {
+    const cur = KW.homeStock(db), on = x => cur.some(c => KW.norm(c) === KW.norm(x));
+    const own = cur.filter(c => !KW.HOME_CHOICES.some(x => KW.norm(x) === KW.norm(c)));
+    return `<div class="sheet-head"><span></span><h2>Grundzutaten</h2><button class="r" data-act="close">Fertig</button></div>
+      <p style="margin:0">Grundzutaten kommen nie auf die Einkaufsliste. <b>Immer dabei:</b> Öl, Salz, Pfeffer, getrocknete Gewürze, Mehl, Zucker, Speisestärke, Essig und Brühe.</p>
+      <span class="lbl">Was hast du außerdem immer zu Hause?</span>
+      <div class="chips wrap">${KW.HOME_CHOICES.map(x => `<button class="chip" data-act="home-t" data-v="${esc(x)}" aria-pressed="${on(x)}">${on(x) ? '✓ ' : ''}${esc(x)}</button>`).join('')}
+        ${own.map(x => `<button class="chip" data-act="home-t" data-v="${esc(x)}" aria-pressed="true">✓ ${esc(x)} ✕</button>`).join('')}</div>
+      <div class="field"><label for="hm-new">Etwas anderes</label><div class="inline" style="gap:8px"><input id="hm-new" placeholder="z. B. Parmesan" value="${esc(HM ? HM.q : '')}" style="flex:1"><button class="btn small" data-act="home-add">Dazu</button></div></div>
+      <p class="hint">Fehlt dir etwas doch mal, setzt du es in der Einkaufsliste unter „Grundzutaten prüfen“ auf „Kaufen“.</p>`;
+  }
   function packsSheet() {
     const q = KW.norm(PL.q);
     const list = SH3.packList(db).filter(p => !q || (p.names || [p.name]).some(n => KW.norm(n).includes(q)));
@@ -811,7 +825,7 @@
     const mine = sc.steps.filter(x => x.rid === st.rid && !x.intro);
     const head = `<div class="bar"><button class="back" data-act="ck-close">${IC.back}Pause</button><div class="dots">${mine.map(x => `<i class="${!st.intro && x.n <= st.n ? 'on' : ''}"></i>`).join('')}</div><span class="hint">${st.count > 1 ? 'Rezept ' + st.no + '/' + st.count : ''}</span></div>`;
     if (st.intro) {
-      const ings = r ? r.ingredients.map(i => { const x = Object.assign({}, i, { qty: i.qty * (st.pots || 1) }); return `<div class="row ingchk"><span class="mid"><span class="t">${esc(i.name)}</span>${KW.isBasic(i) ? '<span class="s">Grundzutat</span>' : ''}</span><span class="right"><b>${esc(KW.amountText(x))}</b></span></div>`; }).join('') : '';
+      const ings = r ? r.ingredients.map(i => { const x = Object.assign({}, i, { qty: i.qty * (st.pots || 1) }); return `<div class="row ingchk"><span class="mid"><span class="t">${esc(i.name)}</span>${KW.isBasic(i, db) ? '<span class="s">Grundzutat</span>' : ''}</span><span class="right"><b>${esc(KW.amountText(x))}</b></span></div>`; }).join('') : '';
       return `<div class="in">${head}
         <div class="stepcard" style="--c:${c}"><span class="rtag">${st.count > 1 ? 'Rezept ' + st.no + ' von ' + st.count : 'Dein Rezept'}${r && r.mc ? ' · 🤖 Monsieur Cuisine' : ''}</span>
           <p class="big-step">${esc(st.name)}</p>
@@ -1303,7 +1317,7 @@
     h += `<h2 class="sec">Zutaten</h2><div class="list ings">` + r.ingredients.map(i => {
       const g = KW.ingGrams(i), k = i.per100 && i.per100.kcal != null ? g * i.per100.kcal / 100 : null;
       const fb = !i.pack && KW.fallbackPack(i);
-      const pk = KW.isBasic(i) ? 'Grundzutat' : i.pack ? KW.packText(i.pack) : fb ? KW.packText(fb) : 'ohne Packung';
+      const pk = KW.isBasic(i, db) ? 'Grundzutat' : i.pack ? KW.packText(i.pack) : fb ? KW.packText(fb) : 'ohne Packung';
       return `<div class="row"><span class="mid"><span class="t">${esc(i.name)}</span><span class="s">${esc(pk)} · ${esc(KW.areaById(i.area).label)}</span></span>
         <span class="right"><b>${esc(KW.amountText(i))}</b><span class="muted" style="color:var(--label-2);font-weight:500">${k == null ? 'Werte fehlen' : f0(k) + ' kcal'}</span></span></div>`;
     }).join('') + '</div>';
@@ -1346,6 +1360,7 @@
       <div class="it"><label for="s-day"><span class="si" style="--c:#FF9500">🍳</span>Standard-Kochtag</label><select id="s-day" data-set="cookDay">${opt(days, p.cookDay, d => d, d => KW.WEEKDAYS[d])}</select></div>
       <div class="it"><label for="s-fac"><span class="si" style="--c:#FF2D55">👫</span>Portion Freundin</label><select id="s-fac" data-set="partnerFactor">${opt(facs, p.partnerFactor, f => f, f => Math.round(f * 100) + ' %')}</select></div></div>
       <div class="group-title">Rezepte</div><div class="set">
+      <button class="act" data-act="home"><span class="sl"><span class="si" style="--c:#FF9500">🧂</span>Grundzutaten – immer zu Hause</span><small>${KW.homeStock(db).length} gewählt</small><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="format"><span class="sl"><span class="si" style="--c:#007AFF">📄</span>Import-Format</span><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="sample"><span class="sl"><span class="si" style="--c:#34C759">📖</span>Beispielrezepte laden</span><span class="chev">${IC.chev}</span></button>
       <button class="act" data-act="packs"><span class="sl"><span class="si" style="--c:#A2845E">📦</span>Packungsgrößen</span><span class="chev">${IC.chev}</span></button>
@@ -1488,7 +1503,7 @@
     return h;
   }
   function packHint(i) {
-    if (KW.isBasic(i)) return 'Grundzutat (Öl, Gewürze, Mehl, Brühe …): kommt nicht auf die Wocheneinkaufsliste.';
+    if (KW.isBasic(i, db)) return 'Grundzutat (hast du immer zu Hause): kommt nicht auf die Wocheneinkaufsliste. Ändern unter Mehr → Grundzutaten.';
     if (i.pantry) return '„Vorrat“ gilt nur für echte Grundzutaten wie Öl und Gewürze. Diese Zutat kommt auf die Einkaufsliste.';
     if (!i.pack) return 'Ohne Packung. Beispiele: „Packung 500 g“, „Dose 400 g“, „Packung 10 Stück“, „Bund“, „Vorrat“.';
     const g = KW.ingGrams(i);
@@ -1994,6 +2009,11 @@ Schritte:
     'extra-chk': b => { const x = db.extra[b.dataset.id]; if (x) { KW.put(db, 'extra', Object.assign({}, x, { done: !x.done })); save(); render(true); } },
     'extra-del': b => { KW.remove(db, 'extra', b.dataset.id); save(); render(true); },
     'extra-clear': () => { for (const x of extras()) if (x.done) KW.remove(db, 'extra', x.id); save(); render(true); },
+    home: () => { HM = { q: '' }; openSheet(homeSheet, { tall: true }); },
+    'home-t': b => { const v = b.dataset.v, cur = KW.homeStock(db); const has = cur.some(c => KW.norm(c) === KW.norm(v));
+      KW.setSetting(db, 'homeStock', has ? cur.filter(c => KW.norm(c) !== KW.norm(v)) : cur.concat(v)); save(); refreshSheet(true); },
+    'home-add': () => { const el = $('#hm-new'), v = el ? el.value.trim() : ''; if (!v) return; const cur = KW.homeStock(db);
+      if (!cur.some(c => KW.norm(c) === KW.norm(v))) KW.setSetting(db, 'homeStock', cur.concat(v)); HM.q = ''; save(); refreshSheet(true); toast('„' + v + '“ ist jetzt Grundzutat'); },
     packs: () => { PL = { q: '' }; openSheet(packsSheet, { tall: true }); },
     'pack-edit': b => openPackEdit(SH3.packList(db).find(p => p.id === b.dataset.id), 'list'),
     'pack-new': () => openPackEdit(null, 'list'),
