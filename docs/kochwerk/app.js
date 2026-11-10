@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const KEY = 'kochwerk_data', KEY_UI = 'kochwerk_ui', KEY_DEV = 'kochwerk_device';
-  const VERSION = '2.5';
+  const VERSION = '2.6';
 
   // ---------- Speicher ----------
   function load() {
@@ -351,6 +351,7 @@
     h += `<div class="card plan2 auto"><div class="inline"><span class="step-n">2</span><span class="mid" style="flex:1"><span class="t">Woche automatisch planen</span><span class="s">${es.length ? `${es.length} Mahlzeiten · ${empty ? empty + ' noch leer · ' : ''}Ø ${f0(avgP)} g Protein pro Tag` : 'Wähle, was du vorgekocht essen willst – der Rest kommt von selbst.'}</span></span></div>
       <span class="lbl">Mahlzeiten</span>
       <div class="mealchips">${P.MEALS.map(m => `<button class="mchip" data-act="auto-meal" data-meal="${m.id}" aria-pressed="${am.includes(m.id)}">${m.icon} ${esc(m.short)}</button>`).join('')}</div>
+      <div class="it oneweek"><span>🍲 Ein Gericht für die ganze Woche<small>pro Mahlzeit – wenn ein Rezept (höchstens doppelt gekocht) für alle Tage reicht</small></span><button class="switch" data-act="auto-one" role="switch" aria-checked="${autoOne()}" aria-label="Ein Gericht für die ganze Woche"><span></span></button></div>
       <span class="lbl">Tage</span>
       <div class="mealchips days">${[0, 1, 2, 3, 4, 5, 6].map(k => `<button class="mchip" data-act="auto-day" data-k="${k}" aria-pressed="${ad.includes(k)}">${P.DAY_SHORT[k]}</button>`).join('')}</div>
       <button class="btn" data-act="auto-go"${am.length && ad.length ? '' : ' disabled'}>✨ ${empty ? 'Leere Plätze füllen' : es.some(e => P.isMain(e) && P.recipeOf(db, e)) ? 'Fehlende ergänzen' : 'Ganze Woche planen'}</button>
@@ -506,9 +507,10 @@
   // ---------- Vorschlagen ----------
   const autoMeals = () => { const v = KW.getSetting(db, 'autoMeals'); return Array.isArray(v) ? v : ['lunch']; };
   const autoDays = () => { const v = KW.getSetting(db, 'autoDays'); return Array.isArray(v) ? v : [0, 1, 2, 3, 4, 5, 6]; };
+  const autoOne = () => KW.getSetting(db, 'autoOne') !== false;
   const toggleIn = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : arr.concat([x]);
   function runAuto(fresh) {
-    const res = P.autoPlan(db, S.week, autoMeals(), autoDays(), fresh);
+    const res = P.autoPlan(db, S.week, autoMeals(), autoDays(), fresh, { one: autoOne() });
     showSuggest(res);
   }
   function runSuggest() {
@@ -1937,6 +1939,7 @@ Schritte:
       KW.setWeight(db, kg); save(); const cont = WG.cont; closeSheet(); render(true);
       if (cont === 'suggest') runSuggest(); else if (cont === 'auto') runAuto(false); else toast('Gewicht gespeichert');
     },
+    'auto-one': () => { KW.setSetting(db, 'autoOne', !autoOne()); save(); render(true); },
     'auto-meal': b => { KW.setSetting(db, 'autoMeals', toggleIn(autoMeals(), b.dataset.meal)); save(); render(true); },
     'auto-day': b => { KW.setSetting(db, 'autoDays', toggleIn(autoDays(), +b.dataset.k).sort()); save(); render(true); },
     'auto-go': () => { if (!recentWeight() && S.week >= P.weekStart(today())) { openWeight('auto'); return; } runAuto(false); },

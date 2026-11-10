@@ -516,3 +516,6 @@ body.swiping{overflow-x:hidden}
 .row.ingchk{grid-template-columns:minmax(0,1fr) auto}
 .row.ingchk .t{white-space:normal}
 .chips.wrap{flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+.it.oneweek{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0}
+.it.oneweek>span{display:flex;flex-direction:column;font-weight:600;font-size:15px}
+.it.oneweek small{font-weight:400;font-size:12.5px;color:var(--label-2)}

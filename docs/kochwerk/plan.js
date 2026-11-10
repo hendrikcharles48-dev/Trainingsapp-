@@ -157,12 +157,12 @@
     return { fill: out, open };
   }
   const BREAKFAST_RE = /frühstück|bowl|porridge|oats|haferflocken|müsli|granola|overnight|frittata|omelett|shakshuka|rührei|pancake|pfannkuchen|waffel|quark|skyr|joghurt|brot|toast|bagel|muffin/;
-  const NOT_BREAKFAST_RE = /fajita|gyros|burrito|hack|hähnchen|pute|fisch|lachs|thunfisch|kartoffel|reis|nudel|curry|chili|sticks/;
+  const NOT_BREAKFAST_RE = /hummus|aufstrich|dip\b|fajita|gyros|burrito|hack|hähnchen|pute|fisch|lachs|thunfisch|kartoffel|reis|nudel|curry|chili|sticks/;
   const isBreakfast = r => { const n = String(r.name || '').toLowerCase(); return BREAKFAST_RE.test(n) && !NOT_BREAKFAST_RE.test(n); };
 
   // Automatisch planen: gewählte Mahlzeiten an gewählten Tagen anlegen und füllen (Meal Prep: ein Topf reicht für mehrere Tage).
   // fresh = vorhandene Rezepte dieser Mahlzeiten vorher herausnehmen (neu planen).
-  function autoPlan(db, start, meals, wdays, fresh) {
+  function autoPlan(db, start, meals, wdays, fresh, opt) {
     for (const d of weekDays(start)) {
       if (!wdays.includes(wd(d))) continue;
       for (const m of meals) {
@@ -170,9 +170,35 @@
         if (fresh) { const e = db.plan[mainId(d, m)]; if (e && e.recipeId) update(db, e.id, { recipeId: null }); }
       }
     }
+    let pre = [];
+    if (opt && opt.one) { pre = oneDishWeek(db, start, meals); applySuggestions(db, pre); }
     const res = suggestWeek(db, start);
     applySuggestions(db, res.fill);
+    res.fill = pre.concat(res.fill);
+    res.one = pre.length;
     return res;
+  }
+  // Ein Gericht pro Mahlzeit für die ganze Woche (Nutzerwunsch 10.11.): pro gewählter Mahlzeit ein Rezept für alle leeren Tage,
+  // wenn die Mengen es zulassen – höchstens doppeltes Rezept (MAX_POTS), Haltbarkeit oder Gefrierfach muss bis zum letzten Tag reichen.
+  const MAX_POTS = 2;
+  function oneDishWeek(db, start, meals) {
+    const factor = KW.getSetting(db, 'partnerFactor'), cook = cookDate(db, start);
+    const all = KW.live(db, 'recipes'), used = new Set(weekEntries(db, start).map(e => e.recipeId).filter(Boolean));
+    const rank = list => list.map(r => ({ r, s: score(db, r) })).filter(x => x.s > -Infinity).sort((a, b) => b.s - a.s).map(x => x.r);
+    const out = [];
+    for (const m of meals) {
+      const slots = weekEntries(db, start).filter(e => e.meal === m && !recipeOf(db, e));
+      if (slots.length < 2) continue;
+      const need = slots.reduce((n, e) => n + 1 + (e.partner ? factor : 0), 0), last = slots[slots.length - 1].date;
+      const bf = m === 'breakfast' && all.some(r => r.cat !== 'emergency' && isBreakfast(r));
+      const pool = rank(all.filter(r => bf ? r.cat !== 'emergency' && isBreakfast(r) && portionOf(r).kcal >= 300 : r.cat === 'main' && !isBreakfast(r)));
+      const ok = r => !used.has(r.id) && (m !== 'box' || r.box) && (r.freeze || diffDays(cook, last) <= r.keepDays) && r.portions * MAX_POTS >= need - 0.01;
+      const r = pool.find(ok);
+      if (!r) continue;
+      used.add(r.id);
+      for (const e of slots) out.push({ id: e.id, date: e.date, recipeId: r.id });
+    }
+    return out;
   }
   function applySuggestions(db, list) { for (const s of list) update(db, s.id, { recipeId: s.recipeId }); }
 

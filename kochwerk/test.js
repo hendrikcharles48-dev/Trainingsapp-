@@ -448,6 +448,22 @@ eq('Packung 1 Stück', KW.parsePack('Packung 1 Stück').pack, { kind: 'Stück', 
   eq('Chat-Rezepte im Paket ohne Warnung', p2.filter(x => x.warnings.length || x.errors.length).map(x => x.recipe.name + ': ' + x.warnings.concat(x.errors).join('; ')), []);
 }
 
+// Ein Gericht für die ganze Woche
+{
+  const O = KW.emptyDb();
+  for (const x of KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8'))) KW.importRecipe(O, x.recipe, 'new');
+  const W = P.weekStart('2026-11-16');
+  const res = P.autoPlan(O, W, ['lunch'], [0, 1, 2, 3, 4, 5, 6], false, { one: true });
+  const ids = new Set(P.weekEntries(O, W).map(e => e.recipeId));
+  const r = O.recipes[[...ids][0]];
+  eq('Ein Gericht: 7 Mittage, ein Rezept', [res.one, ids.size], [7, 1]);
+  eq('Ein Gericht: höchstens doppelt gekocht, hält oder ist einfrierbar', S.weekPots(O, W)[0].pots <= 2 && (r.freeze || r.keepDays >= 6), true);
+  const O2 = KW.emptyDb();
+  for (const x of KW.parseRecipes(fs.readFileSync(path.join(__dirname, 'rezepte-paket.txt'), 'utf8'))) KW.importRecipe(O2, x.recipe, 'new');
+  P.autoPlan(O2, W, ['lunch'], [0, 1, 2, 3, 4, 5, 6], false, { one: false });
+  eq('Ohne Schalter: abwechslungsreich', new Set(P.weekEntries(O2, W).map(e => e.recipeId)).size > 1, true);
+}
+
 // ---------- Tagebuch (track.js) ----------
 {
   const T = require('./track.js');

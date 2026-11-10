@@ -92,6 +92,8 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
   Symbole pro Rezept aus dem Namen: `KW.recipeIcon` (`ICON_RULES` in `core.js`, Salat → 🥗 usw., sonst Kategorie-Symbol).
   Automatisch planen (Wochenplan): Einstellungen `autoMeals`/`autoDays` (z. B. nur Mittag, Mo–So), `P.autoPlan` legt die Plätze an
   und füllt sie über `suggestWeek` (Töpfe reichen für mehrere Tage). Frühstück bevorzugt Frühstücksrezepte (`P.isBreakfast`).
+  „Ein Gericht für die ganze Woche“ (Einstellung `autoOne`, Standard an, Nutzerwunsch 10.11.): `oneDishWeek` nimmt pro Mahlzeit ein
+  Rezept für alle Tage, wenn höchstens doppelt gekocht (`MAX_POTS`) reicht und Haltbarkeit oder Einfrieren bis zum letzten Tag passt; sonst normal gemischt.
   Monsieur Cuisine (Lidl-Küchenmaschine des Nutzers): optionales Feld `Gerät: Monsieur Cuisine` im Import-Format → `r.mc`,
   Kennzeichen 🤖, Filter „🤖 Monsieur Cuisine“, Schalter im Editor. 20 MC-Rezepte (günstig, ≤ 600 kcal, eiweißreich) im Paket;
   Schritte nennen Zeit/Temperatur/Linkslauf/Stufe. Der Chat-Skill „kochwerk-rezept“ kennt das Feld noch nicht.
