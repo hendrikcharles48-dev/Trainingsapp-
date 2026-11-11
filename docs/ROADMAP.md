@@ -13,7 +13,7 @@ Abhaken: Wenn eine Etappe fertig ist, in der Übersicht `[ ]` zu `[x]` machen un
 - [x] **Etappe 3** – Datensicherheit (mittel, Risiko: mittel – nur zusätzliche Kopien, nichts wird umgezogen) – erledigt 11.11.2026, Version 3.2.0
 - [x] **Etappe 4** – Eigene Pläne (groß, Risiko: mittel – `plans` kommt dazu, `plan` bleibt als Spiegel) – erledigt 11.11.2026, Version 3.3.0
 - [x] **Etappe 5** – Trainingswissenschaft (mittel, Risiko: gering – nur Rechenregeln) – erledigt 11.11.2026, Version 3.4.0 (Volumen-Untergrenze war schon 7,5 – unverändert)
-- [ ] **Etappe 6** – Eigene Vorschläge und Komfort V1–V8 (mittel, Risiko: gering) – jeder Vorschlag einzeln abwählbar
+- [x] **Etappe 6** – Eigene Vorschläge und Komfort V1–V8 (mittel, Risiko: gering) – jeder Vorschlag einzeln abwählbar – erledigt 11.11.2026, Version 3.5.0
 
 ## Regeln für jede Etappe
 
@@ -401,33 +401,33 @@ workout.planId, active.planId      // neu, rein informativ
 Jeder Punkt ist ein **Eigener Vorschlag** und einzeln umsetzbar. Sagt der Nutzer zu einem „Nein“, hier durchstreichen.
 **Aufwand:** zusammen mittel. **Datenrisiko:** gering (nur neue, zusätzliche Felder).
 
-- [ ] **V1 – Werte ohne Tastatur ändern.** Grund: Zahlen tippen mit einer Hand ist mühsam.
+- [x] **V1 – Werte ohne Tastatur ändern.** Grund: Zahlen tippen mit einer Hand ist mühsam.
   In der Fokus-Karte neben Gewicht und Wdh. große −/+-Knöpfe (mindestens 44 px; Gewicht springt durch die verfügbare
   Liste `E.loadOptions`, sonst `wStep`). Das Reserve-Fenster bleibt (2 Tipps pro Satz: „Satz fertig“ → Reserve), die
   Knöpfe darin werden größer (2 Reihen à 3, mindestens 64 px hoch), Ziel-Reserve farbig hervorgehoben.
   Zusätzlich Einstellung „Schnell abhaken“ (`settings.quick`, Standard aus): „Satz fertig“ speichert sofort mit
   Ziel-Reserve; Antippen der Satznummer korrigiert wie bisher.
-- [ ] **V2 – Rückgängig.** Grund: Fehltipp zwischen den Sätzen. Der Toast nach dem Abhaken bekommt für 6 s einen Knopf
+- [x] **V2 – Rückgängig.** Grund: Fehltipp zwischen den Sätzen. Der Toast nach dem Abhaken bekommt für 6 s einen Knopf
   „Rückgängig“ (entfernt den letzten Satz, stellt `cur`, Pause und Entwurf wieder her).
-- [ ] **V3 – „Gerät besetzt“.** Grund: Alltag im Studio. In der Fokus-Karte Knopf „Später“ (schiebt die Übung ans Ende
+- [x] **V3 – „Gerät besetzt“.** Grund: Alltag im Studio. In der Fokus-Karte Knopf „Später“ (schiebt die Übung ans Ende
   der noch offenen Übungen, nur heute) neben „Tauschen“. Supersatz-Partner wandern gemeinsam.
-- [ ] **V4 – Gewichtstrend.** Grund: Beim Abnehmen zählt der Trend, nicht der Tageswert. Im Fortschritt-Reiter „Körper“:
+- [x] **V4 – Gewichtstrend.** Grund: Beim Abnehmen zählt der Trend, nicht der Tageswert. Im Fortschritt-Reiter „Körper“:
   Mittel der letzten 7 Tage gegen die 7 Tage davor, Anzeige „−0,4 % pro Woche“. Bei Ziel `recomp`: grün bei −0,25 bis
   −0,75 %/Woche, Hinweis „zu schnell – Muskeln in Gefahr“ unter −1 %, „kaum Bewegung“ über −0,1 % (erst ab 3 Wochen Daten).
   Nur lokal; nichts davon in Repo-Texte schreiben.
-- [ ] **V5 – Baseball-Tage.** Grund: schwere Beine/Schultern direkt vor dem Spiel schaden. Einstellung „Spiel-/
+- [x] **V5 – Baseball-Tage.** Grund: schwere Beine/Schultern direkt vor dem Spiel schaden. Einstellung „Spiel-/
   Trainingstage“ (Wochentage, `profile.sportDays`). Startseite: Wenn morgen ein solcher Tag ist und der nächste Plan-Tag
   eine schwere Bein- oder Überkopf-Grundübung enthält → Hinweis mit Knopf „Anderen Tag vorziehen“ (nutzt die vorhandene
   Tageswahl `homeDay`).
-- [ ] **V6 – Pausenende deutlicher.** Grund: iPhone vibriert nicht aus Web-Apps, Ton ist im Stumm-Modus aus (A17).
+- [x] **V6 – Pausenende deutlicher.** Grund: iPhone vibriert nicht aus Web-Apps, Ton ist im Stumm-Modus aus (A17).
   Bei Ablauf blinkt das untere Panel dreimal kräftig (Farbe wechselt auf Lime), große Schrift „Los geht’s“.
   In den Einstellungen ehrlicher Hinweis: „Vibration gibt es auf dem iPhone nicht; Ton nur, wenn der Stumm-Schalter aus
   ist. Bei gesperrtem Bildschirm kann die App nichts melden.“ Der Bildschirm bleibt im Training an (vorhandenes
   `keepAwake`); nach Rückkehr `keepAwake(true)` erneut.
-- [ ] **V7 – Rekord in Reichweite.** Grund: Motivation ohne Mehraufwand. In der Ziel-Box eine Zeile, wenn die Empfehlung
+- [x] **V7 – Rekord in Reichweite.** Grund: Motivation ohne Mehraufwand. In der Ziel-Box eine Zeile, wenn die Empfehlung
   höchstens 3 % unter dem bisherigen Bestwert der Übung liegt: „Rekord bei 9 Wdh. mit 60 kg“ (über `E.setScore`
   zurückgerechnet).
-- [ ] **V8 – iOS-Feinschliff.** Grund: Bedienung mit einer Hand. Alle Tipp-Flächen ≥ 44 px prüfen (besonders `.btn.sm`
+- [x] **V8 – iOS-Feinschliff.** Grund: Bedienung mit einer Hand. Alle Tipp-Flächen ≥ 44 px prüfen (besonders `.btn.sm`
   in der Fuß-Leiste der Übung – in ein „⋯ Mehr“-Fenster zusammenfassen, sichtbar bleiben nur „+ Satz“, „Tauschen“,
   „Notiz“); Fenster schließen sich auch per Wisch nach unten (vorhanden – prüfen); `-webkit-tap-highlight-color`
   aus; `touch-action: manipulation` auf Knöpfen (kein Doppeltipp-Zoom); Sicherheitsabstände (`safe-area`) am unteren

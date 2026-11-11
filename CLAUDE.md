@@ -26,28 +26,51 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
   `progView`, `timerView`. Overlays über `st.ov` (`workout`, `quiz`, `result`), Fenster über `st.sheet` + `SHEETS`,
   unteres Trainings-Panel `renderRest`. Klicks: `data-a` → `A[...]`; Eingaben: `data-in` → `IN[...]`.
   Training: `startWorkout` → `exState`/`curIndex` → `focusCard` → `A.doneSet` → Fenster `rir` → `commitSet` → `finishWorkout`.
-- Beim Tippen nie die ganze Ansicht neu bauen (Suchfelder: nur die Trefferliste ersetzen).
+- Beim Tippen nie die ganze Ansicht neu bauen (Suchfelder: nur die Trefferliste ersetzen: `libResults`/`#libRes`,
+  `pickResults`/`#pickRes`, `later()` verzögert). Bei offenem Overlay baut `render()` die Seite dahinter nicht neu.
+- Training schnell halten: Verlauf über `histOf(exId)` (Cache, ungültig über `Store.wv`), `exState` hat einen Cache
+  (Schlüssel enthält `st.ev`, das jede Klick/Eingabe hochzählt). Nach Satz/Übungswechsel `toFocus()` (Fokus-Übung oben).
+- Version: `APP_VERSION` in `app.js` (Anzeige in den Einstellungen) + `CACHE` in `pwa/sw.js` bei jedem Release erhöhen.
+- Service Worker: Satzwerks eigene Dateien und Schriften „Cache zuerst, im Hintergrund auffrischen“; Unterordner (andere
+  Apps) Netz zuerst. Neue Version lädt die Seite nur neu, wenn kein Training läuft (`build.js`, `controllerchange`).
 
 ## Datenmodell und Speicher
 - Speicher über `Store` (`app.js`): localStorage `satzwerk.profile`, `satzwerk.workouts` (Liste), `satzwerk.active`
-  (laufendes Training). In der Artifact-Version zusätzlich Online-Speicher (`Store.mode === 'db'`).
-  Geplant laut Roadmap: `satzwerk.meta`, IndexedDB `satzwerk` (Sicherungen).
-- `profile`: `answers` (Fragebogen), `plan`, `custom` (eigene Übungen), `settings`, `exW`, `exNotes`, `checkins`, `adapt`.
-- `plan`: `{id, v, split, splitName, goal, locs, days, meso:{start,len}, next, bal, forceDeload, deloadUntil}`;
-  `day`: `{id, key, name, focus, slots}`; `slot`: `{id, p, r, sets, rr, custRR, rest, ex:{home,gym}, ss}`.
-  Rollen `r`: `main` Grundübung, `sec` Ergänzung, `iso`, `skill`, `core`, `cond`.
-- `active`: `{id, dayIdx, dayId, name, loc, start, bw, exercises:[{key, exId, slotId, presc, sets, draft, extra, band, ss, note}], cur}`.
-- `workout` (gespeichert): `{id, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
-- Export: JSON `{app:'satzwerk', version, profile, workouts}`; ältere Versionen müssen importierbar bleiben.
+  (laufendes Training), `satzwerk.meta` (`{schema: 2}`), Rettung beschädigter Inhalte `satzwerk.corrupt.<key>`.
+  In der Artifact-Version zusätzlich Online-Speicher (`Store.mode === 'db'`). Alle Änderungen an Trainings über
+  `Store.saveWorkout`/`deleteWorkout` (zählen `Store.wv` hoch). `LS.set` meldet Fehler (rotes Band `renderSaveErr`).
+- Sicherungen: IndexedDB `satzwerk`, Speicher `snap` (`Backup.snapshot(grund)`, max. 8 + je eine pro „vor-…“-Grund).
+  Vor jeder Umstellung/jedem Ersetzen `Backup.snapshot('vor-…')` aufrufen (Kopie wird synchron gezogen).
+  Fenster „Sicherungen“ (`A.backups`), Import mit Vorschau (`importPreview`: Zusammenführen/Alles ersetzen),
+  nach Laden/Ersetzen `afterDataLoad()` (ruft `normalizePlans`).
+- `profile`: `answers` (Fragebogen), `plans` (alle Pläne), `planId` (aktiv), `plan` (Spiegel = aktiver Plan, gleiches
+  Objekt; `normalizePlans()` beim Start hält es zusammen, `profile.plan` ist maßgeblich), `custom` (eigene Übungen),
+  `settings` (u. a. `quick` = Schnell abhaken), `exW`, `exNotes`, `checkins`, `adapt`, `bwLog`, `favs`, `lastExport`,
+  `seen` (einmalige Hinweise), `dlAsk` (Deload-Vorschlag zuletzt), `sportDays` (0 = Mo … 6 = So).
+- `plan`: `{id, name, v, custom, edited, split, splitName, goal, locs, days, meso:{start,len}, next, bal, restV, forceDeload, deloadUntil}`;
+  `custom` = vom Nutzer gebaut, `edited` = empfohlener Plan vom Nutzer verändert (`touchPlan()` bei jeder Planänderung).
+  Nur `autoPlan(p)` (= `!custom && !edited`) darf automatisch umgebaut werden (Balance, Plan-Update, Favoriten-Auswahl).
+  `day`: `{id, key, name, focus, slots}`; `slot`: `{id, p, r, sets, rr, custRR, rest, ex:{home,gym}, why, locked, ss}`.
+  Rollen `r`: `main` Grundübung, `sec` Ergänzung, `iso`, `skill`, `core`, `cond`. Tage ändern über `keepNext()`.
+- `active`: `{id, planId, dayIdx, dayId, name, loc, start, bw, exercises:[{key, exId, slotId, presc, sets:[{done,w,reps,sec,rir,band,t}], draft, extra, band, ss, note}], cur, rest, hold}`
+  (`rest`/`hold` = laufende Timer, `syncTimers`/`restoreTimers`). Beim Start öffnet sich ein laufendes Training sofort (`boot`), nach 12 h Fenster `stale`.
+- `workout` (gespeichert): `{id, planId, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
+- Export: JSON `{app:'satzwerk', version: 2, appVersion, exported, profile, workouts, active}`; Version 1 bleibt importierbar.
 
 ## Wissenschaftliche Regeln (Ziel: Fett reduzieren und Muskeln aufbauen)
 - Volumen: ~10 harte Sätze je Muskel und Woche, Schwerpunkte mehr, Deckel 15, mitbeteiligte Muskeln halb; jeder Muskel
   möglichst 2× pro Woche. Im Defizit nicht mehr Volumen, sondern Gewicht auf der Stange halten.
 - Wiederholungen: Grundübungen 6–10, Ergänzung 8–12, Isolation 10–15 (5–30 wirken ähnlich, wenn nah am Versagen).
 - Reserve: 1–2 Wdh. (Grundübungen nie bis zum Versagen), Deload 3. Ehrliche Reserve-Angabe steuert alles.
-- Progression: doppelt – erst Wdh. bis zur Obergrenze, dann nächstes Gewicht (Roadmap Etappe 5).
-- Pausen: Grundübungen 2,5–3 min, Ergänzung 2 min, Isolation ~1,5 min; Supersätze nur bei Übungen, die sich nicht stören.
-- Deload: alle 4–8 trainierten Wochen oder nach Bedarf (Check-in, fallende Leistung): halbe Sätze, Gewicht bleiben.
+- Progression: doppelt (`recommend`, Gewichte mit Auswahlliste): gleiches Gewicht +1 Wdh. (gleich viele, wenn es härter
+  war als geplant), alle Sätze an der Obergrenze → nächstes Gewicht und unten anfangen, unter der Untergrenze → leichter.
+  Ab Satz 2 bleibt das Gewicht; bei Tagesform ±8 % und ohne frischen Verlauf (> 21 Tage) gilt die Leistungszahl.
+- Pausen: Grundübungen 2,5–3 min, Ergänzung 2 min, Isolation 1,5 min (`E.defaultRest`); Supersätze nur bei Übungen, die sich nicht stören.
+- Deload: Zyklus zählt nur trainierte Wochen (`mesoWeek`, `E.setWorkouts`), Länge 4/5/6/8 wählbar (`meso.len`),
+  nach ≥ 14 Tagen Pause Neustart (`mesoBreak`); zusätzlich nach Bedarf (Check-in, `deloadNeeded` bei fallender Leistung):
+  halbe Sätze, Reserve 3, Gewicht bleibt.
+- Ziel `recomp` („Fett weg & Muskeln aufbauen“, `E.isCut`): wie Muskelaufbau, Schwerpunkte 12 statt 14 Sätze, kein
+  Zusatzsatz in den harten Wochen, Check-in gibt erst später mehr Volumen; Gewichtstrend im Fortschritt (Ziel −0,25 bis −0,75 %/Woche).
 - Reihenfolge: Skill → Grundübung → Ergänzung → Isolation → Rumpf; Schwerpunkt-Muskel früh in der Einheit.
 
 ## Designregeln (modernes iOS, Bedienung mit einer Hand)
@@ -55,7 +78,9 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
 - Eingabefelder ≥ 16 px Schrift (sonst zoomt iOS), Zahlen lieber über −/+ als über die Tastatur.
 - Aktuelle Übung im Training immer sichtbar; nichts darf beim Sperren oder App-Wechsel verloren gehen.
 - Sicherheitsabstände (`env(safe-area-inset-*)`) beachten, Fenster von unten, dunkles Design, ruhige Animationen.
-- iPhone: keine Vibration aus Web-Apps, Ton nur ohne Stumm-Schalter – Signale immer auch sichtbar machen.
+- iPhone: keine Vibration aus Web-Apps, Ton nur ohne Stumm-Schalter – Signale immer auch sichtbar machen (`flashPanel`).
+- Im Training: Plus/Minus für Gewicht/Wdh. (`qAdj`), Reserve-Fenster oder „Schnell abhaken“, „Rückgängig“ im Hinweis
+  (`toast(msg, ms, {a, l})`, `undoSet`), „Später“ (`exLater`), seltene Knöpfe im „⋯ Mehr“-Fenster (`exMenu`).
 - Texte kurz, deutsch, ohne Fachwörter.
 
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
@@ -92,7 +117,8 @@ Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene
 
 ## Trainingslogik
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
-- Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an.
+- Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
+  Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).
 - Effizienz-Prinzip (Nutzerwunsch, „2-5-15“ sinngemäß): pro Muskel/Woche ~10 harte Sätze,
   Schwerpunkte ~14, Deckel 15, mitbeteiligte Muskeln zählen halb, Skills nur 2×/Woche.
   `balancePlan()`/`planVolume()` in `engine.js`; läuft in `buildPlan` und einmalig für alte Pläne
