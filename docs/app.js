@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.0.0';
+  const APP_VERSION = '3.1.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -87,11 +87,14 @@
       const go = () => this.write('a', () => this.aRef().set({ active: clone(st.active) || null }));
       now ? go() : this.debounce('a', 1200, go);
     },
+    wv: 0,
     saveWorkout(w) {
+      this.wv++;
       LS.set('workouts', st.workouts);
       if (this.mode === 'db') this.write('w' + w.id, () => this.wCol().doc(w.id).set(clone(w)));
     },
     deleteWorkout(id) {
+      this.wv++;
       LS.set('workouts', st.workouts);
       if (this.mode === 'db') this.write('w' + id, () => this.wCol().doc(id).delete());
     }
@@ -167,13 +170,20 @@
     }
     return Object.keys(D.GROUPS).map(g => { const l = last[g]; if (!l) return { g, pct: 100, fresh: true }; const need = l.sets >= 6 ? 72 : l.sets >= 3 ? 48 : 24; const h = (now - l.ts) / 36e5; return { g, pct: Math.max(5, Math.min(100, Math.round(h / need * 100))), h }; });
   }
-  function prevEntry(exId) { const h = E.historyFor(exId, st.workouts); return h.length ? h[h.length - 1] : null; }
+  // Verlauf je Übung zwischenspeichern; ungültig, sobald sich die Trainingsliste ändert
+  let histCache = { ref: null, wv: -1, n: -1, m: {} };
+  function histOf(exId) {
+    const c = histCache;
+    if (c.ref !== st.workouts || c.wv !== Store.wv || c.n !== st.workouts.length) histCache = { ref: st.workouts, wv: Store.wv, n: st.workouts.length, m: {} };
+    const m = histCache.m; return m[exId] || (m[exId] = E.historyFor(exId, st.workouts));
+  }
+  function prevEntry(exId) { const h = histOf(exId); return h.length ? h[h.length - 1] : null; }
   const bandOf = k => (E.BANDS || []).find(b => b.k === k);
   const bandDot = k => { const b = bandOf(k); return b ? `<span class="bdot" style="background:${b.c}" title="Band ${b.n}"></span>` : ''; };
   const shortSet0 = (ex, s) => !s ? '–' : (ex.kind === 'hold' || ex.kind === 'int') ? fmt(s.sec) + ' s' : ex.kind === 'load' ? fmt(s.w) + '×' + fmt(s.reps) : ((s.w ? '+' + fmt(s.w) + '×' : '') + fmt(s.reps));
   const shortSet = (ex, s) => shortSet0(ex, s) + (s && s.band ? ' ' + bandDot(s.band) : '');
   // Band, das zuletzt bei dieser Übung benutzt wurde (letzter Satz der letzten Einheit)
-  function lastBand(exId) { const h = E.historyFor(exId, st.workouts); const l = h.length ? h[h.length - 1] : null; if (!l) return null; const ss = (l.entry.sets || []).filter(x => x.done !== false); return ss.length ? (ss[ss.length - 1].band || '') : null; }
+  function lastBand(exId) { const h = histOf(exId); const l = h.length ? h[h.length - 1] : null; if (!l) return null; const ss = (l.entry.sets || []).filter(x => x.done !== false); return ss.length ? (ss[ss.length - 1].band || '') : null; }
   function toast(msg, ms) { st.toast = msg; renderToast(); clearTimeout(toast.t); toast.t = setTimeout(() => { st.toast = null; renderToast(); }, ms || 2600); }
 
   /* Ton & Vibration */
@@ -197,6 +207,9 @@
   function render() {
     document.documentElement.dataset.font = settings().font === 'classic' ? 'classic' : 'hand';
     const app = $('#app');
+    // Bei offenem Training/Fragebogen die Seite dahinter nicht neu bauen (spart Zeit nach jedem Satz)
+    if (st.ov) { st.appDirty = true; renderLayer(); return; }
+    st.appDirty = false;
     if (!P() || !P().plan) { app.innerHTML = welcomeView(); renderTabs(false); renderLayer(); return; }
     const v = { heute: homeView, plan: planView, uebungen: libView, fortschritt: progView, timer: timerView }[st.tab] || homeView;
     app.innerHTML = v();
@@ -216,7 +229,9 @@
     if (!st.ov) { el.className = ''; el.innerHTML = ''; document.body.style.overflow = ''; return; }
     const html = { workout: workoutView, quiz: quizView, result: resultView }[st.ov.type]();
     const keep = el.scrollTop;
-    el.className = 'overlay'; el.innerHTML = '<div class="inner">' + html + '</div>'; el.scrollTop = keep;
+    // Die Fokus-Übung steht oben: wechselt sie, springt die Ansicht nach oben
+    const fk = st.ov.type === 'workout' && st.active ? (st.active.exercises[curIndex()] || {}).key : st.ov.type + (st.ov.i ?? '');
+    el.className = 'overlay'; el.innerHTML = '<div class="inner">' + html + '</div>'; el.scrollTop = fk === st.ovKey ? keep : 0; st.ovKey = fk;
     if (st.ov.type === 'workout') renderRest();
     document.body.style.overflow = 'hidden';
   }
@@ -487,7 +502,7 @@
   function mostFrequent(ids) { const c = {}; for (const w of st.workouts) for (const e of w.exercises) c[e.exId] = (c[e.exId] || 0) + 1; return ids.sort((a, b) => (c[b] || 0) - (c[a] || 0))[0]; }
   function exSeries(exId) {
     const ex = getEx(exId); if (!ex) return [];
-    return E.historyFor(exId, st.workouts).map(h => ({ x: h.date, y: E.sessionBest(ex, h.entry, h.bw || E.bodyweight(P())) })).filter(p => p.y > 0);
+    return histOf(exId).map(h => ({ x: h.date, y: E.sessionBest(ex, h.entry, h.bw || E.bodyweight(P())) })).filter(p => p.y > 0);
   }
   function exUnit(ex) { return ex.kind === 'hold' ? 's' : (ex.kind === 'bw' && !(ex.bwf > 0)) ? 'Wdh.' : 'kg'; }
   function exChart(exId) {
@@ -613,14 +628,30 @@
 
   /* ================= Pausentimer im Training ================= */
   function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, len: sec, label: label || '' }; renderRest(); }
+  // Pause und Halte-Timer im laufenden Training mitspeichern (übersteht Neuladen durch iOS)
+  function syncTimers() {
+    const a = st.active; if (!a) return;
+    const r = st.rest && !st.rest.fired ? { end: st.rest.end, total: st.rest.total, len: st.rest.len, label: st.rest.label || '' } : null;
+    const h = st.hold ? { i: st.hold.i, start: st.hold.start, name: st.hold.name } : null;
+    if (JSON.stringify([r, h]) === JSON.stringify([a.rest || null, a.hold || null])) return;
+    a.rest = r; a.hold = h; Store.saveActive();
+  }
+  function restoreTimers() {
+    const a = st.active; if (!a) return;
+    const now = Date.now();
+    if (a.rest && !st.rest) { if (a.rest.end > now - 4000) st.rest = Object.assign({}, a.rest); else { toast('Pause seit ' + mmss((now - a.rest.end) / 1000) + ' vorbei'); a.rest = null; } }
+    if (a.hold && !st.hold) st.hold = Object.assign({}, a.hold);
+  }
+  function toFocus() { const o = document.getElementById('ov'); if (o) o.scrollTop = 0; }
   function renderRest() {
     const el = layerEl('rb');
+    syncTimers();
     if (!st.ov || st.ov.type !== 'workout' || !st.active) { el.innerHTML = st.hold ? holdPanel() : ''; return; }
     if (st.hold) { el.innerHTML = holdPanel(); return; }
     const a = st.active; const ci = curIndex(); const S = ci >= 0 ? exState(a.exercises[ci]) : null;
     const left = st.rest ? (st.rest.end - Date.now()) / 1000 : 0;
     const resting = st.rest && left > -4;
-    el.innerHTML = `<div class="panel"><div class="cols"><div><small>Dauer</small><div class="v" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</div></div>
+    el.innerHTML = `<div class="panel">${S ? `<button class="pname" data-a="toFocus">${esc(S.ex.name)}</button>` : ''}<div class="cols"><div><small>Dauer</small><div class="v" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</div></div>
       <div><small style="text-align:center" id="restLbl">${resting ? (left > 0 ? 'Pause' : 'Los geht’s') : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${resting ? mmss(Math.max(0, left)) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div>${resting ? `<div class="restof" id="restOf">von ${mmss(st.rest.len ?? st.rest.total)} Pause</div>` : ''}</div>
       <div style="text-align:right"><small>Satz</small><div class="v">${S ? Math.min(S.done.length + 1, S.planned) + '/' + S.planned : '–'}</div></div></div>
       ${resting ? `<div class="prog"><i id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></i></div>` : ''}
@@ -635,7 +666,8 @@
     if (t && left > -4) t.textContent = mmss(Math.max(0, left));
     if (p) p.style.width = Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100)) + '%';
     if (left <= 3 && left > 0 && st.rest.beeped !== Math.ceil(left)) { st.rest.beeped = Math.ceil(left); beep(700, 0.1); }
-    if (left <= 0 && !st.rest.fired) { st.rest.fired = true; beep(1100, 0.45); buzz([250, 120, 250]); const l = $('#restLbl'); if (l) l.textContent = 'Los geht’s'; setTimeout(() => { if (st.rest && st.rest.fired) { st.rest = null; renderRest(); } }, 4000); }
+    if (left < -4 && !st.rest.fired) { const over = -left; st.rest = null; renderRest(); toast('Pause seit ' + mmss(over) + ' vorbei'); return; }
+    if (left <= 0 && !st.rest.fired) { st.rest.fired = true; syncTimers(); flashPanel(); beep(1100, 0.45); buzz([250, 120, 250]); const l = $('#restLbl'); if (l) l.textContent = 'Los geht’s'; setTimeout(() => { if (st.rest && st.rest.fired) { st.rest = null; renderRest(); } }, 4000); }
   }
   function tickHold(now) { if (st.hold) { const t = $('#holdT'); if (t) t.textContent = mmss((now - st.hold.start) / 1000); } }
 
@@ -662,11 +694,20 @@
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
-  function openWorkout() { st.ov = { type: 'workout' }; keepAwake(true); render(); }
+  function openWorkout() { st.ov = { type: 'workout' }; restoreTimers(); keepAwake(true); render(); }
+  function flashPanel() { const p = document.querySelector('#rb .panel'); if (!p) return; p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }
+  // exState wird pro Neuaufbau mehrfach gebraucht: Ergebnis merken, bis sich etwas ändert (jede Eingabe zählt st.ev hoch)
+  const exCache = new Map();
   function exState(entry) {
+    const last = entry.sets[entry.sets.length - 1];
+    const sig = [st.ev || 0, Store.wv, st.workouts.length, entry.exId, entry.sets.length, last ? last.t : 0, entry.band || '', entry.extra || 0, entry.closed ? 1 : 0, entry.ignoreStop ? 1 : 0, entry.presc && entry.presc.sets, E.todayISO()].join('|');
+    const c = exCache.get(entry.key); if (c && c.sig === sig) return c.S;
+    const S = exStateCalc(entry); exCache.set(entry.key, { sig, S }); return S;
+  }
+  function exStateCalc(entry) {
     const ex = getEx(entry.exId); const presc = entry.presc;
     const done = entry.sets.filter(s => s.done);
-    const hist = E.historyFor(entry.exId, st.workouts);
+    const hist = histOf(entry.exId);
     const rec = E.recommend(ex, presc, done, hist, { profile: P(), loc: st.active.loc, band: entry.band || null });
     let planned = Math.max(1, rec.setsRec + (entry.extra || 0));
     if (rec.stop && !entry.ignoreStop) planned = Math.max(done.length, 1);
@@ -806,6 +847,8 @@
   }
 
   function commitSet(idx, vals, rir) {
+    if (Date.now() - (st.lastCommit || 0) < 400) return; // Doppeltipp-Schutz
+    st.lastCommit = Date.now(); st.ev = (st.ev || 0) + 1;
     const a = st.active; const entry = a.exercises[idx]; const ex = getEx(entry.exId);
     const before = exState(entry);
     const set = { done: true, rir, t: Date.now() };
@@ -829,8 +872,7 @@
         a.cur = nxt.i; const roundDone = pos + k >= grp.length; const nm = getEx(nxt.e.exId).name;
         msg += roundDone ? 'Runde fertig – Pause, dann ' + nm + '.' : 'Supersatz: direkt weiter mit ' + nm + '.';
         startRest(roundDone ? Math.max(...grp.map(x => x.e.presc.rest)) : 15, 'Nächste: ' + nm);
-        toast(msg, 3800); Store.saveActive(); closeSheet(); render();
-        setTimeout(() => { const el = document.getElementById('ex-' + nxt.e.key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+        toast(msg, 3800); Store.saveActive(); closeSheet(); render(); toFocus();
         return;
       }
     }
@@ -847,11 +889,10 @@
       startRest(entry.presc.rest, getEx(entry.exId).name);
     }
     toast(msg, 3800);
-    Store.saveActive(); closeSheet(); render();
-    if (after.finished && a.cur >= 0) setTimeout(() => { const el = document.getElementById('ex-' + a.exercises[a.cur].key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    Store.saveActive(); closeSheet(); render(); toFocus();
   }
 
-  function finishWorkout(save) {
+  function finishWorkout(save, endTs) {
     const a = st.active; if (!a) return;
     if (save) {
       const bw = E.bodyweight(P());
@@ -859,18 +900,18 @@
       const prs = [];
       for (const e of exs) {
         const ex = getEx(e.exId); if (!ex || !e.best) continue;
-        const prev = E.historyFor(e.exId, st.workouts).map(h => E.sessionBest(ex, h.entry, h.bw || bw));
+        const prev = histOf(e.exId).map(h => E.sessionBest(ex, h.entry, h.bw || bw));
         if (prev.length && e.best > Math.max(...prev) * 1.005) prs.push(e.exId);
       }
       const vol = exs.reduce((t, e) => { const ex = getEx(e.exId); return t + e.sets.reduce((u, s) => u + (ex && ex.kind === 'load' ? (s.w || 0) * (s.reps || 0) : ex && ex.kind === 'bw' ? (bw * (ex.bwf || 0) + (s.w || 0)) * (s.reps || 0) : 0), 0); }, 0);
-      const w = { id: a.id, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round((Date.now() - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
+      const w = { id: a.id, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round(((endTs || Date.now()) - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
       if (exs.length) {
         st.workouts.push(w); Store.saveWorkout(w);
         if (a.dayIdx != null && plan()) { plan().next = (a.dayIdx + 1) % plan().days.length; Store.saveProfile(); }
         st.summary = w;
       }
     }
-    st.active = null; st.rest = null; st.hold = null; Store.saveActive(true); keepAwake(false);
+    st.active = null; st.rest = null; st.hold = null; exCache.clear(); Store.saveActive(true); keepAwake(false);
     st.ov = null; st.tab = 'heute';
     if (save && st.summary) openSheet({ type: 'summary' }); else closeSheet();
     render();
@@ -963,7 +1004,7 @@
     },
     exInfo(s) {
       const ex = getEx(s.id); if (!ex) return '';
-      const h = E.historyFor(ex.id, st.workouts);
+      const h = histOf(ex.id);
       const easier = ex.grp ? E.chainStep(ex, -1, P(), defLoc()) : null, harder = ex.grp ? E.chainStep(ex, 1, P(), defLoc()) : null;
       const chain = ex.grp ? E.allExercises(P()).filter(e => e.grp === ex.grp && e.pat === ex.pat).sort((a, b) => a.rank - b.rank) : [];
       const last = h.slice(-5).reverse();
@@ -1067,6 +1108,13 @@
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <button class="btn" data-a="customFrom">${I.plus} Nicht dabei? Eigene Übung anlegen</button>
         <div class="list" id="pickRes">${pickResults(s)}</div></div>`;
+    },
+    stale(s) {
+      const a = st.active; const n = a.exercises.reduce((t, e) => t + e.sets.filter(x => x.done).length, 0);
+      return `<div class="stack"><h2>Training noch offen</h2><div class="small muted">${esc(a.name)} · begonnen ${dateDE(E.todayISO(new Date(a.start)))} · ${n} Sätze erledigt</div>
+        <button class="btn primary big" data-a="staleSave" ${n ? '' : 'disabled'}>Speichern und beenden</button>
+        <button class="btn" data-a="staleGo">Weiter trainieren</button>
+        ${s.confirm ? '<button class="btn danger" data-a="staleDropYes">Wirklich verwerfen</button>' : '<button class="btn ghost" data-a="staleDrop">Verwerfen</button>'}</div>`;
     },
     balanceInfo(s) {
       const ch = s.ch || [];
@@ -1263,7 +1311,12 @@
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
     wMin() { st.ov = null; keepAwake(false); render(); },
-    focusEx(t) { st.active.cur = +t.dataset.i; renderOverlay(); renderRest(); },
+    focusEx(t) { st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
+    toFocus() { toFocus(); },
+    staleGo() { closeSheet(); openWorkout(); },
+    staleSave() { const a = st.active; const ts = a.exercises.flatMap(e => e.sets.map(s => s.t || 0)); closeSheet(); finishWorkout(true, Math.max(a.start, ...ts)); },
+    staleDrop() { st.sheet.confirm = true; renderSheet(); },
+    staleDropYes() { closeSheet(); finishWorkout(false); },
     doneSet(t) {
       const i = +t.dataset.i; const entry = st.active.exercises[i]; const ex = getEx(entry.exId); const S = exState(entry);
       const d = entry.draft || {};
@@ -1367,7 +1420,7 @@
     swLap() { const sw = T.sw; sw.laps.unshift(sw.acc + (Date.now() - sw.start)); render(); },
     swReset() { T.sw = { start: null, acc: 0, laps: [] }; render(); },
     restAdj(t) { if (!st.rest) return; st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
-    restSkip() { st.rest = null; renderRest(); }
+    restSkip() { st.rest = null; renderRest(); toFocus(); }
   };
   function applyPick(s, id) {
       const ex = getEx(id);
@@ -1380,7 +1433,7 @@
     if (!st.active) return;
     st.active.exercises.push(newEntry(id, null)); st.active.cur = st.active.exercises.length - 1;
     Store.saveActive(); closeSheet(); if (!st.ov) openWorkout(); else renderOverlay();
-    setTimeout(() => { const e = st.active.exercises[st.active.cur]; const el = document.getElementById('ex-' + e.key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    toFocus();
   }
   function addToPlan(di, id) {
     const ex = getEx(id); const day = plan().days[di]; const r = roleOfEx(ex);
@@ -1447,6 +1500,7 @@
 
   document.addEventListener('click', e => {
     if (Date.now() < (st.noClickUntil || 0)) { e.preventDefault(); return; }
+    st.ev = (st.ev || 0) + 1;
     const t = e.target.closest('[data-a]'); if (!t) return;
     if (t.tagName === 'INPUT' && t.type === 'checkbox') { /* Checkbox: Aktion nach Zustandswechsel */ }
     const fn = A[t.dataset.a]; if (!fn) return;
@@ -1454,8 +1508,8 @@
     if (!actx && settings().sound) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (err) { } }
     fn(t, e);
   });
-  document.addEventListener('input', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && t.type !== 'file' && t.tagName !== 'SELECT') IN[t.dataset.in](t); });
-  document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.in && IN[t.dataset.in] && (t.type === 'file' || t.tagName === 'SELECT')) IN[t.dataset.in](t); });
+  document.addEventListener('input', e => { const t = e.target; st.ev = (st.ev || 0) + 1; if (t.dataset && t.dataset.in && IN[t.dataset.in] && t.type !== 'file' && t.tagName !== 'SELECT') IN[t.dataset.in](t); });
+  document.addEventListener('change', e => { const t = e.target; st.ev = (st.ev || 0) + 1; if (t.dataset && t.dataset.in && IN[t.dataset.in] && (t.type === 'file' || t.tagName === 'SELECT')) IN[t.dataset.in](t); });
   // Plan: Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern
   let lp = null;
   function lpStart(el, y) {
@@ -1534,7 +1588,12 @@
     if (e.key === 'Escape' && st.sheet) closeSheet();
     if (e.key === 'Enter' && st.ov && st.ov.type === 'quiz' && e.target.tagName === 'INPUT') { const b = $('[data-a="qNext"]'); if (b && !b.disabled) quizNext(); }
   });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.ov && st.ov.type === 'workout') keepAwake(true); });
+  // Sperren / App-Wechsel: sofort speichern; bei Rückkehr Zeiten nachziehen
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { if (st.active) { syncTimers(); Store.saveActive(true); } return; }
+    if (st.ov && st.ov.type === 'workout') { keepAwake(true); timerTick(); renderRest(); }
+  });
+  window.addEventListener('pagehide', () => { if (st.active) { syncTimers(); Store.saveActive(true); } });
 
   setInterval(() => {
     timerTick();
@@ -1553,8 +1612,13 @@
       st.profile.plan = np; Store.saveProfile(true);
       setTimeout(() => toast('Plan aktualisiert: jetzt 5–7 Übungen pro Einheit', 4000), 400);
     }
-    if (st.profile && st.profile.plan && st.active) toast('Dein Training läuft noch: tippe auf „Weiter trainieren“', 3500);
+    restoreTimers();
     render();
+    // Laufendes Training sofort wieder öffnen (iOS lädt die App nach Sperren/App-Wechsel oft neu)
+    if (st.profile && st.profile.plan && st.active) {
+      if (Date.now() - (st.active.start || 0) < 12 * 3600e3) openWorkout();
+      else openSheet({ type: 'stale' });
+    }
     if (balCh && balCh.length) setTimeout(() => openSheet({ type: 'balanceInfo', ch: balCh }), 700);
   })();
 })();

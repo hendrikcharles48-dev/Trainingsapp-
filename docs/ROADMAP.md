@@ -9,7 +9,7 @@ Abhaken: Wenn eine Etappe fertig ist, in der Übersicht `[ ]` zu `[x]` machen un
 ## Übersicht
 
 - [x] **Etappe 1** – Suche ruhig, Versionsanzeige (klein, Datenrisiko: keins) – erledigt 11.11.2026, Version 3.0.0
-- [ ] **Etappe 2** – Training flüssig, aktuelle Übung immer sichtbar, übersteht Sperren/App-Wechsel (mittel, Risiko: gering)
+- [x] **Etappe 2** – Training flüssig, aktuelle Übung immer sichtbar, übersteht Sperren/App-Wechsel (mittel, Risiko: gering) – erledigt 11.11.2026, Version 3.1.0
 - [ ] **Etappe 3** – Datensicherheit (mittel, Risiko: mittel – nur zusätzliche Kopien, nichts wird umgezogen)
 - [ ] **Etappe 4** – Eigene Pläne (groß, Risiko: mittel – `plans` kommt dazu, `plan` bleibt als Spiegel)
 - [ ] **Etappe 5** – Trainingswissenschaft (mittel, Risiko: gering – nur Rechenregeln)
