@@ -170,6 +170,10 @@
   };
   const SKILL_GRP = { mu: 'mu', fl: 'fl', hs: 'hsskill', lsit: 'lsit', planche: 'planche', bl: 'bl' };
 
+  // Standard-Pause je Rolle (Sekunden)
+  function defaultRest(role, goal) {
+    return role === 'main' ? (goal === 'strength' ? 180 : goal === 'fit' ? 105 : 150) : role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'cond' ? 20 : role === 'core' ? 60 : 75;
+  }
   function goalRanges(goal) {
     return {
       muscle: { main: [6, 10], sec: [8, 12], iso: [10, 15] },
@@ -313,7 +317,7 @@
         sl.sets = role === 'main' ? baseSets.main + (goal === 'strength' ? 1 : 0) : role === 'sec' ? baseSets.sec : role === 'iso' ? baseSets.iso : role === 'skill' ? 3 : role === 'cond' ? 5 : (lvl === 'new' ? 2 : 3);
         if (poorRecovery && (role === 'sec' || role === 'iso')) sl.sets = Math.max(2, sl.sets - 1);
         if (sl.prio) sl.sets = Math.max(2, sl.sets - (role === 'iso' ? 0 : 1));
-        sl.rest = role === 'main' ? restMain : role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'cond' ? 20 : role === 'core' ? 60 : 75;
+        sl.rest = defaultRest(role, goal);
         sl.rr = ranges[role] || null;
         sl.id = 's' + Math.random().toString(36).slice(2, 8);
       }
@@ -823,6 +827,6 @@
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
-    estimate1RM, allExercises, effLoad, refreshSelection, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
+    estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.2.0';
+  const APP_VERSION = '3.3.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -139,6 +139,49 @@
     }
   };
 
+  /* ================= Mehrere Pläne =================
+     profile.plans = alle Pläne, profile.planId = aktiver Plan, profile.plan = derselbe Plan (Spiegel, damit
+     alter Code, alte Backups und ältere App-Versionen weiter funktionieren). */
+  function normalizePlans() {
+    const p = st.profile; if (!p) return;
+    let changed = false;
+    if (p.plan && !Array.isArray(p.plans)) {
+      Backup.snapshot('vor-plaene');
+      if (!p.plan.id) p.plan.id = 'p' + uid();
+      p.plans = [p.plan]; changed = true;
+    }
+    if (!Array.isArray(p.plans)) return;
+    if (p.plan) { // p.plan ist maßgeblich (nach dem Laden ein eigenes Objekt mit gleichem Inhalt)
+      if (!p.plan.id) p.plan.id = 'p' + uid();
+      const i = p.plans.findIndex(x => x.id === p.plan.id);
+      if (i >= 0) p.plans[i] = p.plan; else { p.plans.push(p.plan); changed = true; }
+      if (p.planId !== p.plan.id) { p.planId = p.plan.id; changed = true; }
+    } else if (p.plans.length) { p.plan = p.plans.find(x => x.id === p.planId) || p.plans[0]; p.planId = p.plan.id; changed = true; }
+    for (const x of p.plans) if (!x.name) { x.name = x.custom ? 'Eigener Plan' : (x.splitName || 'Plan'); changed = true; }
+    if (changed) { const m = LS.get('meta') || {}; if ((m.schema || 1) < 2) LS.set('meta', Object.assign(m, { schema: 2 })); Store.saveProfile(true); }
+  }
+  // Empfohlene Pläne, an denen der Nutzer etwas geändert hat, werden nie mehr automatisch umgebaut
+  function touchPlan() { const p = plan(); if (p && !p.custom) p.edited = true; }
+  const autoPlan = p => p && !p.custom && !p.edited;
+  function activatePlan(id) {
+    const pr = P(); const np = (pr.plans || []).find(x => x.id === id); if (!np) return false;
+    pr.plan = np; pr.planId = id; st.homeDay = null; Store.saveProfile(true); return true;
+  }
+  function emptyPlan(name, nDays) {
+    const a = P().answers || {};
+    return { v: E.PLAN_VERSION, id: 'p' + uid(), name, custom: true, created: new Date().toISOString(), split: 'custom', splitName: 'Eigener Plan', goal: a.goal || 'muscle',
+      locs: locs(), days: Array.from({ length: nDays }, (_, i) => ({ id: 'd' + uid(), key: 'C', name: 'Tag ' + 'ABCDEF'[i], focus: 'full', slots: [] })), meso: { start: E.todayISO(), len: 5 }, next: 0, bal: true };
+  }
+  function lockAll(pl) { for (const d of pl.days) for (const sl of d.slots) { sl.locked = sl.locked || {}; for (const l of pl.locs || []) sl.locked[l] = true; } return pl; }
+  function addPlan(np, activate) { const pr = P(); pr.plans = pr.plans || []; pr.plans.push(np); if (activate) { pr.plan = np; pr.planId = np.id; st.homeDay = null; } Store.saveProfile(true); }
+  // Tagesreihenfolge geändert: derselbe Tag bleibt „als Nächstes dran“
+  function keepNext(fn) {
+    const p = plan(); const nd = p.days[(p.next || 0) % p.days.length]; const nid = nd && nd.id; const old = p.next || 0;
+    fn(p);
+    const i = p.days.findIndex(d => d.id === nid); p.next = i >= 0 ? i : Math.min(old, p.days.length - 1);
+    st.homeDay = null; touchPlan(); Store.saveProfile();
+  }
+
   /* ================= Hilfen ================= */
   const P = () => st.profile;
   const plan = () => st.profile && st.profile.plan;
@@ -195,6 +238,17 @@
   const favMark = id => isFav(id) ? '<span style="color:var(--lime)">★</span> ' : '';
   const figSVG = (ex, o) => ex ? window.FIG.svg(ex, o) : '';
   const thumb = ex => `<div class="thumb">${figSVG(ex)}</div>`;
+  // Hinweis, wenn eine Isolationsübung vor einer Grundübung für denselben Muskel steht
+  function orderHint(day, loc) {
+    const exs = day.slots.map(sl => ({ sl, ex: getEx(sl.ex[loc]) })).filter(x => x.ex);
+    for (let i = 0; i < exs.length; i++) {
+      if (!['iso', 'core'].includes(exs[i].sl.r)) continue;
+      const m = new Set(exs[i].ex.prim);
+      const later = exs.slice(i + 1).find(x => x.sl.r === 'main' && x.ex.prim.concat(x.ex.sec || []).some(z => m.has(z)));
+      if (later) return `<div class="tiny muted" style="margin:-4px 0 6px">Tipp: „${esc(later.ex.name)}“ vor „${esc(exs[i].ex.name)}“ bringt mehr – Grundübung zuerst.</div>`;
+    }
+    return '';
+  }
   function dayFocus(day, loc) {
     const cnt = {}; for (const sl of day.slots) { const ex = getEx(sl.ex[loc]); if (!ex) continue; for (const g in D.GROUPS) if (ex.prim.some(m => D.GROUPS[g].includes(m))) cnt[g] = (cnt[g] || 0) + (sl.r === 'main' ? 2 : 1); }
     return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 3).join(' / ');
@@ -413,10 +467,11 @@
   function planView() {
     const p = plan(); const loc = st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
     const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
-    return `<div class="topbar"><h1>Plan</h1><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
+    return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto;margin-right:8px">Pläne${(P().plans || []).length > 1 ? ' (' + P().plans.length + ')' : ''}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
     <div class="stack">
       <div class="card lime rings-bg stack">
-        <div class="row wrap" style="gap:6px"><span class="tag">${esc(p.splitName)}</span><span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
+        <b style="font-size:19px">${esc(p.name || p.splitName)}</b>
+        <div class="row wrap" style="gap:6px"><span class="tag">${p.custom ? 'Eigener Plan' : esc(p.splitName)}</span><span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
         <div class="row between"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
         <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
         <div class="meter"><i style="width:${wi.w / wi.len * 100}%"></i></div>
@@ -425,15 +480,16 @@
         <button class="btn dark sm" style="align-self:flex-start" data-a="ciOpen">Wochen-Check-in ausfüllen</button>
       </div>
       ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-      ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span></div>
+      ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten" style="width:44px;height:44px;font-weight:900">⋯</button></div>${orderHint(d, loc)}
         <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
           const SLp = ssLabels(d.slots);
           return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</b></div>${noteChip(ex.id)}<div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
       ${volumeCard(p, loc)}
+      <button class="btn" data-a="dayAdd">${I.plus} Tag hinzufügen</button>
       <div class="card flat small" style="margin-bottom:10px">↕ <b>Tipp:</b> Übung kurz gedrückt halten und nach oben oder unten ziehen, um die Reihenfolge zu ändern.</div>
       <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
-      <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">Plan neu berechnen</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
+      <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">${p.custom ? 'Plan empfehlen lassen' : 'Plan neu berechnen'}</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
     </div>`;
   }
 
@@ -733,7 +789,7 @@
       });
       timeNote = { delta, minutes: tp.minutes, notes: tp.notes };
     } else exercises = day.slots.filter(s => s.ex[loc]).map(s => newEntry(s.ex[loc], s));
-    st.active = { id: uid(), dayIdx: di, dayId: day.id, name: day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
+    st.active = { id: uid(), planId: p.id, dayIdx: di, dayId: day.id, name: day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
@@ -947,11 +1003,11 @@
         if (prev.length && e.best > Math.max(...prev) * 1.005) prs.push(e.exId);
       }
       const vol = exs.reduce((t, e) => { const ex = getEx(e.exId); return t + e.sets.reduce((u, s) => u + (ex && ex.kind === 'load' ? (s.w || 0) * (s.reps || 0) : ex && ex.kind === 'bw' ? (bw * (ex.bwf || 0) + (s.w || 0)) * (s.reps || 0) : 0), 0); }, 0);
-      const w = { id: a.id, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round(((endTs || Date.now()) - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
+      const w = { id: a.id, planId: a.planId || undefined, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round(((endTs || Date.now()) - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
       if (exs.length) {
         st.workouts.push(w); Store.saveWorkout(w); Backup.snapshot('training');
         try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }); } catch (e) { }
-        if (a.dayIdx != null && plan()) { plan().next = (a.dayIdx + 1) % plan().days.length; Store.saveProfile(); }
+        if (a.dayIdx != null && plan() && (!a.planId || a.planId === plan().id)) { const di = a.dayId ? plan().days.findIndex(d => d.id === a.dayId) : a.dayIdx; plan().next = ((di >= 0 ? di : a.dayIdx) + 1) % plan().days.length; Store.saveProfile(); }
         st.summary = w;
       }
     }
@@ -1011,6 +1067,7 @@
       ${p.locs.length > 1 ? `<div class="seg">${p.locs.map(l => `<button data-a="resultLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
       ${p.days.map(d => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">≈ ${estMinutes(d, loc)} min</span></div><div class="list">${d.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); const pr = E.prescription(sl, ex, r.prof, p); return `<div class="li">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div>${sl.why[loc] && sl.why[loc].length ? `<div class="why" style="margin-top:4px">${sl.why[loc].map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div></div>`; }).join('')}</div></div>`).join('')}
       <button class="btn primary big" data-a="acceptPlan">Plan übernehmen</button>
+      <button class="btn" data-a="resultOwn">Lieber eigenen Plan bauen</button>
       <button class="btn" data-a="reroll">Andere Übungsauswahl vorschlagen</button></div>`;
   }
 
@@ -1138,7 +1195,8 @@
       const alts = E.alternatives(sl, loc, P(), day.slots.filter(x => x !== sl).map(x => x.ex[loc])).filter(x => x.ex.id !== (ex && ex.id)).slice(0, 12);
       const pr = ex ? E.prescription(sl, ex, P(), p) : null; const rr = sl.custRR || (pr && pr.rr) || [8, 12];
       return `<div class="stack"><div><div class="eyebrow">${esc(day.name)} · ${ROLE[sl.r][1]}</div><h2>${ex ? esc(ex.name) : 'Keine Übung'}</h2></div>
-        <div class="row">${[['sets', 'Sätze', sl.sets], ['lo', 'Wdh. min', rr[0]], ['hi', 'Wdh. max', rr[1]], ['rest', 'Pause s', sl.rest]].map(([k, l, v]) => `<div class="grow"><label class="lbl" for="sl-${k}">${l}</label><input class="field num" id="sl-${k}" inputmode="numeric" data-in="slot" data-k="${k}" value="${v}"></div>`).join('')}</div>
+        <div class="minigrid">${[['sets', 'Sätze', sl.sets, 1], ['rest', 'Pause (Sek.)', sl.rest, 15], ['lo', (ex && (ex.kind === 'hold' || ex.kind === 'int') ? 'Sek.' : 'Wdh.') + ' von', rr[0], ex && ex.kind === 'hold' ? 5 : 1], ['hi', (ex && (ex.kind === 'hold' || ex.kind === 'int') ? 'Sek.' : 'Wdh.') + ' bis', rr[1], ex && ex.kind === 'hold' ? 5 : 1]].map(([k, l, v, st1]) => `<div><label class="lbl" for="sl-${k}">${l}</label><div class="mini"><button data-a="slotStep" data-k="${k}" data-d="${-st1}" aria-label="weniger">−</button><input class="num" id="sl-${k}" inputmode="numeric" data-in="slot" data-k="${k}" value="${v}"><button data-a="slotStep" data-k="${k}" data-d="${st1}" aria-label="mehr">+</button></div></div>`).join('')}</div>
+        <div><div class="lbl">Rolle im Plan</div><div class="chips">${Object.keys(ROLE).map(r => `<button class="chip ${sl.r === r ? 'set' : ''}" data-a="slotRole" data-r="${r}">${ROLE[r][1]}</button>`).join('')}</div></div>
         ${sl.ss && day.slots.filter(x => x.ss === sl.ss).length > 1 ? `<button class="btn sm" data-a="ssUnlinkP">⇄ Supersatz auflösen</button>` : s.s < day.slots.length - 1 && day.slots[s.s + 1].ex[loc] ? `<button class="btn sm" data-a="ssLinkP">⇄ Supersatz mit „${esc((getEx(day.slots[s.s + 1].ex[loc]) || {}).name || 'nächster Übung')}“</button>` : ''}
         ${ex ? noteChip(ex.id) : ''}
         <div class="row"><button class="btn sm" data-a="slotMove" data-dir="-1">Nach oben</button><button class="btn sm" data-a="slotMove" data-dir="1">Nach unten</button><span class="grow"></span>${s.confirm ? '<button class="btn sm danger" data-a="slotDelYes">Wirklich entfernen</button>' : '<button class="btn sm danger" data-a="slotDel">Entfernen</button>'}</div>
@@ -1179,11 +1237,49 @@
         <button class="btn" data-a="staleGo">Weiter trainieren</button>
         ${s.confirm ? '<button class="btn danger" data-a="staleDropYes">Wirklich verwerfen</button>' : '<button class="btn ghost" data-a="staleDrop">Verwerfen</button>'}</div>`;
     },
+    plans() {
+      const pr = P(); const list = pr.plans || [plan()];
+      return `<div class="stack"><h2>Deine Pläne</h2><div class="small muted">Tippe auf einen Plan, um ihn zu aktivieren, umzubenennen, zu kopieren oder zu löschen. Verlauf und Rekorde gehören zu den Übungen und bleiben bei jedem Plan erhalten.</div>
+        <div class="list">${list.map(x => `<button class="li" data-a="planOpen" data-id="${x.id}" ${x.id === pr.planId ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}><div class="grow"><b>${esc(x.name || x.splitName)}</b><div class="small muted">${x.days.length} Tage · ${x.custom ? 'Eigener Plan' : 'Empfohlen' + (x.edited ? ', angepasst' : '')}${x.id === pr.planId ? ' · <b style="color:var(--lime)">aktiv</b>' : ''}</div></div><span class="chev">${I.chev}</span></button>`).join('')}</div>
+        <button class="btn primary" data-a="planNew">${I.plus} Neuer Plan</button></div>`;
+    },
+    planMenu(s) {
+      const pr = P(); const x = (pr.plans || []).find(p => p.id === s.id); if (!x) return '<div class="stack"><h2>Plan nicht gefunden</h2></div>';
+      const act = x.id === pr.planId;
+      return `<div class="stack"><h2>${esc(x.name || x.splitName)}</h2>
+        <div><label class="lbl" for="pl-name">Name</label><input class="field" id="pl-name" data-in="planName" data-id="${x.id}" value="${esc(x.name || '')}"></div>
+        <div class="small muted">${x.days.map(d => esc(d.name)).join(' · ')}</div>
+        ${act ? '<div class="small" style="font-weight:800">Dieser Plan ist aktiv.</div>' : `<button class="btn primary big" data-a="planAct" data-id="${x.id}">Diesen Plan aktivieren</button>`}
+        <button class="btn" data-a="planDup" data-id="${x.id}">Kopieren</button>
+        ${(pr.plans || []).length > 1 ? (s.confirm ? `<button class="btn danger" data-a="planDelYes" data-id="${x.id}">Wirklich löschen</button>` : `<button class="btn ghost" data-a="planDel">Plan löschen</button>`) : ''}
+        <button class="btn ghost" data-a="plans">Zurück zur Liste</button></div>`;
+    },
+    planNew(s) {
+      const segN = [1, 2, 3, 4, 5, 6].map(n => `<button data-a="pnN" data-n="${n}" aria-pressed="${s.n === n}">${n}</button>`).join('');
+      return `<div class="stack"><h2>Neuer Plan</h2>
+        <div><label class="lbl" for="pn-name">Name</label><input class="field" id="pn-name" data-in="pnName" value="${esc(s.name)}"></div>
+        <div><div class="lbl">Tage pro Woche</div><div class="seg">${segN}</div></div>
+        <button class="btn primary" data-a="pnCreate" data-k="empty">Leer anfangen (${s.n} Tage)</button>
+        <div class="card stack" style="gap:10px"><b>Aus Vorlage</b><div class="seg">${[['fb', 'Ganzkörper'], ['ul', 'OK / UK'], ['ppl', 'Push/Pull/Beine']].map(([k, n]) => `<button data-a="pnSplit" data-k="${k}" aria-pressed="${s.split === k}">${n}</button>`).join('')}</div>
+          <div class="small muted">Übungen passend zu deiner Ausrüstung; danach frei änderbar.</div><button class="btn" data-a="pnCreate" data-k="tpl" ${s.n < 2 ? 'disabled' : ''}>Vorlage mit ${s.n} Tagen</button></div>
+        <button class="btn" data-a="pnCreate" data-k="copy">Kopie des aktuellen Plans</button>
+        <button class="btn ghost" data-a="quizEdit">Neu empfehlen lassen (Fragebogen)</button></div>`;
+    },
+    dayEdit(s) {
+      const p = plan(); const d = p.days[s.d]; if (!d) return '';
+      return `<div class="stack"><h2>${s.fresh ? 'Neuer Tag' : 'Tag bearbeiten'}</h2>
+        <div><label class="lbl" for="day-name">Name</label><input class="field" id="day-name" data-in="dayName" value="${esc(d.name)}"></div>
+        <div class="row"><button class="btn grow" data-a="dayMove" data-dir="-1" ${s.d === 0 ? 'disabled' : ''}>Nach oben</button><button class="btn grow" data-a="dayMove" data-dir="1" ${s.d === p.days.length - 1 ? 'disabled' : ''}>Nach unten</button></div>
+        <button class="btn" data-a="pickEx" data-mode="plan" data-d="${s.d}">${I.plus} Übung hinzufügen</button>
+        <button class="btn" data-a="dayDup">Tag kopieren</button>
+        ${p.days.length > 1 ? (s.confirm ? '<button class="btn danger" data-a="dayDelYes">Wirklich löschen</button>' : '<button class="btn ghost" data-a="dayDel">Tag löschen</button>') : ''}
+        <button class="btn primary" data-a="closeSheet">Fertig</button></div>`;
+    },
     balanceInfo(s) {
       const ch = s.ch || [];
       return `<div class="stack"><div><div class="eyebrow">Effizienz</div><h2>${ch.length ? 'Plan ausbalanciert' : 'Plan passt schon'}</h2><div class="small muted">Ziel: jeder Muskel ~10 harte Sätze pro Woche (Schwerpunkte ~14), nicht über 15. Deine eigenen Übungen und die Reihenfolge bleiben, festgelegte Übungen werden nicht angefasst.</div></div>
         ${ch.length ? `<div class="list">${ch.map(c => `<div class="li small">${esc(c)}</div>`).join('')}</div>` : '<div class="small">Alle Muskeln liegen schon im effizienten Bereich.</div>'}
-        <button class="btn primary" data-a="closeSheet">Alles klar</button></div>`;
+        ${s.preview && ch.length ? '<div class="small" style="font-weight:800">Das würde sich ändern. Übernehmen?</div><button class="btn primary" data-a="balanceApply">Übernehmen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button>' : '<button class="btn primary" data-a="closeSheet">Alles klar</button>'}</div>`;
     },
     time(s) {
       const p = plan(); const day = p.days[s.d]; const base = estMinutes(day, s.l);
@@ -1267,7 +1363,7 @@
         <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION}</p></div>`;
     },
     rebuild() {
-      return `<div class="stack"><h2>Plan neu berechnen?</h2><p class="ink2" style="margin:0">Mit deinen bisherigen Antworten wird eine neue Übungsauswahl erstellt. Deine manuellen Änderungen am Plan gehen dabei verloren. Dein Trainingsverlauf bleibt erhalten.</p><button class="btn primary" data-a="rebuildYes">Neu berechnen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button></div>`;
+      return `<div class="stack"><h2>Neuen Plan berechnen?</h2><p class="ink2" style="margin:0">Mit deinen Antworten aus dem Fragebogen wird ein neuer Plan erstellt und aktiviert. Dein bisheriger Plan bleibt unter „Pläne“ erhalten, dein Trainingsverlauf sowieso.</p><button class="btn primary" data-a="rebuildYes">Neu berechnen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button></div>`;
     },
     addToPlan(s) {
       const ex = getEx(s.id);
@@ -1300,14 +1396,14 @@
     noteClear() { st.sheet.v = ''; A.noteSave(); },
     ssLinkW(t) { const i = +t.dataset.i; linkSS(st.active.exercises, i); Store.saveActive(); closeSheet(); renderOverlay(); toast('Supersatz erstellt'); },
     ssUnlinkW(t) { unlinkSS(st.active.exercises, +t.dataset.i); Store.saveActive(); closeSheet(); renderOverlay(); toast('Supersatz aufgelöst'); },
-    ssLinkP() { const s = st.sheet; linkSS(plan().days[s.d].slots, s.s); Store.saveProfile(); renderSheet(); render(); toast('Supersatz im Plan erstellt'); },
-    ssUnlinkP() { const s = st.sheet; unlinkSS(plan().days[s.d].slots, s.s); Store.saveProfile(); renderSheet(); render(); toast('Supersatz aufgelöst'); },
+    ssLinkP() { const s = st.sheet; linkSS(plan().days[s.d].slots, s.s); touchPlan(); Store.saveProfile(); renderSheet(); render(); toast('Supersatz im Plan erstellt'); },
+    ssUnlinkP() { const s = st.sheet; unlinkSS(plan().days[s.d].slots, s.s); touchPlan(); Store.saveProfile(); renderSheet(); render(); toast('Supersatz aufgelöst'); },
     howToggle() { st.howOpen = !st.howOpen; render(); },
     favToggle(t) {
       const id = t.dataset.id; const ex = getEx(id); const f = P().favs = P().favs || [];
       const i = f.indexOf(id); const on = i < 0;
       if (on) f.push(id); else f.splice(i, 1);
-      E.refreshSelection(plan(), P());
+      if (autoPlan(plan())) E.refreshSelection(plan(), P());
       Store.saveProfile(); renderSheet(); render();
       const where = []; plan().days.forEach(d => d.slots.forEach(sl => { for (const l of locs()) if (sl.ex[l] === id) where.push(d.name + (locs().length > 1 ? ' (' + LOCN[l] + ')' : '')); }));
       if (!on) toast('Favorit entfernt. Die Übungsauswahl wurde neu bewertet.', 3500);
@@ -1364,14 +1460,74 @@
       r.plan = pl; renderOverlay(); toast('Neue Auswahl erstellt'); },
     acceptPlan() {
       const r = st.ov; const prof = r.prof; const old = plan();
-      if (old && old.meso) r.plan.meso = old.meso;
-      prof.plan = r.plan; st.profile = prof; registerCustom();
-      Store.saveProfile(true); st.ov = null; st.tab = 'heute'; render(); toast('Plan gespeichert. Viel Erfolg!');
+      if (old && old.meso) r.plan.meso = clone(old.meso);
+      if (!r.plan.name) r.plan.name = r.plan.splitName;
+      if (old) Backup.snapshot('vor-plan');
+      prof.plan = r.plan; st.profile = prof; registerCustom(); normalizePlans();
+      Store.saveProfile(true); st.ov = null; st.tab = 'heute'; render(); toast(old ? 'Neuer Plan aktiv – der alte bleibt unter „Pläne“' : 'Plan gespeichert. Viel Erfolg!');
+    },
+    resultOwn() {
+      const r = st.ov; const prof = r.prof; st.profile = prof; registerCustom();
+      const np = emptyPlan('Mein Plan', 3); prof.plan = np; normalizePlans();
+      Store.saveProfile(true); st.ov = null; st.tab = 'plan'; render(); toast('Leerer Plan angelegt: füge jedem Tag Übungen hinzu');
+    },
+    plans() { openSheet({ type: 'plans' }); },
+    planOpen(t) { openSheet({ type: 'planMenu', id: t.dataset.id }); },
+    planAct(t) {
+      if (st.active) { toast('Erst das laufende Training beenden'); return; }
+      if (activatePlan(t.dataset.id)) { closeSheet(); render(); toast('Plan aktiv: ' + plan().name); }
+    },
+    planDup(t) { const src = (P().plans || []).find(x => x.id === t.dataset.id); if (!src) return; const np = clone(src); np.id = 'p' + uid(); np.name = (src.name || 'Plan') + ' (Kopie)'; np.custom = true; np.edited = false; np.created = new Date().toISOString(); np.next = 0; lockAll(np); addPlan(np, false); openSheet({ type: 'plans' }); toast('Kopie angelegt'); },
+    planDel() { st.sheet.confirm = true; renderSheet(); },
+    async planDelYes(t) {
+      const pr = P(); if ((pr.plans || []).length < 2) return; const id = t.dataset.id;
+      if (st.active && pr.planId === id) { toast('Erst das laufende Training beenden'); return; }
+      await Backup.snapshot('vor-planloeschen');
+      pr.plans = pr.plans.filter(x => x.id !== id);
+      if (pr.planId === id) { pr.plan = pr.plans[0]; pr.planId = pr.plan.id; st.homeDay = null; }
+      Store.saveProfile(true); openSheet({ type: 'plans' }); render(); toast('Plan gelöscht');
+    },
+    planNew() { openSheet({ type: 'planNew', n: 3, split: 'fb', name: 'Eigener Plan ' + (((P().plans || []).filter(x => x.custom).length) + 1) }); },
+    pnN(t) { st.sheet.n = +t.dataset.n; renderSheet(); },
+    pnSplit(t) { st.sheet.split = t.dataset.k; renderSheet(); },
+    pnCreate(t) {
+      const s = st.sheet; const kind = t.dataset.k; const name = (s.name || '').trim() || 'Eigener Plan'; let np;
+      if (kind === 'empty') np = emptyPlan(name, s.n);
+      else if (kind === 'tpl') {
+        const prof = clone(P()); prof.answers = Object.assign({}, prof.answers, { split: s.split, days: String(s.n) });
+        np = lockAll(E.buildPlan(prof)); np.id = 'p' + uid(); np.custom = true; np.name = name; np.next = 0; np.meso = { start: E.todayISO(), len: 5 };
+      } else { np = lockAll(clone(plan())); np.id = 'p' + uid(); np.custom = true; np.edited = false; np.name = name; np.next = 0; np.created = new Date().toISOString(); }
+      if (st.active) { addPlan(np, false); toast('Plan angelegt – aktivieren kannst du ihn nach dem Training'); closeSheet(); render(); return; }
+      addPlan(np, true); closeSheet(); st.tab = 'plan'; render(); window.scrollTo(0, 0); toast('Plan angelegt und aktiv');
+    },
+    dayEdit(t) { openSheet({ type: 'dayEdit', d: +t.dataset.d }); },
+    dayAdd() {
+      const p = plan(); const used = new Set(p.days.map(d => d.name)); let k = 0; while (used.has('Tag ' + 'ABCDEFGHIJ'[k]) && k < 9) k++;
+      keepNext(p => p.days.push({ id: 'd' + uid(), key: 'C', name: 'Tag ' + 'ABCDEFGHIJ'[k], focus: 'full', slots: [] }));
+      render(); openSheet({ type: 'dayEdit', d: p.days.length - 1, fresh: true });
+    },
+    dayMove(t) { const s = st.sheet; const j = s.d + +t.dataset.dir; const p = plan(); if (j < 0 || j >= p.days.length) return; keepNext(p => { [p.days[s.d], p.days[j]] = [p.days[j], p.days[s.d]]; }); s.d = j; renderSheet(); render(); },
+    dayDup() { const s = st.sheet; const p = plan(); const nd = clone(p.days[s.d]); nd.id = 'd' + uid(); nd.name += ' (Kopie)'; for (const sl of nd.slots) { sl.id = 's' + uid(); delete sl.ss; } keepNext(p => p.days.splice(s.d + 1, 0, nd)); closeSheet(); render(); toast('Tag kopiert'); },
+    dayDel() { st.sheet.confirm = true; renderSheet(); },
+    dayDelYes() { const s = st.sheet; if (plan().days.length < 2) return; keepNext(p => p.days.splice(s.d, 1)); closeSheet(); render(); toast('Tag gelöscht'); },
+    slotStep(t) {
+      const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const k = t.dataset.k; const d = +t.dataset.d; const loc = st.planLoc || defLoc();
+      if (k === 'sets') sl.sets = Math.max(1, Math.min(10, (sl.sets || 3) + d));
+      else if (k === 'rest') sl.rest = Math.max(15, Math.min(600, (sl.rest || 90) + d));
+      else { const ex = getEx(sl.ex[loc]); const cur = sl.custRR || (ex ? E.prescription(sl, ex, P(), plan()).rr : sl.rr) || [8, 12]; const rr = [...cur]; const i = k === 'lo' ? 0 : 1; rr[i] = Math.max(1, rr[i] + d); if (rr[0] > rr[1]) rr[i ? 0 : 1] = rr[i]; sl.custRR = rr; }
+      touchPlan(); Store.saveProfile(); renderSheet(); render();
+    },
+    slotRole(t) {
+      const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const r = t.dataset.r; if (sl.r === r) return; const goal = plan().goal;
+      if (sl.rest === E.defaultRest(sl.r, goal)) sl.rest = E.defaultRest(r, goal);
+      sl.r = r; sl.rr = (E.goalRanges(goal) || {})[r] || null; touchPlan(); Store.saveProfile(); renderSheet(); render();
     },
     homeLoc(t) { st.homeLoc = t.dataset.l; render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
     planLoc(t) { st.planLoc = t.dataset.l; render(); },
-    startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; } openSheet({ type: 'time', d: +t.dataset.d, l: t.dataset.l }); },
+    startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; }
+      const d0 = plan().days[+t.dataset.d]; if (!d0 || !d0.slots.some(s => s.ex[t.dataset.l])) { st.tab = 'plan'; render(); toast('Füge diesem Tag zuerst Übungen hinzu'); return; }
+      openSheet({ type: 'time', d: +t.dataset.d, l: t.dataset.l }); },
     timePick(t) { const d = st.sheet.d, l = st.sheet.l; closeSheet(); startWorkout(d, l, +t.dataset.delta); },
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
@@ -1446,18 +1602,19 @@
     },
     cxUseBuiltin(t) { const r = st.sheet.ret; applyPick(r, t.dataset.id); },
     addToWorkout(t) { addToWorkout(t.dataset.id); },
-    balanceNow() { const ch = E.balancePlan(plan(), P()); Store.saveProfile(); render(); openSheet({ type: 'balanceInfo', ch }); },
+    balanceApply() { const cp = st.sheet.preview; if (!cp) return; plan().days = cp.days; Store.saveProfile(true); closeSheet(); render(); toast('Plan ausbalanciert'); },
+    balanceNow() { if (!autoPlan(plan())) { const cp = clone(plan()); const ch = E.balancePlan(cp, P()); openSheet({ type: 'balanceInfo', ch, preview: cp }); return; } const ch = E.balancePlan(plan(), P()); Store.saveProfile(); render(); openSheet({ type: 'balanceInfo', ch }); },
     freeAdd(t) { addToWorkout(t.dataset.id); const e = st.active.exercises[st.active.exercises.length - 1]; if (e) { e.extraEx = true; Store.saveActive(); } toast('Hinzugefügt – viel Spaß!'); },
     addToPlanAsk(t) { openSheet({ type: 'addToPlan', id: t.dataset.id }); },
     addToPlanDo(t) { addToPlan(+t.dataset.d, t.dataset.id); },
     slotSheet(t) { openSheet({ type: 'slot', d: +t.dataset.d, s: +t.dataset.s }); },
-    slotSwap(t) { const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); const alts = E.alternatives(sl, loc, P(), []); const a = alts.find(x => x.ex.id === t.dataset.id); sl.ex[loc] = t.dataset.id; sl.why[loc] = a ? a.reasons : []; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); if (getEx(t.dataset.id).pat !== sl.p[0] && !sl.p.includes(getEx(t.dataset.id).pat)) sl.p = [getEx(t.dataset.id).pat, ...sl.p]; Store.saveProfile(); st.sheet.keepScroll = false; renderSheet(); render(); toast('Getauscht: ' + getEx(t.dataset.id).name); },
-    slotMove(t) { const s = st.sheet; const d = plan().days[s.d]; const j = s.s + +t.dataset.dir; if (j < 0 || j >= d.slots.length) return; [d.slots[s.s], d.slots[j]] = [d.slots[j], d.slots[s.s]]; s.s = j; Store.saveProfile(); renderSheet(); render(); },
+    slotSwap(t) { const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); const alts = E.alternatives(sl, loc, P(), []); const a = alts.find(x => x.ex.id === t.dataset.id); sl.ex[loc] = t.dataset.id; sl.why[loc] = a ? a.reasons : []; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); if (getEx(t.dataset.id).pat !== sl.p[0] && !sl.p.includes(getEx(t.dataset.id).pat)) sl.p = [getEx(t.dataset.id).pat, ...sl.p]; touchPlan(); Store.saveProfile(); st.sheet.keepScroll = false; renderSheet(); render(); toast('Getauscht: ' + getEx(t.dataset.id).name); },
+    slotMove(t) { const s = st.sheet; const d = plan().days[s.d]; const j = s.s + +t.dataset.dir; if (j < 0 || j >= d.slots.length) return; [d.slots[s.s], d.slots[j]] = [d.slots[j], d.slots[s.s]]; s.s = j; touchPlan(); Store.saveProfile(); renderSheet(); render(); },
     slotDel() { st.sheet.confirm = true; renderSheet(); },
-    slotDelYes() { const s = st.sheet; plan().days[s.d].slots.splice(s.s, 1); Store.saveProfile(); closeSheet(); render(); },
+    slotDelYes() { const s = st.sheet; plan().days[s.d].slots.splice(s.s, 1); touchPlan(); Store.saveProfile(); closeSheet(); render(); },
     deloadToggle() { const p = plan(); p.forceDeload = !p.forceDeload; if (!p.forceDeload) p.meso.start = E.todayISO(); Store.saveProfile(); render(); toast(p.forceDeload ? 'Deload aktiv: halbe Sätze, mehr Reserve' : 'Neuer Zyklus startet mit Woche 1'); },
     rebuildAsk() { openSheet({ type: 'rebuild' }); },
-    rebuildYes() { Backup.snapshot('vor-plan'); const old = plan(); const np = E.buildPlan(P()); np.meso = old.meso; np.next = 0; P().plan = np; Store.saveProfile(true); closeSheet(); render(); toast('Plan neu berechnet'); },
+    rebuildYes() { Backup.snapshot('vor-plan'); const old = plan(); const np = E.buildPlan(P()); np.meso = clone(old.meso); np.next = 0; np.name = np.splitName; if (old.name && !/\(vorher\)$/.test(old.name)) old.name += ' (vorher)'; addPlan(np, true); closeSheet(); render(); toast('Neuer Plan aktiv – der alte bleibt unter „Pläne“'); },
     progSeg(t) { st.progSeg = t.dataset.k; render(); },
     chartTip(t) { const el = $('#chartTip', t.closest('.card, .sheet')) || $('#chartTip'); if (el) el.textContent = t.dataset.t; },
     wDetail(t) { openSheet({ type: 'wDetail', id: t.dataset.id }); },
@@ -1509,7 +1666,7 @@
       if (s.mode === 'workout') { addToWorkout(id); return; }
       if (s.mode === 'swapWorkout') { doSwapWorkout(s.i, id, !!s.plan); return; }
       if (s.mode === 'plan') { addToPlan(s.d, id); return; }
-      if (s.mode === 'slot') { const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); sl.ex[loc] = id; sl.why[loc] = ['Von dir gewählt']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' im Plan'); }
+      if (s.mode === 'slot') { const sl = plan().days[s.d].slots[s.s]; const loc = st.planLoc || defLoc(); sl.ex[loc] = id; sl.why[loc] = ['Von dir gewählt']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); touchPlan(); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' im Plan'); }
     }
   function addToWorkout(id) {
     if (!st.active) return;
@@ -1518,17 +1675,21 @@
     toFocus();
   }
   function addToPlan(di, id) {
-    const ex = getEx(id); const day = plan().days[di]; const r = roleOfEx(ex);
-    const sl = { id: 's' + uid(), p: [ex.pat], r, sets: r === 'iso' ? 3 : 3, rest: r === 'sec' ? 120 : r === 'iso' ? 75 : r === 'skill' ? 120 : 60, rr: null, ex: {}, why: {}, locked: {} };
-    for (const l of locs()) { sl.ex[l] = id; sl.why[l] = ['Von dir hinzugefügt']; sl.locked[l] = true; }
-    day.slots.push(sl); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' zu ' + day.name + ' hinzugefügt');
+    const ex = getEx(id); const p = plan(); const day = p.days[di]; const r = roleOfEx(ex);
+    const sl = { id: 's' + uid(), p: [ex.pat], r, sets: 3, rest: E.defaultRest(r, p.goal), rr: (E.goalRanges(p.goal) || {})[r] || null, ex: {}, why: {}, locked: {} };
+    for (const l of (p.locs || locs())) {
+      if (E.available(ex, E.locEquip(P(), l)) || l === (st.planLoc || defLoc())) { sl.ex[l] = id; sl.why[l] = ['Von dir hinzugefügt']; }
+      else { const alt = E.alternatives(sl, l, P(), day.slots.map(x => x.ex[l]))[0]; if (alt) { sl.ex[l] = alt.ex.id; sl.why[l] = ['Ersatz für ' + ex.name]; } }
+      sl.locked[l] = true;
+    }
+    day.slots.push(sl); touchPlan(); Store.saveProfile(); closeSheet(); render(); toast(ex.name + ' zu ' + day.name + ' hinzugefügt');
   }
   function doSwapWorkout(i, id, alsoPlan) {
     const e = st.active.exercises[i]; const ex = getEx(id);
     const slot = findSlot(e);
     if (e.sets.some(s => s.done)) { const n = newEntry(id, slot); const nd = e.sets.filter(s => s.done).length; e.closed = true; n.extra = -nd; st.active.exercises.splice(i + 1, 0, n); st.active.cur = i + 1; }
     else { e.exId = id; e.presc = E.prescription(slot, ex, P(), plan()); e.draft = null; }
-    if (alsoPlan && slot) { slot.ex[st.active.loc] = id; slot.why[st.active.loc] = ['Von dir gewählt']; slot.locked = Object.assign({}, slot.locked, { [st.active.loc]: true }); Store.saveProfile(); }
+    if (alsoPlan && slot) { slot.ex[st.active.loc] = id; slot.why[st.active.loc] = ['Von dir gewählt']; slot.locked = Object.assign({}, slot.locked, { [st.active.loc]: true }); touchPlan(); Store.saveProfile(); }
     Store.saveActive(); closeSheet(); renderOverlay(); toast('Getauscht: ' + ex.name);
   }
   // Export: Konto-Download (Artifact) → Teilen-Menü (iPhone: „In Dateien sichern“) → Download → Zwischenablage
@@ -1611,7 +1772,10 @@
     draft(t) { const e = st.active.exercises[+t.dataset.i]; e.draft = Object.assign({}, e.draft, { [t.dataset.f]: num(t.value) }); Store.saveActive(); },
     rirVal(t) { st.sheet.vals[t.dataset.f] = num(t.value); },
     editSet(t) { const s = st.sheet; const entry = st.active.exercises[s.i]; const set = entry.sets.filter(x => x.done)[s.s]; set[t.dataset.k] = num(t.value) ?? 0; },
-    slot(t) { const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const v = num(t.value); if (v == null) return; const k = t.dataset.k;
+    planName(t) { const x = (P().plans || []).find(p => p.id === t.dataset.id); if (x) { x.name = t.value; Store.saveProfile(); later('plR', 400, () => { if (!st.ov) render(); }); } },
+    pnName(t) { st.sheet.name = t.value; },
+    dayName(t) { const d = plan().days[st.sheet.d]; if (d) { d.name = t.value; touchPlan(); Store.saveProfile(); later('dnR', 400, () => { if (!st.ov) render(); }); } },
+    slot(t) { const s = st.sheet; const sl = plan().days[s.d].slots[s.s]; const v = num(t.value); if (v == null) return; const k = t.dataset.k; touchPlan();
       if (k === 'sets') sl.sets = Math.max(1, Math.min(10, Math.round(v))); else if (k === 'rest') sl.rest = Math.max(15, Math.min(600, Math.round(v)));
       else { const ex = getEx(sl.ex[st.planLoc || defLoc()]); const cur = sl.custRR || E.prescription(sl, ex, P(), plan()).rr; const rr = [...cur]; rr[k === 'lo' ? 0 : 1] = Math.max(1, Math.round(v)); if (rr[1] >= rr[0]) sl.custRR = rr; }
       Store.saveProfile(); render(); },
@@ -1665,7 +1829,7 @@
       const [m] = a.exercises.splice(L.s, 1); a.exercises.splice(L.to, 0, m);
       if (curKey) a.cur = a.exercises.findIndex(e => e.key === curKey);
       Store.saveActive(); toast('Reihenfolge geändert');
-    } else if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); Store.saveProfile(); toast('Reihenfolge geändert'); }
+    } else if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); touchPlan(); Store.saveProfile(); toast('Reihenfolge geändert'); }
     render();
   }
   document.addEventListener('touchstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (el && !st.sheet) lpStart(el, e.touches[0].clientY); }, { passive: true });
@@ -1726,15 +1890,17 @@
   /* ================= Start ================= */
   (async function boot() {
     await Store.init();
+    normalizePlans();
     if (!LS.get('meta')) LS.set('meta', { schema: 1 });
     registerCustom();
     if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }
-    let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal) { Backup.snapshot('vor-update'); balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
+    let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal && autoPlan(st.profile.plan)) { Backup.snapshot('vor-update'); balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
     const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
+    if (st.profile && st.profile.plan && !autoPlan(st.profile.plan) && (st.profile.plan.v || 1) < E.PLAN_VERSION) { st.profile.plan.v = E.PLAN_VERSION; Store.saveProfile(true); }
     if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) { Backup.snapshot('vor-update');
-      const old = st.profile.plan; const np = E.buildPlan(st.profile);
+      const old = st.profile.plan; const np = E.buildPlan(st.profile); np.id = old.id; np.name = old.name;
       np.meso = old.meso || np.meso; np.next = (old.next || 0) % np.days.length; np.forceDeload = old.forceDeload;
-      st.profile.plan = np; Store.saveProfile(true);
+      st.profile.plan = np; normalizePlans(); Store.saveProfile(true);
       setTimeout(() => toast('Plan aktualisiert: jetzt 5–7 Übungen pro Einheit', 4000), 400);
     }
     restoreTimers();
