@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.5.0';
+  const APP_VERSION = '3.6.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -299,7 +299,7 @@
 
   /* ================= Rendering ================= */
   function render() {
-    document.documentElement.dataset.font = settings().font === 'classic' ? 'classic' : 'hand';
+    const fo = settings().font; document.documentElement.dataset.font = fo === 'classic' || fo === 'hand' ? fo : 'system';
     const app = $('#app');
     // Bei offenem Training/Fragebogen die Seite dahinter nicht neu bauen (spart Zeit nach jedem Satz)
     if (st.ov) { st.appDirty = true; renderLayer(); return; }
@@ -414,7 +414,7 @@
           <div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Heute dran'}</div>
           <div><h2 class="xl">${esc(day.name)}</h2><div class="small" style="font-weight:800;margin-top:4px;opacity:.75">${esc(dayFocus(day, loc))} · ${estMinutes(day, loc)} min</div></div>
           ${locs().length > 1 ? `<div class="seg onlight" style="max-width:220px">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-          <button class="btn dark" data-a="startWorkout" data-d="${di}" data-l="${loc}" style="align-self:flex-start;padding-right:10px">${slots.length} Übungen starten <span style="display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--lime);color:var(--on-light)">${I.arrow}</span></button>
+          <button class="btn dark" data-a="startWorkout" data-d="${di}" data-l="${loc}" style="align-self:flex-start;padding-right:10px;white-space:nowrap">${slots.length} Übungen starten <span style="display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--lime);color:var(--on-light)">${I.arrow}</span></button>
         </div>
         <svg class="ringnum" width="54" height="54" viewBox="0 0 54 54" style="position:absolute;top:14px;right:14px;z-index:3" aria-label="Woche ${pct} Prozent"><circle cx="27" cy="27" r="${R}" fill="none" stroke="rgba(20,20,22,.15)" stroke-width="5"/><circle cx="27" cy="27" r="${R}" fill="none" stroke="#141416" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 27 27)"/><text x="27" y="31" text-anchor="middle" style="font:800 12px var(--display);fill:#141416">${pct}%</text></svg>
         <div class="figdark" style="position:absolute;right:-8px;bottom:-10px;width:50%;z-index:1">${figSVG(hx, { anim: 2.8 })}</div>
@@ -475,7 +475,7 @@
     <div class="stack">
       <div class="card lime rings-bg stack">
         <b style="font-size:19px">${esc(p.name || p.splitName)}</b>
-        <div class="row wrap" style="gap:6px"><span class="tag">${p.custom ? 'Eigener Plan' : esc(p.splitName)}</span><span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
+        <div class="row wrap" style="gap:6px">${p.custom ? '<span class="tag">Eigener Plan</span>' : (p.name || '') !== p.splitName ? `<span class="tag">${esc(p.splitName)}</span>` : ''}<span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
         <div class="row between"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
         <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
         <div class="meter"><i style="width:${wi.w / wi.len * 100}%"></i></div>
@@ -521,7 +521,10 @@
     if (key !== st.libKey) { st.libKey = key; st.libMax = 40; }
     const max = st.libMax || 40;
     return `<div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
-      ${list.length ? `<div class="exgrid">${list.slice(0, max).map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}${isFav(ex.id) ? '<span class="star">★</span>' : ''}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>${list.length > max ? `<button class="btn" data-a="libMore">Mehr anzeigen (${list.length - max} weitere)</button>` : ''}` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}`;
+      ${list.length ? `${(() => { // nach Kategorie gruppiert, mit Überschrift
+        const groups = []; for (const ex of list.slice(0, max)) { const g = groups[groups.length - 1]; if (g && g.pat === ex.pat) g.items.push(ex); else groups.push({ pat: ex.pat, items: [ex] }); }
+        const tile = ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}${isFav(ex.id) ? '<span class="star">★</span>' : ''}</div><span>${esc(ex.name)}</span>${ex.lvl ? `<small class="lvldots" aria-label="Schwierigkeit ${ex.lvl} von 5">${'●'.repeat(ex.lvl)}<i>${'●'.repeat(5 - ex.lvl)}</i></small>` : ''}</button>`;
+        return groups.map(g => `<div class="grouphead">${esc(D.PATTERNS[g.pat] || g.pat)}<span>${list.filter(x => x.pat === g.pat).length}</span></div><div class="exgrid">${g.items.map(tile).join('')}</div>`).join(''); })()}${list.length > max ? `<button class="btn" data-a="libMore">Mehr anzeigen (${list.length - max} weitere)</button>` : ''}` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}`;
   }
   function libView() {
     const F = st.libF || {};
@@ -1400,7 +1403,7 @@
       const se = settings();
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
       return `<div class="stack"><h2>Einstellungen</h2>
-        <div class="card stack" style="gap:10px"><b>Schrift</b><div class="seg">${[['hand', 'Handschrift'], ['classic', 'Klassisch']].map(([k, n]) => `<button data-a="setFont" data-k="${k}" aria-pressed="${(se.font === 'classic' ? 'classic' : 'hand') === k}">${n}</button>`).join('')}</div></div>
+        <div class="card stack" style="gap:10px"><b>Schrift</b><div class="seg">${[['system', 'Standard'], ['hand', 'Handschrift'], ['classic', 'Technisch']].map(([k, n]) => `<button data-a="setFont" data-k="${k}" aria-pressed="${(['hand', 'classic'].includes(se.font) ? se.font : 'system') === k}">${n}</button>`).join('')}</div></div>
         <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve – antippen der Satznummer korrigiert')}${tog('sound', 'Töne', 'Auf dem iPhone nur, wenn der Stumm-Schalter aus ist')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden. Im Training bleibt der Bildschirm deshalb an.</div>
         <div class="card stack" style="gap:8px"><b>Spiel- und Trainingstage (z. B. Baseball)</b><div class="small muted">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div><div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div></div>
@@ -2002,6 +2005,8 @@
   (async function boot() {
     await Store.init();
     E.setWorkouts(() => st.workouts);
+    // 3.6: neue Standardschrift (System) – alte Handschrift-Voreinstellung einmalig umstellen, wählbar bleibt sie
+    if (st.profile && st.profile.settings && st.profile.settings.font === 'hand' && !(st.profile.seen || {}).sysfont) { delete st.profile.settings.font; st.profile.seen = Object.assign({}, st.profile.seen, { sysfont: true }); Store.saveProfile(); }
     normalizePlans();
     // Pausen bei Isolationsübungen 75 → 90 s (nur unveränderte empfohlene Pläne)
     for (const pl of (st.profile && st.profile.plans) || []) if ((pl.restV || 1) < 2) { if (autoPlan(pl)) for (const d of pl.days) for (const sl of d.slots) if (sl.r === 'iso' && sl.rest === 75) sl.rest = 90; pl.restV = 2; Store.saveProfile(); }

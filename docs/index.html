@@ -17,8 +17,8 @@
   --accent:var(--lime); --accent-ink:var(--on-light); --accent-soft:rgba(220,242,126,.12);
   --good:#9BE37B; --warn:#F6C85F; --bad:#FF7A8A;
   --r-main:#DCF27E; --r-sec:#B7A5F7; --r-iso:#7FD6E8; --r-skill:#F5A3C7; --r-core:#F6C85F; --r-cond:#FF9C73;
-  --display:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif;
-  --body:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif;
+  --display:-apple-system,"SF Pro Display",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --body:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --r:28px; --tabh:72px;
 }
 *{box-sizing:border-box}
@@ -28,8 +28,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .12s}
 button:active{transform:scale(.97)}
 :focus-visible{outline:2px solid var(--lime);outline-offset:2px}
-h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.1;margin:0;text-wrap:balance;letter-spacing:.01em}
-h1{font-size:28px} h2{font-size:22px} h3{font-size:18px;font-weight:600}
+h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.015em}
+h1{font-size:32px;font-weight:800;letter-spacing:-.025em} h2{font-size:21px} h3{font-size:17px;font-weight:650}
+/* Standard: Systemschrift (SF Pro auf dem iPhone) – ruhig und gut lesbar */
+:root[data-font="system"] body{font-size:15.5px;font-weight:500}
+:root[data-font="system"] .toptabs button{font-size:13px;letter-spacing:.05em}
+:root[data-font="system"] .stage .over h2{font-size:21px}
+:root[data-font="system"] .eyebrow{text-transform:uppercase;font-size:11.5px;letter-spacing:.07em;font-weight:700}
+:root[data-font="system"] .target b{font-size:32px;font-weight:800;letter-spacing:-.02em}
+:root[data-font="system"] .panel .big{font-weight:800;letter-spacing:-.03em}
+:root[data-font="hand"]{--display:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif;--body:"Mouse Memoirs","Arial Narrow",-apple-system,system-ui,sans-serif}
 .num{font-family:var(--display);font-variant-numeric:tabular-nums}
 .eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
 .muted{color:var(--muted)} .ink2{color:var(--ink2)} .small{font-size:13.5px} .tiny{font-size:12px}
@@ -48,10 +56,11 @@ h1{font-size:28px} h2{font-size:22px} h3{font-size:18px;font-weight:600}
 /* Schwebende Navigation mit runden Knöpfen */
 .tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:20;background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);border:1px solid var(--line);border-radius:999px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
 .tabs nav{display:flex;gap:6px;padding:7px}
-.tabs button{width:56px;height:56px;border-radius:50%;border:0;background:var(--surface2);display:grid;place-items:center;color:var(--ink2)}
+.tabs button{width:64px;height:56px;border-radius:20px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted)}
 .tabs button svg{width:22px;height:22px}
-.tabs button[aria-current="page"]{background:var(--lav);color:var(--on-light)}
-.tabs button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.tabs button[aria-current="page"]{background:var(--surface2);color:var(--lime)}
+.tabs button span{font-size:10.5px;font-weight:700;letter-spacing:.01em;font-family:var(--body)}
+:root[data-font="hand"] .tabs button span{font-size:14px}
 
 .card{background:var(--surface);border-radius:var(--r);padding:18px}
 .card.flat{background:var(--surface2)}
@@ -153,6 +162,10 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .extile .tile{aspect-ratio:1;width:100%;display:grid;place-items:center;padding:6px}
 .extile span{font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .extile.off .tile{opacity:.45}
+.extile .lvldots{font-size:7px;letter-spacing:2px;color:var(--lime);line-height:1}
+.extile .lvldots i{font-style:normal;color:var(--surface2)}
+.grouphead{display:flex;justify-content:space-between;align-items:baseline;margin:14px 2px 2px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.grouphead span{color:var(--muted);font-weight:700}
 .extile .tile{position:relative}
 .extile .star{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;background:var(--lime);color:var(--on-light);display:grid;place-items:center;font-size:14px;line-height:1}
 .favbtn{position:absolute;top:14px;right:14px;z-index:3;width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.1);color:var(--ink2);font-size:24px;line-height:1;display:grid;place-items:center}
@@ -181,12 +194,14 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 @media (prefers-reduced-motion:reduce){.fig animate,.fig animateTransform{display:none}}
 
 /* Training */
-.stage{position:relative;background:#1E1E22;border-radius:32px;overflow:hidden;aspect-ratio:1/0.9}
-.stage .fig{position:absolute;left:6%;bottom:0;width:70%;height:70%}
-.stage .over{position:absolute;left:18px;top:16px;right:84px}
-.stage .over h2{font-size:24px}
-.setpill{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:#fff;border-radius:999px;padding:10px 8px;display:flex;flex-direction:column;gap:5px;align-items:center}
-.setpill i{display:block;width:26px;height:8px;border-radius:99px;background:rgba(183,165,247,.35)}
+/* Kompakte Übungs-Bühne: Name links, Figur rechts – Empfehlung bleibt ohne Scrollen sichtbar */
+.stage{position:relative;background:var(--surface);border-radius:26px;overflow:hidden;height:168px}
+.stage .fig{position:absolute;right:2%;bottom:0;width:44%;height:96%}
+.stage .over{position:absolute;left:18px;top:16px;right:46%}
+.stage .over h2{font-size:23px;line-height:1.15}
+.setpill{position:absolute;left:18px;bottom:16px;background:var(--surface2);border-radius:999px;padding:7px 12px;display:flex;flex-direction:row;gap:5px;align-items:center}
+.setpill b{color:var(--ink)!important;margin-left:4px}
+.setpill i{display:block;width:16px;height:8px;border-radius:99px;background:rgba(183,165,247,.35)}
 .setpill i.on{background:var(--violet)}
 .setpill i.cur{background:var(--lime2)}
 .setpill b{font:700 11px var(--display);color:var(--on-light)}
@@ -285,6 +300,8 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .toast{display:flex;align-items:center;gap:12px}
 .toast .tbtn{border:0;background:var(--on-light);color:#fff;border-radius:999px;padding:9px 14px;min-height:40px;font-weight:800;white-space:nowrap}
 .qadj{display:flex;gap:10px;margin:8px 0 2px}
+.qadj .mini button{background:var(--on-light);color:#fff;font-size:26px;font-weight:600;line-height:1}
+.qadj .mini b{color:var(--on-light)}
 .qadj>div{flex:1;min-width:0}
 .qadj small{display:block;font-size:12px;font-weight:700;opacity:.65;margin-bottom:3px}
 .qadj .mini b{text-align:center;font-size:24px;font-weight:800}
@@ -305,39 +322,39 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 @media (max-width:380px){ h1{font-size:25px} .xl{font-size:26px} .tabs button{width:50px;height:50px} .bar{grid-template-columns:88px 1fr 38px} .sets input{min-height:40px;font-size:17px} .panel .big{font-size:38px} .cal .n{width:36px;height:36px} }
 
 /* Handschrift (Standard): schmale Display-Schrift überall, größer gesetzt, ohne künstliches Fett */
-:root:not([data-font="classic"]) body{font-size:20px;letter-spacing:.025em;line-height:1.3}
-:root:not([data-font="classic"]) *{font-synthesis:none;font-weight:400!important}
-:root:not([data-font="classic"]) h1{font-size:40px}
-:root:not([data-font="classic"]) h2{font-size:30px}
-:root:not([data-font="classic"]) h3{font-size:24px}
-:root:not([data-font="classic"]) .xl{font-size:44px}
-:root:not([data-font="classic"]) .small{font-size:18px}
-:root:not([data-font="classic"]) .tiny{font-size:16px}
-:root:not([data-font="classic"]) .eyebrow{font-size:16px;letter-spacing:.08em}
-:root:not([data-font="classic"]) .btn{font-size:20px}
-:root:not([data-font="classic"]) .btn.big{font-size:24px}
-:root:not([data-font="classic"]) .btn.sm{font-size:17px}
-:root:not([data-font="classic"]) .chip,:root:not([data-font="classic"]) .seg button{font-size:18px}
-:root:not([data-font="classic"]) .tag{font-size:16px}
-:root:not([data-font="classic"]) .toptabs button{font-size:20px}
-:root:not([data-font="classic"]) input.field,:root:not([data-font="classic"]) .search input,:root:not([data-font="classic"]) textarea.field{font-size:21px}
-:root:not([data-font="classic"]) .sets input,:root:not([data-font="classic"]) .num{font-size:inherit}
-:root:not([data-font="classic"]) .sets input{font-size:24px}
-:root:not([data-font="classic"]) .sets th{font-size:15px}
-:root:not([data-font="classic"]) .target b{font-size:40px}
-:root:not([data-font="classic"]) .panel .big{font-size:58px}
-:root:not([data-font="classic"]) .bigtimer{font-size:110px}
-:root:not([data-font="classic"]) .kpi b{font-size:34px}
-:root:not([data-font="classic"]) .extile span{font-size:17px}
-:root:not([data-font="classic"]) .opt small{font-size:17px}
-:root:not([data-font="classic"]) .cal .n{font-size:22px}
-:root:not([data-font="classic"]) .chart text{font-size:14px}
-:root:not([data-font="classic"]) .panel .cols small{font-size:17px}
-:root:not([data-font="classic"]) .panel .cols .v{font-size:26px}
-:root:not([data-font="classic"]) .setpill b,:root:not([data-font="classic"]) .minbadge small,:root:not([data-font="classic"]) .rirgrid button span,:root:not([data-font="classic"]) .badge span,:root:not([data-font="classic"]) .kpi span,:root:not([data-font="classic"]) .cal .d,:root:not([data-font="classic"]) .lbl{font-size:16px}
-:root:not([data-font="classic"]) .minbadge{font-size:24px}
-:root:not([data-font="classic"]) .badge b{font-size:18px}
-:root:not([data-font="classic"]) .rirgrid button b{font-size:36px}
+:root[data-font="hand"] body{font-size:20px;letter-spacing:.025em;line-height:1.3}
+:root[data-font="hand"] *{font-synthesis:none;font-weight:400!important}
+:root[data-font="hand"] h1{font-size:40px}
+:root[data-font="hand"] h2{font-size:30px}
+:root[data-font="hand"] h3{font-size:24px}
+:root[data-font="hand"] .xl{font-size:44px}
+:root[data-font="hand"] .small{font-size:18px}
+:root[data-font="hand"] .tiny{font-size:16px}
+:root[data-font="hand"] .eyebrow{font-size:16px;letter-spacing:.08em}
+:root[data-font="hand"] .btn{font-size:20px}
+:root[data-font="hand"] .btn.big{font-size:24px}
+:root[data-font="hand"] .btn.sm{font-size:17px}
+:root[data-font="hand"] .chip,:root[data-font="hand"] .seg button{font-size:18px}
+:root[data-font="hand"] .tag{font-size:16px}
+:root[data-font="hand"] .toptabs button{font-size:20px}
+:root[data-font="hand"] input.field,:root[data-font="hand"] .search input,:root[data-font="hand"] textarea.field{font-size:21px}
+:root[data-font="hand"] .sets input,:root[data-font="hand"] .num{font-size:inherit}
+:root[data-font="hand"] .sets input{font-size:24px}
+:root[data-font="hand"] .sets th{font-size:15px}
+:root[data-font="hand"] .target b{font-size:40px}
+:root[data-font="hand"] .panel .big{font-size:58px}
+:root[data-font="hand"] .bigtimer{font-size:110px}
+:root[data-font="hand"] .kpi b{font-size:34px}
+:root[data-font="hand"] .extile span{font-size:17px}
+:root[data-font="hand"] .opt small{font-size:17px}
+:root[data-font="hand"] .cal .n{font-size:22px}
+:root[data-font="hand"] .chart text{font-size:14px}
+:root[data-font="hand"] .panel .cols small{font-size:17px}
+:root[data-font="hand"] .panel .cols .v{font-size:26px}
+:root[data-font="hand"] .setpill b,:root[data-font="hand"] .minbadge small,:root[data-font="hand"] .rirgrid button span,:root[data-font="hand"] .badge span,:root[data-font="hand"] .kpi span,:root[data-font="hand"] .cal .d,:root[data-font="hand"] .lbl{font-size:16px}
+:root[data-font="hand"] .minbadge{font-size:24px}
+:root[data-font="hand"] .badge b{font-size:18px}
+:root[data-font="hand"] .rirgrid button b{font-size:36px}
 :root[data-font="classic"]{--display:"Oxanium","Arial Rounded MT Bold",-apple-system,system-ui,sans-serif;--body:"Manrope",-apple-system,"SF Pro Text",system-ui,sans-serif}
 .howsec{display:flex;flex-direction:column;gap:8px}.howh{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .howsteps{list-style:none;margin:0;padding:0;counter-reset:hs;display:flex;flex-direction:column;gap:8px}.howsteps li{counter-increment:hs;display:flex;gap:10px;align-items:flex-start;line-height:1.35}

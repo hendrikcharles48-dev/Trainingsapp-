@@ -82,6 +82,10 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
 - Im Training: Plus/Minus für Gewicht/Wdh. (`qAdj`), Reserve-Fenster oder „Schnell abhaken“, „Rückgängig“ im Hinweis
   (`toast(msg, ms, {a, l})`, `undoSet`), „Später“ (`exLater`), seltene Knöpfe im „⋯ Mehr“-Fenster (`exMenu`).
 - Texte kurz, deutsch, ohne Fachwörter.
+- Schrift: Standard ist die Systemschrift (SF Pro, `data-font="system"`); „Handschrift“ (`hand`) und „Technisch“ (`classic`)
+  sind wählbar (`settings.font`). Handschrift-Regeln in `index.html` nur unter `:root[data-font="hand"]`.
+- Navigation unten mit Symbol + Beschriftung; Übungsliste nach Kategorie gruppiert (`.grouphead`) mit Schwierigkeitspunkten;
+  Trainings-Bühne kompakt (Name links, Figur rechts, 168 px hoch), damit die Empfehlung ohne Scrollen sichtbar ist.
 
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
 
@@ -112,6 +116,8 @@ Wo die eigenen Übungen zu finden sind:
   (Artifact https://claude.ai/artifact/9rhKGs5pYvdeqRx7ymim9L).
 - Wenn nichts davon vorliegt: den Nutzer kurz fragen, ob er neue Übungen angelegt hat.
 
+Übungsbestand: 248 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
+neue Figuren nutzen vorhandene Vorlagen). Prüfen: jede Übung braucht Eintrag in allen drei Dateien.
 Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`).
 Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
 
