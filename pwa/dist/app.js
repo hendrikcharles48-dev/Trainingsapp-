@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.1.0';
+  const APP_VERSION = '3.2.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -40,8 +40,47 @@
 
   /* ================= Speicher ================= */
   const LS = {
-    get(k) { try { const v = localStorage.getItem('satzwerk.' + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
-    set(k, v) { try { localStorage.setItem('satzwerk.' + k, JSON.stringify(v)); } catch (e) { } }
+    // Kaputter Inhalt wird nie stillschweigend überschrieben: Rohtext nach satzwerk.corrupt.<k> retten
+    get(k) {
+      let v = null; try { v = localStorage.getItem('satzwerk.' + k); } catch (e) { return null; }
+      if (!v) return null;
+      try { return JSON.parse(v); } catch (e) { try { localStorage.setItem('satzwerk.corrupt.' + k, v); } catch (e2) { } st.corrupt = true; return null; }
+    },
+    set(k, v) {
+      try { localStorage.setItem('satzwerk.' + k, JSON.stringify(v)); if (st.saveErr) { st.saveErr = false; renderSaveErr(); } return true; }
+      catch (e) { if (!st.saveErr) { st.saveErr = true; renderSaveErr(); } return false; }
+    }
+  };
+  /* ================= Sicherungen (IndexedDB „satzwerk“, Speicher „snap“) ================= */
+  const SNAP_LBL = { training: 'Nach Training', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
+  const Backup = {
+    p: null,
+    open() {
+      if (!this.p) {
+        this.p = new Promise((res, rej) => {
+          if (!window.indexedDB) return rej(new Error('kein IndexedDB'));
+          const r = indexedDB.open('satzwerk', 1);
+          r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('snap')) r.result.createObjectStore('snap', { keyPath: 'id' }); };
+          r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+        });
+        this.p.catch(() => { this.p = null; });
+      }
+      return this.p;
+    },
+    req(mode, fn) { return this.open().then(db => new Promise((res, rej) => { const t = db.transaction('snap', mode); const r = fn(t.objectStore('snap')); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); })); },
+    async list() { try { return ((await this.req('readonly', s => s.getAll())) || []).sort((a, b) => b.id - a.id); } catch (e) { return []; } },
+    async get(id) { try { return await this.req('readonly', s => s.get(id)); } catch (e) { return null; } },
+    // Kopie wird sofort (synchron) gezogen, gespeichert wird danach im Hintergrund
+    snapshot(reason) {
+      if (!st.profile && !st.workouts.length) return Promise.resolve();
+      const rec = { id: Date.now() + Math.random(), ts: Date.now(), reason, version: APP_VERSION, profile: clone(st.profile), workouts: clone(st.workouts), active: clone(st.active) };
+      return this.req('readwrite', s => s.put(rec)).then(() => this.prune()).catch(() => { });
+    },
+    async prune() {
+      const all = await this.list(); const keep = new Set(all.slice(0, 8).map(x => x.id)); const seen = new Set();
+      for (const x of all) if (x.reason !== 'training' && !seen.has(x.reason)) { seen.add(x.reason); keep.add(x.id); }
+      const del = all.filter(x => !keep.has(x.id)); if (del.length) await this.req('readwrite', s => { for (const x of del) s.delete(x.id); });
+    }
   };
   const Store = {
     mode: 'local', db: null, uid: null, q: {}, timers: {},
@@ -260,6 +299,10 @@
     const s = el.querySelector('.sheet'); if (s && st.sheet.keepScroll) s.scrollTop = keep;
     st.sheet.keepScroll = true;
   }
+  function renderSaveErr() {
+    const el = layerEl('se');
+    el.innerHTML = st.saveErr ? `<div class="saveerr" role="alert"><span>Speichern fehlgeschlagen – bitte jetzt ein Backup sichern.</span><button class="btn sm" data-a="exportData">Backup</button></div>` : '';
+  }
   function renderToast() { const el = layerEl('ts'); el.innerHTML = st.toast ? `<div class="toast ${st.ov ? 'top' : ''}" role="status">${esc(st.toast)}</div>` : ''; }
   function openSheet(s) { st.sheet = s; renderSheet(); }
   function closeSheet() { st.sheet = null; renderSheet(); }
@@ -309,7 +352,7 @@
     <div class="stack">
       <div class="card" style="padding:14px 10px"><div class="row between" style="padding:0 8px 8px"><b class="num" style="font-size:17px">${new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</b><span class="small muted">${cnt} von ${goal} Trainings</span></div>
         <div class="cal">${DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); return `<div><div class="d">${d}</div><div class="n ${i === todayIdx ? 'today' : ''} ${doneDays.has(i) ? 'done' : ''}">${dt.getDate()}</div></div>`; }).join('')}</div></div>
-      ${checkinDue() ? checkinCard() : ''}
+      ${checkinDue() ? checkinCard() : ''}${homeCards()}
       ${st.active ? `<div class="card lime rings-bg stack"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl">${esc(st.active.name)}</h2><div class="small" style="font-weight:800">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div><button class="btn dark big" data-a="resume">${I.play} Weiter trainieren</button></div>` : `
       <div class="card lime rings-bg" style="position:relative;min-height:230px;padding:20px">
         <div style="position:relative;z-index:2;max-width:60%" class="stack">
@@ -906,7 +949,8 @@
       const vol = exs.reduce((t, e) => { const ex = getEx(e.exId); return t + e.sets.reduce((u, s) => u + (ex && ex.kind === 'load' ? (s.w || 0) * (s.reps || 0) : ex && ex.kind === 'bw' ? (bw * (ex.bwf || 0) + (s.w || 0)) * (s.reps || 0) : 0), 0); }, 0);
       const w = { id: a.id, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round(((endTs || Date.now()) - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
       if (exs.length) {
-        st.workouts.push(w); Store.saveWorkout(w);
+        st.workouts.push(w); Store.saveWorkout(w); Backup.snapshot('training');
+        try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }); } catch (e) { }
         if (a.dayIdx != null && plan()) { plan().next = (a.dayIdx + 1) % plan().days.length; Store.saveProfile(); }
         st.summary = w;
       }
@@ -1109,6 +1153,25 @@
         <button class="btn" data-a="customFrom">${I.plus} Nicht dabei? Eigene Übung anlegen</button>
         <div class="list" id="pickRes">${pickResults(s)}</div></div>`;
     },
+    backups(s) {
+      if (!s.items) return `<div class="stack"><h2>Sicherungen</h2><div class="muted">Lädt …</div></div>`;
+      const est = s.est ? `<div class="small muted">Belegt: ${fmt(s.est.usage / 1048576, 1)} MB${s.est.quota ? ' von ' + fmt(s.est.quota / 1048576, 0) + ' MB' : ''}${s.persisted ? ' · dauerhaft geschützt' : ''}</div>` : '';
+      return `<div class="stack"><h2>Sicherungen</h2>
+        ${s.warn ? `<div class="card" style="border:2px solid var(--rose)"><b>Deine Daten wurden nicht gefunden oder sind beschädigt.</b><div class="small">Stelle eine Sicherung wieder her. Beschädigte Daten bleiben unter „satzwerk.corrupt.*“ erhalten.</div></div>` : ''}
+        <div class="small muted">Satzwerk legt automatisch Sicherungen auf diesem Gerät an (nach jedem Training und vor jeder größeren Änderung). Der Speicher wird mit den anderen Apps auf dieser Adresse geteilt (z. B. Lernwerk, Kochwerk) – exportiere deshalb ab und zu ein Backup in „Dateien“.</div>${est}
+        ${s.items.length ? `<div class="list">${s.items.map(x => `<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${new Date(x.ts).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b><div class="small muted">${esc(SNAP_LBL[x.reason] || x.reason)} · ${(x.workouts || []).length} Trainings${x.profile && x.profile.plan ? ' · ' + esc(x.profile.plan.name || x.profile.plan.splitName || '') : ''}</div></div>
+          ${s.confirm === x.id ? `<button class="btn danger sm" data-a="bkRestoreYes" data-id="${x.id}">Wirklich wiederherstellen</button>` : `<button class="btn sm" data-a="bkRestore" data-id="${x.id}">Wiederherstellen</button>`}<button class="btn sm" data-a="bkFile" data-id="${x.id}">Als Datei</button></div>`).join('')}</div>` : '<div class="empty">Noch keine Sicherung vorhanden.</div>'}</div>`;
+    },
+    importPreview(s) {
+      const d = s.d; const have = new Set(st.workouts.map(w => w.id)); const ws = d.workouts || []; const nNew = ws.filter(w => !have.has(w.id)).length;
+      const pl = d.profile.plan; const plName = (d.profile.plans || []).length > 1 ? d.profile.plans.length + ' Pläne' : pl ? (pl.name || pl.splitName || 'Plan') : 'kein Plan';
+      return `<div class="stack"><h2>Backup importieren</h2>
+        <div class="card stack" style="gap:4px"><div>Datei vom <b>${d.exported ? dateDE(d.exported.slice(0, 10)) : 'unbekannt'}</b>${d.appVersion ? ' · Version ' + esc(d.appVersion) : ''}</div><div>${ws.length} Trainings, davon <b>${nNew} neu</b></div><div>Plan: ${esc(plName)}</div></div>
+        <button class="btn primary big" data-a="impMerge">Zusammenführen</button>
+        <div class="tiny muted" style="margin-top:-6px">Fehlende Trainings werden ergänzt${st.profile ? ', dein Plan und deine Einstellungen bleiben' : ''}.</div>
+        ${s.confirm ? '<button class="btn danger" data-a="impReplaceYes">Wirklich alles ersetzen</button>' : '<button class="btn" data-a="impReplace">Alles ersetzen</button>'}
+        <div class="tiny muted">Vorher wird automatisch eine Sicherung angelegt.</div></div>`;
+    },
     stale(s) {
       const a = st.active; const n = a.exercises.reduce((t, e) => t + e.sets.filter(x => x.done).length, 0);
       return `<div class="stack"><h2>Training noch offen</h2><div class="small muted">${esc(a.name)} · begonnen ${dateDE(E.todayISO(new Date(a.start)))} · ${n} Sätze erledigt</div>
@@ -1195,9 +1258,11 @@
         <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('sound', 'Töne')}${tog('vib', 'Vibration')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         <div class="card stack"><b>Studio-Gewichte</b><div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div></div>
         <div class="card stack"><b>Datensicherung</b><div class="small muted">${Store.mode === 'db' ? 'Deine Daten werden in deinem Konto gespeichert und sind auf allen Geräten verfügbar, auf denen du angemeldet bist.' : 'Deine Daten liegen nur in diesem Browser. Mach ab und zu ein Backup.'}</div>
+          <div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert.'}</div>
+          <button class="btn" data-a="backups">Sicherungen auf diesem Gerät</button>
           <div class="row wrap"><button class="btn grow" data-a="exportData">Backup exportieren</button><label class="btn grow" for="importFile" style="cursor:pointer">Backup importieren</label><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden></div></div>
         <button class="btn" data-a="quizEdit">Fragebogen bearbeiten</button>
-        ${s.confirm ? '<button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn danger" data-a="reset">Alle Daten löschen</button>'}
+        ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn danger" data-a="reset">Alle Daten löschen</button>'}
         <p class="tiny muted" style="margin:0">Satzwerk ersetzt keine ärztliche Beratung. Bei Schmerzen Übung abbrechen.</p>
         <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION}</p></div>`;
     },
@@ -1313,6 +1378,23 @@
     wMin() { st.ov = null; keepAwake(false); render(); },
     focusEx(t) { st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
     toFocus() { toFocus(); },
+    bkLater() { st.bkLater = true; render(); },
+    async backups() {
+      openSheet({ type: 'backups', items: null, warn: !!st.corrupt });
+      const items = await Backup.list(); let est = null, persisted = false;
+      try { est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false; } catch (e) { }
+      if (st.sheet && st.sheet.type === 'backups') { Object.assign(st.sheet, { items, est, persisted }); renderSheet(); }
+    },
+    bkRestore(t) { st.sheet.confirm = +t.dataset.id; renderSheet(); },
+    async bkRestoreYes(t) {
+      const x = await Backup.get(+t.dataset.id); if (!x) { toast('Sicherung nicht gefunden'); return; }
+      await Backup.snapshot('vor-restore'); replaceAll(x); st.corrupt = false;
+      closeSheet(); st.ov = null; render(); toast('Sicherung wiederhergestellt: ' + (x.workouts || []).length + ' Trainings');
+    },
+    async bkFile(t) { const x = await Backup.get(+t.dataset.id); if (x) exportData(x); },
+    async impMerge() { const d = st.sheet.d; await Backup.snapshot('vor-import'); const n = mergeImport(d); closeSheet(); render(); toast('Backup importiert: ' + n + ' neue Trainings'); },
+    impReplace() { st.sheet.confirm = true; renderSheet(); },
+    async impReplaceYes() { const d = st.sheet.d; await Backup.snapshot('vor-import'); replaceAll(d); closeSheet(); st.ov = null; render(); toast('Backup übernommen: ' + (d.workouts || []).length + ' Trainings'); },
     staleGo() { closeSheet(); openWorkout(); },
     staleSave() { const a = st.active; const ts = a.exercises.flatMap(e => e.sets.map(s => s.t || 0)); closeSheet(); finishWorkout(true, Math.max(a.start, ...ts)); },
     staleDrop() { st.sheet.confirm = true; renderSheet(); },
@@ -1375,12 +1457,12 @@
     slotDelYes() { const s = st.sheet; plan().days[s.d].slots.splice(s.s, 1); Store.saveProfile(); closeSheet(); render(); },
     deloadToggle() { const p = plan(); p.forceDeload = !p.forceDeload; if (!p.forceDeload) p.meso.start = E.todayISO(); Store.saveProfile(); render(); toast(p.forceDeload ? 'Deload aktiv: halbe Sätze, mehr Reserve' : 'Neuer Zyklus startet mit Woche 1'); },
     rebuildAsk() { openSheet({ type: 'rebuild' }); },
-    rebuildYes() { const old = plan(); const np = E.buildPlan(P()); np.meso = old.meso; np.next = 0; P().plan = np; Store.saveProfile(true); closeSheet(); render(); toast('Plan neu berechnet'); },
+    rebuildYes() { Backup.snapshot('vor-plan'); const old = plan(); const np = E.buildPlan(P()); np.meso = old.meso; np.next = 0; P().plan = np; Store.saveProfile(true); closeSheet(); render(); toast('Plan neu berechnet'); },
     progSeg(t) { st.progSeg = t.dataset.k; render(); },
     chartTip(t) { const el = $('#chartTip', t.closest('.card, .sheet')) || $('#chartTip'); if (el) el.textContent = t.dataset.t; },
     wDetail(t) { openSheet({ type: 'wDetail', id: t.dataset.id }); },
     wDel() { st.sheet.confirm = true; renderSheet(); },
-    wDelYes(t) { st.workouts = st.workouts.filter(w => w.id !== t.dataset.id); Store.deleteWorkout(t.dataset.id); closeSheet(); render(); toast('Training gelöscht'); },
+    wDelYes(t) { Backup.snapshot('vor-loeschen'); st.workouts = st.workouts.filter(w => w.id !== t.dataset.id); Store.deleteWorkout(t.dataset.id); closeSheet(); render(); toast('Training gelöscht'); },
     bwSheet() { openSheet({ type: 'bw' }); },
     bwStep(t) { const i = $('#bwIn'); i.value = fmt((num(i.value) || 0) + +t.dataset.d, 1); },
     bwSave() { const v = num($('#bwIn').value); if (!(v > 25 && v < 300)) { toast('Bitte ein Gewicht zwischen 25 und 300 kg eingeben'); return; } const log = P().bwLog = P().bwLog || []; const today = E.todayISO(); const ex = log.find(x => x.d === today); if (ex) ex.kg = v; else log.push({ d: today, kg: v }); log.sort((a, b) => a.d < b.d ? -1 : 1); Store.saveProfile(); closeSheet(); render(); toast('Gespeichert: ' + fmt(v, 1) + ' kg'); },
@@ -1409,7 +1491,7 @@
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
     exportData() { exportData(); },
     reset() { st.sheet.confirm = true; renderSheet(); },
-    async resetYes() { for (const w of st.workouts) Store.deleteWorkout(w.id); st.workouts = []; st.active = null; st.profile = null; LS.set('profile', null); LS.set('workouts', []); Store.saveActive(true); if (Store.mode === 'db') Store.write('p', () => Store.pRef().delete()); closeSheet(); render(); toast('Alle Daten gelöscht'); },
+    async resetYes() { await Backup.snapshot('vor-reset'); for (const w of st.workouts) Store.deleteWorkout(w.id); st.workouts = []; st.active = null; st.profile = null; LS.set('profile', null); LS.set('workouts', []); Store.saveActive(true); if (Store.mode === 'db') Store.write('p', () => Store.pRef().delete()); closeSheet(); render(); toast('Alle Daten gelöscht'); },
     timerMode(t) { T.mode = t.dataset.k; render(); },
     restPreset(t) { T.restDur = +t.dataset.s; if (T.restEnd) T.restEnd = Date.now() + T.restDur * 1000; render(); },
     restToggle() { T.restEnd = T.restEnd ? null : Date.now() + (T.restDur || 90) * 1000; beep(880, 0.08); render(); },
@@ -1449,27 +1531,69 @@
     if (alsoPlan && slot) { slot.ex[st.active.loc] = id; slot.why[st.active.loc] = ['Von dir gewählt']; slot.locked = Object.assign({}, slot.locked, { [st.active.loc]: true }); Store.saveProfile(); }
     Store.saveActive(); closeSheet(); renderOverlay(); toast('Getauscht: ' + ex.name);
   }
-  async function exportData() {
-    const data = JSON.stringify({ app: 'satzwerk', version: 1, exported: new Date().toISOString(), profile: st.profile, workouts: st.workouts }, null, 1);
+  // Export: Konto-Download (Artifact) → Teilen-Menü (iPhone: „In Dateien sichern“) → Download → Zwischenablage
+  async function exportData(src) {
+    const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };
+    const data = JSON.stringify({ app: 'satzwerk', version: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), profile: d.profile, workouts: d.workouts, active: d.active || null }, null, 1);
     const name = 'satzwerk-backup-' + E.todayISO() + '.json';
+    const ok = msg => { toast(msg); if (!src && st.profile) { st.profile.lastExport = E.todayISO(); Store.saveProfile(); if (!st.ov) render(); } };
     try {
       const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-      if (dl) { await dl.save({ filename: name, data }); toast('Backup gespeichert'); return; }
+      if (dl) { await dl.save({ filename: name, data }); ok('Backup gespeichert'); return; }
     } catch (e) { if (e && e.code === 'declined') return; }
-    try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast('Backup erstellt'); return; } catch (e) { }
-    try { await navigator.clipboard.writeText(data); toast('Backup in die Zwischenablage kopiert'); } catch (e) { toast('Export hier nicht möglich'); }
+    try {
+      const file = new File([data], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Satzwerk-Backup' }); ok('Backup geteilt'); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); ok('Backup erstellt'); return; } catch (e) { }
+    try { await navigator.clipboard.writeText(data); ok('Backup in die Zwischenablage kopiert'); } catch (e) { toast('Export hier nicht möglich'); }
+  }
+  function validBackup(d) {
+    return d && d.app === 'satzwerk' && d.profile && typeof d.profile === 'object' && Array.isArray(d.workouts || []) && (d.workouts || []).every(w => w && w.id && Array.isArray(w.exercises));
   }
   function importData(file) {
     const r = new FileReader();
     r.onload = () => {
-      try {
-        const d = JSON.parse(r.result); if (d.app !== 'satzwerk' || !d.profile) throw new Error('bad');
-        st.profile = d.profile; registerCustom(); Store.saveProfile(true);
-        const have = new Set(st.workouts.map(w => w.id)); for (const w of d.workouts || []) if (!have.has(w.id)) { st.workouts.push(w); Store.saveWorkout(w); }
-        st.workouts.sort((x, y) => (x.ts || 0) - (y.ts || 0)); closeSheet(); render(); toast('Backup importiert: ' + (d.workouts || []).length + ' Trainings');
-      } catch (e) { toast('Diese Datei ist kein Satzwerk-Backup'); }
+      let d = null; try { d = JSON.parse(r.result); } catch (e) { }
+      if (!validBackup(d)) { toast('Diese Datei ist kein Satzwerk-Backup'); return; }
+      openSheet({ type: 'importPreview', d });
     };
     r.readAsText(file);
+  }
+  // Nach jedem Laden/Ersetzen von Daten (Import, Wiederherstellen)
+  function afterDataLoad() {
+    registerCustom(); exCache.clear(); st.workouts.sort((x, y) => (x.ts || 0) - (y.ts || 0));
+    if (typeof normalizePlans === 'function') normalizePlans();
+  }
+  // Ersetzt alle Daten (vorher immer Backup.snapshot aufrufen)
+  function replaceAll(d) {
+    const newIds = new Set((d.workouts || []).map(w => w.id));
+    const gone = st.workouts.filter(w => !newIds.has(w.id)).map(w => w.id);
+    st.profile = clone(d.profile) || null; st.workouts = clone(d.workouts || []); st.active = clone(d.active) || null; st.rest = null; st.hold = null;
+    afterDataLoad();
+    if (st.profile) Store.saveProfile(true); else LS.set('profile', null);
+    for (const id of gone) Store.deleteWorkout(id);
+    if (Store.mode === 'db') for (const w of st.workouts) Store.saveWorkout(w); else { Store.wv++; LS.set('workouts', st.workouts); }
+    Store.saveActive(true);
+  }
+  function mergeImport(d) {
+    if (!st.profile) st.profile = clone(d.profile);
+    else { // eigene Übungen ergänzen, damit importierte Trainings ihre Übungen finden
+      const mine = st.profile.custom = st.profile.custom || []; const ids = new Set(mine.map(c => c.id));
+      for (const c of d.profile.custom || []) if (!ids.has(c.id)) mine.push(c);
+    }
+    const have = new Set(st.workouts.map(w => w.id)); let n = 0;
+    for (const w of d.workouts || []) if (!have.has(w.id)) { st.workouts.push(clone(w)); n++; }
+    afterDataLoad(); Store.saveProfile(true);
+    if (Store.mode === 'db') { for (const w of st.workouts) if (!have.has(w.id)) Store.saveWorkout(w); } else { Store.wv++; LS.set('workouts', st.workouts); }
+    return n;
+  }
+  function homeCards() {
+    const p = P(); let out = '';
+    const since = p.lastExport || ''; const nNew = st.workouts.filter(w => w.date > since).length;
+    const days = since ? (Date.now() - new Date(since + 'T12:00:00').getTime()) / 864e5 : 999;
+    if (Store.mode !== 'db' && !st.bkLater && nNew >= 3 && days > 14) out += `<div class="card stack" style="gap:10px"><b>Backup sichern</b><div class="small muted">${since ? 'Letztes Backup am ' + dateDE(since) + '. ' : ''}${nNew} Trainings sind nur auf diesem iPhone gespeichert.</div><div class="row"><button class="btn primary grow" data-a="exportData">Backup sichern</button><button class="btn grow" data-a="bkLater">Später</button></div></div>`;
+    return out;
   }
 
   /* ================= Eingaben ================= */
@@ -1494,7 +1618,7 @@
     pickQ(t) { st.sheet.q = t.value; later('pickQ', 120, () => { const el = $('#pickRes'); if (el && st.sheet) el.innerHTML = pickResults(st.sheet); }); },
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
-    importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
+    importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); t.value = ''; },
     cx(t) { const c = st.sheet.c; c[t.dataset.k] = t.value; if (t.dataset.k === 'kind') renderSheet(); if (t.dataset.k === 'name') { const h = $('#cx-hit'); if (h) h.innerHTML = cxHit(t.value, !!st.sheet.ret); } }
   };
 
@@ -1602,11 +1726,12 @@
   /* ================= Start ================= */
   (async function boot() {
     await Store.init();
+    if (!LS.get('meta')) LS.set('meta', { schema: 1 });
     registerCustom();
     if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }
-    let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal) { balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
+    let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal) { Backup.snapshot('vor-update'); balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
     const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
-    if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) {
+    if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) { Backup.snapshot('vor-update');
       const old = st.profile.plan; const np = E.buildPlan(st.profile);
       np.meso = old.meso || np.meso; np.next = (old.next || 0) % np.days.length; np.forceDeload = old.forceDeload;
       st.profile.plan = np; Store.saveProfile(true);
@@ -1614,6 +1739,9 @@
     }
     restoreTimers();
     render();
+    // Daten beschädigt oder verschwunden? Sicherungen anbieten
+    let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }
+    if (st.corrupt || missing) Backup.list().then(l => { if (l.length || st.corrupt) A.backups(); });
     // Laufendes Training sofort wieder öffnen (iOS lädt die App nach Sperren/App-Wechsel oft neu)
     if (st.profile && st.profile.plan && st.active) {
       if (Date.now() - (st.active.start || 0) < 12 * 3600e3) openWorkout();
