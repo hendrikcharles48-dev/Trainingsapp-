@@ -6,6 +6,58 @@ Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engin
 Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
+## Arbeitsregeln (Satzwerk)
+- **Bauplan:** `docs/ROADMAP.md` (Etappen mit Prüfkriterien). Skill `satzwerk-etappe` („nächste Etappe“) arbeitet sie ab.
+- **Erst kurzen Plan zeigen, auf OK warten**, dann umsetzen (außer der Nutzer verzichtet ausdrücklich darauf).
+- **Bestehende Daten nie verlieren:** gespeicherte Felder nie löschen oder umbenennen, Neues nur zusätzlich; vor jeder
+  Umstellung eine Sicherung. Nur Schlüssel mit `satzwerk.`, nie `localStorage.clear()` – der Browser-Speicher wird mit
+  den anderen Apps derselben Adresse geteilt (Lernwerk, Kochwerk, Stunden, Toleranzen).
+- Keine fremden Dienste, kein Server, keine Bibliotheken. Das Repository ist öffentlich: keine persönlichen
+  Gesundheitsdaten (Gewicht, Beschwerden, Messwerte) in Dateien schreiben.
+- Sparsam lesen: `app.js` hat sehr lange Zeilen → per `grep -n … | cut -c1-300` gezielt lesen.
+
+## Aufbau
+- `index.html`: Gerüst (`#app`, `#layer`) und gesamtes CSS. `pwa/build.js` setzt Kopf und Service-Worker-Anmeldung davor/dahinter.
+- `exercises.js` (`window.EXDB`: `list`, `byId`, `MUSCLES`, `GROUPS`, `PATTERNS`, `EQUIP`), `howto.js`, `figures.js` (`figSVG`).
+- `engine.js` (`window.ENGINE`): Fragebogen `Q`, `buildPlan`/`fillDay`/`balancePlan`/`planVolume`, `timePlan`,
+  `weekInfo`/`mesoWeek`, `prescription` (Sätze, Wdh.-Bereich, Reserve, Pause je Slot), `recommend` (Empfehlung je Satz),
+  `setScore`/`sessionBest`/`historyFor`, `applyCheckin`.
+- `app.js`: Zustand `st`; `render()` baut die Ansicht als HTML-Text neu. Reiter: `homeView`, `planView`, `libView`,
+  `progView`, `timerView`. Overlays über `st.ov` (`workout`, `quiz`, `result`), Fenster über `st.sheet` + `SHEETS`,
+  unteres Trainings-Panel `renderRest`. Klicks: `data-a` → `A[...]`; Eingaben: `data-in` → `IN[...]`.
+  Training: `startWorkout` → `exState`/`curIndex` → `focusCard` → `A.doneSet` → Fenster `rir` → `commitSet` → `finishWorkout`.
+- Beim Tippen nie die ganze Ansicht neu bauen (Suchfelder: nur die Trefferliste ersetzen).
+
+## Datenmodell und Speicher
+- Speicher über `Store` (`app.js`): localStorage `satzwerk.profile`, `satzwerk.workouts` (Liste), `satzwerk.active`
+  (laufendes Training). In der Artifact-Version zusätzlich Online-Speicher (`Store.mode === 'db'`).
+  Geplant laut Roadmap: `satzwerk.meta`, IndexedDB `satzwerk` (Sicherungen).
+- `profile`: `answers` (Fragebogen), `plan`, `custom` (eigene Übungen), `settings`, `exW`, `exNotes`, `checkins`, `adapt`.
+- `plan`: `{id, v, split, splitName, goal, locs, days, meso:{start,len}, next, bal, forceDeload, deloadUntil}`;
+  `day`: `{id, key, name, focus, slots}`; `slot`: `{id, p, r, sets, rr, custRR, rest, ex:{home,gym}, ss}`.
+  Rollen `r`: `main` Grundübung, `sec` Ergänzung, `iso`, `skill`, `core`, `cond`.
+- `active`: `{id, dayIdx, dayId, name, loc, start, bw, exercises:[{key, exId, slotId, presc, sets, draft, extra, band, ss, note}], cur}`.
+- `workout` (gespeichert): `{id, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
+- Export: JSON `{app:'satzwerk', version, profile, workouts}`; ältere Versionen müssen importierbar bleiben.
+
+## Wissenschaftliche Regeln (Ziel: Fett reduzieren und Muskeln aufbauen)
+- Volumen: ~10 harte Sätze je Muskel und Woche, Schwerpunkte mehr, Deckel 15, mitbeteiligte Muskeln halb; jeder Muskel
+  möglichst 2× pro Woche. Im Defizit nicht mehr Volumen, sondern Gewicht auf der Stange halten.
+- Wiederholungen: Grundübungen 6–10, Ergänzung 8–12, Isolation 10–15 (5–30 wirken ähnlich, wenn nah am Versagen).
+- Reserve: 1–2 Wdh. (Grundübungen nie bis zum Versagen), Deload 3. Ehrliche Reserve-Angabe steuert alles.
+- Progression: doppelt – erst Wdh. bis zur Obergrenze, dann nächstes Gewicht (Roadmap Etappe 5).
+- Pausen: Grundübungen 2,5–3 min, Ergänzung 2 min, Isolation ~1,5 min; Supersätze nur bei Übungen, die sich nicht stören.
+- Deload: alle 4–8 trainierten Wochen oder nach Bedarf (Check-in, fallende Leistung): halbe Sätze, Gewicht bleiben.
+- Reihenfolge: Skill → Grundübung → Ergänzung → Isolation → Rumpf; Schwerpunkt-Muskel früh in der Einheit.
+
+## Designregeln (modernes iOS, Bedienung mit einer Hand)
+- Tipp-Flächen ≥ 44 px, wichtige Knöpfe unten in Daumenreichweite, höchstens 2 Tipps pro Satz.
+- Eingabefelder ≥ 16 px Schrift (sonst zoomt iOS), Zahlen lieber über −/+ als über die Tastatur.
+- Aktuelle Übung im Training immer sichtbar; nichts darf beim Sperren oder App-Wechsel verloren gehen.
+- Sicherheitsabstände (`env(safe-area-inset-*)`) beachten, Fenster von unten, dunkles Design, ruhige Animationen.
+- iPhone: keine Vibration aus Web-Apps, Ton nur ohne Stumm-Schalter – Signale immer auch sichtbar machen.
+- Texte kurz, deutsch, ohne Fachwörter.
+
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
 
 Bevor ein Update hochgeladen wird, nachsehen, ob der Nutzer neue eigene Übungen angelegt hat.
