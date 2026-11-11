@@ -10,7 +10,7 @@
     { id: 'age', title: 'Wie alt bist du?', type: 'number', unit: 'Jahre', min: 12, max: 99, placeholder: '30' },
     { id: 'bw', title: 'Dein Körpergewicht', hint: 'Wichtig: Bei Klimmzügen, Dips & Co. rechnet der Algorithmus mit deinem Gewicht.', type: 'number', unit: 'kg', min: 30, max: 250, step: 0.1, placeholder: '80' },
     { id: 'exp', title: 'Wie lange trainierst du schon regelmäßig?', type: 'single', options: [['new', 'Weniger als 6 Monate'], ['some', '6 Monate bis 2 Jahre'], ['exp', '2 bis 5 Jahre'], ['vet', 'Mehr als 5 Jahre']] },
-    { id: 'goal', title: 'Was ist dein Hauptziel?', type: 'single', options: [['muscle', 'Muskelaufbau', 'Mehr Muskelmasse, sichtbare Form'], ['strength', 'Maximalkraft', 'Schwerere Gewichte, weniger Wiederholungen'], ['skills', 'Calisthenics-Skills', 'Muscle-up, Front Lever, Handstand …'], ['fit', 'Fitness & Fettabbau', 'Kraft plus Kondition'], ['health', 'Gesund & beweglich', 'Solide Basis, schonend']] },
+    { id: 'goal', title: 'Was ist dein Hauptziel?', type: 'single', options: [['muscle', 'Muskelaufbau', 'Mehr Muskelmasse, sichtbare Form'], ['recomp', 'Fett weg & Muskeln aufbauen', 'Muskeln aufbauen oder halten, während das Körperfett sinkt'], ['strength', 'Maximalkraft', 'Schwerere Gewichte, weniger Wiederholungen'], ['skills', 'Calisthenics-Skills', 'Muscle-up, Front Lever, Handstand …'], ['fit', 'Fitness & Fettabbau', 'Kraft plus Kondition'], ['health', 'Gesund & beweglich', 'Solide Basis, schonend']] },
     { id: 'skills', title: 'Welche Skills willst du lernen?', hint: 'Mehrfachauswahl. Jede Einheit bekommt dann einen Skill-Block.', type: 'multi', options: [['pullup', 'Mehr / erste Klimmzüge'], ['mu', 'Muscle-up'], ['fl', 'Front Lever'], ['hs', 'Handstand'], ['lsit', 'L-Sit'], ['pistol', 'Pistol Squat'], ['planche', 'Planche'], ['bl', 'Back Lever / Schulterbeweglichkeit']] },
     { id: 'location', title: 'Wo trainierst du?', type: 'single', options: [['home', 'Nur zu Hause'], ['gym', 'Nur im Studio'], ['both', 'Beides', 'Der Plan bekommt für jede Einheit eine Zuhause- und eine Studio-Version']] },
     { id: 'homeEq', title: 'Was hast du zu Hause?', hint: 'Mehrfachauswahl. Körpergewicht geht immer.', type: 'multi', when: a => a.location !== 'gym', options: [['bar', 'Klimmzugstange'], ['rings', 'Turnringe'], ['db', 'Kurzhantel(n)'], ['cable', 'Seilzug von oben'], ['bench', 'Bank (oder stabiler Stuhl)'], ['band', 'Widerstandsbänder'], ['dipbar', 'Dip-Barren / Parallettes']] },
@@ -170,11 +170,15 @@
   };
   const SKILL_GRP = { mu: 'mu', fl: 'fl', hs: 'hsskill', lsit: 'lsit', planche: 'planche', bl: 'bl' };
 
-  // Standard-Pause je Rolle (Sekunden)
+  // „Fett weg & Muskeln aufbauen“ trainiert wie Muskelaufbau, mit weniger Zusatzvolumen (Erholung im Defizit knapper)
+  const baseGoal = g => !g || g === 'recomp' ? 'muscle' : g;
+  function isCut(profile, plan) { return ((profile && profile.answers) || {}).goal === 'recomp' || (plan && plan.goal === 'recomp'); }
+  // Standard-Pause je Rolle (Sekunden): Grundübung 2,5 min, Ergänzung 2 min, Isolation 1,5 min
   function defaultRest(role, goal) {
-    return role === 'main' ? (goal === 'strength' ? 180 : goal === 'fit' ? 105 : 150) : role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'cond' ? 20 : role === 'core' ? 60 : 75;
+    return role === 'main' ? (goal === 'strength' ? 180 : goal === 'fit' ? 105 : 150) : role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'cond' ? 20 : role === 'core' ? 60 : 90;
   }
   function goalRanges(goal) {
+    goal = baseGoal(goal);
     return {
       muscle: { main: [6, 10], sec: [8, 12], iso: [10, 15] },
       strength: { main: [3, 6], sec: [6, 10], iso: [10, 15] },
@@ -209,7 +213,7 @@
       const spared = (a.injuries || []).filter(t => ['shoulder', 'elbow', 'wrist', 'lowback', 'knee'].includes(t)).map(t => names[t]);
       if (spared.length && (ex.pat === 'dip' || ex.pat === 'vpush' || ex.pat === 'hpush' || ex.pat === 'squat' || ex.pat === 'hinge')) reasons.push('Schont ' + spared.join(' & '));
     }
-    const goal = a.goal || 'muscle';
+    const goal = baseGoal(a.goal);
     if (ex.kind === 'load' && (goal === 'muscle' || goal === 'strength')) s += 1;
     if (ex.kind !== 'load' && goal === 'skills') s += 3;
     if (loc === 'gym' && (goal === 'muscle' || goal === 'strength') && ex.eq.some(e => ['bb', 'mach', 'gcable'].includes(e))) s += 2;
@@ -361,7 +365,7 @@
   const LOWER = ['quads', 'hams', 'glutes', 'calves'];
   function volTargets(profile) {
     const pr = new Set(); for (const g of ((profile.answers || {}).priority || [])) for (const m of (DB.GROUPS[g] || [])) pr.add(m);
-    const t = {}; for (const m in VOL_T) t[m] = pr.has(m) ? 14 : 10; return t;
+    const t = {}; for (const m in VOL_T) t[m] = pr.has(m) ? (isCut(profile) ? 12 : 14) : 10; return t;
   }
   function mainLoc(plan, profile) { const l = plan.locs || ['home']; return l.includes('home') && (profile.answers || {}).location !== 'gym' ? 'home' : l[0]; }
   function planVolume(plan, profile, loc) {
@@ -433,7 +437,7 @@
       if (!cands.length) { if (direct.length) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; } T[under] = 0; continue; }
       const d = cands[0].d;
       if (cands[0].sp) { const y = cands[0].sp; d.slots = d.slots.filter(z => z !== y); changes.push('Ersetzt: ' + exAt(y).name); } const role = pat === 'core' ? 'core' : pat === 'hpull' ? 'sec' : 'iso';
-      const sl = S([pat], role, { sets: 3, rest: role === 'sec' ? 120 : role === 'core' ? 60 : 75, rr: goalRanges(plan.goal || 'muscle')[role] || null, id: 's' + Math.random().toString(36).slice(2, 8), ex: {}, why: {}, bal: true });
+      const sl = S([pat], role, { sets: 3, rest: defaultRest(role, plan.goal), rr: goalRanges(plan.goal || 'muscle')[role] || null, id: 's' + Math.random().toString(36).slice(2, 8), ex: {}, why: {}, bal: true });
       let ok = false;
       for (const l of (plan.locs || [loc])) {
         const used = new Set(); plan.days.forEach(x => x.slots.forEach(y => y.ex && y.ex[l] && used.add(y.ex[l])));
@@ -535,20 +539,42 @@
 
   /* ================= Mesozyklus ================= */
   function todayISO(d) { d = d || new Date(); const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); }
+  /* Zyklus nach TRAINIERTEN Wochen: Woche = 1 + Zahl der Kalenderwochen seit meso.start (ohne die laufende),
+     in denen mindestens ein Training war. Wochen ohne Training schieben den Deload also nicht vor. */
+  let WK = null; // Zugriff auf die Trainingsliste (setzt die App)
+  function setWorkouts(fn) { WK = fn; }
   function mesoWeek(plan, date) {
     if (!plan || !plan.meso) return 1;
-    const start = new Date(plan.meso.start + 'T00:00:00');
-    const diff = Math.floor(((date || new Date()) - start) / (7 * 864e5));
     const len = plan.meso.len || 5;
-    return ((diff % len) + len) % len + 1;
+    const ws = WK && WK();
+    if (!ws) {
+      const start = new Date(plan.meso.start + 'T00:00:00');
+      const diff = Math.floor(((date || new Date()) - start) / (7 * 864e5));
+      return ((diff % len) + len) % len + 1;
+    }
+    const s = todayISO(startOfWeek(new Date(plan.meso.start + 'T12:00:00'))), cur = todayISO(startOfWeek(date || new Date()));
+    const weeks = new Set();
+    for (const w of ws) if (w.date >= s && w.date < cur) weeks.add(todayISO(startOfWeek(new Date(w.date + 'T12:00:00'))));
+    return weeks.size % len + 1;
   }
+  // Nach ≥ 14 Tagen ohne Training beginnt der Zyklus neu (Einstiegswoche statt plötzlichem Deload)
+  function mesoBreak(plan) {
+    const ws = WK && WK(); if (!plan || !plan.meso || !ws || !ws.length) return false;
+    const last = ws.reduce((m, w) => w.date > m ? w.date : m, '');
+    const cur = todayISO(startOfWeek());
+    if (!last || (Date.now() - new Date(last + 'T12:00:00').getTime()) / 864e5 < 14 || plan.meso.start >= cur) return false;
+    plan.meso.start = cur; return true;
+  }
+  // Phase 0–3 (Einstieg, Aufbau, Aufbau, Peak) für beliebige Zykluslänge
+  function phaseOf(w, len) { return Math.max(0, Math.min(3, Math.round((w - 1) / Math.max(1, len - 2) * 3))); }
   function weekInfo(plan, profile) {
     const autoDl = plan && plan.deloadUntil && todayISO() < plan.deloadUntil;
-    const w = plan && (plan.forceDeload || autoDl) ? (plan.meso.len || 5) : mesoWeek(plan);
     const len = (plan && plan.meso && plan.meso.len) || 5;
+    const w = plan && (plan.forceDeload || autoDl) ? len : mesoWeek(plan);
     const deload = w === len;
-    const label = deload ? 'Deload-Woche' : ['Einstieg', 'Aufbau', 'Aufbau', 'Peak'][w - 1] || 'Aufbau';
-    return { w, len, deload, label, rirShift: 0 };
+    const phase = phaseOf(w, len);
+    const label = deload ? 'Deload-Woche' : ['Einstieg', 'Aufbau', 'Aufbau', 'Peak'][phase];
+    return { w, len, deload, label, phase, rirShift: 0 };
   }
   function adaptNow(profile) { const ad = profile && profile.adapt; if (!ad) return null; const t = todayISO(); return t >= ad.from && t < ad.until ? ad : null; }
   /* Reserve (RIR) pro Mesozyklus-Woche. Hypertrophie-Studien (z. B. Refalo 2023, Robinson 2024):
@@ -565,7 +591,7 @@
     const i = (profile.answers || {}).intensity || 'hard';
     const tbl = RIR_PLAN[i] || RIR_PLAN.hard;
     const row = role === 'main' ? tbl.main : role === 'sec' ? tbl.sec : tbl.iso;
-    let r = row[Math.min(row.length, Math.max(1, wi.w)) - 1] + (ad ? ad.rir || 0 : 0);
+    let r = row[wi.phase ?? Math.min(row.length - 1, Math.max(0, wi.w - 1))] + (ad ? ad.rir || 0 : 0);
     const min = role === 'main' ? 1 : 0;
     if (kind === 'hold' || role === 'skill') r = Math.max(1, r);
     return Math.max(min, Math.min(3, r));
@@ -575,7 +601,8 @@
     const role = slot ? slot.r : (ex.role === 'c' ? 'sec' : ex.role === 'i' ? 'iso' : ex.role === 's' ? 'skill' : ex.role === 'x' ? 'cond' : 'core');
     let sets = slot ? slot.sets : (role === 'iso' ? 3 : 3);
     const exp = (profile.answers || {}).exp;
-    if (!wi.deload && (wi.w === 3 || wi.w === 4) && role === 'main' && exp !== 'new') sets += 1;
+    // Zusatzsatz für Grundübungen in den harten Wochen – nicht im Defizit (Ziel „Fett weg & Muskeln“)
+    if (!wi.deload && (wi.phase ?? wi.w - 1) >= 2 && role === 'main' && exp !== 'new' && !isCut(profile, plan)) sets += 1;
     if (wi.deload) sets = Math.max(1, Math.ceil(sets / 2));
     const ad = adaptNow(profile);
     if (ad && !wi.deload) { if (ad.sets < 0 && (role === 'sec' || role === 'iso' || role === 'core')) sets = Math.max(2, sets + ad.sets); if (ad.sets > 0 && (role === 'main' || role === 'sec')) sets += ad.sets; }
@@ -724,6 +751,44 @@
       if (r < lo - 1) { out.easier = chainStep(ex, -1, profile, loc); if (out.easier) notes.push('Unter dem Zielbereich: leichtere Stufe wäre sinnvoll'); }
       return out;
     }
+    /* Doppelte Progression (Gewichte mit fester Auswahl): erst Wdh. bis zur Obergrenze steigern, dann das
+       nächste Gewicht und wieder unten anfangen. Gilt nur mit frischem Verlauf, nicht im Deload, nicht mit Band. */
+    const lastH = hist.length ? hist[hist.length - 1] : null;
+    const lastDays = lastH ? (Date.now() - new Date(lastH.date).getTime()) / 864e5 : 999;
+    const lastSets = lastH ? (lastH.entry.sets || []).filter(s => s.done !== false && (+s.reps || 0) > 0) : [];
+    if (opts && opts.length > 1 && lastSets.length && lastDays <= 21 && !presc.deload && !ctx.band && !calib) {
+      const lastRIRT = lastH.entry.rirT ?? rirT;
+      const anchor = snap(+lastSets[0].w || 0, opts);
+      const ai = opts.indexOf(anchor);
+      const capR = w => 30 * (C / (baseLoad + w) - 1) - rirT;
+      const fit = r => Math.max(lo, Math.min(hi, Math.round(r)));
+      const keepNotes = notes.filter(n => !/Progression$/.test(n)); notes.length = 0; notes.push(...keepNotes);
+      if (!done.length) {
+        const r0 = +lastSets[0].reps || 0;
+        const allTop = lastSets.every(s => (+s.reps || 0) >= hi && (+s.rir || 0) <= lastRIRT + 1);
+        let w = anchor, reps;
+        if (allTop) {
+          const up = opts[ai + 1];
+          if (up != null && (baseLoad + up) > 0) { w = up; reps = fit(Math.max(lo, capR(up))); notes.push('Obergrenze geschafft: mehr Gewicht, Wdh. beginnen wieder unten'); }
+          else { reps = hi; notes.push('Schwerstes Gewicht: langsamer ablassen (3 s) macht es härter'); }
+        } else if (r0 < lo - 1) {
+          const dn = ai > 0 ? opts[ai - 1] : anchor; w = dn; reps = fit(capR(dn));
+          notes.push(dn < anchor ? 'Letztes Mal unter dem Zielbereich: etwas leichter' : 'Leichtestes Gewicht: so viele Wdh. wie sauber möglich');
+        } else {
+          const easier = (+lastSets[0].rir || 0) >= lastRIRT;
+          reps = fit(easier ? r0 + 1 : r0);
+          notes.push(easier ? 'Gleiches Gewicht, 1 Wdh. mehr als letztes Mal' : 'Gleiches Gewicht und gleiche Wdh. – letztes Mal war es härter als geplant');
+        }
+        out.w = w; out.reps = reps; out.dp = true;
+        if (ex.kind === 'load' && presc.role === 'main' && w >= 20) out.warmup = warmups(w, opts);
+        return out;
+      }
+      if (dayForm == null || Math.abs(dayForm) < 0.08) {
+        const w = +done[0].w || 0; const first = +done[0].reps || hi;
+        out.w = w; out.reps = Math.max(1, Math.min(first, clampReps(capR(w), hi))); out.dp = true;
+        return out;
+      }
+    }
     const ideal = C / (1 + (t + rirT) / 30) - baseLoad;
     if (!opts) opts = rangeList(ex.kind === 'bw' ? 0 : 0.5, Math.max(10, ideal * 2), ideal > 20 ? 2.5 : ideal > 6 ? 1 : 0.5);
     let bestO = null, bestD = Infinity;
@@ -817,7 +882,7 @@
     let res;
     if (n('pain') >= 2 || score >= 5) { plan.deloadUntil = until; res = { kind: 'deload', text: 'Diese Woche Deload: halbe Sätze und mehr Reserve, damit du dich richtig erholst.' + (n('pain') >= 2 ? ' Bei anhaltenden Schmerzen bitte ärztlich abklären lassen.' : '') }; profile.adapt = null; }
     else if (score >= 2.5) { profile.adapt = { from, until, sets: -1, rir: 1 }; res = { kind: 'less', text: 'Etwas weniger Volumen: 1 Satz weniger bei Ergänzung, Isolation und Rumpf, dazu 1 Wiederholung mehr Reserve.' }; }
-    else if (score <= -2.5) { profile.adapt = { from, until, sets: 1, rir: 0 }; res = { kind: 'more', text: 'Du steckst das gut weg: 1 Satz mehr bei Grund- und Ergänzungsübungen.' }; }
+    else if (score <= (isCut(profile, plan) ? -3.5 : -2.5)) { profile.adapt = { from, until, sets: 1, rir: 0 }; res = { kind: 'more', text: 'Du steckst das gut weg: 1 Satz mehr bei Grund- und Ergänzungsübungen.' }; }
     else { profile.adapt = null; res = { kind: 'same', text: 'Alles im grünen Bereich: Der Plan läuft wie vorgesehen weiter.' }; }
     profile.checkins = profile.checkins || [];
     profile.checkins = profile.checkins.filter(c => c.week !== weekStartIso).concat([{ week: weekStartIso, ans, score: Math.round(score * 10) / 10, result: res.kind }]).slice(-52);
@@ -827,6 +892,6 @@
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
     loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
-    estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
+    estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

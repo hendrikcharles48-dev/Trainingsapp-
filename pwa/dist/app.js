@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.3.0';
+  const APP_VERSION = '3.4.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -393,7 +393,7 @@
     const loc = st.homeLoc || defLoc();
     const slots = day.slots.filter(s => s.ex[loc]);
     const goal = +a.days || p.days.length; const cnt = weekW.length; const pct = Math.min(100, Math.round(cnt / goal * 100));
-    const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics', fit: 'Fitness', health: 'Gesundheit' }[p.goal] || 'Training';
+    const goalN = { muscle: 'Muskelaufbau', recomp: 'Fett weg & Muskeln', strength: 'Maximalkraft', skills: 'Calisthenics', fit: 'Fitness', health: 'Gesundheit' }[p.goal] || 'Training';
     const hx = heroEx(day, loc);
     const R = 20, C = 2 * Math.PI * R;
     const last = st.workouts[st.workouts.length - 1];
@@ -456,17 +456,20 @@
   /* ================= Plan ================= */
   function volumeCard(p, loc) {
     const v = E.planVolume(p, P(), loc); const T = v.targets;
+    const freq = m => v.perDay.filter(dv => dv[m] >= 2).length;
+    const once = Object.keys(T).filter(m => v.week[m] >= 4 && freq(m) === 1);
     const rows = Object.keys(T).map(m => { const val = Math.round(v.week[m] * 2) / 2, t = T[m]; const st_ = val < t - 2.5 ? 'low' : val > 15.5 ? 'high' : 'ok';
       const col = { low: '#F5C26B', ok: 'var(--lime)', high: '#FF8A8A' }[st_];
       return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${t / 20 * 100}%"></b><b class="cap" style="left:${15 / 20 * 100}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}</span></div>`; }).join('');
     return `<div class="card stack" style="gap:10px"><div class="row between"><b>Sätze pro Muskel & Woche</b><span class="tiny muted">Strich = Ziel · rot ab 15</span></div>
       <div class="tiny muted">Effizienz-Prinzip: ~10 harte Sätze pro Muskel (Schwerpunkte ~14), 2× pro Woche, über 15 bringt kaum noch mehr. Mittrainierte Muskeln zählen halb.</div>
       <div class="stack" style="gap:6px">${rows}</div>
+      ${once.length && p.days.length >= 3 ? `<div class="tiny" style="color:#F5C26B">Nur an einem Tag trainiert: ${once.map(m => D.MUSCLES[m]).join(', ')} – besser auf zwei Tage verteilen.</div>` : ''}
       <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div>`;
   }
   function planView() {
     const p = plan(); const loc = st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
-    const goalN = { muscle: 'Muskelaufbau', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
+    const goalN = { muscle: 'Muskelaufbau', recomp: 'Fett weg & Muskeln', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
     return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto;margin-right:8px">Pläne${(P().plans || []).length > 1 ? ' (' + P().plans.length + ')' : ''}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
     <div class="stack">
       <div class="card lime rings-bg stack">
@@ -475,7 +478,8 @@
         <div class="row between"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
         <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
         <div class="meter"><i style="width:${wi.w / wi.len * 100}%"></i></div>
-        <div class="small" style="font-weight:700;opacity:.7">Woche 1 locker, Woche 2–3 Aufbau, Woche 4 am härtesten, Woche 5 Deload mit halben Sätzen.</div>
+        <div class="small" style="font-weight:700;opacity:.7">Erst locker, dann Aufbau, zuletzt am härtesten; in Woche ${wi.len} Deload mit halben Sätzen. Gezählt werden nur Wochen, in denen du trainiert hast.</div>
+        <div class="row" style="gap:8px;align-items:center"><span class="small" style="font-weight:800">Deload alle</span><div class="seg" style="flex:1">${[4, 5, 6, 8].map(n => `<button data-a="mesoLen" data-n="${n}" aria-pressed="${wi.len === n}">${n}</button>`).join('')}</div><span class="small" style="font-weight:800">Wochen</span></div>
         ${(() => { const c = (P().checkins || []).slice(-1)[0]; const txt = { deload: 'Deload diese Woche', less: 'Weniger Volumen diese Woche', more: 'Mehr Volumen diese Woche', same: 'Volumen wie geplant' }; return c ? `<div class="small" style="font-weight:800">Letzter Check-in (${dateDE(c.week, { day: 'numeric', month: 'short' })}): ${txt[c.result] || ''}</div>` : ''; })()}
         <button class="btn dark sm" style="align-self:flex-start" data-a="ciOpen">Wochen-Check-in ausfüllen</button>
       </div>
@@ -485,6 +489,12 @@
           const SLp = ssLabels(d.slots);
           return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</b></div>${noteChip(ex.id)}<div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
         <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
+      ${E.isCut(P(), p) ? `<details class="card flat small"><summary style="font-weight:800;cursor:pointer">So klappt „Fett weg & Muskeln“</summary><ul style="margin:8px 0 0;padding-left:18px">
+        <li>Schwer trainieren bleibt das Signal für die Muskeln – Gewicht und Wdh. halten ist beim Abnehmen schon ein Erfolg.</li>
+        <li>Viel Eiweiß: Richtwert 1,6–2,2 g pro kg Körpergewicht am Tag, über die Mahlzeiten verteilt.</li>
+        <li>Mäßiges Defizit: etwa 0,5 % Körpergewicht pro Woche abnehmen; schneller kostet eher Muskeln.</li>
+        <li>Genug Schlaf und viele Alltagsschritte helfen mehr als zusätzliche Sätze.</li>
+        <li>Der Plan gibt im Defizit etwas weniger Zusatzvolumen vor, weil die Erholung knapper ist.</li></ul></details>` : ''}
       ${volumeCard(p, loc)}
       <button class="btn" data-a="dayAdd">${I.plus} Tag hinzufügen</button>
       <div class="card flat small" style="margin-bottom:10px">↕ <b>Tipp:</b> Übung kurz gedrückt halten und nach oben oder unten ziehen, um die Reihenfolge zu ändern.</div>
@@ -960,7 +970,7 @@
     let msg = '';
     if (ex.kind !== 'int') {
       const targetSc = E.setScore(ex, { done: true, w: before.rec.w, reps: before.rec.reps, sec: before.rec.sec, rir: before.rec.rir }, E.bodyweight(P()));
-      if (sc && targetSc) { const d = sc / targetSc - 1; msg = d > 0.03 ? 'Stärker als erwartet (' + (d > 0 ? '+' : '') + Math.round(d * 100) + ' %). ' : d < -0.05 ? 'Etwas unter dem Ziel, Empfehlung angepasst. ' : 'Genau im Ziel. '; }
+      if (sc && targetSc) { const d = sc / targetSc - 1; msg = d > 0.03 ? 'Stärker als erwartet (' + (d > 0 ? '+' : '') + Math.round(d * 100) + ' %). ' : d < -0.05 ? 'Etwas unter dem Ziel, Empfehlung angepasst. ' : E.isCut(P(), plan()) ? 'Kraft gehalten – genau richtig beim Abnehmen. ' : 'Genau im Ziel. '; }
     }
     // Supersatz: direkt zur Partnerübung, Pause erst nach der Runde
     const grp = entry.ss ? a.exercises.map((e, i) => ({ e, i })).filter(x => x.e.ss === entry.ss) : [];
@@ -1535,6 +1545,11 @@
     focusEx(t) { st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
     toFocus() { toFocus(); },
     bkLater() { st.bkLater = true; render(); },
+    recompYes() { const p = P(); p.answers.goal = 'recomp'; plan().goal = 'recomp'; p.seen = Object.assign({}, p.seen, { recomp: true }); Store.saveProfile(true); render(); toast('Ziel: Fett weg & Muskeln aufbauen'); },
+    recompNo() { P().seen = Object.assign({}, P().seen, { recomp: true }); Store.saveProfile(); render(); },
+    dlYes() { plan().deloadUntil = E.todayISO(new Date(Date.now() + 7 * 864e5)); P().dlAsk = E.todayISO(); Store.saveProfile(true); render(); toast('Deload-Woche läuft bis ' + dateDE(plan().deloadUntil)); },
+    dlNo() { P().dlAsk = E.todayISO(); Store.saveProfile(); render(); },
+    mesoLen(t) { const p = plan(); p.meso = Object.assign({ start: E.todayISO() }, p.meso, { len: +t.dataset.n }); Store.saveProfile(); render(); },
     async backups() {
       openSheet({ type: 'backups', items: null, warn: !!st.corrupt });
       const items = await Backup.list(); let est = null, persisted = false;
@@ -1749,8 +1764,25 @@
     if (Store.mode === 'db') { for (const w of st.workouts) if (!have.has(w.id)) Store.saveWorkout(w); } else { Store.wv++; LS.set('workouts', st.workouts); }
     return n;
   }
+  // Leistung fällt bei mehreren Grund-/Ergänzungsübungen zweimal hintereinander (> 3 %) → Deload vorschlagen
+  function deloadNeeded() {
+    const p = plan(); if (!p || E.weekInfo(p, P()).deload) return false;
+    const asked = P().dlAsk; if (asked && (Date.now() - new Date(asked + 'T12:00:00').getTime()) / 864e5 < 21) return false;
+    const ids = new Set(); for (const d of p.days) for (const sl of d.slots) if (sl.r === 'main' || sl.r === 'sec') for (const l of p.locs || []) if (sl.ex[l]) ids.add(sl.ex[l]);
+    let falling = 0;
+    for (const id of ids) {
+      const ex = getEx(id); if (!ex || ex.kind === 'hold' || ex.kind === 'int') continue;
+      const h = histOf(id).slice(-3); if (h.length < 3) continue;
+      const b = h.map(x => E.sessionBest(ex, x.entry, x.bw || E.bodyweight(P())));
+      if (b[1] < b[0] * 0.97 && b[2] < b[1] * 0.97) falling++;
+    }
+    return falling >= 2;
+  }
   function homeCards() {
     const p = P(); let out = '';
+    const g = (p.answers || {}).goal;
+    if (!(p.seen || {}).recomp && ['muscle', 'fit', 'health'].includes(g)) out += `<div class="card stack" style="gap:10px"><b>Neues Ziel: Fett weg & Muskeln aufbauen</b><div class="small muted">Für die Zeit, in der du Körperfett verlierst: gleiche Übungen, etwas weniger Zusatzvolumen, Fokus darauf, die Kraft zu halten. Dein Plan bleibt, wie er ist.</div><div class="row"><button class="btn primary grow" data-a="recompYes">Umstellen</button><button class="btn grow" data-a="recompNo">Nein danke</button></div></div>`;
+    if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Leistung fällt – Deload-Woche empfohlen</b><div class="small muted">Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. Eine leichtere Woche (halbe Sätze, mehr Reserve) bringt dich meist stärker zurück.</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
     const since = p.lastExport || ''; const nNew = st.workouts.filter(w => w.date > since).length;
     const days = since ? (Date.now() - new Date(since + 'T12:00:00').getTime()) / 864e5 : 999;
     if (Store.mode !== 'db' && !st.bkLater && nNew >= 3 && days > 14) out += `<div class="card stack" style="gap:10px"><b>Backup sichern</b><div class="small muted">${since ? 'Letztes Backup am ' + dateDE(since) + '. ' : ''}${nNew} Trainings sind nur auf diesem iPhone gespeichert.</div><div class="row"><button class="btn primary grow" data-a="exportData">Backup sichern</button><button class="btn grow" data-a="bkLater">Später</button></div></div>`;
@@ -1890,7 +1922,11 @@
   /* ================= Start ================= */
   (async function boot() {
     await Store.init();
+    E.setWorkouts(() => st.workouts);
     normalizePlans();
+    // Pausen bei Isolationsübungen 75 → 90 s (nur unveränderte empfohlene Pläne)
+    for (const pl of (st.profile && st.profile.plans) || []) if ((pl.restV || 1) < 2) { if (autoPlan(pl)) for (const d of pl.days) for (const sl of d.slots) if (sl.r === 'iso' && sl.rest === 75) sl.rest = 90; pl.restV = 2; Store.saveProfile(); }
+    if (plan() && E.mesoBreak(plan())) { Store.saveProfile(); setTimeout(() => toast('Nach der Pause beginnt dein Zyklus neu mit der Einstiegswoche', 4000), 500); }
     if (!LS.get('meta')) LS.set('meta', { schema: 1 });
     registerCustom();
     if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }

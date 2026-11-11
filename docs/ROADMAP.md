@@ -12,7 +12,7 @@ Abhaken: Wenn eine Etappe fertig ist, in der Übersicht `[ ]` zu `[x]` machen un
 - [x] **Etappe 2** – Training flüssig, aktuelle Übung immer sichtbar, übersteht Sperren/App-Wechsel (mittel, Risiko: gering) – erledigt 11.11.2026, Version 3.1.0
 - [x] **Etappe 3** – Datensicherheit (mittel, Risiko: mittel – nur zusätzliche Kopien, nichts wird umgezogen) – erledigt 11.11.2026, Version 3.2.0
 - [x] **Etappe 4** – Eigene Pläne (groß, Risiko: mittel – `plans` kommt dazu, `plan` bleibt als Spiegel) – erledigt 11.11.2026, Version 3.3.0
-- [ ] **Etappe 5** – Trainingswissenschaft (mittel, Risiko: gering – nur Rechenregeln)
+- [x] **Etappe 5** – Trainingswissenschaft (mittel, Risiko: gering – nur Rechenregeln) – erledigt 11.11.2026, Version 3.4.0 (Volumen-Untergrenze war schon 7,5 – unverändert)
 - [ ] **Etappe 6** – Eigene Vorschläge und Komfort V1–V8 (mittel, Risiko: gering) – jeder Vorschlag einzeln abwählbar
 
 ## Regeln für jede Etappe
