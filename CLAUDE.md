@@ -54,7 +54,7 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
   Rollen `r`: `main` Grundübung, `sec` Ergänzung, `iso`, `skill`, `core`, `cond`. Tage ändern über `keepNext()`.
 - `active`: `{id, planId, dayIdx, dayId, name, loc, start, bw, exercises:[{key, exId, slotId, presc, sets:[{done,w,reps,sec,rir,band,t}], draft, extra, band, ss, note}], cur, rest, hold}`
   (`rest`/`hold` = laufende Timer, `syncTimers`/`restoreTimers`). Beim Start öffnet sich ein laufendes Training sofort (`boot`), nach 12 h Fenster `stale`.
-- `workout` (gespeichert): `{id, planId, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
+- `workout` (gespeichert): `{id, planId, rating, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
 - Export: JSON `{app:'satzwerk', version: 2, appVersion, exported, profile, workouts, active}`; Version 1 bleibt importierbar.
 
 ## Wissenschaftliche Regeln (Ziel: Fett reduzieren und Muskeln aufbauen)
@@ -82,10 +82,24 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
 - Im Training: Plus/Minus für Gewicht/Wdh. (`qAdj`), Reserve-Fenster oder „Schnell abhaken“, „Rückgängig“ im Hinweis
   (`toast(msg, ms, {a, l})`, `undoSet`), „Später“ (`exLater`), seltene Knöpfe im „⋯ Mehr“-Fenster (`exMenu`).
 - Texte kurz, deutsch, ohne Fachwörter.
-- Schrift: Standard ist die Systemschrift (SF Pro, `data-font="system"`); „Handschrift“ (`hand`) und „Technisch“ (`classic`)
-  sind wählbar (`settings.font`). Handschrift-Regeln in `index.html` nur unter `:root[data-font="hand"]`.
-- Navigation unten mit Symbol + Beschriftung; Übungsliste nach Kategorie gruppiert (`.grouphead`) mit Schwierigkeitspunkten;
-  Trainings-Bühne kompakt (Name links, Figur rechts, 168 px hoch), damit die Empfehlung ohne Scrollen sichtbar ist.
+- Design „Graphit / Tiefblau / Eisblau“ (ab 3.7, Nutzervorgabe): nur dunkel. Variablen in `index.html`:
+  `--bg #090B0F`, `--surface #12161D`, `--surface2 #1A202A`, `--line #232A35`, `--ink #EEF2F7`, `--muted #8D97A8`,
+  `--accent #8FB3D9` (Eisblau, EINZIGE Akzentfarbe), `--navy #14203A`/`--navy2 #1C2B4A` (aktiv/heute, Kacheln),
+  `--highlight #C9D8EA` (Rekorde, Baseball). Alte Namen (`--lime`, `--lav`, `--rose`, `--r-*` …) sind darauf abgebildet –
+  nichts Buntes einführen. Keine Verläufe, keine Schatten, keine Emojis, Linien-Icons (`I` in `app.js`).
+- Schrift Inter (Google Fonts) mit Tabellenziffern; große Titel 34–46 px Gewicht 900, Labels 11–13 px Großbuchstaben.
+  Keine Schriftwahl mehr (`settings.font` wird ignoriert).
+- Formen: Karten 22–30 px Rundung, Knöpfe 20 px, Hauptknopf 58 px Eisblau mit dunkler Schrift.
+- Figuren nur per CSS gefärbt (`figures.js` unverändert) und immer in eigener Kachel (`.figtile`, `.thumb`, `.tile`, Navy).
+- Stepper (`.mini`): eine Pille, −/+ fest 30 px (`flex:0 0 30px`), Zahl `flex:1; min-width:0` – nie überlappend (102,5 geprüft).
+  Lange Namen mit „…“ kürzen (`.ell`, `.clamp2`). Jede Ansicht bei 390 und 375 px prüfen.
+- Ansichten: Tab-Leiste Heute/Plan/Fortschritt/Übungen (Timer über Symbol oben auf „Heute“). Heute: Datum, „Moin, Name“
+  (Name aus dem Fragebogen, nie fest im Code), Wochenleiste (erledigt = Haken, Baseball = Eisweiß-Rand, heute = weiße Kachel),
+  Navy-Karte „Nächste Einheit“ mit Figur, 3 Mini-Kacheln, Kacheln Serie/Sätze/Rekorde, „Zuletzt“.
+  Vor dem Training: Tagesform-Check (`SHEETS.time`, `tfDelta`) – Energie/Schlaf/Zeit wählen NUR unter den vorhandenen
+  Längen −2…+2 von `timePlan`, keine eigene Trainingslogik. Training: Segment-Fortschritt (`.segbar`), Pause als Ring
+  (`#restRing`, letzte 10 s Eisweiß) mit „Als Nächstes“. Abschluss: 4 Kennzahlen, Rekordkarte, Muskel-Balken,
+  Bewertung 1–5 (`workout.rating`). Plan: Zyklus-Balken (`.cycbar`), Wochenliste (`weekList`). Übungen: Liste (`.exrow`).
 
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
 
