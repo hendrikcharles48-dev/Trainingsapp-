@@ -8,6 +8,9 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const APP_VERSION = '3.0.0';
+  // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
+  const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
   const st = { profile: null, workouts: [], active: null, tab: 'heute', ov: null, sheet: null, rest: null, hold: null, toast: null, progSeg: 'overview', libQ: '', libGroup: '', libAvail: true, libTab: 'all', libF: {}, homeFilter: 'all', chartEx: null, timer: { mode: 'rest' }, planLoc: null, homeLoc: null };
 
@@ -387,8 +390,16 @@
       && (!st.libAvail || st.libTab === 'fav' || E.available(ex, eqs)) && (st.libTab !== 'mine' || trained.has(ex.id)) && (st.libTab !== 'fav' || isFav(ex.id)))
       .sort((a, b) => a.pat.localeCompare(b.pat) || (a.rank || a.lvl) - (b.rank || b.lvl));
   }
-  function libView() {
+  function libResults() {
     const list = libList(); const F = st.libF || {};
+    const key = JSON.stringify([st.libQ, F, st.libAvail, st.libTab]);
+    if (key !== st.libKey) { st.libKey = key; st.libMax = 40; }
+    const max = st.libMax || 40;
+    return `<div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
+      ${list.length ? `<div class="exgrid">${list.slice(0, max).map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}${isFav(ex.id) ? '<span class="star">★</span>' : ''}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>${list.length > max ? `<button class="btn" data-a="libMore">Mehr anzeigen (${list.length - max} weitere)</button>` : ''}` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}`;
+  }
+  function libView() {
+    const F = st.libF || {};
     const chip = (k, label, val) => `<button class="chip ${val ? 'set' : ''}" data-a="libFilter" data-k="${k}">${val ? esc(val) : label} ▾</button>`;
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
@@ -396,8 +407,7 @@
       ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen gelten als „kann ich und vertrage ich“: Der Plan wählt sie bevorzugt, wenn die Ausrüstung da ist, sie an eine passende Stelle passen und höchstens 2 Stufen über deinem Level liegen. Maximal 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
       <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
-      <div class="row between"><span class="small muted">${list.length} Übungen</span>${(F.lvl || F.group || F.pat || F.eq) ? '<button class="btn ghost sm" data-a="libReset">Filter zurücksetzen</button>' : ''}</div>
-      ${list.length ? `<div class="exgrid">${list.map(ex => `<button class="extile" data-a="exInfo" data-id="${ex.id}"><div class="tile">${figSVG(ex)}${isFav(ex.id) ? '<span class="star">★</span>' : ''}</div><span>${esc(ex.name)}</span></button>`).join('')}</div>` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}
+      <div class="stack" id="libRes">${libResults()}</div>
     </div>`;
   }
 
@@ -920,6 +930,15 @@
   }
 
   /* ================= Sheets ================= */
+  function plateRes(s) { return SHEETS._plateRes(s); }
+  function pickResults(s) {
+    const q = (s.q || '').trim().toLowerCase();
+    const loc = st.active ? st.active.loc : (st.planLoc || defLoc());
+    const eq = E.locEquip(P(), loc);
+    const list = E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q) || (ex.alias || []).some(a => String(a).toLowerCase().includes(q))) && (s.all || E.available(ex, eq))).sort((a, b) => a.name.localeCompare(b.name));
+    if (!list.length) return `<div class="empty">Keine Übung gefunden.</div>`;
+    return list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('');
+  }
   const SHEETS = {
     rir(s) {
       const entry = st.active.exercises[s.i]; const ex = getEx(entry.exId); const S = exState(entry);
@@ -1013,16 +1032,20 @@
     },
     plates(s) {
       const bar = s.bar || 20; const w = s.w || 60;
+      return `<div class="stack"><h2>Scheibenrechner</h2><div class="small muted" style="margin-top:-8px">Gesamtgewicht und Stange wählen</div>
+        <div class="stepper"><button data-a="plateStep" data-d="-2.5">−</button><input id="plateW" inputmode="decimal" data-in="plateW" value="${fmt(w)}" aria-label="Zielgewicht"><button data-a="plateStep" data-d="2.5">+</button></div>
+        <div class="seg">${[20, 15, 10].map(b => `<button data-a="plateBar" data-b="${b}" aria-pressed="${bar === b}">${b} kg</button>`).join('')}</div>
+        <div class="card" id="plateRes">${plateRes(s)}</div></div>`;
+    },
+    _plateRes(s) {
+      const bar = s.bar || 20; const w = s.w || 60;
       const per = Math.max(0, (w - bar) / 2); const PL = [[25, 'var(--rose)'], [20, 'var(--lav)'], [15, 'var(--warn)'], [10, 'var(--good)'], [5, '#fff'], [2.5, '#9C9CA7'], [1.25, '#6E6E78']];
       let rest = per; const use = [];
       for (const [p, c] of PL) while (rest >= p - 1e-6) { use.push([p, c]); rest = Math.round((rest - p) * 100) / 100; }
       const h = p => 34 + p * 3.2;
       const side = use.map(([p, c]) => `<div class="pl" style="height:${h(p)}px;background:${c}">${fmt(p)}</div>`).join('');
-      return `<div class="stack"><h2>Scheibenrechner</h2><div class="small muted" style="margin-top:-8px">Gesamtgewicht und Stange wählen</div>
-        <div class="stepper"><button data-a="plateStep" data-d="-2.5">−</button><input id="plateW" inputmode="decimal" data-in="plateW" value="${fmt(w)}" aria-label="Zielgewicht"><button data-a="plateStep" data-d="2.5">+</button></div>
-        <div class="seg">${[20, 15, 10].map(b => `<button data-a="plateBar" data-b="${b}" aria-pressed="${bar === b}">${b} kg</button>`).join('')}</div>
-        <div class="card"><div class="platebar"><div class="sleeve"></div>${[...use].reverse().map(([p, c]) => `<div class="pl" style="height:${h(p)}px;background:${c}">${fmt(p)}</div>`).join('')}<div class="bar"></div>${side}<div class="sleeve"></div></div>
-        <div class="small ink2" style="text-align:center">${use.length ? 'Pro Seite: ' + use.map(u => fmt(u[0])).join(' + ') + ' kg' : 'Nur die Stange'}${rest > 0 ? ' · ' + fmt(rest * 2) + ' kg nicht darstellbar' : ''}</div></div></div>`;
+      return `<div class="platebar"><div class="sleeve"></div>${[...use].reverse().map(([p, c]) => `<div class="pl" style="height:${h(p)}px;background:${c}">${fmt(p)}</div>`).join('')}<div class="bar"></div>${side}<div class="sleeve"></div></div>
+        <div class="small ink2" style="text-align:center">${use.length ? 'Pro Seite: ' + use.map(u => fmt(u[0])).join(' + ') + ' kg' : 'Nur die Stange'}${rest > 0 ? ' · ' + fmt(rest * 2) + ' kg nicht darstellbar' : ''}</div>`;
     },
     slot(s) {
       const p = plan(); const day = p.days[s.d]; const sl = day.slots[s.s]; const loc = st.planLoc || defLoc();
@@ -1039,14 +1062,11 @@
         <button class="btn" data-a="pickEx" data-mode="slot" data-d="${s.d}" data-s="${s.s}">Aus allen Übungen wählen</button></div></div>`;
     },
     pick(s) {
-      const q = (s.q || '').toLowerCase();
       const loc = st.active ? st.active.loc : (st.planLoc || defLoc());
-      const eq = E.locEquip(P(), loc);
-      const list = E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q)) && (s.all || E.available(ex, eq))).sort((a, b) => a.name.localeCompare(b.name));
-      return `<div class="stack"><h2>Übung wählen</h2><input class="field" id="pickq" type="search" data-in="pickQ" placeholder="Suchen" value="${esc(s.q || '')}">
+      return `<div class="stack pickbox"><h2>Übung wählen</h2><input class="field" id="pickq" type="search" data-in="pickQ" placeholder="Suchen" value="${esc(s.q || '')}">
         <label class="row small"><input type="checkbox" data-a="pickAll" ${s.all ? 'checked' : ''}> Auch Übungen ohne passende Ausrüstung (${LOCN[loc]})</label>
         <button class="btn" data-a="customFrom">${I.plus} Nicht dabei? Eigene Übung anlegen</button>
-        <div class="list">${list.slice(0, 80).map(ex => `<button class="li" data-a="pickDo" data-id="${ex.id}"><div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${esc(D.PATTERNS[ex.pat] || '')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</div></div></button>`).join('')}</div></div>`;
+        <div class="list" id="pickRes">${pickResults(s)}</div></div>`;
     },
     balanceInfo(s) {
       const ch = s.ch || [];
@@ -1130,7 +1150,8 @@
           <div class="row wrap"><button class="btn grow" data-a="exportData">Backup exportieren</button><label class="btn grow" for="importFile" style="cursor:pointer">Backup importieren</label><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden></div></div>
         <button class="btn" data-a="quizEdit">Fragebogen bearbeiten</button>
         ${s.confirm ? '<button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn danger" data-a="reset">Alle Daten löschen</button>'}
-        <p class="tiny muted" style="margin:0">Satzwerk ersetzt keine ärztliche Beratung. Bei Schmerzen Übung abbrechen.</p></div>`;
+        <p class="tiny muted" style="margin:0">Satzwerk ersetzt keine ärztliche Beratung. Bei Schmerzen Übung abbrechen.</p>
+        <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION}</p></div>`;
     },
     rebuild() {
       return `<div class="stack"><h2>Plan neu berechnen?</h2><p class="ink2" style="margin:0">Mit deinen bisherigen Antworten wird eine neue Übungsauswahl erstellt. Deine manuellen Änderungen am Plan gehen dabei verloren. Dein Trainingsverlauf bleibt erhalten.</p><button class="btn primary" data-a="rebuildYes">Neu berechnen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button></div>`;
@@ -1192,6 +1213,7 @@
     dayLoc(t) { st.sheet.loc = t.dataset.l; st.homeLoc = t.dataset.l; renderSheet(); render(); },
     progGo(t) { st.tab = 'fortschritt'; st.progSeg = t.dataset.k; render(); window.scrollTo(0, 0); },
     libTab(t) { st.libTab = t.dataset.k; render(); },
+    libMore() { st.libMax = (st.libMax || 40) + 60; const el = $('#libRes'); if (el) el.innerHTML = libResults(); },
     libFilter(t) { openSheet({ type: 'filter', k: t.dataset.k }); },
     filterPick(t) { const k = st.sheet.k; const v = t.dataset.v; st.libF = Object.assign({}, st.libF, { [k]: v === '' ? null : (k === 'lvl' ? +v : v) }); closeSheet(); render(); },
     libAvailT() { st.libAvail = !st.libAvail; render(); },
@@ -1401,8 +1423,9 @@
   const IN = {
     noteText(t) { st.sheet.v = t.value; },
     wList(t) { st.sheet.v = t.value; const el = $('#w-prev'); if (el) el.innerHTML = wChips(t.value); },
-    plateW(t) { const v = num(t.value); if (v != null) { st.sheet.w = v; const pos = t.selectionStart; renderSheet(); const n = $('#plateW'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } } },
-    libQ(t) { st.libQ = t.value; const pos = t.selectionStart; render(); const n = $('#libq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } },
+    plateW(t) { const v = num(t.value); if (v != null) { st.sheet.w = v; const el = $('#plateRes'); if (el) el.innerHTML = plateRes(st.sheet); } },
+    // Suche: nur die Treffer neu zeichnen, Suchfeld und Tastatur bleiben unberührt
+    libQ(t) { st.libQ = t.value; later('libQ', 120, () => { const el = $('#libRes'); if (el) el.innerHTML = libResults(); }); },
     chartEx(t) { st.chartEx = t.value; render(); },
     quiz(t) { const q = E.Q.find(x => x.id === t.dataset.q); const v = q.type === 'number' ? num(t.value) : t.value; st.ov.answers[q.id] = v; const b = $('[data-a="qNext"]'); if (b) b.disabled = !(q.optional || (v != null && v !== '')); },
     dbList(t) { st.ov.answers.dbSetup.list = t.value.split(/[\s;]+/).map(num).filter(x => x > 0); },
@@ -1415,7 +1438,7 @@
       if (k === 'sets') sl.sets = Math.max(1, Math.min(10, Math.round(v))); else if (k === 'rest') sl.rest = Math.max(15, Math.min(600, Math.round(v)));
       else { const ex = getEx(sl.ex[st.planLoc || defLoc()]); const cur = sl.custRR || E.prescription(sl, ex, P(), plan()).rr; const rr = [...cur]; rr[k === 'lo' ? 0 : 1] = Math.max(1, Math.round(v)); if (rr[1] >= rr[0]) sl.custRR = rr; }
       Store.saveProfile(); render(); },
-    pickQ(t) { st.sheet.q = t.value; const pos = t.selectionStart; renderSheet(); const n = $('#pickq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } },
+    pickQ(t) { st.sheet.q = t.value; later('pickQ', 120, () => { const el = $('#pickRes'); if (el && st.sheet) el.innerHTML = pickResults(st.sheet); }); },
     iv(t) { T.iv[t.dataset.k] = Math.max(0, Math.round(num(t.value) || 0)); },
     setNum(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: num(t.value) }); Store.saveProfile(); },
     importFile(t) { if (t.files && t.files[0]) importData(t.files[0]); },
