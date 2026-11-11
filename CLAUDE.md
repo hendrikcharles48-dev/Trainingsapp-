@@ -6,6 +6,101 @@ Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engin
 Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
+## Arbeitsregeln (Satzwerk)
+- **Bauplan:** `docs/ROADMAP.md` (Etappen mit Prüfkriterien). Skill `satzwerk-etappe` („nächste Etappe“) arbeitet sie ab.
+- **Erst kurzen Plan zeigen, auf OK warten**, dann umsetzen (außer der Nutzer verzichtet ausdrücklich darauf).
+- **Bestehende Daten nie verlieren:** gespeicherte Felder nie löschen oder umbenennen, Neues nur zusätzlich; vor jeder
+  Umstellung eine Sicherung. Nur Schlüssel mit `satzwerk.`, nie `localStorage.clear()` – der Browser-Speicher wird mit
+  den anderen Apps derselben Adresse geteilt (Lernwerk, Kochwerk, Stunden, Toleranzen).
+- Keine fremden Dienste, kein Server, keine Bibliotheken. Das Repository ist öffentlich: keine persönlichen
+  Gesundheitsdaten (Gewicht, Beschwerden, Messwerte) in Dateien schreiben.
+- Sparsam lesen: `app.js` hat sehr lange Zeilen → per `grep -n … | cut -c1-300` gezielt lesen.
+
+## Aufbau
+- `index.html`: Gerüst (`#app`, `#layer`) und gesamtes CSS. `pwa/build.js` setzt Kopf und Service-Worker-Anmeldung davor/dahinter.
+- `exercises.js` (`window.EXDB`: `list`, `byId`, `MUSCLES`, `GROUPS`, `PATTERNS`, `EQUIP`), `howto.js`, `figures.js` (`figSVG`).
+- `engine.js` (`window.ENGINE`): Fragebogen `Q`, `buildPlan`/`fillDay`/`balancePlan`/`planVolume`, `timePlan`,
+  `weekInfo`/`mesoWeek`, `prescription` (Sätze, Wdh.-Bereich, Reserve, Pause je Slot), `recommend` (Empfehlung je Satz),
+  `setScore`/`sessionBest`/`historyFor`, `applyCheckin`.
+- `app.js`: Zustand `st`; `render()` baut die Ansicht als HTML-Text neu. Reiter: `homeView`, `planView`, `libView`,
+  `progView`, `timerView`. Overlays über `st.ov` (`workout`, `quiz`, `result`), Fenster über `st.sheet` + `SHEETS`,
+  unteres Trainings-Panel `renderRest`. Klicks: `data-a` → `A[...]`; Eingaben: `data-in` → `IN[...]`.
+  Training: `startWorkout` → `exState`/`curIndex` → `focusCard` → `A.doneSet` → Fenster `rir` → `commitSet` → `finishWorkout`.
+- Beim Tippen nie die ganze Ansicht neu bauen (Suchfelder: nur die Trefferliste ersetzen: `libResults`/`#libRes`,
+  `pickResults`/`#pickRes`, `later()` verzögert). Bei offenem Overlay baut `render()` die Seite dahinter nicht neu.
+- Training schnell halten: Verlauf über `histOf(exId)` (Cache, ungültig über `Store.wv`), `exState` hat einen Cache
+  (Schlüssel enthält `st.ev`, das jede Klick/Eingabe hochzählt). Nach Satz/Übungswechsel `toFocus()` (Fokus-Übung oben).
+- Version: `APP_VERSION` in `app.js` (Anzeige in den Einstellungen) + `CACHE` in `pwa/sw.js` bei jedem Release erhöhen.
+- Service Worker: Satzwerks eigene Dateien und Schriften „Cache zuerst, im Hintergrund auffrischen“; Unterordner (andere
+  Apps) Netz zuerst. Neue Version lädt die Seite nur neu, wenn kein Training läuft (`build.js`, `controllerchange`).
+
+## Datenmodell und Speicher
+- Speicher über `Store` (`app.js`): localStorage `satzwerk.profile`, `satzwerk.workouts` (Liste), `satzwerk.active`
+  (laufendes Training), `satzwerk.meta` (`{schema: 2}`), Rettung beschädigter Inhalte `satzwerk.corrupt.<key>`.
+  In der Artifact-Version zusätzlich Online-Speicher (`Store.mode === 'db'`). Alle Änderungen an Trainings über
+  `Store.saveWorkout`/`deleteWorkout` (zählen `Store.wv` hoch). `LS.set` meldet Fehler (rotes Band `renderSaveErr`).
+- Sicherungen: IndexedDB `satzwerk`, Speicher `snap` (`Backup.snapshot(grund)`, max. 8 + je eine pro „vor-…“-Grund).
+  Vor jeder Umstellung/jedem Ersetzen `Backup.snapshot('vor-…')` aufrufen (Kopie wird synchron gezogen).
+  Fenster „Sicherungen“ (`A.backups`), Import mit Vorschau (`importPreview`: Zusammenführen/Alles ersetzen),
+  nach Laden/Ersetzen `afterDataLoad()` (ruft `normalizePlans`).
+- `profile`: `answers` (Fragebogen), `plans` (alle Pläne), `planId` (aktiv), `plan` (Spiegel = aktiver Plan, gleiches
+  Objekt; `normalizePlans()` beim Start hält es zusammen, `profile.plan` ist maßgeblich), `custom` (eigene Übungen),
+  `settings` (u. a. `quick` = Schnell abhaken), `exW`, `exNotes`, `checkins`, `adapt`, `bwLog`, `favs`, `lastExport`,
+  `seen` (einmalige Hinweise), `dlAsk` (Deload-Vorschlag zuletzt), `sportDays` (0 = Mo … 6 = So).
+- `plan`: `{id, name, v, custom, edited, split, splitName, goal, locs, days, meso:{start,len}, next, bal, restV, forceDeload, deloadUntil}`;
+  `custom` = vom Nutzer gebaut, `edited` = empfohlener Plan vom Nutzer verändert (`touchPlan()` bei jeder Planänderung).
+  Nur `autoPlan(p)` (= `!custom && !edited`) darf automatisch umgebaut werden (Balance, Plan-Update, Favoriten-Auswahl).
+  `day`: `{id, key, name, focus, slots}`; `slot`: `{id, p, r, sets, rr, custRR, rest, ex:{home,gym}, why, locked, ss}`.
+  Rollen `r`: `main` Grundübung, `sec` Ergänzung, `iso`, `skill`, `core`, `cond`. Tage ändern über `keepNext()`.
+- `active`: `{id, planId, dayIdx, dayId, name, loc, start, bw, exercises:[{key, exId, slotId, presc, sets:[{done,w,reps,sec,rir,band,t}], draft, extra, band, ss, note}], cur, rest, hold}`
+  (`rest`/`hold` = laufende Timer, `syncTimers`/`restoreTimers`). Beim Start öffnet sich ein laufendes Training sofort (`boot`), nach 12 h Fenster `stale`.
+- `workout` (gespeichert): `{id, planId, rating, ts, date, name, dayId, loc, dur, bw, exercises:[{exId, sets:[{w,reps,sec,rir,band}], rirT, rr, note, best}], prs, vol}`.
+- Export: JSON `{app:'satzwerk', version: 2, appVersion, exported, profile, workouts, active}`; Version 1 bleibt importierbar.
+
+## Wissenschaftliche Regeln (Ziel: Fett reduzieren und Muskeln aufbauen)
+- Volumen: ~10 harte Sätze je Muskel und Woche, Schwerpunkte mehr, Deckel 15, mitbeteiligte Muskeln halb; jeder Muskel
+  möglichst 2× pro Woche. Im Defizit nicht mehr Volumen, sondern Gewicht auf der Stange halten.
+- Wiederholungen: Grundübungen 6–10, Ergänzung 8–12, Isolation 10–15 (5–30 wirken ähnlich, wenn nah am Versagen).
+- Reserve: 1–2 Wdh. (Grundübungen nie bis zum Versagen), Deload 3. Ehrliche Reserve-Angabe steuert alles.
+- Progression: doppelt (`recommend`, Gewichte mit Auswahlliste): gleiches Gewicht +1 Wdh. (gleich viele, wenn es härter
+  war als geplant), alle Sätze an der Obergrenze → nächstes Gewicht und unten anfangen, unter der Untergrenze → leichter.
+  Ab Satz 2 bleibt das Gewicht; bei Tagesform ±8 % und ohne frischen Verlauf (> 21 Tage) gilt die Leistungszahl.
+- Pausen: Grundübungen 2,5–3 min, Ergänzung 2 min, Isolation 1,5 min (`E.defaultRest`); Supersätze nur bei Übungen, die sich nicht stören.
+- Deload: Zyklus zählt nur trainierte Wochen (`mesoWeek`, `E.setWorkouts`), Länge 4/5/6/8 wählbar (`meso.len`),
+  nach ≥ 14 Tagen Pause Neustart (`mesoBreak`); zusätzlich nach Bedarf (Check-in, `deloadNeeded` bei fallender Leistung):
+  halbe Sätze, Reserve 3, Gewicht bleibt.
+- Ziel `recomp` („Fett weg & Muskeln aufbauen“, `E.isCut`): wie Muskelaufbau, Schwerpunkte 12 statt 14 Sätze, kein
+  Zusatzsatz in den harten Wochen, Check-in gibt erst später mehr Volumen; Gewichtstrend im Fortschritt (Ziel −0,25 bis −0,75 %/Woche).
+- Reihenfolge: Skill → Grundübung → Ergänzung → Isolation → Rumpf; Schwerpunkt-Muskel früh in der Einheit.
+
+## Designregeln (modernes iOS, Bedienung mit einer Hand)
+- Tipp-Flächen ≥ 44 px, wichtige Knöpfe unten in Daumenreichweite, höchstens 2 Tipps pro Satz.
+- Eingabefelder ≥ 16 px Schrift (sonst zoomt iOS), Zahlen lieber über −/+ als über die Tastatur.
+- Aktuelle Übung im Training immer sichtbar; nichts darf beim Sperren oder App-Wechsel verloren gehen.
+- Sicherheitsabstände (`env(safe-area-inset-*)`) beachten, Fenster von unten, dunkles Design, ruhige Animationen.
+- iPhone: keine Vibration aus Web-Apps, Ton nur ohne Stumm-Schalter – Signale immer auch sichtbar machen (`flashPanel`).
+- Im Training: Plus/Minus für Gewicht/Wdh. (`qAdj`), Reserve-Fenster oder „Schnell abhaken“, „Rückgängig“ im Hinweis
+  (`toast(msg, ms, {a, l})`, `undoSet`), „Später“ (`exLater`), seltene Knöpfe im „⋯ Mehr“-Fenster (`exMenu`).
+- Texte kurz, deutsch, ohne Fachwörter.
+- Design „Graphit / Tiefblau / Eisblau“ (ab 3.7, Nutzervorgabe): nur dunkel. Variablen in `index.html`:
+  `--bg #090B0F`, `--surface #12161D`, `--surface2 #1A202A`, `--line #232A35`, `--ink #EEF2F7`, `--muted #8D97A8`,
+  `--accent #8FB3D9` (Eisblau, EINZIGE Akzentfarbe), `--navy #14203A`/`--navy2 #1C2B4A` (aktiv/heute, Kacheln),
+  `--highlight #C9D8EA` (Rekorde, Baseball). Alte Namen (`--lime`, `--lav`, `--rose`, `--r-*` …) sind darauf abgebildet –
+  nichts Buntes einführen. Keine Verläufe, keine Schatten, keine Emojis, Linien-Icons (`I` in `app.js`).
+- Schrift Inter (Google Fonts) mit Tabellenziffern; große Titel 34–46 px Gewicht 900, Labels 11–13 px Großbuchstaben.
+  Keine Schriftwahl mehr (`settings.font` wird ignoriert).
+- Formen: Karten 22–30 px Rundung, Knöpfe 20 px, Hauptknopf 58 px Eisblau mit dunkler Schrift.
+- Figuren nur per CSS gefärbt (`figures.js` unverändert) und immer in eigener Kachel (`.figtile`, `.thumb`, `.tile`, Navy).
+- Stepper (`.mini`): eine Pille, −/+ fest 30 px (`flex:0 0 30px`), Zahl `flex:1; min-width:0` – nie überlappend (102,5 geprüft).
+  Lange Namen mit „…“ kürzen (`.ell`, `.clamp2`). Jede Ansicht bei 390 und 375 px prüfen.
+- Ansichten: Tab-Leiste Heute/Plan/Fortschritt/Übungen (Timer über Symbol oben auf „Heute“). Heute: Datum, „Moin, Name“
+  (Name aus dem Fragebogen, nie fest im Code), Wochenleiste (erledigt = Haken, Baseball = Eisweiß-Rand, heute = weiße Kachel),
+  Navy-Karte „Nächste Einheit“ mit Figur, 3 Mini-Kacheln, Kacheln Serie/Sätze/Rekorde, „Zuletzt“.
+  Vor dem Training: Tagesform-Check (`SHEETS.time`, `tfDelta`) – Energie/Schlaf/Zeit wählen NUR unter den vorhandenen
+  Längen −2…+2 von `timePlan`, keine eigene Trainingslogik. Training: Segment-Fortschritt (`.segbar`), Pause als Ring
+  (`#restRing`, letzte 10 s Eisweiß) mit „Als Nächstes“. Abschluss: 4 Kennzahlen, Rekordkarte, Muskel-Balken,
+  Bewertung 1–5 (`workout.rating`). Plan: Zyklus-Balken (`.cycbar`), Wochenliste (`weekList`). Übungen: Liste (`.exrow`).
+
 ## Feste Regel des Nutzers: bei JEDEM Update eigene Übungen prüfen
 
 Bevor ein Update hochgeladen wird, nachsehen, ob der Nutzer neue eigene Übungen angelegt hat.
@@ -35,12 +130,15 @@ Wo die eigenen Übungen zu finden sind:
   (Artifact https://claude.ai/artifact/9rhKGs5pYvdeqRx7ymim9L).
 - Wenn nichts davon vorliegt: den Nutzer kurz fragen, ob er neue Übungen angelegt hat.
 
+Übungsbestand: 248 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
+neue Figuren nutzen vorhandene Vorlagen). Prüfen: jede Übung braucht Eintrag in allen drei Dateien.
 Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`).
 Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
 
 ## Trainingslogik
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
-- Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an.
+- Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
+  Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).
 - Effizienz-Prinzip (Nutzerwunsch, „2-5-15“ sinngemäß): pro Muskel/Woche ~10 harte Sätze,
   Schwerpunkte ~14, Deckel 15, mitbeteiligte Muskeln zählen halb, Skills nur 2×/Woche.
   `balancePlan()`/`planVolume()` in `engine.js`; läuft in `buildPlan` und einmalig für alte Pläne

@@ -298,7 +298,24 @@
     'cable-crunch': 'cablecrunch', 'cable-woodchop': 'woodchop', 'dragon-flag': 'dragon', 'suitcase-carry': ['carry', false], 'farmer-carry': ['carry', true], 'ab-machine': 'abmachine',
     'tuck-lsit': 'lsittuck', 'ring-tuck-lsit': 'ringlsittuck', 'ring-lsit': 'ringlsit', 'lsit-one': 'lsitone', 'lsit': 'lsit', 'wall-hs': 'wallhs', 'free-hs': 'freehs', 'tuck-fl': 'fltuck', 'adv-tuck-fl': 'fladv', 'straddle-fl': 'fl', 'full-fl': 'fl',
     'false-grip-hang': 'falsegrip', 'mu-transition': 'mutrans', 'neg-mu': 'mu', 'muscle-up': 'mu', 'ring-mu': 'ringmu', 'skin-cat': 'skincat', 'tuck-bl': 'backlever', 'planche-lean': 'planchelean', 'tuck-planche': 'tuckplanche',
-    'burpees': 'burpee', 'mountain': 'climber', 'db-thruster': 'thruster', 'swing-int': 'swing', 'jump-squat': 'jump'
+    'burpees': 'burpee', 'mountain': 'climber', 'db-thruster': 'thruster', 'swing-int': 'swing', 'jump-squat': 'jump',
+    // Erweiterung 3.6
+    'neutral-pulldown': 'latpd', 'wide-pullup': 'pullup', 'neutral-pullup': 'pullup', 'active-hang': 'scap',
+    'tbar-row': ['bentrow', 'bb'], 'pendlay-row': ['bentrow', 'bb'], 'cable-row-1arm': 'seatedrow', 'seal-row': 'chestrow', 'wide-cable-row': 'seatedrow',
+    'seated-db-press': ['press', 'db'], 'landmine-press': ['press', 'db1'], 'push-press': ['press', 'bb'],
+    'wall-pushup': 'inclinepu', 'knee-pushup': 'pushup', 'deficit-pushup': 'pushup', 'cable-press': 'cflyF', 'incline-machine': 'chestpress', 'db-squeeze-press': ['bench', 'db'],
+    'machine-dip': ['dip', 'post'], 'straight-bar-dip': ['dip', 'post'], 'incline-db-fly': ['fly', 'db'], 'cable-fly-low': 'cflyF',
+    'db-lateral-seated': ['latF', 'db'], 'db-upright-row': ['latF', 'db'], 'db-rear-row': 'chestrow', 'ytw-raise': ['revflyFB', 'db'],
+    'cable-curl': 'cablecurl', 'bb-curl': ['curl', 'bb'], 'spider-curl': 'preacher', 'db-preacher': 'preacher', 'cross-hammer': ['curl', 'db'],
+    'cable-pushdown-1arm': 'pushdown', 'bb-skull': 'skull', 'cable-kickback': 'kickback', 'machine-triceps': 'pushdown',
+    'heel-goblet': 'goblet', 'box-squat': 'backsq', 'wall-sit': 'squat', 'reverse-nordic': 'sissy', 'sl-leg-ext': 'legext',
+    'split-squat': ['lunge', null], 'db-split-squat': ['lunge', 'db'], 'db-lateral-lunge': 'cossackF', 'skater-squat': ['pistol', true], 'stepup-bw': 'stepup',
+    'good-morning': ['rdl', 'bb'], 'cable-pull-through': 'swing', 'sumo-dl': 'deadlift', 'db-sumo-dl': 'deadlift',
+    'frog-pump': 'bridge', 'db-glute-bridge': 'bridge', 'machine-hip-thrust': ['hipthrust', 'bb'], 'cable-abduction': 'abduct', 'cable-glute-kick': ['slrdl', null],
+    'seated-leg-curl': 'legcurl', 'db-leg-curl': 'legcurl', 'seated-calf': ['calf', null], 'db-calf': ['calf', 'db1'], 'leg-press-calf': ['calf', null],
+    'pallof': 'woodchop', 'reverse-crunch': 'deadbug', 'crunch': 'hollow', 'bird-dog': 'plank', 'side-plank-hip': 'sideplank', 'copenhagen': 'sideplank', 'hanging-oblique': 'knee', 'v-up': 'hollow', 'plank-tap': 'plank',
+    'jumping-jacks': 'jump', 'high-knees': 'jump', 'skater-jumps': 'jump', 'db-snatch': 'thruster', 'bear-crawl': 'climber',
+    'crow': 'tuckplanche', 'chest-wall-hs': 'wallhs'
   };
   const LS = (feet, o) => ({ k: [Object.assign({ hip: [82, 152], t: 160, h: [[102, 169], [98, 169]], f: feet, ks: [-1, -1] }, o || {}), Object.assign({ hip: [82, 149], t: 160, h: [[102, 169], [98, 169]], f: feet.map(x => [x[0], x[1] - 3]), ks: [-1, -1] }, o || {})], p: [{ k: 'para', x: 100, y: 171 }] });
   T.lsit = LS([[164, 154], [162, 156]], { tp: [1, 1] });
