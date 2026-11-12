@@ -1,5 +1,5 @@
 // Cache zuerst (Start ohne Warten aufs Netz), im Hintergrund auffrischen; neue Version über CACHE-Namen
-const CACHE = 'satzwerk-v31';
+const CACHE = 'satzwerk-v32';
 const FILES = ['./', './index.html', './exercises.js', './howto.js', './engine.js', './figures.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(FILES.map(f => fetch(f, { cache: 'reload' }).then(r => { if (r.ok) return c.put(f, r); })))).then(() => self.skipWaiting()));

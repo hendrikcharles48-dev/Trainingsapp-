@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.7.0';
+  const APP_VERSION = '3.8.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -35,6 +35,8 @@
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
     note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>',
+    more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+    later: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>'
   };
 
@@ -430,16 +432,10 @@
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
       ${sport.size ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span><span><i class="lg-sport"></i>Baseball</span><span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
       ${hero}
+      ${st.active ? '' : `<div class="row"><button class="btn grow" data-a="dayPick">Andere Einheit</button><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button></div>`}
+      ${(() => { const h = (checkinDue() ? checkinCard() : '') + homeCards() + bwNudge(); return h ? `<div class="section"><div class="head"><h3>Hinweise</h3></div>${h}</div>` : ''; })()}
       <div class="tiles3"><div><b>${weeksStreak()}</b><span>Wochen Serie</span></div><div><b>${setsWeek}</b><span>Sätze diese Woche</span></div><div><b>${prsTotal}</b><span>Rekorde</span></div></div>
       ${last ? `<div class="section"><div class="head"><h3>Zuletzt</h3><button class="btn ghost sm" data-a="progGo" data-k="history">Alle</button></div>${workoutRow(last)}</div>` : ''}
-      ${checkinDue() ? checkinCard() : ''}${homeCards()}
-      <div class="section"><div class="head"><h3>Deine Einheiten</h3><button class="btn ghost sm" data-a="tab" data-k="plan">Plan</button></div>
-        <div class="list">${p.days.map((d, i) => { const n = d.slots.filter(s => s.ex[loc]).length; return `<button class="li" data-a="dayOpen" data-i="${i}">${thumb(heroEx(d, loc))}<div class="grow"><div class="ell" style="font-weight:700">${esc(d.name)}</div><div class="small muted ell">${n} Übungen · ${estMinutes(d, loc)} min${i === nextDayIdx() ? ' · als Nächstes' : ''}</div></div><span class="chev">${I.chev}</span></button>`; }).join('')}</div></div>
-      <div class="card stack"><div class="row between"><h3>Erholung</h3><span class="small muted">Muskelgruppen</span></div>
-        <div class="bars">${rec.map(r => `<div class="bar"><span class="ell">${r.g}</span><div class="track"><i class="${r.pct < 50 ? 'warn' : ''}" style="width:${r.pct}%"></i></div><span class="num small" style="text-align:right">${r.pct}%</span></div>`).join('')}</div>
-        <div class="tiny muted">Geschätzt aus Sätzen und Zeit seit dem letzten Training. Voller Balken = bereit.</div></div>
-      <button class="btn" data-a="freeWorkout">${I.plus} Freies Training</button>
-      ${bwNudge()}
     </div>`;
   }
   function bwNudge() {
@@ -469,46 +465,43 @@
     const rows = Object.keys(T).map(m => { const val = Math.round(v.week[m] * 2) / 2, t = T[m]; const st_ = val < t - 2.5 ? 'low' : val > 15.5 ? 'high' : 'ok';
       const col = { low: 'var(--highlight)', ok: 'var(--lime)', high: 'var(--highlight)' }[st_];
       return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${t / 20 * 100}%"></b><b class="cap" style="left:${15 / 20 * 100}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}</span></div>`; }).join('');
-    return `<div class="card stack" style="gap:10px"><div class="row between"><b>Sätze pro Muskel & Woche</b><span class="tiny muted">Strich = Ziel · rot ab 15</span></div>
+    const lowN = Object.keys(T).filter(m => v.week[m] < T[m] - 2.5).length, highN = Object.keys(T).filter(m => v.week[m] > 15.5).length;
+    return `<details class="card fold"><summary><span class="grow">Sätze pro Muskel & Woche</span><span class="tagx">${lowN || highN ? [lowN ? lowN + ' zu wenig' : '', highN ? highN + ' zu viel' : ''].filter(Boolean).join(' · ') : 'passt'}</span></summary><div class="stack" style="gap:10px;margin-top:12px"><div class="tiny muted">Strich = Ziel · ab 15 kaum Zusatznutzen</div>
       <div class="tiny muted">Effizienz-Prinzip: ~10 harte Sätze pro Muskel (Schwerpunkte ~14), 2× pro Woche, über 15 bringt kaum noch mehr. Mittrainierte Muskeln zählen halb.</div>
       <div class="stack" style="gap:6px">${rows}</div>
       ${once.length && p.days.length >= 3 ? `<div class="tiny" style="color:var(--highlight)">Nur an einem Tag trainiert: ${once.map(m => D.MUSCLES[m]).join(', ')} – besser auf zwei Tage verteilen.</div>` : ''}
-      <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div>`;
+      <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div></details>`;
   }
   function planView() {
     const p = plan(); const loc = st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
     const goalN = { muscle: 'Muskelaufbau', recomp: 'Fett weg & Muskeln', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
-    return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto;margin-right:8px">Pläne${(P().plans || []).length > 1 ? ' (' + P().plans.length + ')' : ''}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div>
+    const nd = nextDayIdx(); const openD = st.planOpen || {};
+    const isOpen = di => openD[p.days[di].id] ?? (di === nd);
+    const sub = [p.custom ? 'Eigener Plan' : (p.name || '') !== p.splitName ? p.splitName : '', p.days.length + '× pro Woche', goalN].filter(Boolean).join(' · ');
+    const lastCi = (P().checkins || []).slice(-1)[0]; const ciTxt = { deload: 'Deload diese Woche', less: 'weniger Volumen diese Woche', more: 'mehr Volumen diese Woche', same: 'Volumen wie geplant' };
+    const slotRow = (d, di, sl, si, SLp) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
+      return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="ell" style="font-weight:700">${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</div><div class="small muted ell">${ROLE[sl.r][1]} · ${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · ${sl.rest} s</div>${noteChip(ex.id)}</div><span class="chev">${I.chev}</span></button>`; };
+    return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto">Pläne${(P().plans || []).length > 1 ? ' (' + P().plans.length + ')' : ''}</button><button class="iconbtn" data-a="planTools" aria-label="Plan verwalten">${I.more}</button></div>
     <div class="stack">
-      <div class="card lime rings-bg stack">
-        <b style="font-size:19px">${esc(p.name || p.splitName)}</b>
-        <div class="row wrap" style="gap:6px">${p.custom ? '<span class="tag">Eigener Plan</span>' : (p.name || '') !== p.splitName ? `<span class="tag">${esc(p.splitName)}</span>` : ''}<span class="tag">${p.days.length}× pro Woche</span><span class="tag">${goalN}</span></div>
-        <div class="row between"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
-        <button class="btn dark sm" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt'}</button></div>
+      <div class="card navy stack" style="gap:12px">
+        <div style="min-width:0"><div class="eyebrow">Aktiver Plan</div><h2 class="ell" style="margin-top:2px">${esc(p.name || p.splitName)}</h2><div class="small ink2 ell">${esc(sub)}</div></div>
+        <button class="cychead" data-a="cycleSheet"><span class="grow ell">Woche ${wi.w} von ${wi.len} · ${wi.label}</span><span class="small" style="color:var(--accent)">Zyklus ›</span></button>
         <div class="cycbar">${Array.from({ length: wi.len }, (_, k) => `<div class="${k + 1 === wi.w ? 'cur' : k + 1 < wi.w ? 'past' : ''}"><i></i><span>${k + 1 === wi.len ? 'Deload' : 'W' + (k + 1)}</span></div>`).join('')}</div>
-        <div class="small" style="font-weight:700;opacity:.7">Erst locker, dann Aufbau, zuletzt am härtesten; in Woche ${wi.len} Deload mit halben Sätzen. Gezählt werden nur Wochen, in denen du trainiert hast.</div>
-        <div class="row" style="gap:8px;align-items:center"><span class="small" style="font-weight:800">Deload alle</span><div class="seg" style="flex:1">${[4, 5, 6, 8].map(n => `<button data-a="mesoLen" data-n="${n}" aria-pressed="${wi.len === n}">${n}</button>`).join('')}</div><span class="small" style="font-weight:800">Wochen</span></div>
-        ${(() => { const c = (P().checkins || []).slice(-1)[0]; const txt = { deload: 'Deload diese Woche', less: 'Weniger Volumen diese Woche', more: 'Mehr Volumen diese Woche', same: 'Volumen wie geplant' }; return c ? `<div class="small" style="font-weight:800">Letzter Check-in (${dateDE(c.week, { day: 'numeric', month: 'short' })}): ${txt[c.result] || ''}</div>` : ''; })()}
-        <button class="btn dark sm" style="align-self:flex-start" data-a="ciOpen">Wochen-Check-in ausfüllen</button>
+        ${lastCi ? `<div class="tiny ink2">Letzter Check-in: ${ciTxt[lastCi.result] || ''}</div>` : ''}
       </div>
       ${weekList(p)}
-      ${locs().length > 1 ? `<div class="seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-      ${p.days.map((d, di) => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min</span><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten" style="width:44px;height:44px;font-weight:900">⋯</button></div>${orderHint(d, loc)}
-        <div class="list">${d.slots.map((sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p);
-          const SLp = ssLabels(d.slots);
-          return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="row" style="gap:6px"><span class="plate p-${sl.r}" style="width:20px;height:20px;font-size:10px">${ROLE[sl.r][0]}</span><b>${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</b></div>${noteChip(ex.id)}<div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''} · Pause ${sl.rest} s</div>${(sl.why && sl.why[loc] && sl.why[loc].length) ? `<div class="why" style="margin-top:4px">${sl.why[loc].slice(0, 2).map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div><span class="chev">${I.chev}</span></button>`; }).join('')}
-        <button class="li" data-a="pickEx" data-mode="plan" data-d="${di}" style="color:var(--lime);font-weight:800"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div></div>`).join('')}
-      ${E.isCut(P(), p) ? `<details class="card flat small"><summary style="font-weight:800;cursor:pointer">So klappt „Fett weg & Muskeln“</summary><ul style="margin:8px 0 0;padding-left:18px">
+      <div class="section"><div class="head"><h3>Einheiten</h3>${locs().length > 1 ? `<div class="seg mini-seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}</div>
+        ${p.days.map((d, di) => { const o = isOpen(di); const SLp = ssLabels(d.slots); return `<div class="daybox ${o ? 'open' : ''}"><div class="dayhead"><button class="grow dayt" data-a="dayToggle" data-d="${di}" aria-expanded="${o}"><div style="min-width:0"><b class="ell">${esc(d.name)}</b><span class="ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min${di === nd ? ' · als Nächstes' : ''}</span></div><span class="chev">${I.chev}</span></button><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten">${I.more}</button></div>
+          ${o ? `${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => slotRow(d, di, sl, si, SLp)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>` : ''}</div>`; }).join('')}
+        <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
+        <button class="btn" data-a="dayAdd">${I.plus} Tag hinzufügen</button></div>
+      ${volumeCard(p, loc)}
+      ${E.isCut(P(), p) ? `<details class="card fold"><summary>So klappt „Fett weg & Muskeln“</summary><ul class="small ink2" style="margin:10px 0 0;padding-left:18px">
         <li>Schwer trainieren bleibt das Signal für die Muskeln – Gewicht und Wdh. halten ist beim Abnehmen schon ein Erfolg.</li>
         <li>Viel Eiweiß: Richtwert 1,6–2,2 g pro kg Körpergewicht am Tag, über die Mahlzeiten verteilt.</li>
         <li>Mäßiges Defizit: etwa 0,5 % Körpergewicht pro Woche abnehmen; schneller kostet eher Muskeln.</li>
         <li>Genug Schlaf und viele Alltagsschritte helfen mehr als zusätzliche Sätze.</li>
         <li>Der Plan gibt im Defizit etwas weniger Zusatzvolumen vor, weil die Erholung knapper ist.</li></ul></details>` : ''}
-      ${volumeCard(p, loc)}
-      <button class="btn" data-a="dayAdd">${I.plus} Tag hinzufügen</button>
-      <div class="card flat small" style="margin-bottom:10px">↕ <b>Tipp:</b> Übung kurz gedrückt halten und nach oben oder unten ziehen, um die Reihenfolge zu ändern.</div>
-      <div class="card flat small"><div class="row wrap" style="gap:12px">${Object.keys(ROLE).map(r => `<span class="row" style="gap:6px">${plateHTML(r)} ${ROLE[r][1]}</span>`).join('')}</div><p class="muted tiny" style="margin:10px 0 0">Jede Einheit hat 5–7 Übungen: Grundübungen zuerst, dann Ergänzung, Isolation und Rumpf.</p></div>
-      <div class="row wrap"><button class="btn grow" data-a="rebuildAsk">${p.custom ? 'Plan empfehlen lassen' : 'Plan neu berechnen'}</button><button class="btn grow" data-a="quizEdit">Fragebogen bearbeiten</button></div>
     </div>`;
   }
 
@@ -613,6 +606,7 @@
     if (!st.chartEx || !exWithHist.includes(st.chartEx)) st.chartEx = mostFrequent(exWithHist);
     if (!total) return `<div class="empty">Noch keine Trainings gespeichert. Nach deinem ersten Training siehst du hier Kraftkurven, Rekorde und Sätze pro Muskelgruppe.</div>`;
     return `<div class="kpis"><div class="kpi"><b>${total}</b><span>Trainings gesamt</span></div><div class="kpi"><b>${w7.length}</b><span>Letzte 7 Tage</span></div><div class="kpi"><b>${weeksStreak()}</b><span>Wochen am Stück</span></div></div>
+      ${(() => { const rec = recovery(); return `<div class="card stack"><div class="row between"><h3>Erholung</h3><span class="small muted">Muskelgruppen</span></div><div class="bars">${rec.map(r => `<div class="bar"><span class="ell">${r.g}</span><div class="track"><i class="${r.pct < 50 ? 'warn' : ''}" style="width:${r.pct}%"></i></div><span class="num small" style="text-align:right">${r.pct}%</span></div>`).join('')}</div><div class="tiny muted">Geschätzt aus Sätzen und Zeit seit dem letzten Training. Voller Balken = bereit.</div></div>`; })()}
       <div class="section"><div class="head"><h3>Kraftentwicklung</h3></div>
         <div class="chips">${exWithHist.slice().sort((x, y) => (x === st.chartEx ? -1 : y === st.chartEx ? 1 : 0)).slice(0, 14).map(id => `<button class="chip ${id === st.chartEx ? 'on' : ''}" data-a="chartPick" data-id="${id}">${esc(getEx(id).name)}</button>`).join('')}</div>
         <div class="card stack" style="gap:6px"><div class="eyebrow">Geschätztes Maximum (1 Wdh.)</div>${exChart(st.chartEx)}</div></div>
@@ -879,7 +873,7 @@
       <div class="stack">
         ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>${freeCard()}`}
         <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
-          <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
+          <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten zum Verschieben.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
           ${(() => { const SL = ssLabels(a.exercises); return a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''} ${SL[i] ? 'ss' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${SL[i] ? `<span class="sstag">${SL[i]}</span>` : ''}${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join(''); })()}
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
@@ -1010,8 +1004,8 @@
       ${(() => { const n = entry.note || (exNote(ex.id) || {}).t || lastNote; if (!n) return ''; const src = entry.note ? '' : '<span class="muted">Deine Notiz:</span> '; return `<div class="card flat small notecard" data-a="noteOpen" data-i="${idx}" style="cursor:pointer">${I.note.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} ${src}${esc(n)}</div>`; })()}
       <table class="sets"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
       <div class="exfoot">${isHold && !finished && kind === 'hold' ? `<button class="btn sm primary" data-a="holdStart" data-i="${idx}">${I.play} Halten starten</button>` : ''}${kind === 'int' && !finished ? `<button class="btn sm primary" data-a="intStart" data-i="${idx}">${I.play} Intervall</button>` : ''}
-        <button class="btn sm" data-a="setPlus" data-i="${idx}">+ Satz</button>
-        <button class="btn sm" data-a="swapWorkout" data-i="${idx}">${I.swap} Tauschen</button>${!finished && st.active.exercises.some((x, k) => k !== idx && !(entry.ss && x.ss === entry.ss) && !exState(x).finished) ? `<button class="btn sm" data-a="exLater" data-i="${idx}" title="Gerät besetzt">Später</button>` : ''}<button class="btn sm" data-a="noteOpen" data-i="${idx}">${I.note} Notiz</button><button class="btn sm ghost" data-a="exMenu" data-i="${idx}">⋯ Mehr</button></div>`;
+      </div>
+      <div class="toolbar"><button data-a="setPlus" data-i="${idx}">${I.plus}<span>Satz</span></button><button data-a="swapWorkout" data-i="${idx}">${I.swap}<span>Tauschen</span></button><button data-a="exLater" data-i="${idx}" ${!finished && st.active.exercises.some((x, k) => k !== idx && !(entry.ss && x.ss === entry.ss) && !exState(x).finished) ? '' : 'disabled'}>${I.later}<span>Später</span></button><button data-a="noteOpen" data-i="${idx}">${I.note}<span>Notiz</span></button><button data-a="exMenu" data-i="${idx}">${I.more}<span>Mehr</span></button></div>`;
   }
 
   function commitSet(idx, vals, rir) {
@@ -1309,6 +1303,32 @@
         ${s.confirm ? '<button class="btn danger" data-a="impReplaceYes">Wirklich alles ersetzen</button>' : '<button class="btn" data-a="impReplace">Alles ersetzen</button>'}
         <div class="tiny muted">Vorher wird automatisch eine Sicherung angelegt.</div></div>`;
     },
+    cycleSheet() {
+      const p = plan(); const wi = E.weekInfo(p, P()); const c = (P().checkins || []).slice(-1)[0];
+      const txt = { deload: 'Deload diese Woche', less: 'Weniger Volumen diese Woche', more: 'Mehr Volumen diese Woche', same: 'Volumen wie geplant' };
+      return `<div class="stack"><div><div class="eyebrow">Zyklus</div><h2>Woche ${wi.w} von ${wi.len} · ${wi.label}</h2></div>
+        <div class="small ink2">Erst locker, dann Aufbau, zuletzt am härtesten; in Woche ${wi.len} Deload mit halben Sätzen und mehr Reserve. Gezählt werden nur Wochen, in denen du trainiert hast.</div>
+        <div><div class="lbl">Deload alle … Wochen</div><div class="seg">${[4, 5, 6, 8].map(n => `<button data-a="mesoLen" data-n="${n}" aria-pressed="${wi.len === n}">${n}</button>`).join('')}</div></div>
+        <button class="btn" data-a="deloadToggle">${p.forceDeload ? 'Deload beenden' : 'Deload jetzt starten'}</button>
+        <div class="card stack" style="gap:8px"><div class="eyebrow">Wochen-Check-in</div><div class="small ink2">${c ? 'Letzter Check-in (' + dateDE(c.week, { day: 'numeric', month: 'short' }) + '): ' + (txt[c.result] || '') : '7 kurze Fragen; danach passe ich das Volumen der Woche an.'}</div><button class="btn primary" data-a="ciOpen">Check-in ausfüllen</button></div></div>`;
+    },
+    planTools() {
+      const p = plan();
+      return `<div class="stack"><h2>Plan verwalten</h2>
+        <div class="list">
+          <button class="li" data-a="plans"><div class="grow"><b>Pläne</b><div class="small muted">Wechseln, kopieren, neu anlegen</div></div><span class="chev">${I.chev}</span></button>
+          <button class="li" data-a="dayAdd"><div class="grow"><b>Tag hinzufügen</b><div class="small muted">Neue Einheit im aktiven Plan</div></div><span class="chev">${I.chev}</span></button>
+          <button class="li" data-a="balanceNow"><div class="grow"><b>Plan ausbalancieren</b><div class="small muted">Sätze pro Muskel in den sinnvollen Bereich bringen</div></div><span class="chev">${I.chev}</span></button>
+          <button class="li" data-a="rebuildAsk"><div class="grow"><b>${p.custom ? 'Plan empfehlen lassen' : 'Plan neu berechnen'}</b><div class="small muted">Neuer Plan aus deinen Antworten, der alte bleibt</div></div><span class="chev">${I.chev}</span></button>
+          <button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button>
+        </div>
+        <div class="tiny muted">Rollen im Plan: Grundübung zuerst, dann Ergänzung, Isolation und Rumpf. Jede Einheit hat 5–7 Übungen.</div></div>`;
+    },
+    dayPick() {
+      const p = plan(); const loc = st.homeLoc || defLoc(); const nd = nextDayIdx(); const cur = st.homeDay ?? nd;
+      return `<div class="stack"><h2>Einheit wählen</h2><div class="list">${p.days.map((d, i) => `<button class="li" data-a="pickDay" data-i="${i}" ${i === cur ? 'style="background:var(--navy)"' : ''}>${thumb(heroEx(d, loc))}<div class="grow"><div class="ell" style="font-weight:700">${esc(d.name)}</div><div class="small muted ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ${estMinutes(d, loc)} min${i === nd ? ' · als Nächstes' : ''}</div></div>${i === cur ? `<span style="color:var(--accent)">${I.check.replace('<svg', '<svg width="20" height="20"')}</span>` : ''}</button>`).join('')}</div>
+        <div class="tiny muted">Die Reihenfolge im Plan bleibt; nach dem Training ist der Tag danach dran.</div></div>`;
+    },
     stale(s) {
       const a = st.active; const n = a.exercises.reduce((t, e) => t + e.sets.filter(x => x.done).length, 0);
       return `<div class="stack"><h2>Training noch offen</h2><div class="small muted">${esc(a.name)} · begonnen ${dateDE(E.todayISO(new Date(a.start)))} · ${n} Sätze erledigt</div>
@@ -1444,19 +1464,18 @@
     settings(s) {
       const se = settings();
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
+      const head = t => `<div class="eyebrow sethead">${t}</div>`;
       return `<div class="stack"><h2>Einstellungen</h2>
-        <div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve – antippen der Satznummer korrigiert')}${tog('sound', 'Töne', 'Auf dem iPhone nur, wenn der Stumm-Schalter aus ist')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
-        <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden. Im Training bleibt der Bildschirm deshalb an.</div>
-        <div class="card stack" style="gap:8px"><b>Spiel- und Trainingstage (z. B. Baseball)</b><div class="small muted">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div><div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div></div>
-        <div class="card stack"><b>Studio-Gewichte</b><div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div></div>
-        <div class="card stack"><b>Datensicherung</b><div class="small muted">${Store.mode === 'db' ? 'Deine Daten werden in deinem Konto gespeichert und sind auf allen Geräten verfügbar, auf denen du angemeldet bist.' : 'Deine Daten liegen nur in diesem Browser. Mach ab und zu ein Backup.'}</div>
-          <div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert.'}</div>
-          <button class="btn" data-a="backups">Sicherungen auf diesem Gerät</button>
-          <div class="row wrap"><button class="btn grow" data-a="exportData">Backup exportieren</button><label class="btn grow" for="importFile" style="cursor:pointer">Backup importieren</label><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden></div></div>
-        <button class="btn" data-a="quizEdit">Fragebogen bearbeiten</button>
-        ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn danger" data-a="reset">Alle Daten löschen</button>'}
-        <p class="tiny muted" style="margin:0">Satzwerk ersetzt keine ärztliche Beratung. Bei Schmerzen Übung abbrechen.</p>
-        <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION}</p></div>`;
+        ${head('Training')}<div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
+        ${head('Signale')}<div class="list">${tog('sound', 'Töne', 'Auf dem iPhone nur ohne Stumm-Schalter')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}</div>
+        <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden; im Training bleibt der Bildschirm an.</div>
+        ${head('Baseball-Tage')}<div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div>
+        <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
+        ${head('Studio-Gewichte')}<div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div>
+        ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button></div>
+        ${head('Daten')}<div class="list"><button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
+        ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn ghost danger" data-a="reset">Alle Daten löschen</button>'}
+        <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung</p></div>`;
     },
     rebuild() {
       return `<div class="stack"><h2>Neuen Plan berechnen?</h2><p class="ink2" style="margin:0">Mit deinen Antworten aus dem Fragebogen wird ein neuer Plan erstellt und aktiviert. Dein bisheriger Plan bleibt unter „Pläne“ erhalten, dein Trainingsverlauf sowieso.</p><button class="btn primary" data-a="rebuildYes">Neu berechnen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button></div>`;
@@ -1620,6 +1639,11 @@
     },
     homeLoc(t) { st.homeLoc = t.dataset.l; render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
+    pickDay(t) { const i = +t.dataset.i; st.homeDay = i === nextDayIdx() ? null : i; closeSheet(); render(); window.scrollTo(0, 0); },
+    dayPick() { openSheet({ type: 'dayPick' }); },
+    planTools() { openSheet({ type: 'planTools' }); },
+    cycleSheet() { openSheet({ type: 'cycleSheet' }); },
+    dayToggle(t) { const p = plan(); const di = +t.dataset.d; const d = p.days[di]; st.planOpen = st.planOpen || {}; const cur = st.planOpen[d.id] ?? (di === nextDayIdx()); st.planOpen[d.id] = !cur; render(); },
     planLoc(t) { st.planLoc = t.dataset.l; render(); },
     startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; }
       const d0 = plan().days[+t.dataset.d]; if (!d0 || !d0.slots.some(s => s.ex[t.dataset.l])) { st.tab = 'plan'; render(); toast('Füge diesem Tag zuerst Übungen hinzu'); return; }

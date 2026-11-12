@@ -614,6 +614,38 @@ input.field,select.field,textarea.field,.search{border-radius:18px}
 .toast.top{top:calc(env(safe-area-inset-top,0px) + 72px)}
 .stage .over .eyebrow{display:block}
 @media (max-width:380px){ .homebar h1{font-size:34px} }
+
+/* ---------- Aufgeräumt (3.8) ---------- */
+.cychead{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--navy2);color:var(--ink);border-radius:16px;padding:10px 14px;font-weight:800;font-size:15px;text-align:left;min-height:46px}
+.mini-seg{padding:3px;border-radius:14px;flex:none}
+.mini-seg button{padding:7px 12px;font-size:13px;border-radius:11px}
+.daybox{background:var(--surface);border-radius:22px;overflow:hidden}
+.daybox .list{border-radius:0;background:transparent}
+.dayhead{display:flex;align-items:center;gap:6px;padding:6px 8px 6px 4px}
+.dayt{display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--ink);text-align:left;padding:10px 12px;min-height:52px;min-width:0}
+.dayt>div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.dayt b{font-size:17px;font-weight:800;letter-spacing:-.02em;display:block}
+.dayt span.ell{font-size:12.5px;color:var(--muted);font-weight:600;display:block}
+.dayt .chev{transition:transform .2s} .daybox.open .dayt .chev{transform:rotate(90deg)}
+.daybox.open .dayhead{border-bottom:1px solid var(--line)}
+.dayhead .iconbtn{background:transparent}
+.addrow{color:var(--accent);font-weight:700}
+details.fold>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:800;font-size:16px;min-height:28px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px;flex:none;transition:transform .2s}
+details.fold[open]>summary::after{transform:rotate(-135deg);margin-bottom:-4px}
+.sethead{margin:8px 2px -6px}
+.toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.toolbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:58px;border:0;border-radius:16px;background:var(--surface);color:var(--ink);font-size:11.5px;font-weight:700;min-width:0}
+.toolbar button svg{width:20px;height:20px;color:var(--accent)}
+.toolbar button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.toolbar button:disabled{opacity:.35}
+.exfoot:not(:has(button)){display:none}
+.exfoot .btn{flex:1}
+
+.toolbar button{font-size:11px;letter-spacing:-.01em}
+.wd.today.sport{background:var(--ink);color:var(--accent-ink);box-shadow:inset 0 0 0 2px var(--highlight)} .wd.today.sport span{color:rgba(9,11,15,.55)} .wd.today.sport i em{background:var(--accent-ink)}
+.wkrow{min-height:38px;padding:7px 12px}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>

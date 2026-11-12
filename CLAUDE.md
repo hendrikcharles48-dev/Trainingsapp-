@@ -8,6 +8,9 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
 
 ## Arbeitsregeln (Satzwerk)
 - **Bauplan:** `docs/ROADMAP.md` (Etappen mit Prüfkriterien). Skill `satzwerk-etappe` („nächste Etappe“) arbeitet sie ab.
+- **Jedes Update direkt live stellen** (Nutzerwunsch 12.11.2026, dauerhafte Freigabe): nach Build, Kopie nach `docs/` und
+  Commit einen Pull Request nach `main` anlegen und sofort mergen – erst dann sieht der Nutzer es in der App auf dem iPhone.
+  Danach den Arbeits-Branch für die nächste Arbeit wieder von `origin/main` starten.
 - **Erst kurzen Plan zeigen, auf OK warten**, dann umsetzen (außer der Nutzer verzichtet ausdrücklich darauf).
 - **Bestehende Daten nie verlieren:** gespeicherte Felder nie löschen oder umbenennen, Neues nur zusätzlich; vor jeder
   Umstellung eine Sicherung. Nur Schlüssel mit `satzwerk.`, nie `localStorage.clear()` – der Browser-Speicher wird mit
@@ -93,6 +96,12 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
 - Figuren nur per CSS gefärbt (`figures.js` unverändert) und immer in eigener Kachel (`.figtile`, `.thumb`, `.tile`, Navy).
 - Stepper (`.mini`): eine Pille, −/+ fest 30 px (`flex:0 0 30px`), Zahl `flex:1; min-width:0` – nie überlappend (102,5 geprüft).
   Lange Namen mit „…“ kürzen (`.ell`, `.clamp2`). Jede Ansicht bei 390 und 375 px prüfen.
+- Aufgeräumt (3.8): Zusammengehöriges an einem Ort. Heute: Hinweise gebündelt (Check-in, Backup, Ziel, Deload, Baseball,
+  Körpergewicht unter „Hinweise“), „Andere Einheit“ (`dayPick`) + „Freies Training“; keine Einheitenliste, Erholung steht
+  unter Fortschritt. Plan: Tage zum Aufklappen (`dayToggle`, `st.planOpen`, Standard offen = nächster Tag), Zyklus-Fenster
+  (`cycleSheet`: Deload-Abstand, Deload jetzt, Check-in), „⋯“ = Plan verwalten (`planTools`), Volumen aufklappbar
+  (`details.fold`). Einstellungen in Abschnitten (Training, Signale, Baseball-Tage, Studio-Gewichte, Profil, Daten).
+  Training: Werkzeugleiste `.toolbar` (Satz, Tauschen, Später, Notiz, Mehr).
 - Ansichten: Tab-Leiste Heute/Plan/Fortschritt/Übungen (Timer über Symbol oben auf „Heute“). Heute: Datum, „Moin, Name“
   (Name aus dem Fragebogen, nie fest im Code), Wochenleiste (erledigt = Haken, Baseball = Eisweiß-Rand, heute = weiße Kachel),
   Navy-Karte „Nächste Einheit“ mit Figur, 3 Mini-Kacheln, Kacheln Serie/Sätze/Rekorde, „Zuletzt“.

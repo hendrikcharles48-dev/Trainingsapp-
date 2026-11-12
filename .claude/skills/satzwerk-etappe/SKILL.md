@@ -30,8 +30,9 @@ Grundregel: **Bestehende Trainingsdaten, Verlauf, Pläne und Rekorde nie verlier
    - Regel „eigene Übungen prüfen“ aus `CLAUDE.md` beachten.
 8. `docs/ROADMAP.md`: Etappe abhaken (`[x]`, Datum, Version). `CLAUDE.md` aktualisieren, wenn sich Aufbau,
    Datenmodell, Speicherschlüssel oder Trainingsregeln geändert haben.
-9. Committen und pushen. Dem Nutzer kurz sagen: was neu ist, was er **am iPhone prüfen** soll (Liste aus der Roadmap),
-   und dass die App erst live ist, wenn der Stand auf `main` liegt.
+9. Committen und pushen, dann Pull Request nach `main` anlegen und mergen (dauerhafte Freigabe des Nutzers: jedes Update
+   direkt live). Dem Nutzer kurz sagen, was neu ist und was er **am iPhone prüfen** soll (App einmal ganz schließen und neu
+   öffnen; Versionsnummer steht unten in den Einstellungen).
 
 ## Verbote
 
