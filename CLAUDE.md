@@ -42,6 +42,13 @@ Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu an
   (laufendes Training), `satzwerk.meta` (`{schema: 2}`), Rettung beschädigter Inhalte `satzwerk.corrupt.<key>`.
   In der Artifact-Version zusätzlich Online-Speicher (`Store.mode === 'db'`). Alle Änderungen an Trainings über
   `Store.saveWorkout`/`deleteWorkout` (zählen `Store.wv` hoch). `LS.set` meldet Fehler (rotes Band `renderSaveErr`).
+- Automatische Sicherung (3.9, `Cloud` in `app.js`): nach Änderungen (15 s verzögert, nach Training 3 s, beim Verlassen sofort)
+  Datei `satzwerk-backup.json` (Export-Format) per GitHub-API ins private Repository des Nutzers. Zugang nur in
+  `satzwerk.cloud` `{repo, token}` (nie im Export/in Sicherungen), Stand in `satzwerk.cloudState` (`last`, `sum` = Prüfsumme,
+  `err`, `checked`, `conflict`, `off`). Beim Start wird der Kochwerk-Zugang (`kochwerk_sync`, nur lesen) still übernommen,
+  wenn nichts eingerichtet und nicht bewusst ausgeschaltet. Lädt nur bei geänderten Daten hoch; nur private Repositorys.
+  Schutz: Vor dem ersten Hochladen eines Geräts wird die GitHub-Datei geholt – fehlen hier Trainings, die dort liegen,
+  wird nicht überschrieben (`conflict`, Hinweis auf Heute, „Aus GitHub laden“ → Import-Vorschau). Fenster `SHEETS.cloud`.
 - Sicherungen: IndexedDB `satzwerk`, Speicher `snap` (`Backup.snapshot(grund)`, max. 8 + je eine pro „vor-…“-Grund).
   Vor jeder Umstellung/jedem Ersetzen `Backup.snapshot('vor-…')` aufrufen (Kopie wird synchron gezogen).
   Fenster „Sicherungen“ (`A.backups`), Import mit Vorschau (`importPreview`: Zusammenführen/Alles ersetzen),
@@ -143,6 +150,9 @@ Wo die eigenen Übungen zu finden sind:
 neue Figuren nutzen vorhandene Vorlagen). Prüfen: jede Übung braucht Eintrag in allen drei Dateien.
 Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`).
 Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
+Reiter „Eigene“ in Übungen (`st.libTab = 'own'`): Bearbeiten (`cxEdit`, gleiche ID, Verlauf bleibt) und Löschen (`cxDelYes`):
+aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favoriten; mit Verlauf nur `hidden: true`
+(`E.allExercises` blendet aus, `getEx` findet sie weiter), ohne Verlauf ganz entfernen. Vorher `Backup.snapshot`.
 
 ## Trainingslogik
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.

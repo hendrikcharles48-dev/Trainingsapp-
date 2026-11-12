@@ -278,7 +278,7 @@
     out.sort((x, y) => y.s - x.s);
     return limit ? out.slice(0, limit) : out;
   }
-  function allExercises(profile) { return DB.list.concat((profile && profile.custom) || []); }
+  function allExercises(profile) { return DB.list.concat(((profile && profile.custom) || []).filter(e => !e.hidden)); }
 
   function buildPlan(profile) {
     const a = profile.answers || {};
