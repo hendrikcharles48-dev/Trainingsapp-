@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.8.0';
+  const APP_VERSION = '3.9.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -54,7 +54,7 @@
     }
   };
   /* ================= Sicherungen (IndexedDB „satzwerk“, Speicher „snap“) ================= */
-  const SNAP_LBL = { training: 'Nach Training', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
+  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
   const Backup = {
     p: null,
     open() {
@@ -82,6 +82,89 @@
       const all = await this.list(); const keep = new Set(all.slice(0, 8).map(x => x.id)); const seen = new Set();
       for (const x of all) if (x.reason !== 'training' && !seen.has(x.reason)) { seen.add(x.reason); keep.add(x.id); }
       const del = all.filter(x => !keep.has(x.id)); if (del.length) await this.req('readwrite', s => { for (const x of del) s.delete(x.id); });
+    }
+  };
+  /* ================= Automatische Sicherung in ein privates GitHub-Repository =================
+     Zugang (Repository + Schlüssel) nur in localStorage „satzwerk.cloud“ (nie im Export). Stand in „satzwerk.cloudState“.
+     Gleicher Zugang wie Kochwerk („kochwerk_sync“, wird nur gelesen), eigene Datei satzwerk-backup.json. Lädt nur hoch,
+     wenn sich die Daten geändert haben (Prüfsumme). Ältere Stände bleiben im Verlauf des Repositorys. */
+  const Cloud = {
+    FILE: 'satzwerk-backup.json', timer: null, busy: false,
+    cfg() { const c = LS.get('cloud'); return c && c.repo && c.token ? c : null; },
+    state() { return LS.get('cloudState') || {}; },
+    setState(o) { LS.set('cloudState', Object.assign(this.state(), o)); },
+    usable() { return Store.mode !== 'db' && !!this.cfg(); },
+    clean: r => String(r || '').trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/, '').replace(/\/+$/, ''),
+    parse(text) { const m = /(?:kochwerk|satzwerk)-zugang:([^:\s]+\/[^:\s]+):(\S+)/.exec(String(text || '')); return m ? { repo: m[1], token: m[2] } : null; },
+    kochwerk() { try { const k = JSON.parse(localStorage.getItem('kochwerk_sync') || '{}'); return k && k.repo && k.token ? { repo: this.clean(k.repo), token: String(k.token).trim() } : null; } catch (e) { return null; } },
+    gh(c, path, opt = {}) {
+      return fetch('https://api.github.com/repos/' + this.clean(c.repo) + path, Object.assign({}, opt, { cache: 'no-store',
+        headers: Object.assign({ Authorization: 'Bearer ' + c.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, opt.headers || {}) }));
+    },
+    msg(s) { return s === 401 ? 'Der Schlüssel stimmt nicht oder ist abgelaufen.' : s === 403 ? 'Der Schlüssel darf nicht schreiben („Contents: Read and write“ nötig).' : s === 404 ? 'Repository nicht gefunden.' : 'GitHub meldet Fehler ' + s + '.'; },
+    b64(text) { const b = new TextEncoder().encode(text); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); },
+    unb64(b64) { const bin = atob(String(b64 || '').replace(/\s/g, '')); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new TextDecoder().decode(b); },
+    hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return s.length + ':' + (h >>> 0).toString(36); },
+    // Zugang prüfen: Repository muss existieren und privat sein (Trainingsdaten nie öffentlich)
+    async test(c) {
+      try {
+        const r = await this.gh(c, ''); if (!r.ok) return { ok: false, msg: this.msg(r.status) };
+        const j = await r.json(); if (!j.private) return { ok: false, msg: 'Dieses Repository ist öffentlich. Bitte ein privates Repository nehmen.' };
+        return { ok: true };
+      } catch (e) { return { ok: false, msg: 'Keine Verbindung zu GitHub.' }; }
+    },
+    async connect(c) {
+      c = { repo: this.clean(c.repo), token: String(c.token).trim() };
+      const t = await this.test(c); if (!t.ok) return t;
+      LS.set('cloud', c); this.setState({ off: false, err: '', checked: false, conflict: 0 }); await this.push(true); return { ok: true };
+    },
+    disconnect() { try { localStorage.removeItem('satzwerk.cloud'); } catch (e) { } this.setState({ off: true, err: '', checked: false, conflict: 0, sum: '' }); },
+    // Beim Start: Kochwerk-Zugang still übernehmen, wenn noch nichts eingerichtet und nicht bewusst getrennt
+    async auto() {
+      if (Store.mode === 'db' || !st.profile) return;
+      if (!this.cfg() && !this.state().off) { const k = this.kochwerk(); if (k) { const t = await this.test(k); if (t.ok) { LS.set('cloud', k); this.setState({ err: '' }); } } }
+      this.soon(4000);
+    },
+    soon(ms) { if (!this.usable() || !st.profile) return; clearTimeout(this.timer); this.timer = setTimeout(() => { this.timer = null; this.push(); }, ms == null ? 15000 : ms); },
+    flush() { if (this.timer) { clearTimeout(this.timer); this.timer = null; this.push(); } },
+    payload() { return { app: 'satzwerk', version: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), profile: st.profile, workouts: st.workouts, active: null }; },
+    async push(force) {
+      const c = this.cfg(); if (!c || Store.mode === 'db' || !st.profile || this.busy) return false;
+      const sum = this.hash(JSON.stringify([st.profile, st.workouts]));
+      if (!force && sum === this.state().sum) return true;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      this.busy = true;
+      try {
+        // Nie eine Sicherung mit Trainings überschreiben, die hier fehlen (z. B. neues/geleertes Handy)
+        if (!this.state().checked) {
+          const p = await this.pull();
+          if (p.d && Array.isArray(p.d.workouts)) { const have = new Set(st.workouts.map(w => w.id)); const miss = p.d.workouts.filter(w => w && !have.has(w.id)).length; if (miss) { this.setState({ conflict: miss, err: '' }); if (!st.ov && !st.sheet) render(); return false; } }
+          else if (p.error && !/Noch keine/.test(p.error)) { this.setState({ err: p.error, errAt: Date.now() }); return false; }
+          this.setState({ checked: true, conflict: 0 });
+        }
+        const body = JSON.stringify(this.payload(), null, 1);
+        for (let i = 0; i < 3; i++) {
+          const g = await this.gh(c, '/contents/' + this.FILE); let sha = null;
+          if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) { this.setState({ err: this.msg(g.status), errAt: Date.now() }); return false; }
+          const r = await this.gh(c, '/contents/' + this.FILE, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ message: 'Sicherung ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' (' + st.workouts.length + ' Trainings)', content: this.b64(body) }, sha ? { sha } : {})) });
+          if (r.status === 409 || r.status === 422) continue;
+          if (!r.ok) { this.setState({ err: this.msg(r.status), errAt: Date.now() }); return false; }
+          this.setState({ sum, last: Date.now(), n: st.workouts.length, err: '' }); if (st.sheet && st.sheet.type === 'cloud') renderSheet(); return true;
+        }
+        return false;
+      } catch (e) { return false; } // offline: beim nächsten Mal
+      finally { this.busy = false; }
+    },
+    async pull() {
+      const c = this.cfg(); if (!c) return { error: 'Nicht verbunden.' };
+      try {
+        const r = await this.gh(c, '/contents/' + this.FILE, { headers: { Accept: 'application/vnd.github.raw+json' } });
+        if (r.status === 404) return { error: 'Noch keine Sicherung auf GitHub.' };
+        if (!r.ok) return { error: this.msg(r.status) };
+        let d = null; try { d = JSON.parse(await r.text()); } catch (e) { return { error: 'Die Sicherung auf GitHub ist beschädigt.' }; }
+        return { d };
+      } catch (e) { return { error: 'Keine Verbindung zu GitHub.' }; }
     }
   };
   const Store = {
@@ -117,7 +200,7 @@
     },
     debounce(key, ms, fn) { clearTimeout(this.timers[key]); this.timers[key] = setTimeout(fn, ms); },
     saveProfile(now) {
-      LS.set('profile', st.profile);
+      LS.set('profile', st.profile); Cloud.soon();
       if (this.mode !== 'db') return;
       const go = () => this.write('p', () => this.pRef().set(clone(st.profile)));
       now ? go() : this.debounce('p', 700, go);
@@ -131,12 +214,12 @@
     wv: 0,
     saveWorkout(w) {
       this.wv++;
-      LS.set('workouts', st.workouts);
+      LS.set('workouts', st.workouts); Cloud.soon(st.active ? null : 3000);
       if (this.mode === 'db') this.write('w' + w.id, () => this.wCol().doc(w.id).set(clone(w)));
     },
     deleteWorkout(id) {
       this.wv++;
-      LS.set('workouts', st.workouts);
+      LS.set('workouts', st.workouts); Cloud.soon();
       if (this.mode === 'db') this.write('w' + id, () => this.wCol().doc(id).delete());
     }
   };
@@ -513,7 +596,7 @@
     const trained = new Set(st.workouts.flatMap(w => w.exercises.map(e => e.exId)));
     return E.allExercises(P()).filter(ex => (!q || ex.name.toLowerCase().includes(q) || (D.PATTERNS[ex.pat] || '').toLowerCase().includes(q) || ex.prim.some(m => D.MUSCLES[m].toLowerCase().includes(q)))
       && (!F.group || D.GROUPS[F.group].some(m => ex.prim.includes(m))) && (!F.lvl || ex.lvl === F.lvl) && (!F.pat || ex.pat === F.pat) && (!F.eq || ex.eq.includes(F.eq))
-      && (!st.libAvail || st.libTab === 'fav' || E.available(ex, eqs)) && (st.libTab !== 'mine' || trained.has(ex.id)) && (st.libTab !== 'fav' || isFav(ex.id)))
+      && (!st.libAvail || st.libTab === 'fav' || st.libTab === 'own' || E.available(ex, eqs)) && (st.libTab !== 'own' || ex.custom) && (st.libTab !== 'mine' || trained.has(ex.id)) && (st.libTab !== 'fav' || isFav(ex.id)))
       .sort((a, b) => a.pat.localeCompare(b.pat) || (a.rank || a.lvl) - (b.rank || b.lvl));
   }
   function libResults() {
@@ -525,14 +608,15 @@
       ${list.length ? `${(() => { // nach Kategorie gruppiert, mit Überschrift
         const groups = []; for (const ex of list.slice(0, max)) { const g = groups[groups.length - 1]; if (g && g.pat === ex.pat) g.items.push(ex); else groups.push({ pat: ex.pat, items: [ex] }); }
         const row = ex => `<button class="exrow" data-a="exInfo" data-id="${ex.id}"><div class="figtile">${figSVG(ex)}</div><div class="grow"><b class="ell">${esc(ex.name)}</b><span class="ell">${ex.prim.map(m => D.MUSCLES[m]).join(', ')} · ${ex.eq.map(e => D.EQUIP[e]).join(' + ')}</span></div><div class="exmeta">${isFav(ex.id) ? `<span class="favdot" aria-label="Favorit">${I.check}</span>` : ''}${ex.lvl ? `<small class="lvlbar" aria-label="Schwierigkeit ${ex.lvl} von 5">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= ex.lvl ? 'on' : ''}"></i>`).join('')}</small>` : ''}</div></button>`;
-        return groups.map(g => `<div class="grouphead">${esc(D.PATTERNS[g.pat] || g.pat)}<span>${list.filter(x => x.pat === g.pat).length}</span></div><div class="exlist">${g.items.map(row).join('')}</div>`).join(''); })()}${list.length > max ? `<button class="btn" data-a="libMore">Mehr anzeigen (${list.length - max} weitere)</button>` : ''}` : `<div class="empty">${st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}`;
+        return groups.map(g => `<div class="grouphead">${esc(D.PATTERNS[g.pat] || g.pat)}<span>${list.filter(x => x.pat === g.pat).length}</span></div><div class="exlist">${g.items.map(row).join('')}</div>`).join(''); })()}${list.length > max ? `<button class="btn" data-a="libMore">Mehr anzeigen (${list.length - max} weitere)</button>` : ''}` : `<div class="empty">${st.libTab === 'own' ? 'Noch keine eigenen Übungen. Über „Neue eigene Übung“ anlegen.' : st.libTab === 'mine' ? 'Noch keine Übung trainiert.' : st.libTab === 'fav' ? 'Noch keine Favoriten. Öffne eine Übung und tippe auf den ★.' : 'Keine Übung gefunden.'}</div>`}`;
   }
   function libView() {
     const F = st.libF || {};
     const chip = (k, label, val) => `<button class="chip ${val ? 'set' : ''}" data-a="libFilter" data-k="${k}">${val ? esc(val) : label} ▾</button>`;
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
-      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">★ Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button></div>
+      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button><button data-a="libTab" data-k="own" aria-pressed="${st.libTab === 'own'}">Eigene</button></div>
+      ${st.libTab === 'own' ? `<div class="row" style="gap:10px"><div class="grow small muted">Antippen zum Ansehen, Bearbeiten oder Löschen.</div><button class="btn sm" data-a="customEx">${I.plus} Neue eigene Übung</button></div>` : ''}
       ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen gelten als „kann ich und vertrage ich“: Der Plan wählt sie bevorzugt, wenn die Ausrüstung da ist, sie an eine passende Stelle passen und höchstens 2 Stufen über deinem Level liegen. Maximal 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
       <div class="chips">${chip('lvl', 'Schwierigkeit', F.lvl && LVL[F.lvl - 1][1])}${chip('group', 'Muskelgruppe', F.group)}${chip('pat', 'Kategorie', F.pat && D.PATTERNS[F.pat])}${chip('eq', 'Ausrüstung', F.eq && D.EQUIP[F.eq])}<button class="chip ${st.libAvail ? 'on' : ''}" data-a="libAvailT">Meine Geräte</button></div>
@@ -1195,6 +1279,7 @@
         ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
         ${pctTable}
         <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div>
+        ${ex.custom ? `<div class="row"><button class="btn grow" data-a="cxEdit" data-id="${ex.id}">${I.note} Bearbeiten</button><button class="btn grow danger" data-a="cxDel" data-id="${ex.id}">Löschen</button></div>` : ''}
         ${ex.custom ? `<div class="card flat stack" style="gap:8px"><b>Bild & Anleitung ergänzen lassen</b><div class="small muted">Eigene Übungen liegen nur auf deinem Handy. Schick sie Claude – beim nächsten Update kommt die Übung mit Bild, Anleitung und allen Daten zurück, dein Verlauf bleibt erhalten.</div><button class="btn" data-a="shareCustom" data-id="${ex.id}">An Claude schicken</button></div>` : ''}</div>`;
     },
     checkin(s) {
@@ -1292,6 +1377,32 @@
         <div class="small muted">Satzwerk legt automatisch Sicherungen auf diesem Gerät an (nach jedem Training und vor jeder größeren Änderung). Der Speicher wird mit den anderen Apps auf dieser Adresse geteilt (z. B. Lernwerk, Kochwerk) – exportiere deshalb ab und zu ein Backup in „Dateien“.</div>${est}
         ${s.items.length ? `<div class="list">${s.items.map(x => `<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${new Date(x.ts).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b><div class="small muted">${esc(SNAP_LBL[x.reason] || x.reason)} · ${(x.workouts || []).length} Trainings${x.profile && x.profile.plan ? ' · ' + esc(x.profile.plan.name || x.profile.plan.splitName || '') : ''}</div></div>
           ${s.confirm === x.id ? `<button class="btn danger sm" data-a="bkRestoreYes" data-id="${x.id}">Wirklich wiederherstellen</button>` : `<button class="btn sm" data-a="bkRestore" data-id="${x.id}">Wiederherstellen</button>`}<button class="btn sm" data-a="bkFile" data-id="${x.id}">Als Datei</button></div>`).join('')}</div>` : '<div class="empty">Noch keine Sicherung vorhanden.</div>'}</div>`;
+    },
+    cxDel(s) {
+      const ex = getEx(s.id); if (!ex) return ''; const n = histOf(ex.id).length;
+      const inPlans = (P().plans || []).filter(pl => (pl.days || []).some(d => d.slots.some(sl => Object.values(sl.ex || {}).includes(ex.id)))).map(pl => pl.name || pl.splitName);
+      return `<div class="stack"><h2>„${esc(ex.name)}“ löschen?</h2>
+        <div class="card stack" style="gap:6px">${n ? `<div class="small">Du hast sie in <b>${n} Trainings</b> gemacht. Diese bleiben mit Namen und Werten im Verlauf, die Übung verschwindet nur aus der Liste.</div>` : '<div class="small">Noch nie trainiert – sie wird ganz entfernt.</div>'}
+        ${inPlans.length ? `<div class="small">Steht im Plan: <b>${inPlans.map(esc).join(', ')}</b>. Dort wird sie herausgenommen (oder durch die Übung für den anderen Ort ersetzt).</div>` : ''}
+        <div class="small muted">Vorher wird eine Sicherung angelegt.</div></div>
+        <button class="btn danger" data-a="cxDelYes">Löschen</button><button class="btn" data-a="closeSheet">Abbrechen</button></div>`;
+    },
+    cloud(s) {
+      const c = Cloud.cfg(), cs = Cloud.state(), kw = !c && Cloud.kochwerk();
+      if (Store.mode === 'db') return `<div class="stack"><h2>Automatische Sicherung</h2><div class="small muted">In dieser Version liegen deine Daten schon in deinem Konto.</div></div>`;
+      if (!c) return `<div class="stack"><div><h2>Automatische Sicherung</h2><div class="small muted">Nach jedem Training sichert Satzwerk still in dein privates GitHub-Repository (Datei ${Cloud.FILE}). Kein Knopf, kein Nachfragen. Ältere Stände bleiben im Verlauf von GitHub.</div></div>
+        ${kw ? `<div class="card flat stack" style="gap:8px"><b>Zugang von Kochwerk gefunden</b><div class="small muted">Repository ${esc(kw.repo)} – Satzwerk nutzt eine eigene Datei darin.</div><button class="btn primary" data-a="cloudKw">Diesen Zugang nutzen</button></div>` : ''}
+        <div><label class="lbl" for="cl-code">Zugangscode</label><textarea class="field" id="cl-code" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="kochwerk-zugang:name/repository:github_pat_…" style="font-size:16px"></textarea><div class="small muted" style="margin-top:6px">Den Code aus Kochwerk („Zugang ans iPad schicken“) hier einfügen. Der Schlüssel bleibt nur auf diesem Gerät.</div></div>
+        ${s.err ? `<div class="small" style="color:var(--rose)">${esc(s.err)}</div>` : ''}
+        <button class="btn ${kw ? '' : 'primary'}" data-a="cloudConnect">${s.busy ? 'Prüfe …' : 'Verbinden'}</button></div>`;
+      const last = cs.last ? dateDE(new Date(cs.last).toISOString().slice(0, 10)) + ', ' + new Date(cs.last).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'noch nie';
+      return `<div class="stack"><div><h2>Automatische Sicherung</h2><div class="small muted">An – in ${esc(c.repo)} (${Cloud.FILE})</div></div>
+        <div class="card stack" style="gap:4px"><div>Zuletzt gesichert: <b>${last}</b>${cs.n != null && cs.last ? ' · ' + cs.n + ' Trainings' : ''}</div>
+        ${cs.conflict ? `<div class="small">Auf GitHub liegt eine Sicherung mit <b>${cs.conflict} Trainings, die hier fehlen</b>. Damit nichts verloren geht, wird sie nicht überschrieben. Bitte erst „Aus GitHub laden“ → Zusammenführen.</div>` : ''}
+        ${cs.err ? `<div class="small" style="color:var(--rose)">${esc(cs.err)}</div>` : ''}</div>
+        <div class="row"><button class="btn grow" data-a="cloudNow">${s.busy ? 'Sichere …' : 'Jetzt sichern'}</button><button class="btn grow ${cs.conflict ? 'primary' : ''}" data-a="cloudPull">Aus GitHub laden</button></div>
+        <div class="small muted">Laden zeigt erst eine Vorschau (Zusammenführen oder Ersetzen), vorher wird hier gesichert.</div>
+        <button class="btn ghost danger" data-a="cloudOff">Automatische Sicherung ausschalten</button></div>`;
     },
     importPreview(s) {
       const d = s.d; const have = new Set(st.workouts.map(w => w.id)); const ws = d.workouts || []; const nNew = ws.filter(w => !have.has(w.id)).length;
@@ -1473,7 +1584,7 @@
         <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
         ${head('Studio-Gewichte')}<div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div>
         ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button></div>
-        ${head('Daten')}<div class="list"><button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
+        ${head('Daten')}<div class="list">${Store.mode !== 'db' ? `<button class="li" data-a="cloudSheet"><div class="grow"><b>Automatische Sicherung</b><div class="small muted">${cloudLine()}</div></div><span class="chev">${I.chev}</span></button>` : ''}<button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
         ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn ghost danger" data-a="reset">Alle Daten löschen</button>'}
         <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung</p></div>`;
     },
@@ -1486,14 +1597,14 @@
     },
     custom(s) {
       const c = s.c || (s.c = { name: '', pat: 'biceps', kind: 'load', prim: [], eq: ['bw'], lo: 8, hi: 12 });
-      return `<div class="stack"><div>${s.ret ? `<div class="eyebrow">${s.ret.mode === 'swapWorkout' || s.ret.mode === 'slot' ? 'Ersetzt ' + esc(s.base || 'die Übung') : s.ret.mode === 'plan' ? 'Kommt in den Plan' : 'Kommt ins Training'}</div>` : ''}<h2>Eigene Übung</h2>${s.base ? `<div class="small muted">Vorausgefüllt wie „${esc(s.base)}“ – nur Name und Unterschiede anpassen.</div>` : ''}</div>
+      return `<div class="stack"><div>${s.ret ? `<div class="eyebrow">${s.ret.mode === 'swapWorkout' || s.ret.mode === 'slot' ? 'Ersetzt ' + esc(s.base || 'die Übung') : s.ret.mode === 'plan' ? 'Kommt in den Plan' : 'Kommt ins Training'}</div>` : ''}<h2>${s.edit ? 'Übung bearbeiten' : 'Eigene Übung'}</h2>${s.base ? `<div class="small muted">Vorausgefüllt wie „${esc(s.base)}“ – nur Name und Unterschiede anpassen.</div>` : ''}</div>
         <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"><div id="cx-hit">${cxHit(c.name, !!s.ret)}</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-pat">Bewegung</label><select class="field" id="cx-pat" data-in="cx" data-k="pat">${Object.entries(D.PATTERNS).map(([k, v]) => `<option value="${k}" ${c.pat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
         <div class="grow"><label class="lbl" for="cx-kind">Art</label><select class="field" id="cx-kind" data-in="cx" data-k="kind">${[['load', 'Mit Gewicht'], ['bw', 'Körpergewicht'], ['hold', 'Halten (Sekunden)']].map(([k, v]) => `<option value="${k}" ${c.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
         <div><div class="lbl">Muskeln</div><div class="row wrap">${Object.entries(D.MUSCLES).map(([k, v]) => `<button class="chip ${c.prim.includes(k) ? 'on' : ''}" data-a="cxMuscle" data-k="${k}">${v}</button>`).join('')}</div></div>
         <div><div class="lbl">Geräte</div><div class="row wrap">${Object.entries(D.EQUIP).map(([k, v]) => `<button class="chip ${c.eq.includes(k) ? 'on' : ''}" data-a="cxEq" data-k="${k}">${v}</button>`).join('')}</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-lo">${c.kind === 'hold' ? 'Sek. min' : 'Wdh. min'}</label><input class="field" id="cx-lo" inputmode="numeric" data-in="cx" data-k="lo" value="${c.lo}"></div><div class="grow"><label class="lbl" for="cx-hi">${c.kind === 'hold' ? 'Sek. max' : 'Wdh. max'}</label><input class="field" id="cx-hi" inputmode="numeric" data-in="cx" data-k="hi" value="${c.hi}"></div></div>
-        <button class="btn primary" data-a="cxSave">${s.ret ? 'Anlegen & einsetzen' : 'Speichern'}</button></div>`;
+        <button class="btn primary" data-a="cxSave">${s.edit ? 'Änderungen speichern' : s.ret ? 'Anlegen & einsetzen' : 'Speichern'}</button>${s.edit ? '<div class="small muted">Dein Verlauf mit dieser Übung bleibt erhalten.</div>' : ''}</div>`;
     }
   };
   function cxHit(name, ret) { const b = name && name.trim().length > 3 ? findBuiltin(name) : null; return b ? `<button class="card flat row" style="margin-top:8px;width:100%;text-align:left;gap:10px" data-a="${ret ? 'cxUseBuiltin' : 'exInfo'}" data-id="${b.id}">${thumb(b)}<div class="grow small"><b>Gibt es schon:</b> ${esc(b.name)}<div class="muted">${ret ? 'Antippen, um diese Übung direkt einzusetzen' : 'Mit Bild, Anleitung und Empfehlungen – antippen'}</div></div></button>` : ''; }
@@ -1790,6 +1901,11 @@
     cxEq(t) { const c = st.sheet.c; const k = t.dataset.k; const i = c.eq.indexOf(k); if (i >= 0) c.eq.splice(i, 1); else c.eq.push(k); if (!c.eq.length) c.eq = ['bw']; renderSheet(); },
     cxSave() {
       const c = st.sheet.c; if (!c.name.trim()) { toast('Bitte einen Namen eingeben'); return; } if (!c.prim.length) { toast('Bitte mindestens einen Muskel wählen'); return; }
+      if (st.sheet.edit) { const ex = (P().custom || []).find(x => x.id === st.sheet.edit); if (!ex) return; Backup.snapshot('vor-uebung-aendern');
+        const role = ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i';
+        Object.assign(ex, { name: c.name.trim(), pat: c.pat, role, kind: c.kind, eq: c.eq.length ? c.eq.slice() : ['bw'], prim: c.prim.slice(), rr: [+c.lo || 8, +c.hi || 12], edited: new Date().toISOString() });
+        if (c.kind === 'bw') ex.bwf = ex.bwf || 0.6; if (c.skill && ex.pat === 'skill') ex.skill = c.skill;
+        registerCustom(); exCache.clear(); Store.saveProfile(); render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung geändert'); return; }
       const ex = { id: 'c-' + uid(), custom: true, name: c.name.trim(), pat: c.pat, role: ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i', kind: c.kind, eq: c.eq.length ? c.eq : ['bw'], prim: c.prim, sec: [], lvl: 2, rr: [+c.lo || 8, +c.hi || 12], d: 'Eigene Übung.', c: [], std: 0.3, bwf: c.kind === 'bw' ? 0.6 : undefined };
       if (c.skill && ex.pat === 'skill') ex.skill = c.skill;
       P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile();
@@ -1797,9 +1913,36 @@
       if (ret) { closeSheet(); applyPick(ret, ex.id); toast('Übung angelegt und eingesetzt'); return; }
       render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung angelegt');
     },
+    cxEdit(t) { const ex = getEx(t.dataset.id); if (!ex || !ex.custom) return; openSheet({ type: 'custom', edit: ex.id, c: { name: ex.name, pat: ex.pat, kind: ex.kind, prim: ex.prim.slice(), eq: ex.eq.slice(), lo: (ex.rr || [8])[0], hi: (ex.rr || [8, 12])[1], skill: ex.skill } }); },
+    cxDel(t) { openSheet({ type: 'cxDel', id: t.dataset.id }); },
+    cxDelYes() {
+      const id = st.sheet.id; const pr = P(); const ex = (pr.custom || []).find(x => x.id === id); if (!ex) return;
+      if (st.active && st.active.exercises.some(e => e.exId === id)) { toast('Die Übung ist im laufenden Training – erst danach löschen'); return; }
+      Backup.snapshot('vor-uebung-loeschen');
+      // Aus allen Plänen nehmen: anderer Ort hat eine andere Übung → die übernehmen, sonst Platz entfernen
+      for (const pl of pr.plans || [pr.plan].filter(Boolean)) {
+        let ch = false;
+        for (const d of pl.days || []) d.slots = d.slots.filter(sl => {
+          const locs = Object.keys(sl.ex || {}).filter(k => sl.ex[k] === id); if (!locs.length) return true;
+          ch = true; const other = Object.values(sl.ex).find(v => v && v !== id); if (!other) return false;
+          for (const k of locs) sl.ex[k] = other; return true;
+        });
+        if (ch && !pl.custom) pl.edited = true;
+      }
+      if (pr.favs) pr.favs = pr.favs.filter(x => x !== id);
+      // Mit Verlauf: nur ausblenden, damit alte Trainings ihren Namen behalten
+      if (histOf(id).length) ex.hidden = true; else { pr.custom = pr.custom.filter(x => x.id !== id); delete D.byId[id]; }
+      normalizePlans(); exCache.clear(); Store.saveProfile(true); closeSheet(); render(); toast('Übung gelöscht');
+    },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
+    cloudSheet() { openSheet({ type: 'cloud' }); },
+    async cloudKw() { const k = Cloud.kochwerk(); if (!k) return; st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
+    async cloudConnect() { const v = ($('#cl-code') || {}).value || ''; const k = Cloud.parse(v); if (!k) { st.sheet.err = 'Das ist kein Zugangscode. Er beginnt mit „kochwerk-zugang:“.'; renderSheet(); return; } st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
+    async cloudNow() { st.sheet.busy = true; renderSheet(); const ok = await Cloud.push(true); if (st.sheet && st.sheet.type === 'cloud') { st.sheet.busy = false; renderSheet(); } toast(ok ? 'Gesichert' : Cloud.state().conflict ? 'Nicht gesichert – erst aus GitHub laden' : 'Nicht gesichert – ' + (Cloud.state().err || 'offline?')); },
+    async cloudPull() { const r = await Cloud.pull(); if (r.error) { toast(r.error); return; } if (!validBackup(r.d)) { toast('Die Sicherung auf GitHub ist kein Satzwerk-Backup'); return; } openSheet({ type: 'importPreview', d: r.d }); },
+    cloudOff() { Cloud.disconnect(); renderSheet(); render(); toast('Automatische Sicherung aus'); },
     exportData() { exportData(); },
     reset() { st.sheet.confirm = true; renderSheet(); },
     async resetYes() { await Backup.snapshot('vor-reset'); for (const w of st.workouts) Store.deleteWorkout(w.id); st.workouts = []; st.active = null; st.profile = null; LS.set('profile', null); LS.set('workouts', []); Store.saveActive(true); if (Store.mode === 'db') Store.write('p', () => Store.pRef().delete()); closeSheet(); render(); toast('Alle Daten gelöscht'); },
@@ -1847,6 +1990,13 @@
     Store.saveActive(); closeSheet(); renderOverlay(); toast('Getauscht: ' + ex.name);
   }
   // Export: Konto-Download (Artifact) → Teilen-Menü (iPhone: „In Dateien sichern“) → Download → Zwischenablage
+  function cloudLine() {
+    const c = Cloud.cfg(), cs = Cloud.state();
+    if (!c) return 'Aus – einmal einrichten, dann sichert die App von selbst';
+    if (cs.conflict) return 'Wartet: auf GitHub liegen Trainings, die hier fehlen';
+    if (cs.err) return 'Problem: ' + cs.err;
+    return cs.last ? 'An · zuletzt ' + dateDE(new Date(cs.last).toISOString().slice(0, 10)) + ', ' + new Date(cs.last).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'An · sichert beim nächsten Speichern';
+  }
   async function exportData(src) {
     const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };
     const data = JSON.stringify({ app: 'satzwerk', version: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), profile: d.profile, workouts: d.workouts, active: d.active || null }, null, 1);
@@ -1936,7 +2086,9 @@
     if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Leistung fällt – Deload-Woche empfohlen</b><div class="small muted">Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. Eine leichtere Woche (halbe Sätze, mehr Reserve) bringt dich meist stärker zurück.</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
     const since = p.lastExport || ''; const nNew = st.workouts.filter(w => w.date > since).length;
     const days = since ? (Date.now() - new Date(since + 'T12:00:00').getTime()) / 864e5 : 999;
-    if (Store.mode !== 'db' && !st.bkLater && nNew >= 3 && days > 14) out += `<div class="card stack" style="gap:10px"><b>Backup sichern</b><div class="small muted">${since ? 'Letztes Backup am ' + dateDE(since) + '. ' : ''}${nNew} Trainings sind nur auf diesem iPhone gespeichert.</div><div class="row"><button class="btn primary grow" data-a="exportData">Backup sichern</button><button class="btn grow" data-a="bkLater">Später</button></div></div>`;
+    const cs = Cloud.state(), cOn = !!Cloud.cfg();
+    if (Store.mode !== 'db' && cOn && (cs.conflict || (cs.last ? Date.now() - cs.last > 7 * 864e5 : Date.now() - (cs.errAt || Date.now()) > 864e5 && cs.err))) out += `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="cloudSheet"><div class="grow"><b>Sicherung braucht dich kurz</b><div class="small muted">${cs.conflict ? 'Auf GitHub liegen Trainings, die hier fehlen' : 'Automatische Sicherung klappt seit ein paar Tagen nicht'}</div></div><span class="chev">${I.chev}</span></button>`;
+    else if (Store.mode !== 'db' && !cOn && !st.bkLater && nNew >= 3 && days > 14) out += `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="cloudSheet"><div class="grow"><b>Automatisch sichern</b><div class="small muted">${nNew} Trainings liegen nur auf diesem iPhone – einmal einrichten, dann nie mehr dran denken</div></div><span class="chev">${I.chev}</span></button>`;
     return out;
   }
 
@@ -2094,6 +2246,7 @@
     }
     restoreTimers();
     render();
+    Cloud.auto(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Cloud.flush(); });
     // Daten beschädigt oder verschwunden? Sicherungen anbieten
     let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }
     if (st.corrupt || missing) Backup.list().then(l => { if (l.length || st.corrupt) A.backups(); });
