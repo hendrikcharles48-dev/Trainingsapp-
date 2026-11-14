@@ -236,6 +236,7 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.
 
 ## Formwerk (eigene App in `formwerk/`, Worker in `formwerk-worker/`)
+**Offene Schritte (Einrichtung Cloudflare/Garmin, Anpassung an echte Daten): `formwerk/OFFEN.md` – zuerst lesen und den Nutzer erinnern.**
 Whoop-Alternative für die Garmin Vivoactive 5, Fokus Krafttraining. Erholung (HRV 50 %, Ruhepuls 25 %, Schlaf 25 % gegen die
 eigene 30-Tage-Basis, Body Battery nur Anzeige), Belastung (Zonen-TRIMP aus Garmin-Aktivitäten), Muskel-Ermüdung aus Satzwerk,
 Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen Aussagen.
@@ -247,5 +248,5 @@ Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen A
 - Schnittstelle: `formwerk/SCHNITTSTELLE.md`. Satzwerk-Seite NUR in `formwerk-link.js` (Abgleich über Prüfsummen, Karte auf
   „Heute“, Fenster `SHEETS.formwerk`, Einstellungen → Daten). In `app.js` nur Aufrufe über `FW` (`FW.changed()` in
   `Store.saveWorkout/deleteWorkout`, `FW.init` in `boot`, `FW.card()` in `homeView`). Speicher `satzwerk.formwerk*`.
-- App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`) nach `docs/formwerk/` kopieren,
+- App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.
