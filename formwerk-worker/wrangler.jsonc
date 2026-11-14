@@ -1,0 +1,23 @@
+// Formwerk-Worker (Cloudflare Workers, Free-Plan). Bereitgestellt über Workers Builds, Root-Verzeichnis formwerk-worker/.
+// Geheimnisse NICHT hier eintragen: GARMIN_API_KEY und APP_PASSWORD im Cloudflare-Dashboard als „Secret“ anlegen.
+{
+  "name": "formwerk",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    // Nur diese Adresse darf die Daten aus dem Browser abrufen (GitHub Pages von Satzwerk und Formwerk)
+    "ALLOWED_ORIGIN": "https://hendrikcharles48-dev.github.io",
+    // Kalendertage (Schlaf, HRV, Belastung) werden in dieser Zeitzone gezählt
+    "TZ": "Europe/Berlin"
+  },
+  // Speicher: ein Durable Object mit SQLite (gratis im Free-Plan). Braucht im Gegensatz zu KV keine
+  // Namespace-ID im Code und ist sofort konsistent.
+  "durable_objects": {
+    "bindings": [{ "name": "STORE", "class_name": "FormwerkStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FormwerkStore"] }],
+  // Morgens vorab Garmin abfragen (UTC): 04:40 und 05:40 UTC = 05:40/06:40 Winterzeit, 06:40/07:40 Sommerzeit
+  "triggers": { "crons": ["40 4,5 * * *"] },
+  "observability": { "enabled": true }
+}
