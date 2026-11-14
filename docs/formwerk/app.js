@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = '';
 
@@ -282,7 +282,7 @@
       <div class="small c-red" id="su-err"></div>
       <button class="btn primary block" data-a="connect">Verbinden</button>
       ${edit ? '<button class="btn ghost block" data-a="closeSheet">Abbrechen</button>' : ''}
-      <p class="tiny muted" style="margin:0">Das Passwort bleibt nur auf diesem Gerät. Ohne Passwort gibt der Worker keine Daten heraus.</p></div>`;
+      <p class="tiny muted" style="margin:0">Die Worker-Adresse bekommst du erst, wenn der Worker bei Cloudflare läuft (Anleitung: formwerk-worker/EINRICHTEN.md). Der Garmin-Schlüssel kommt nie hier hinein. Das Passwort bleibt nur auf diesem Gerät. Ohne Passwort gibt der Worker keine Daten heraus.</p></div>`;
   }
 
   /* ---------- Fenster ---------- */
@@ -340,6 +340,7 @@
     async connect() {
       const url = ($('#layer #su-url') || $('#su-url')).value.trim().replace(/\/+$/, ''); const pw = ($('#layer #su-pw') || $('#su-pw')).value.trim();
       const err = $('#layer #su-err') || $('#su-err');
+      if (/^GCDC_|^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(url) || /^GCDC_/i.test(pw)) { err.textContent = 'Das ist dein Garmin-Schlüssel – der gehört NICHT in die App, sondern nur als Secret GARMIN_API_KEY in Cloudflare. Hier kommt die Worker-Adresse hin (https://formwerk.….workers.dev), die es erst nach der Cloudflare-Einrichtung gibt.'; return; }
       if (!/^https:\/\/[^/\s]+\.[^/\s]+/.test(url)) { err.textContent = 'Bitte die vollständige https-Adresse des Workers eingeben.'; return; }
       if (!pw) { err.textContent = 'Bitte das App-Passwort eingeben.'; return; }
       const prev = st.cfg; st.cfg = { url, pw }; err.textContent = 'Verbinde …';
