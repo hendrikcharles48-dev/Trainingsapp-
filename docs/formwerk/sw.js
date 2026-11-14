@@ -1,6 +1,6 @@
 // Formwerk: eigene Dateien „Cache zuerst, im Hintergrund auffrischen“ (startet sofort, auch offline).
 // Daten vom Worker gehen nie über diesen Cache (andere Adresse). Löscht nur eigene Caches (formwerk-…).
-const CACHE = 'formwerk-v1';
+const CACHE = 'formwerk-v2';
 const FILES = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(FILES.map(f => fetch(f, { cache: 'reload' }).then(r => { if (r.ok) return c.put(f, r); })))).then(() => self.skipWaiting()));
