@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.9.0';
+  const APP_VERSION = '3.10.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -167,6 +167,8 @@
       } catch (e) { return { error: 'Keine Verbindung zu GitHub.' }; }
     }
   };
+  // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '' };
   const Store = {
     mode: 'local', db: null, uid: null, q: {}, timers: {},
     async init() {
@@ -214,12 +216,12 @@
     wv: 0,
     saveWorkout(w) {
       this.wv++;
-      LS.set('workouts', st.workouts); Cloud.soon(st.active ? null : 3000);
+      LS.set('workouts', st.workouts); Cloud.soon(st.active ? null : 3000); FW.changed();
       if (this.mode === 'db') this.write('w' + w.id, () => this.wCol().doc(w.id).set(clone(w)));
     },
     deleteWorkout(id) {
       this.wv++;
-      LS.set('workouts', st.workouts); Cloud.soon();
+      LS.set('workouts', st.workouts); Cloud.soon(); FW.changed();
       if (this.mode === 'db') this.write('w' + id, () => this.wCol().doc(id).delete());
     }
   };
@@ -513,6 +515,7 @@
     return `<div class="homebar"><div class="row"><div class="eyebrow grow ell">${dateTxt}</div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div>
     <div class="stack">
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
+      ${st.active ? '' : FW.card()}
       ${sport.size ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span><span><i class="lg-sport"></i>Baseball</span><span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
       ${hero}
       ${st.active ? '' : `<div class="row"><button class="btn grow" data-a="dayPick">Andere Einheit</button><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button></div>`}
@@ -1584,10 +1587,11 @@
         <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
         ${head('Studio-Gewichte')}<div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div>
         ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button></div>
-        ${head('Daten')}<div class="list">${Store.mode !== 'db' ? `<button class="li" data-a="cloudSheet"><div class="grow"><b>Automatische Sicherung</b><div class="small muted">${cloudLine()}</div></div><span class="chev">${I.chev}</span></button>` : ''}<button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
+        ${head('Daten')}<div class="list">${Store.mode !== 'db' ? `<button class="li" data-a="cloudSheet"><div class="grow"><b>Automatische Sicherung</b><div class="small muted">${cloudLine()}</div></div><span class="chev">${I.chev}</span></button>` : ''}<button class="li" data-a="formwerkSheet"><div class="grow"><b>Formwerk (Erholung)</b><div class="small muted">${esc(FW.statusLine())}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
         ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn ghost danger" data-a="reset">Alle Daten löschen</button>'}
         <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung</p></div>`;
     },
+    formwerk() { return FW.sheet(); },
     rebuild() {
       return `<div class="stack"><h2>Neuen Plan berechnen?</h2><p class="ink2" style="margin:0">Mit deinen Antworten aus dem Fragebogen wird ein neuer Plan erstellt und aktiviert. Dein bisheriger Plan bleibt unter „Pläne“ erhalten, dein Trainingsverlauf sowieso.</p><button class="btn primary" data-a="rebuildYes">Neu berechnen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button></div>`;
     },
@@ -1938,6 +1942,7 @@
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
     cloudSheet() { openSheet({ type: 'cloud' }); },
+    formwerkSheet() { openSheet({ type: 'formwerk' }); },
     async cloudKw() { const k = Cloud.kochwerk(); if (!k) return; st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
     async cloudConnect() { const v = ($('#cl-code') || {}).value || ''; const k = Cloud.parse(v); if (!k) { st.sheet.err = 'Das ist kein Zugangscode. Er beginnt mit „kochwerk-zugang:“.'; renderSheet(); return; } st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
     async cloudNow() { st.sheet.busy = true; renderSheet(); const ok = await Cloud.push(true); if (st.sheet && st.sheet.type === 'cloud') { st.sheet.busy = false; renderSheet(); } toast(ok ? 'Gesichert' : Cloud.state().conflict ? 'Nicht gesichert – erst aus GitHub laden' : 'Nicht gesichert – ' + (Cloud.state().err || 'offline?')); },
@@ -2246,6 +2251,7 @@
     }
     restoreTimers();
     render();
+    FW.init({ workouts: () => st.workouts, getEx, onChange(force) { if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
     Cloud.auto(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Cloud.flush(); });
     // Daten beschädigt oder verschwunden? Sicherungen anbieten
     let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }

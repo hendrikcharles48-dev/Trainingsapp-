@@ -3,7 +3,7 @@
 Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engine.js`,
 `exercises.js`, `howto.js`, `figures.js`. `node pwa/build.js` baut nach `pwa/dist`, danach
 `pwa/dist/*` nach `docs/` kopieren (GitHub Pages läuft aus `main:/docs`).
-Achtung: `docs/toleranzen/`, `docs/stunden/` und `docs/kochwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
+Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/` und `docs/formwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
 ## Arbeitsregeln (Satzwerk)
@@ -234,3 +234,18 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
   Rezept einplanen oder Lebensmittel eintragen. Kamera nur für Barcodes, keine Bilder speichern.
 - Datenmodell: Sammlungen `id → Eintrag` mit `t` (letzte Änderung) und Löschmarken `{id, del:true, t}`, damit
   `merge` (neueste Änderung gewinnt) funktioniert. Neue Sammlungen in `COLLECTIONS` in `core.js` eintragen.
+
+## Formwerk (eigene App in `formwerk/`, Worker in `formwerk-worker/`)
+Whoop-Alternative für die Garmin Vivoactive 5, Fokus Krafttraining. Erholung (HRV 50 %, Ruhepuls 25 %, Schlaf 25 % gegen die
+eigene 30-Tage-Basis, Body Battery nur Anzeige), Belastung (Zonen-TRIMP aus Garmin-Aktivitäten), Muskel-Ermüdung aus Satzwerk,
+Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen Aussagen.
+- Rechnen nur im Worker: `formwerk-worker/src/model.js` (Formeln dort dokumentiert), Garmin-Auslesen tolerant in `normalize.js`,
+  Endpunkte in `garmin.js` (aus Garmins offiziellem Python-Client, nicht raten). Nach Änderungen an `normalize.js`
+  `NORM_VERSION` in `src/index.js` erhöhen (lädt Garmin einmal neu). Tests: `node formwerk-worker/test/model.test.js`.
+- Worker: Cloudflare Workers Builds (Root `formwerk-worker/`, Name `formwerk`), Speicher Durable Object (SQLite, keine KV-ID nötig).
+  Secrets `GARMIN_API_KEY`, `APP_PASSWORD` nur im Dashboard – nie ins Repo. Einrichtung: `formwerk-worker/EINRICHTEN.md`.
+- Schnittstelle: `formwerk/SCHNITTSTELLE.md`. Satzwerk-Seite NUR in `formwerk-link.js` (Abgleich über Prüfsummen, Karte auf
+  „Heute“, Fenster `SHEETS.formwerk`, Einstellungen → Daten). In `app.js` nur Aufrufe über `FW` (`FW.changed()` in
+  `Store.saveWorkout/deleteWorkout`, `FW.init` in `boot`, `FW.card()` in `homeView`). Speicher `satzwerk.formwerk*`.
+- App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`) nach `docs/formwerk/` kopieren,
+  `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.
