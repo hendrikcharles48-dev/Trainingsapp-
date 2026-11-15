@@ -49,7 +49,7 @@ h1{font-size:32px;font-weight:800;letter-spacing:-.025em} h2{font-size:21px} h3{
 .avatar{width:48px;height:48px;border-radius:50%;background:var(--lime);color:var(--on-light);display:grid;place-items:center;font:800 18px var(--display);flex:none}
 
 /* Schwebende Navigation mit runden Knöpfen */
-.tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:max(6px, calc(env(safe-area-inset-bottom,0px) - 16px));z-index:20;background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);border:1px solid var(--line);border-radius:999px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(max(6px, calc(env(safe-area-inset-bottom,0px) - 16px)) - var(--vgap,0px));z-index:20;background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);border:1px solid var(--line);border-radius:999px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
 .tabs nav{display:flex;gap:6px;padding:7px}
 .tabs button{width:64px;height:56px;border-radius:20px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted)}
 .tabs button svg{width:22px;height:22px}
@@ -224,7 +224,7 @@ label.lbl,.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:6px;co
 .qrow{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:22px;padding:8px 14px 8px 8px;border:0;width:100%;text-align:left}
 .qrow.done{opacity:.55}
 .qrow .thumb{width:56px;height:56px}
-.panel{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:45;max-width:600px;margin:0 auto;background:#F4F4F6;color:var(--on-light);border-radius:30px;padding:14px 18px 14px;box-shadow:0 -10px 40px rgba(0,0,0,.45)}
+.panel{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px - var(--vgap,0px));z-index:45;max-width:600px;margin:0 auto;background:#F4F4F6;color:var(--on-light);border-radius:30px;padding:14px 18px 14px;box-shadow:0 -10px 40px rgba(0,0,0,.45)}
 .panel::before{content:"";position:absolute;top:8px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:9px;background:rgba(20,20,22,.18)}
 .saveerr{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:60;display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--rose);color:#141416;border-radius:18px;padding:10px 12px 10px 16px;font-weight:800;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 .panel .pname{display:block;width:100%;border:0;background:none;padding:2px 0 0;font-weight:800;font-size:14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--on-light);opacity:.8;min-height:22px}
@@ -659,4 +659,4 @@ details.fold[open]>summary::after{transform:rotate(-135deg);margin-bottom:-4px}
 <script src="figures.js"></script>
 <script src="formwerk-link.js"></script>
 <script src="app.js"></script>
-<script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return}let a=null;try{a=JSON.parse(localStorage.getItem('satzwerk.active'))}catch(e){}if(!a)location.reload()})}</script></body></html>
+<script>(function(){function f(){var g=0;try{var sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(sa&&innerHeight>innerWidth){g=Math.round(screen.height-innerHeight);if(g<0||g>100)g=0}}catch(e){}document.documentElement.style.setProperty('--vgap',g+'px')}f();addEventListener('resize',f);addEventListener('orientationchange',function(){setTimeout(f,300)});addEventListener('pageshow',f)})();</script><script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return}let a=null;try{a=JSON.parse(localStorage.getItem('satzwerk.active'))}catch(e){}if(!a)location.reload()})}</script></body></html>
