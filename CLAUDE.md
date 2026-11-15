@@ -11,6 +11,9 @@ Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/` und `docs/formwer
 - **Jedes Update direkt live stellen** (Nutzerwunsch 12.11.2026, dauerhafte Freigabe): nach Build, Kopie nach `docs/` und
   Commit einen Pull Request nach `main` anlegen und sofort mergen – erst dann sieht der Nutzer es in der App auf dem iPhone.
   Danach den Arbeits-Branch für die nächste Arbeit wieder von `origin/main` starten.
+- **Antworten kurz** (Nutzerwunsch 15.11.): nach einem Update Änderungen nicht ausführlich aufzählen – nur Wichtiges, Neues oder
+  was er am iPhone tun muss.
+- Wochenbericht: geplante Aufgabe „Satzwerk-Wochenbericht“ sonntags 17:55 Uhr (Nutzerwunsch: ca. 18 Uhr).
 - **Erst kurzen Plan zeigen, auf OK warten**, dann umsetzen (außer der Nutzer verzichtet ausdrücklich darauf).
 - **Bestehende Daten nie verlieren:** gespeicherte Felder nie löschen oder umbenennen, Neues nur zusätzlich; vor jeder
   Umstellung eine Sicherung. Nur Schlüssel mit `satzwerk.`, nie `localStorage.clear()` – der Browser-Speicher wird mit
