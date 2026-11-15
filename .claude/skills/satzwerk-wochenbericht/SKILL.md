@@ -36,6 +36,9 @@ Griff, beanspruchte Muskeln, typische Fehler. Tippfehler wohlwollend lesen („b
 Danach `node --check`, `node pwa/build.js`, kurz mit Playwright prüfen, `APP_VERSION`/`CACHE` hochzählen,
 `cp pwa/dist/* docs/`, committen, Pull Request nach `main` und mergen (dauerhafte Freigabe). Namen in `built` des Berichts.
 Unklar, was gemeint ist (z. B. „Übung 1“)? Nicht raten – im Bericht als Punkt nachfragen.
+Die App stellt nicht still um: Der Nutzer sieht die Daten der neuen festen Übung auf „Heute“ und bestätigt. Hat er eine
+Zuordnung abgelehnt (`rejected` in der Liste), war die Recherche falsch – neu prüfen und ggf. eine eigene feste Übung anlegen.
+`facts.customWaiting` = eingebaut, wartet auf Bestätigung (im Bericht kurz erwähnen).
 
 ## 3. Fakten rechnen
 

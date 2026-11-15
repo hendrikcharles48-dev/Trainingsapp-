@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.3';
+  const APP_VERSION = '3.14.4';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -295,28 +295,35 @@
     return D.list.find(e => nameKey(e.name) === k || (e.alias || []).some(a => nameKey(a) === k)) || null;
   }
   // Wenn ein Update eine eigene Übung als richtige Übung nachliefert: Verlauf, Plan und Favoriten übernehmen
-  function upgradeCustom() {
-    const pr = P(); if (!pr || !(pr.custom || []).length) return [];
-    const done = [];
-    for (const c of pr.custom.slice()) {
-      const b = findBuiltin(c.name); if (!b) continue;
-      const from = JSON.stringify(c.id), to = JSON.stringify(b.id);
-      const swap = o => o == null ? o : JSON.parse(JSON.stringify(o).split(from).join(to));
-      if (!done.length) Backup.snapshot('vor-uebung-umstellen');
-      // alle Pläne umstellen (nicht nur den aktiven) und den Spiegel profile.plan wieder auf das Objekt in plans setzen
-      pr.plans = swap(pr.plans); pr.plan = swap(pr.plan); pr.favs = swap(pr.favs);
-      const act = (pr.plans || []).find(x => pr.plan && x.id === pr.plan.id); if (act) pr.plan = act;
-      if (pr.exNotes && pr.exNotes[c.id] && !pr.exNotes[b.id]) pr.exNotes[b.id] = pr.exNotes[c.id];
-      for (const k of Object.keys(pr.exW || {})) if (k.startsWith(c.id + '@')) { const nk = b.id + k.slice(c.id.length); if (!pr.exW[nk]) pr.exW[nk] = pr.exW[k]; }
-      if (st.active) { st.active = swap(st.active); Store.saveActive(true); }
-      // erst die neue Liste setzen, dann speichern (saveWorkout speichert st.workouts)
-      const changed = []; st.workouts = st.workouts.map(w => { if (!JSON.stringify(w).includes(from)) return w; const nw = swap(w); changed.push(nw); return nw; });
-      for (const w of changed) Store.saveWorkout(w);
-      pr.custom = pr.custom.filter(x => x.id !== c.id); delete D.byId[c.id];
-      done.push(b.name);
-    }
-    if (done.length) Store.saveProfile(true);
-    return done;
+  // Eigene Übung, die ein Update als feste Übung nachliefert (Name/alias passt): erst anzeigen, Nutzer bestätigt (3.14.4).
+  // profile.cxNo[eigeneId] = festeId → „Passt nicht“, wird nicht wieder gefragt.
+  function pendingCustom() {
+    const pr = P(); if (!pr) return [];
+    return (pr.custom || []).filter(c => !c.hidden).map(c => ({ c, b: findBuiltin(c.name) })).filter(x => x.b && (pr.cxNo || {})[x.c.id] !== x.b.id);
+  }
+  // Verlauf, alle Pläne, Favoriten, Notizen, Gewichtslisten und laufendes Training auf die feste Übung umstellen
+  function upgradeOne(c, b) {
+    const pr = P(); if (!pr || !c || !b) return false;
+    Backup.snapshot('vor-uebung-umstellen');
+    const from = JSON.stringify(c.id), to = JSON.stringify(b.id);
+    const swap = o => o == null ? o : JSON.parse(JSON.stringify(o).split(from).join(to));
+    // alle Pläne umstellen (nicht nur den aktiven) und den Spiegel profile.plan wieder auf das Objekt in plans setzen
+    pr.plans = swap(pr.plans); pr.plan = swap(pr.plan); pr.favs = swap(pr.favs);
+    const act = (pr.plans || []).find(x => pr.plan && x.id === pr.plan.id); if (act) pr.plan = act;
+    if (pr.exNotes && pr.exNotes[c.id] && !pr.exNotes[b.id]) pr.exNotes[b.id] = pr.exNotes[c.id];
+    for (const k of Object.keys(pr.exW || {})) if (k.startsWith(c.id + '@')) { const nk = b.id + k.slice(c.id.length); if (!pr.exW[nk]) pr.exW[nk] = pr.exW[k]; }
+    if (st.active) { st.active = swap(st.active); Store.saveActive(true); }
+    // erst die neue Liste setzen, dann speichern (saveWorkout speichert st.workouts)
+    const changed = []; st.workouts = st.workouts.map(w => { if (!JSON.stringify(w).includes(from)) return w; const nw = swap(w); changed.push(nw); return nw; });
+    for (const w of changed) Store.saveWorkout(w);
+    pr.custom = pr.custom.filter(x => x.id !== c.id); delete D.byId[c.id];
+    exCache.clear(); Store.saveProfile(true);
+    return true;
+  }
+  function cxReadyCard() {
+    const l = pendingCustom(); if (!l.length) return '';
+    const x = l[0];
+    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="cxReady" data-id="${x.c.id}">${thumb(x.b)}<div class="grow" style="min-width:0"><div class="eyebrow">Neue feste Übung${l.length > 1 ? ' · ' + l.length + ' bereit' : ''}</div><b class="ell">${esc(x.b.name)}</b><div class="small muted ell">aus deiner Übung „${esc(x.c.name)}“ – ansehen & bestätigen</div></div><span class="chev">${I.chev}</span></button>`;
   }
   function customReport(ex) {
     return `Satzwerk – neue eigene Übung, bitte mit allen Daten einbauen:\nName: ${ex.name}\n${ex.info ? 'Gerät & Hinweise: ' + ex.info + '\n' : ''}Bewegung: ${D.PATTERNS[ex.pat] || ex.pat}\nArt: ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' : 'Halten'}\nMuskeln: ${ex.prim.map(m => D.MUSCLES[m]).join(', ') || '–'}\nGeräte: ${ex.eq.map(e => D.EQUIP[e]).join(', ')}\nZiel: ${ex.rr[0]}–${ex.rr[1]}`;
@@ -531,6 +538,7 @@
     return `<div class="homebar"><div class="row"><div class="eyebrow grow ell">${dateTxt}</div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div>
     <div class="stack">
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
+      ${st.active ? '' : cxReadyCard()}
       ${st.active ? '' : coachCard()}
       ${st.active ? '' : FW.card()}
       ${sport.size || ((FW.plan() || {}).strengthDays || []).length ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span>${sport.size ? '<span><i class="lg-sport"></i>Baseball</span>' : ''}${((FW.plan() || {}).strengthDays || []).length ? '<span><i class="lg-good"></i>Kraft-Tag</span>' : ''}<span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
@@ -1412,6 +1420,23 @@
         ${s.items.length ? `<div class="list">${s.items.map(x => `<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${new Date(x.ts).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b><div class="small muted">${esc(SNAP_LBL[x.reason] || x.reason)} · ${(x.workouts || []).length} Trainings${x.profile && x.profile.plan ? ' · ' + esc(x.profile.plan.name || x.profile.plan.splitName || '') : ''}</div></div>
           ${s.confirm === x.id ? `<button class="btn danger sm" data-a="bkRestoreYes" data-id="${x.id}">Wirklich wiederherstellen</button>` : `<button class="btn sm" data-a="bkRestore" data-id="${x.id}">Wiederherstellen</button>`}<button class="btn sm" data-a="bkFile" data-id="${x.id}">Als Datei</button></div>`).join('')}</div>` : '<div class="empty">Noch keine Sicherung vorhanden.</div>'}</div>`;
     },
+    cxReady(s) {
+      const x = pendingCustom().find(y => y.c.id === s.id); if (!x) return `<div class="stack"><h2>Erledigt</h2><div class="small muted">Diese Übung ist schon übernommen.</div></div>`;
+      const { c, b } = x; const n = st.workouts.filter(w => (w.exercises || []).some(e => e.exId === c.id)).length;
+      const inPlans = (P().plans || []).filter(pl => (pl.days || []).some(d => d.slots.some(sl => Object.values(sl.ex || {}).includes(c.id)))).map(pl => pl.name || pl.splitName);
+      const lv = LVL.find(l => l[0] === b.lvl);
+      return `<div class="stack"><div><div class="eyebrow">Neue feste Übung · bitte prüfen</div><h2>${esc(b.name)}</h2><div class="small muted">Aus deiner eigenen Übung „${esc(c.name)}“${c.info ? ' (' + esc(c.info) + ')' : ''}</div></div>
+        <div class="stage" style="aspect-ratio:1/0.7"><div class="figtile" style="width:100%;height:100%">${figSVG(b)}</div></div>
+        <div class="card stack" style="gap:6px">
+          <div class="row between"><span class="muted">Muskeln</span><b style="text-align:right">${b.prim.map(m => D.MUSCLES[m]).join(', ')}${(b.sec || []).length ? '<span class="muted" style="font-weight:400"> + ' + b.sec.map(m => D.MUSCLES[m]).join(', ') + '</span>' : ''}</b></div>
+          <div class="row between"><span class="muted">Geräte</span><b>${b.eq.map(e => D.EQUIP[e]).join(' + ')}</b></div>
+          <div class="row between"><span class="muted">Schwierigkeit</span><b>${lv ? b.lvl + ' · ' + lv[1] : b.lvl}</b></div>
+          <div class="row between"><span class="muted">Ziel</span><b>${rrText(b.rr, b)}${b.uni ? ' pro Seite' : ''}</b></div>
+          <div class="row between"><span class="muted">Bewegung</span><b>${esc(D.PATTERNS[b.pat] || b.pat)}</b></div></div>
+        <div class="card stack" style="gap:12px"><b>Anleitung</b>${howtoHTML(b)}</div>
+        <div class="card flat small">Beim Bestätigen wandern ${n ? '<b>' + n + (n === 1 ? ' Training</b>' : ' Trainings</b>') : 'Notizen'}${inPlans.length ? ' und die Plätze in <b>' + inPlans.map(esc).join(', ') + '</b>' : ''} auf die feste Übung. „${esc(c.name)}“ verschwindet aus „Eigene“. Vorher wird gesichert.</div>
+        <button class="btn primary" data-a="cxReadyYes" data-id="${c.id}">Bestätigen</button><button class="btn" data-a="cxReadyNo" data-id="${c.id}">Passt nicht – eigene behalten</button></div>`;
+    },
     coach(s) {
       const c = FW.coach(); if (!c) return `<div class="stack"><h2>Wochenbericht</h2><div class="small muted">Noch kein Bericht. Er kommt jeden Sonntagabend.</div></div>`;
       const rec = ((P() || {}).coachDone || {})[c.id] || { a: {} };
@@ -1423,7 +1448,7 @@
         <div>${esc(c.summary)}</div>
         ${(c.points || []).length ? `<div class="list">${c.points.map(p => `<div class="li"><div class="grow"><b>${esc(p.t)}</b>${p.d ? `<div class="small muted">${esc(p.d)}</div>` : ''}</div></div>`).join('')}</div>` : ''}
         ${act ? `<div class="lbl">Vorschläge für den Plan</div>${act}<div class="small muted">Vor jeder Änderung legt die App eine Sicherung an.</div>` : ''}
-        ${(c.built || []).length ? `<div class="small muted">Neu eingebaut: ${c.built.map(esc).join(', ')}</div>` : ''}
+        ${pendingCustom().length ? `<div class="lbl">Neue feste Übungen – bitte prüfen</div>${pendingCustom().map(x => `<button class="card flat row" style="width:100%;text-align:left;gap:10px" data-a="cxReady" data-id="${x.c.id}">${thumb(x.b)}<div class="grow" style="min-width:0"><b class="ell">${esc(x.b.name)}</b><div class="small muted ell">aus „${esc(x.c.name)}“</div></div><span class="chev">${I.chev}</span></button>`).join('')}` : (c.built || []).length ? `<div class="small muted">Neu eingebaut: ${c.built.map(esc).join(', ')}</div>` : ''}
         <button class="btn" data-a="coachClose">Gelesen</button></div>`;
     },
     cxDel(s) {
@@ -1988,6 +2013,9 @@
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
+    cxReady(t) { openSheet({ type: 'cxReady', id: t.dataset.id }); },
+    cxReadyYes(t) { const x = pendingCustom().find(y => y.c.id === t.dataset.id); if (!x) { closeSheet(); return; } upgradeOne(x.c, x.b); const next = pendingCustom()[0]; render(); if (next) openSheet({ type: 'cxReady', id: next.c.id }); else closeSheet(); toast('Jetzt feste Übung: ' + x.b.name); },
+    cxReadyNo(t) { const x = pendingCustom().find(y => y.c.id === t.dataset.id); if (!x) { closeSheet(); return; } const p = P(); p.cxNo = Object.assign({}, p.cxNo, { [x.c.id]: x.b.id }); Store.saveProfile(); closeSheet(); render(); toast('Deine eigene Übung bleibt – Claude sieht das im nächsten Bericht'); },
     coachOpen() { const c = FW.coach(); if (c) { const r = coachRec(c.id); if (!r.seen) { r.seen = Date.now(); Store.saveProfile(); } } openSheet({ type: 'coach' }); },
     coachClose() { const c = FW.coach(); if (c) { coachRec(c.id).closed = Date.now(); Store.saveProfile(); } closeSheet(); render(); },
     coachNo(t) { const c = FW.coach(); if (!c) return; coachRec(c.id).a[t.dataset.id] = 'no'; Store.saveProfile(); renderSheet(); },
@@ -2327,7 +2355,7 @@
     registerCustom();
     if (st.profile && st.profile.health) { delete st.profile.health; Store.saveProfile(true); }
     let balCh = null; if (st.profile && st.profile.plan && st.profile.answers && !st.profile.plan.bal && autoPlan(st.profile.plan)) { Backup.snapshot('vor-update'); balCh = E.balancePlan(st.profile.plan, st.profile); Store.saveProfile(true); }
-    const up = upgradeCustom(); if (up.length) setTimeout(() => toast('Eigene Übung jetzt mit Anleitung & Bild: ' + up.join(', '), 4500), 600);
+    // eigene Übungen, die jetzt fest eingebaut sind, warten auf Bestätigung (Karte auf Heute, cxReadyCard)
     if (st.profile && st.profile.plan && !autoPlan(st.profile.plan) && (st.profile.plan.v || 1) < E.PLAN_VERSION) { st.profile.plan.v = E.PLAN_VERSION; Store.saveProfile(true); }
     if (st.profile && st.profile.plan && st.profile.answers && (st.profile.plan.v || 1) < E.PLAN_VERSION) { Backup.snapshot('vor-update');
       const old = st.profile.plan; const np = E.buildPlan(st.profile); np.id = old.id; np.name = old.name;
