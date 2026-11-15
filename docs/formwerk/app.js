@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.5.0';
+  const VERSION = '1.6.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -155,7 +155,7 @@
 
   function muscleCard(d) {
     const ms = d.muscles || []; const last = d.strength && d.strength.last;
-    const txt = m => m.pain ? 'Schmerz ' + m.pain + '/3 · schonen' : m.sore ? 'Muskelkater ' + (m.sore === 2 ? 'stark' : 'leicht') : m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
+    const txt = m => m.pain >= 2 ? 'Schmerz ' + m.pain + '/5 · schonen' : m.sore ? 'Muskelkater ' + SORE_L[m.sore] : m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
     const lastTxt = last ? `${esc(last.name || 'Kraft')} · ${last.date === todayIso() ? 'heute' : dShort(last.date)}` : 'Noch keine Einheit von Satzwerk';
     return `<div class="card"><div class="ctitle"><h3>Muskelgruppen</h3><span class="aside ell">${lastTxt}</span></div>
       <div class="muscles">${ms.map(m => `<div class="mus ${m.status}"><div class="top"><b class="ell">${esc(m.label)}</b><span>${txt(m)}</span></div><div class="bar"><i style="width:${Math.max(3, m.pct)}%"></i></div></div>`).join('')}</div>
@@ -200,7 +200,10 @@
     return h;
   }
   /* ----- Morgen-Check: Muskelkater und Schmerz ----- */
-  const SORE_L = ['', 'leicht', 'stark'];
+  // Stufen 1–5 (Nutzerwunsch): Muskelkater und Schmerz gleich fein
+  const SORE_L = ['', 'sehr leicht', 'leicht', 'mittel', 'stark', 'sehr stark'];
+  const PAIN_L = ['', 'kaum', 'spürbar', 'störend', 'stark', 'sehr stark'];
+  const lvTxt = (kind, v) => v ? (kind === 'sore' ? SORE_L[v] : v + '/5 ' + PAIN_L[v]) : '–';
   const PAIN_AREAS = [['nacken', 'Nacken'], ['schulter', 'Schulter'], ['ellbogen', 'Ellbogen'], ['handgelenk', 'Handgelenk'], ['oberer_ruecken', 'Oberer Rücken'], ['unterer_ruecken', 'Unterer Rücken'], ['huefte', 'Hüfte'], ['leiste', 'Leiste'], ['oberschenkel', 'Oberschenkel hinten'], ['knie', 'Knie'], ['sprunggelenk', 'Sprunggelenk'], ['achilles', 'Achilles / Wade']];
   const painLabel = k => (PAIN_AREAS.find(a => a[0] === k) || [k, k])[1];
   function checkCard(d) {
@@ -215,7 +218,7 @@
     if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
       <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ || bbRow}</div>`;
     const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
-    const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/3`);
+    const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/5`);
     const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
     // fertig: kompakte Zeile – nur noch kurz, was eingetragen ist, plus die beiden Baseball-Schalter als kleine Pillen
     const pill = (k, x, l) => `<button class="ckpill ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`}>${bbLabel(x, l)}${x.on ? ' ✓' : ''}</button>`;
@@ -224,12 +227,13 @@
   }
   function ckSheet() {
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
-    const chip = (kind, k, label, v, max) => `<button class="ckchip ${v ? 'on lv' + v : ''}" data-a="ckTap" data-kind="${kind}" data-k="${k}" data-max="${max}"><b class="ell">${esc(label)}</b><span>${kind === 'sore' ? (SORE_L[v] || '–') : v ? v + '/3' : '–'}</span></button>`;
-    openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Antippen wechselt: – → leicht → stark. Schmerz: 1 = spürbar, 2 = stört, 3 = stark.</div></div>
-      <div><div class="lblf">Muskelkater</div><div class="ckgrid">${ms.map(m => chip('sore', m.k, m.label, c.sore[m.k] || 0, 2)).join('')}</div></div>
-      <div><div class="lblf">Schmerz (Gelenke, Sehnen, stechend)</div><div class="ckgrid">${PAIN_AREAS.map(([k, l]) => chip('pain', k, l, c.pain[k] || 0, 3)).join('')}</div></div>
+    const chip = (kind, k, label, v) => `<button class="ckchip ${v ? 'on lv' + v : ''}" data-a="ckTap" data-kind="${kind}" data-k="${k}" data-label="${esc(label)}" id="ck-${kind}-${k}"><b class="ell">${esc(label)}</b><span>${lvTxt(kind, v)}</span></button>`;
+    openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Antippen und Stufe 1–5 wählen. Nichts antippen = alles gut.</div></div>
+      <div><div class="lblf">Muskelkater</div><div class="ckgrid">${ms.map(m => chip('sore', m.k, m.label, c.sore[m.k] || 0)).join('')}</div></div>
+      <div><div class="lblf">Schmerz (Gelenke, Sehnen, stechend)</div><div class="ckgrid">${PAIN_AREAS.map(([k, l]) => chip('pain', k, l, c.pain[k] || 0)).join('')}</div></div>
       <div class="tiny muted">Formwerk stellt keine Diagnose. Hält Schmerz an oder wird stärker: Arzt oder Physio.</div>
-      <button class="btn primary block" data-a="ckSave">Speichern</button><button class="btn ghost block" data-a="closeSheet">Abbrechen</button></div>`);
+      <button class="btn primary block" data-a="ckSave">Speichern</button><button class="btn ghost block" data-a="closeSheet">Abbrechen</button>
+      <div class="ckpick" id="ckPick" hidden></div></div>`);
   }
   async function ckSend(body) {
     try { await api('/v1/checkin', { method: 'POST', body: Object.assign({ date: todayIso() }, body) }); closeSheet(); load(true); }
@@ -372,10 +376,11 @@
 
   /* ---------- Fenster ---------- */
   function openSheet(html) {
+    document.documentElement.classList.add('sheet-open'); // Seite dahinter sperren, nur das Fenster scrollt
     const L = $('#layer'); L.innerHTML = `<div class="dim" data-a="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
     requestAnimationFrame(() => L.classList.add('open'));
   }
-  function closeSheet() { const L = $('#layer'); L.classList.remove('open'); setTimeout(() => { if (!L.classList.contains('open')) L.innerHTML = ''; }, 300); }
+  function closeSheet() { document.documentElement.classList.remove('sheet-open'); const L = $('#layer'); L.classList.remove('open'); setTimeout(() => { if (!L.classList.contains('open')) L.innerHTML = ''; }, 300); }
   function whySheet() {
     const r = st.data.recovery; const col = r.color;
     const parts = r.parts.map(p => `<div class="part"><div class="score ${p.score >= 60 ? 'c-green' : p.score >= 34 ? 'c-yellow' : 'c-red'}">${p.score}<span>${p.weight} %</span></div><div class="grow" style="min-width:0"><b>${p.label}</b><div class="small ink2">${partText(p)}</div></div></div>`).join('');
@@ -414,8 +419,14 @@
     weightSheet() { st.wIn = null; weightSheet(); },
     ckOk() { ckSend({ sore: {}, pain: {} }).then(() => toast('Eingetragen')); },
     ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain) }; ckSheet(); },
-    ckTap(t) { const bag = st.ck[t.dataset.kind]; const k = t.dataset.k; const v = ((bag[k] || 0) + 1) % (+t.dataset.max + 1); if (v) bag[k] = v; else delete bag[k];
-      t.className = 'ckchip' + (v ? ' on lv' + v : ''); t.querySelector('span').textContent = t.dataset.kind === 'sore' ? (SORE_L[v] || '–') : v ? v + '/3' : '–'; },
+    // Kachel antippen → Auswahl 0–5 unten im Fenster
+    ckTap(t) { const kind = t.dataset.kind, k = t.dataset.k; const cur = st.ck[kind][k] || 0; const L = kind === 'sore' ? SORE_L : PAIN_L;
+      const box = $('#ckPick'); box.hidden = false;
+      box.innerHTML = `<div class="ckpick-h"><b>${esc(t.dataset.label)}</b><span class="tiny muted">${kind === 'sore' ? 'Muskelkater' : 'Schmerz'}</span></div><div class="ckpick-row">${[0, 1, 2, 3, 4, 5].map(v => `<button class="ckl ${v === cur ? 'on' : ''} ${v ? 'lv' + v : ''}" data-a="ckSet" data-kind="${kind}" data-k="${k}" data-v="${v}"><b>${v || '–'}</b><span>${v ? L[v] : 'keiner'}</span></button>`).join('')}</div>`;
+      document.querySelectorAll('.ckchip.sel').forEach(x => x.classList.remove('sel')); t.classList.add('sel'); },
+    ckSet(t) { const kind = t.dataset.kind, k = t.dataset.k, v = +t.dataset.v; if (v) st.ck[kind][k] = v; else delete st.ck[kind][k];
+      const chip = $('#ck-' + kind + '-' + k); if (chip) { chip.className = 'ckchip' + (v ? ' on lv' + v : ''); chip.querySelector('span').textContent = lvTxt(kind, v); }
+      const box = $('#ckPick'); box.hidden = true; box.innerHTML = ''; },
     ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain }); },
     ckFlag(t) { ckSend({ bbOnly: true, [t.dataset.k]: t.dataset.on !== '1' }).then(() => toast(t.dataset.on !== '1' ? (t.dataset.k === 'bb' ? 'Gestern Baseball eingetragen' : 'Heute Baseball – Empfehlung angepasst') : 'Entfernt')); },
     ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend({ bbOnly: true, bb: t.dataset.v === '1' }); },

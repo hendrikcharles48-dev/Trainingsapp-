@@ -324,7 +324,8 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const recentActs = [];
   for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of actsByDate[d] || []) recentActs.push(Object.assign({}, a, { trimp: activityTrimp(a, hrv), ts: Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })); }
   const S = Object.assign({}, DEFAULT_SETTINGS, settings || {});
-  const ckBy = Object.fromEntries((checkins || []).map(c => [c.date, c]));
+  checkins = (checkins || []).map(normCheckin);
+  const ckBy = Object.fromEntries(checkins.map(c => [c.date, c]));
   const allActs = withCheckinBaseball(actsByDate, ckBy, hrv, tzOff, S, today);
   for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of allActs[d] || []) if (a.assumed) recentActs.push(a); }
   const calib = calibrate({ sessions, allActs, checkins, today, tzOff, hr: hrv });
@@ -401,12 +402,12 @@ export function weightView(days, manual, today) {
 /* =====================================================================
    7) KÖRPERGEFÜHL: MUSKELKATER UND SCHMERZ (Morgen-Check)
    ---------------------------------------------------------------------
-   Check-in je Tag: {date, sore: {gruppe: 1 leicht | 2 stark}, pain: {stelle: 1–3}, bb: Baseball gestern ja/nein}
-   Stufe 1 – heute: Muskelkater hebt eine Gruppe mindestens auf „teilweise“ (leicht, 40 %) bzw. „ermüdet“ (stark, 75 %).
-     Schmerz ist kein Muskelkater: die betroffenen Gruppen werden geschont, bei Stärke 3 heute keine Kraft,
-     an 3 von 5 Tagen → Hinweis „abklären lassen“. Keine Diagnose.
+   Check-in je Tag: {date, v: 5, sore: {gruppe: 1–5}, pain: {stelle: 1–5}, bb/bbToday: Baseball}
+   Stufe 1 – heute: Muskelkater hebt die Gruppe auf mindestens 25/35/50/70/85 % (Stufe 1–5; ab 3 „teilweise“, ab 4 „ermüdet“).
+     Schmerz ist kein Muskelkater: ab 2/5 werden die Gruppen geschont, ab 4/5 heute keine Kraft,
+     ab 2/5 an 3 von 5 Tagen → Hinweis „abklären lassen“. Keine Diagnose.
    Stufe 2 – lernen: An Check-in-Tagen wird die Rechnung (morgens 8 Uhr) mit deiner Angabe verglichen
-     (kein = 10 %, leicht = 40 %, stark = 75 %). Daraus je Gruppe ein Faktor für Kraft- bzw. Baseball-Ermüdung,
+     (keiner 10 %, Stufe 1–5: 25/35/50/70/85 %). Daraus je Gruppe ein Faktor für Kraft- bzw. Baseball-Ermüdung,
      vorsichtig zur 1 hin gezogen (n/(n+6)), 0,6–1,8, wirksam ab 4 passenden Tagen.
    Stufe 3 – Muster (6 Wochen): wiederkehrende Beschwerden, Zusammenhang mit Baseball, gute Kraft-Tage.
    ===================================================================== */
@@ -426,7 +427,15 @@ export const PAIN_AREAS = [
 ];
 const AREA = Object.fromEntries(PAIN_AREAS.map(a => [a.k, a]));
 const GLABEL = Object.fromEntries(GROUPS.map(g => [g.k, g.label]));
-const SORE_PCT = [10, 40, 75];
+// Skala ab Worker 1.7: Muskelkater und Schmerz je 1–5 (1 sehr leicht/kaum … 5 sehr stark).
+// Ältere Check-ins (Muskelkater 1–2, Schmerz 1–3, ohne v: 5) werden beim Lesen umgerechnet (gespeichert bleibt alles, wie es war).
+const SORE_PCT = [10, 25, 35, 50, 70, 85];
+const PAIN_PCT = [0, 20, 35, 55, 70, 85];
+export function normCheckin(c) {
+  if (!c || c.v === 5) return c;
+  const map = (o, m) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, m[v] || v]));
+  return Object.assign({}, c, { sore: map(c.sore, { 1: 2, 2: 4 }), pain: map(c.pain, { 1: 2, 2: 3, 3: 4 }), v: 5 });
+}
 const TIPS = {
   schulter: 'Schulter-Vorbeugung 2× pro Woche (Außenrotation mit Band, Face Pulls); Überkopf-Kraft nicht am Tag nach Baseball.',
   ellbogen: 'Wurf- und Zugvolumen dosieren, Unterarme langsam kräftigen (Hängen, Handgelenk-Curls).',
@@ -471,8 +480,8 @@ export function applySoreness(muscles, ck) {
   return muscles.map(m => {
     const lv = (ck.sore || {})[m.k] || 0; const pn = Math.max(0, ...PAIN_AREAS.filter(a => a.groups.includes(m.k)).map(a => (ck.pain || {})[a.k] || 0));
     const x = Object.assign({}, m, { sore: lv || 0, pain: pn || 0 });
-    if (lv === 2) x.pct = Math.max(x.pct, 75); else if (lv === 1) x.pct = Math.max(x.pct, 40);
-    if (pn >= 2) x.pct = Math.max(x.pct, 60); else if (pn === 1) x.pct = Math.max(x.pct, 30);
+    if (lv) x.pct = Math.max(x.pct, SORE_PCT[lv]);
+    if (pn) x.pct = Math.max(x.pct, PAIN_PCT[pn]);
     x.status = x.pct >= 55 ? 'tired' : x.pct >= 25 ? 'partial' : 'fresh';
     return x;
   });
@@ -481,7 +490,7 @@ export function applySoreness(muscles, ck) {
 export function painToday(ckBy, today) {
   const ck = ckBy[today]; if (!ck || !ck.pain) return [];
   return Object.entries(ck.pain).filter(([k, v]) => v > 0 && AREA[k]).map(([k, lvl]) => {
-    let days = 0; for (let i = 0; i < 5; i++) { const c = ckBy[addDays(today, -i)]; if (c && c.pain && c.pain[k] > 0) days++; }
+    let days = 0; for (let i = 0; i < 5; i++) { const c = ckBy[addDays(today, -i)]; if (c && c.pain && c.pain[k] >= 2) days++; }
     return { k, label: AREA[k].label, lvl, inj: AREA[k].inj || null, days, groups: AREA[k].groups };
   }).sort((a, b) => b.lvl - a.lvl);
 }
@@ -489,13 +498,13 @@ export function painToday(ckBy, today) {
 export function applyPain(r, pain, muscles) {
   if (!pain || !pain.length) return r;
   const x = Object.assign({}, r, { notes: r.notes.slice() });
-  const hard = pain.filter(p => p.lvl >= 3);
+  const hard = pain.filter(p => p.lvl >= 4);
   if (hard.length && x.level !== 'done') { x.level = 'rest'; x.title = 'Pause'; x.text = `Starker Schmerz (${hard.map(p => p.label).join(', ')}): heute keine Kraft. Schonen, nur was schmerzfrei geht.`; x.good = []; }
   for (const p of pain) {
-    x.notes.unshift(`${p.label} schmerzt (${p.lvl}/3): schonen – keine Übungen, die ${p.label === 'Nacken' ? 'den Nacken' : 'diese Stelle'} belasten.`);
+    x.notes.unshift(p.lvl >= 2 ? `${p.label} schmerzt (${p.lvl}/5): schonen – keine Übungen, die ${p.label === 'Nacken' ? 'den Nacken' : 'diese Stelle'} belasten.` : `${p.label} leicht spürbar (1/5) – im Blick behalten.`);
     if (p.days >= 3) x.notes.unshift(`${p.label} schmerzt seit ${p.days} von 5 Tagen – bitte abklären lassen (Arzt oder Physio).`);
   }
-  const blocked = new Set(pain.flatMap(p => p.groups));
+  const blocked = new Set(pain.filter(p => p.lvl >= 2).flatMap(p => p.groups));
   x.good = (x.good || []).filter(l => !muscles.some(m => m.label === l && blocked.has(m.k)));
   return x;
 }
@@ -536,13 +545,13 @@ export function insights({ ckBy, allActs, today, calib, settings }) {
   const afterBB = c => c.bb === true || (allActs[addDays(c.date, -1)] || []).some(a => sportKind(a.type, a.name) === 'baseball');
   const out = [];
   for (const a of PAIN_AREAS) {
-    const hit = cks.filter(c => (c.pain || {})[a.k] > 0); if (hit.length < 2) continue;
+    const hit = cks.filter(c => (c.pain || {})[a.k] >= 2); if (hit.length < 2) continue;
     const nb = hit.filter(afterBB).length;
     out.push({ kind: 'pain', k: a.k, n: hit.length, bb: nb, text: `${a.label}: ${hit.length}× Schmerz in 6 Wochen${nb ? `, davon ${nb}× am Tag nach Baseball` : ''}.`, tip: TIPS[a.k] });
   }
   const bbGroups = [];
   for (const g of GROUPS) {
-    const hit = cks.filter(c => (c.sore || {})[g.k] > 0); if (hit.length < 3) continue;
+    const hit = cks.filter(c => (c.sore || {})[g.k] >= 2); if (hit.length < 3) continue;
     const nb = hit.filter(afterBB).length;
     if (nb / hit.length >= 0.6) { bbGroups.push(g.k); out.push({ kind: 'sore', k: g.k, n: hit.length, bb: nb, text: `${g.label}: Muskelkater meist nach Baseball (${nb} von ${hit.length}).`, tip: 'Diese Muskeln nicht am Tag nach Baseball hart trainieren.' }); }
     else out.push({ kind: 'sore', k: g.k, n: hit.length, bb: nb, text: `${g.label}: ${hit.length}× Muskelkater in 6 Wochen.`, tip: '' });
@@ -606,7 +615,7 @@ export function physio(days, today, history, ckBy) {
   const rec7 = h7.map(x => x.rec).filter(x => x != null);
   if (rec7.length >= 4 && mean(rec7) < 50) wk.push(`Erholung im Wochenschnitt nur ${Math.round(mean(rec7))} %`);
   const ck7 = Array.from({ length: 7 }, (_, i) => ckBy[addDays(today, -i)]).filter(c => c && !c.partial);
-  const hard = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 2) || Object.values(c.pain || {}).some(v => v >= 2)).length;
+  const hard = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 4) || Object.values(c.pain || {}).some(v => v >= 3)).length;
   if (hard >= 3) wk.push(`An ${hard} Morgen-Checks starker Muskelkater oder Schmerz`);
   return { stress: { flag: !!stress, reasons }, deload: { suggest: wk.length >= 2, count: wk.length, reasons: wk } };
 }
@@ -627,10 +636,10 @@ export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendat
   const why = [];
   let en = null, sl = null;
   if (rec.score != null) {
-    en = recommendation.level === 'rest' || rec.score < 40 ? 0 : rec.score >= 75 && !muscles.some(m => m.sore === 2) ? 2 : 1;
+    en = recommendation.level === 'rest' || rec.score < 40 ? 0 : rec.score >= 75 && !muscles.some(m => m.sore >= 4) ? 2 : 1;
     why.push(`Erholung ${rec.score} %`);
   } else if (recommendation.level === 'rest') en = 0;
-  if (pain.some(p => p.lvl >= 2) && en === 2) en = 1;
+  if (pain.some(p => p.lvl >= 3) && en === 2) en = 1;
   if (sleep && sleep.has) {
     sl = sleep.short ? 0 : (sleep.ofAvg >= 98 && (sleep.score == null || sleep.score >= 75)) ? 2 : 1;
     why.push(`Schlaf ${Math.floor(sleep.total / 3600)}:${String(Math.round(sleep.total % 3600 / 60)).padStart(2, '0')} h`);
@@ -645,10 +654,10 @@ export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendat
   if (sl7.length >= 3) { const need = Math.max(7, Math.min(9, mean(history.slice(-37, -7).map(x => x.sleep).filter(x => x != null)) || 8)); const q = mean(sl7) / need;
     ans.sleep = q >= 0.95 ? 3 : q >= 0.85 ? 2 : 1; src.sleep = `Schlaf Ø ${round(mean(sl7), 1)} h`; }
   if (ck7.length >= 3) {
-    const strong = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 2)).length, any = ck7.filter(c => Object.keys(c.sore || {}).length).length;
+    const strong = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 4)).length, any = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 2)).length;
     ans.sore = strong >= 3 ? 4 : strong >= 1 ? 3 : any ? 2 : 1; src.sore = `${ck7.length} Morgen-Checks`;
     const pmax = Math.max(0, ...ck7.flatMap(c => Object.values(c.pain || {})));
-    ans.pain = pmax >= 2 ? 2 : pmax === 1 ? 1 : 0; src.pain = src.sore;
+    ans.pain = pmax >= 3 ? 2 : pmax >= 1 ? 1 : 0; src.pain = src.sore;
   }
   let games = 0, other = 0;
   for (let i = 0; i < 7; i++) for (const a of allActs[addDays(today, -i)] || []) { const k = sportKind(a.type, a.name); if (k === 'baseball') games++; else if (k) other++; }

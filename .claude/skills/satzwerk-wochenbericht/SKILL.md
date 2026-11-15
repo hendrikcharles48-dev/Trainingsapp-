@@ -56,6 +56,8 @@ Schmerz), Morgen-Checks, `coachDone` (was der Nutzer letzte Woche angenommen/abg
 - Vorschläge nur mit klarem Grund aus den Fakten und nach den Regeln in `CLAUDE.md` (Wissenschaftliche Regeln):
   - `swap`: Übung steht still (`stalled`) → Variante aus `alternatives` (gleiche Bewegung, Level passend, Geräte da).
     Bei Schmerz an einer Stelle (Formwerk `pain`) eine schonendere Variante.
+    Morgen-Checks (`morning`): Muskelkater und Schmerz je Stufe 1–5 (1 sehr leicht/kaum … 5 sehr stark, ab Worker 1.8;
+    ältere Einträge liefert der Worker schon umgerechnet). Schmerz ab 2 = schonen, ab 4 = Pause.
   - `sets`: Muskel klar unter Ziel (geplant) → +1 Satz an einem passenden Platz, Deckel 15 je Muskel und Woche,
     im Defizit (`recomp`) eher nicht mehr Volumen. Klar über Deckel → −1.
   - `rr`: Wiederholungsbereich, wenn z. B. die Obergrenze dauernd gerissen wird oder Gelenke meckern.
