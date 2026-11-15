@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.1';
+  const APP_VERSION = '3.14.2';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -54,7 +54,7 @@
     }
   };
   /* ================= Sicherungen (IndexedDB „satzwerk“, Speicher „snap“) ================= */
-  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-wochenbericht': 'Vor Wochenbericht-Vorschlag', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
+  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-wochenbericht': 'Vor Wochenbericht-Vorschlag', 'vor-uebung-umstellen': 'Vor Umstellung eigener Übung', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
   const Backup = {
     p: null,
     open() {
@@ -302,9 +302,16 @@
       const b = findBuiltin(c.name); if (!b) continue;
       const from = JSON.stringify(c.id), to = JSON.stringify(b.id);
       const swap = o => o == null ? o : JSON.parse(JSON.stringify(o).split(from).join(to));
-      pr.plan = swap(pr.plan); pr.favs = swap(pr.favs);
+      if (!done.length) Backup.snapshot('vor-uebung-umstellen');
+      // alle Pläne umstellen (nicht nur den aktiven) und den Spiegel profile.plan wieder auf das Objekt in plans setzen
+      pr.plans = swap(pr.plans); pr.plan = swap(pr.plan); pr.favs = swap(pr.favs);
+      const act = (pr.plans || []).find(x => pr.plan && x.id === pr.plan.id); if (act) pr.plan = act;
+      if (pr.exNotes && pr.exNotes[c.id] && !pr.exNotes[b.id]) pr.exNotes[b.id] = pr.exNotes[c.id];
+      for (const k of Object.keys(pr.exW || {})) if (k.startsWith(c.id + '@')) { const nk = b.id + k.slice(c.id.length); if (!pr.exW[nk]) pr.exW[nk] = pr.exW[k]; }
       if (st.active) { st.active = swap(st.active); Store.saveActive(true); }
-      st.workouts = st.workouts.map(w => { if (!JSON.stringify(w).includes(from)) return w; const nw = swap(w); Store.saveWorkout(nw); return nw; });
+      // erst die neue Liste setzen, dann speichern (saveWorkout speichert st.workouts)
+      const changed = []; st.workouts = st.workouts.map(w => { if (!JSON.stringify(w).includes(from)) return w; const nw = swap(w); changed.push(nw); return nw; });
+      for (const w of changed) Store.saveWorkout(w);
       pr.custom = pr.custom.filter(x => x.id !== c.id); delete D.byId[c.id];
       done.push(b.name);
     }
