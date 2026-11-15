@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.4.0';
+export const WORKER_VERSION = '1.5.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 2; // 2: Tageswerte v2 verschachtelt (Ruhepuls, Schritte, Stress, Body Battery)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -116,6 +116,14 @@ export class FormwerkStore {
   async putSettings(b) {
     const cur = await this.settings();
     if (Array.isArray(b.sportDays)) cur.sportDays = [...new Set(b.sportDays.map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6))].sort();
+    // feste Baseball-Zeiten je Tag {from 'HH:MM', dur Minuten, since Datum}: zählen ab „since“ automatisch
+    const T = Object.assign({}, cur.sportTimes || {}); const inT = b.sportTimes && typeof b.sportTimes === 'object' ? b.sportTimes : {};
+    for (const d of cur.sportDays) {
+      const prev = T[d] || { from: '18:00', dur: 120, since: this.today() }; const n = inT[d] || {};
+      T[d] = { from: /^([01]\d|2[0-3]):[0-5]\d$/.test(n.from || '') ? n.from : prev.from, dur: Math.min(300, Math.max(30, Math.round(+n.dur || prev.dur))), since: prev.since || this.today() };
+    }
+    for (const k of Object.keys(T)) if (!cur.sportDays.includes(+k)) delete T[k];
+    cur.sportTimes = T;
     if (b.strengthPerWeek != null) cur.strengthPerWeek = Math.min(6, Math.max(1, Math.round(+b.strengthPerWeek) || 2));
     await this.st.put('settings', cur);
     return cur;

@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.3.1';
+  const VERSION = '1.4.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -198,9 +198,11 @@
   function checkCard(d) {
     const b = d.body; if (!b) return '';
     const c = b.checkin; const ms = d.muscles || [];
-    const fl = b.flags || {};
-    const tog = (k, l, on) => `<button class="ckchip ${on ? 'on' : ''}" data-a="ckFlag" data-k="${k}" data-on="${on ? 1 : 0}" style="flex:1;min-height:44px"><b>${l}</b><span>${on ? 'ja' : '–'}</span></button>`;
-    const bbRow = `<div style="display:flex;gap:6px;margin-top:10px">${tog('bbToday', 'Heute Baseball', fl.bbToday === true)}${tog('bb', 'Gestern Baseball', fl.bb === true)}</div>`;
+    const bb = b.baseball || { today: {}, yesterday: {} };
+    // Schalter zeigen den wirksamen Stand: feste Zeit = automatisch an (abwählbar), Uhr-Aktivität = fest
+    const bbLabel = (x, l) => l + (x.recorded ? ' (Uhr)' : x.planned ? ' ' + x.from : '');
+    const tog = (k, x, l) => `<button class="ckchip ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`} style="flex:1;min-height:44px"><b class="ell">${bbLabel(x, l)}</b><span>${x.on ? 'ja' : '–'}</span></button>`;
+    const bbRow = `<div style="display:flex;gap:6px;margin-top:10px">${tog('bbToday', bb.today, 'Heute Baseball')}${tog('bb', bb.yesterday, 'Gestern Baseball')}</div>`;
     const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball gespielt?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
     if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
       <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ || bbRow}</div>`;
@@ -208,9 +210,9 @@
     const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/3`);
     const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
     // fertig: kompakte Zeile – nur noch kurz, was eingetragen ist, plus die beiden Baseball-Schalter als kleine Pillen
-    const pill = (k, l, on) => `<button class="ckpill ${on ? 'on' : ''}" data-a="ckFlag" data-k="${k}" data-on="${on ? 1 : 0}">${l}${on ? ' ✓' : ''}</button>`;
+    const pill = (k, x, l) => `<button class="ckpill ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`}>${bbLabel(x, l)}${x.on ? ' ✓' : ''}</button>`;
     return `<div class="card ckdone"><button class="ckline" data-a="ckOpen"><span class="ckok">${I.check}</span><span class="ell small ink2" style="flex:1">${esc(txt)}</span><span class="tiny muted">Ändern</span></button>
-      ${bbQ || `<div class="ckpills">${pill('bbToday', 'Heute Baseball', fl.bbToday === true)}${pill('bb', 'Gestern Baseball', fl.bb === true)}</div>`}</div>`;
+      ${bbQ || `<div class="ckpills">${pill('bbToday', bb.today, 'Heute Baseball')}${pill('bb', bb.yesterday, 'Gestern Baseball')}</div>`}</div>`;
   }
   function ckSheet() {
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
@@ -321,11 +323,15 @@
 
   /* ----- Mehr ----- */
   function moreView() {
-    const d = st.data; const s = (d && d.settings) || { sportDays: [1, 3], strengthPerWeek: 2 };
+    const d = st.data; const s = Object.assign({ sportDays: [], sportTimes: {}, strengthPerWeek: 2 }, d && d.settings);
     const status = d && d.status;
     return header('Mehr') + `<div class="stack">
       <div class="eyebrow sethead">Mein Wochenrhythmus</div>
-      <div class="card stack"><div><div class="lblf">Feste Baseball-Tage (nur wenn regelmäßig – sonst „Heute/Gestern Baseball“ auf Heute antippen)</div><div class="days7">${DAYS.map((l, i) => `<button data-a="sport" data-k="${i}" aria-pressed="${s.sportDays.includes(i)}">${l}</button>`).join('')}</div></div>
+      <div class="card stack"><div><div class="lblf">Feste Baseball-Zeiten</div><div class="days7">${DAYS.map((l, i) => `<button data-a="sport" data-k="${i}" aria-pressed="${s.sportDays.includes(i)}">${l}</button>`).join('')}</div>
+        ${s.sportDays.map(d => { const t = (s.sportTimes || {})[d] || { from: '18:00', dur: 120 }; const hrs = []; for (let h = 9; h <= 21; h++) for (const m of ['00', '30']) hrs.push(String(h).padStart(2, '0') + ':' + m);
+          return `<div class="sporttime"><b>${DAYS[d]}</b><select class="field" data-ch="sportTime" data-d="${d}" data-f="from" aria-label="Beginn ${DAYS[d]}">${hrs.map(h => `<option ${h === t.from ? 'selected' : ''}>${h}</option>`).join('')}</select>
+            <select class="field" data-ch="sportTime" data-d="${d}" data-f="dur" aria-label="Dauer ${DAYS[d]}">${[60, 90, 120, 150, 180, 240].map(m => `<option value="${m}" ${m === t.dur ? 'selected' : ''}>${m % 60 ? Math.floor(m / 60) + ',5' : m / 60} h</option>`).join('')}</select></div>`; }).join('')}
+        <div class="tiny muted" style="margin-top:6px">${s.sportDays.length ? 'Diese Zeiten zählen automatisch. Gehst du nicht hin: auf „Heute“ den Schalter „Heute Baseball“ abwählen (oder am Morgen danach „Gestern Baseball“).' : 'Keine festen Zeiten: Wenn du spielst, auf „Heute“ einfach „Heute Baseball“ oder „Gestern Baseball“ antippen.'}</div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div style="font-weight:600">Kraft-Einheiten pro Woche</div><div class="tiny muted">Ziel für die Empfehlung</div></div>
         <div class="stepper"><button data-a="spw" data-d="-1" aria-label="Weniger">−</button><b class="num">${s.strengthPerWeek}</b><button data-a="spw" data-d="1" aria-label="Mehr">+</button></div></div></div>
       <div class="eyebrow sethead">Verstehen</div>
@@ -414,7 +420,7 @@
       const i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / r.width * n)));
       st.sel[id] = st.sel[id] === i ? null : i; const top = window.scrollY; render(); window.scrollTo(0, top);
     },
-    async sport(t) { const s = Object.assign({ sportDays: [1, 3], strengthPerWeek: 2 }, st.data && st.data.settings); const k = +t.dataset.k; const sd = s.sportDays.includes(k) ? s.sportDays.filter(x => x !== k) : s.sportDays.concat(k).sort(); await saveSettings({ sportDays: sd }); },
+    async sport(t) { const s = Object.assign({ sportDays: [], sportTimes: {}, strengthPerWeek: 2 }, st.data && st.data.settings); const k = +t.dataset.k; const sd = s.sportDays.includes(k) ? s.sportDays.filter(x => x !== k) : s.sportDays.concat(k).sort(); await saveSettings({ sportDays: sd }); },
     async spw(t) { const s = Object.assign({ strengthPerWeek: 2 }, st.data && st.data.settings); const v = Math.min(6, Math.max(1, s.strengthPerWeek + +t.dataset.d)); await saveSettings({ strengthPerWeek: v }); },
     async refetch() { if (!confirm('Garmin-Daten der letzten 120 Tage neu laden? Das dauert etwa 20 Sekunden.')) return; toast('Lade Garmin-Daten neu …', 4000); try { await api('/v1/refetch', { method: 'POST', timeout: 60000 }); await load(false); toast('Neu geladen'); } catch (e) { toast(e.message, 4000); } },
     openTest() { window.open(base() + '/', '_blank'); },
@@ -435,6 +441,11 @@
     try { const s = await api('/v1/settings', { method: 'PUT', body: patch }); if (st.data) { st.data.settings = s; LS.set('summary', st.data); } render(); load(true); }
     catch (e) { toast(e.message, 3500); }
   }
+  // Auswahlfelder (z. B. Baseball-Zeiten)
+  document.addEventListener('change', e => {
+    const t = e.target.closest('[data-ch]'); if (!t) return;
+    if (t.dataset.ch === 'sportTime') { const d = t.dataset.d; saveSettings({ sportTimes: { [d]: { [t.dataset.f]: t.dataset.f === 'dur' ? +t.value : t.value, [t.dataset.f === 'dur' ? 'from' : 'dur']: undefined } } }); }
+  });
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-a]'); if (!t) return;
     const f = A[t.dataset.a]; if (f) { e.preventDefault(); f(t, e); }
