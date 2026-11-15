@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.10.6';
+  const APP_VERSION = '3.11.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -90,7 +90,9 @@
      wenn sich die Daten geändert haben (Prüfsumme). Ältere Stände bleiben im Verlauf des Repositorys. */
   const Cloud = {
     FILE: 'satzwerk-backup.json', timer: null, busy: false,
-    cfg() { const c = LS.get('cloud'); return c && c.repo && c.token ? c : null; },
+    // GitHub-Zugang (eigenes privates Repo) – oder automatisch über den Formwerk-Worker, wenn Formwerk verbunden ist
+    cfg() { const c = LS.get('cloud'); if (c && c.repo && c.token) return c; return FW.configured() && !this.state().wOff ? { worker: true, repo: 'Formwerk-Worker' } : null; },
+    where() { const c = this.cfg(); return c && c.worker ? 'Formwerk' : 'GitHub'; },
     state() { return LS.get('cloudState') || {}; },
     setState(o) { LS.set('cloudState', Object.assign(this.state(), o)); },
     usable() { return Store.mode !== 'db' && !!this.cfg(); },
@@ -118,7 +120,7 @@
       const t = await this.test(c); if (!t.ok) return t;
       LS.set('cloud', c); this.setState({ off: false, err: '', checked: false, conflict: 0 }); await this.push(true); return { ok: true };
     },
-    disconnect() { try { localStorage.removeItem('satzwerk.cloud'); } catch (e) { } this.setState({ off: true, err: '', checked: false, conflict: 0, sum: '' }); },
+    disconnect() { const w = this.cfg() && this.cfg().worker; if (w) { this.setState({ wOff: true, err: '', checked: false, conflict: 0, sum: '' }); return; } try { localStorage.removeItem('satzwerk.cloud'); } catch (e) { } this.setState({ off: true, err: '', checked: false, conflict: 0, sum: '' }); },
     // Beim Start: Kochwerk-Zugang still übernehmen, wenn noch nichts eingerichtet und nicht bewusst getrennt
     async auto() {
       if (Store.mode === 'db' || !st.profile) return;
@@ -143,6 +145,10 @@
           this.setState({ checked: true, conflict: 0 });
         }
         const body = JSON.stringify(this.payload(), null, 1);
+        if (c.worker) {
+          try { await FW.backupPut(body); } catch (e) { this.setState({ err: e.message === 'offline' ? '' : 'Formwerk-Worker: ' + e.message, errAt: Date.now() }); return false; }
+          this.setState({ sum, last: Date.now(), n: st.workouts.length, err: '' }); if (st.sheet && st.sheet.type === 'cloud') renderSheet(); return true;
+        }
         for (let i = 0; i < 3; i++) {
           const g = await this.gh(c, '/contents/' + this.FILE); let sha = null;
           if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) { this.setState({ err: this.msg(g.status), errAt: Date.now() }); return false; }
@@ -158,6 +164,7 @@
     },
     async pull() {
       const c = this.cfg(); if (!c) return { error: 'Nicht verbunden.' };
+      if (c.worker) { try { const d = await FW.backupGet(); return d ? { d } : { error: 'Noch keine Sicherung im Formwerk-Worker.' }; } catch (e) { return { error: 'Formwerk-Worker: ' + e.message }; } }
       try {
         const r = await this.gh(c, '/contents/' + this.FILE, { headers: { Accept: 'application/vnd.github.raw+json' } });
         if (r.status === 404) return { error: 'Noch keine Sicherung auf GitHub.' };
@@ -524,7 +531,18 @@
       ${last ? `<div class="section"><div class="head"><h3>Zuletzt</h3><button class="btn ghost sm" data-a="progGo" data-k="history">Alle</button></div>${workoutRow(last)}</div>` : ''}
     </div>`;
   }
+  // Körpergewicht kommt aus Formwerk (3.11): neue/geänderte Tageswerte nur ergänzen, nie löschen
+  function syncWeight(latest, list) {
+    if (!P()) return; const log = P().bwLog = P().bwLog || []; let ch = false;
+    for (const w of [].concat(list || [], latest ? [latest] : [])) {
+      if (!w || !w.date || !(w.kg > 25)) continue;
+      const ex = log.find(x => x.d === w.date);
+      if (!ex) { log.push({ d: w.date, kg: w.kg }); ch = true; } else if (ex.kg !== w.kg && w.src !== 'satzwerk') { ex.kg = w.kg; ch = true; }
+    }
+    if (ch) { log.sort((a, b) => (a.d < b.d ? -1 : 1)); Store.saveProfile(); }
+  }
   function bwNudge() {
+    if (FW.configured()) return ''; // Gewicht wird in Formwerk eingetragen
     const log = P().bwLog || []; const lastD = log.length ? log[log.length - 1].d : null;
     if (lastD && (Date.now() - new Date(lastD).getTime()) < 14 * 864e5) return '';
     return `<div class="card row"><div class="grow"><b>Körpergewicht aktuell?</b><div class="small muted">Klimmzüge, Dips & Co. werden damit berechnet. Aktuell: ${fmt(E.bodyweight(P()), 1)} kg</div></div><button class="btn sm" data-a="bwSheet">Eintragen</button></div>`;
@@ -784,10 +802,10 @@
     const log = P().bwLog || [];
     const pts = log.map(x => ({ x: x.d, y: x.kg }));
     const trend = bwTrend(log.slice().sort((x, y) => x.d < y.d ? -1 : 1));
-    return `<div class="card stack"><div class="row between"><div><div class="eyebrow">Körpergewicht</div><div class="num" style="font-size:36px;font-weight:700">${fmt(E.bodyweight(P()), 1)} kg</div></div><button class="btn primary" data-a="bwSheet">Eintragen</button></div>
+    return `<div class="card stack"><div class="row between"><div><div class="eyebrow">Körpergewicht</div><div class="num" style="font-size:36px;font-weight:700">${fmt(E.bodyweight(P()), 1)} kg</div></div>${FW.configured() ? '<span class="small muted" style="text-align:right">Eintragen<br>in Formwerk</span>' : '<button class="btn primary" data-a="bwSheet">Eintragen</button>'}</div>
       ${pts.length >= 2 ? lineChart(pts, 'kg') : '<div class="small muted">Trage dein Gewicht regelmäßig ein, dann erscheint hier der Verlauf. Die App nutzt immer den neuesten Wert für Körpergewichtsübungen.</div>'}</div>
       ${trend || (log.length ? '<div class="tiny muted">Den Trend gibt es, sobald du in zwei aufeinanderfolgenden Wochen gewogen hast. Am besten morgens, mehrmals pro Woche.</div>' : '')}
-      ${log.length ? `<div class="list">${[...log].reverse().slice(0, 30).map((x, i) => `<div class="li"><div class="grow">${dateDE(x.d)}</div><b class="num" style="font-size:18px">${fmt(x.kg, 1)} kg</b><button class="btn ghost sm" data-a="bwDel" data-i="${log.length - 1 - i}" aria-label="Löschen">${I.x.replace('<svg', '<svg width="16" height="16"')}</button></div>`).join('')}</div>` : ''}`;
+      ${log.length ? `<div class="list">${[...log].reverse().slice(0, 30).map((x, i) => `<div class="li"><div class="grow">${dateDE(x.d)}</div><b class="num" style="font-size:18px">${fmt(x.kg, 1)} kg</b>${FW.configured() ? '' : `<button class="btn ghost sm" data-a="bwDel" data-i="${log.length - 1 - i}" aria-label="Löschen">${I.x.replace('<svg', '<svg width="16" height="16"')}</button>`}</div>`).join('')}</div>` : ''}`;
   }
 
   /* ================= Timer ================= */
@@ -1399,11 +1417,11 @@
         ${s.err ? `<div class="small" style="color:var(--rose)">${esc(s.err)}</div>` : ''}
         <button class="btn ${kw ? '' : 'primary'}" data-a="cloudConnect">${s.busy ? 'Prüfe …' : 'Verbinden'}</button></div>`;
       const last = cs.last ? dateDE(new Date(cs.last).toISOString().slice(0, 10)) + ', ' + new Date(cs.last).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'noch nie';
-      return `<div class="stack"><div><h2>Automatische Sicherung</h2><div class="small muted">An – in ${esc(c.repo)} (${Cloud.FILE})</div></div>
+      return `<div class="stack"><div><h2>Automatische Sicherung</h2><div class="small muted">${c.worker ? 'An – über deinen Formwerk-Worker (Cloudflare). Nach jedem Training still, die vorige Fassung bleibt zusätzlich erhalten.' : 'An – in ' + esc(c.repo) + ' (' + Cloud.FILE + ')'}</div></div>
         <div class="card stack" style="gap:4px"><div>Zuletzt gesichert: <b>${last}</b>${cs.n != null && cs.last ? ' · ' + cs.n + ' Trainings' : ''}</div>
-        ${cs.conflict ? `<div class="small">Auf GitHub liegt eine Sicherung mit <b>${cs.conflict} Trainings, die hier fehlen</b>. Damit nichts verloren geht, wird sie nicht überschrieben. Bitte erst „Aus GitHub laden“ → Zusammenführen.</div>` : ''}
+        ${cs.conflict ? `<div class="small">In der Sicherung (${Cloud.where()}) liegen <b>${cs.conflict} Trainings, die hier fehlen</b>. Damit nichts verloren geht, wird sie nicht überschrieben. Bitte erst „Aus ${Cloud.where()} laden“ → Zusammenführen.</div>` : ''}
         ${cs.err ? `<div class="small" style="color:var(--rose)">${esc(cs.err)}</div>` : ''}</div>
-        <div class="row"><button class="btn grow" data-a="cloudNow">${s.busy ? 'Sichere …' : 'Jetzt sichern'}</button><button class="btn grow ${cs.conflict ? 'primary' : ''}" data-a="cloudPull">Aus GitHub laden</button></div>
+        <div class="row"><button class="btn grow" data-a="cloudNow">${s.busy ? 'Sichere …' : 'Jetzt sichern'}</button><button class="btn grow ${cs.conflict ? 'primary' : ''}" data-a="cloudPull">Aus ${Cloud.where()} laden</button></div>
         <div class="small muted">Laden zeigt erst eine Vorschau (Zusammenführen oder Ersetzen), vorher wird hier gesichert.</div>
         <button class="btn ghost danger" data-a="cloudOff">Automatische Sicherung ausschalten</button></div>`;
     },
@@ -1586,7 +1604,7 @@
         ${head('Baseball-Tage')}<div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div>
         <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
         ${head('Studio-Gewichte')}<div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div>
-        ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button></div>
+        ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button>${FW.configured() ? `<div class="li"><div class="grow"><b>Körpergewicht</b><div class="small muted">${fmt(E.bodyweight(P()), 1)} kg · kommt aus Formwerk</div></div></div>` : `<button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button>`}</div>
         ${head('Daten')}<div class="list">${Store.mode !== 'db' ? `<button class="li" data-a="cloudSheet"><div class="grow"><b>Automatische Sicherung</b><div class="small muted">${cloudLine()}</div></div><span class="chev">${I.chev}</span></button>` : ''}<button class="li" data-a="formwerkSheet"><div class="grow"><b>Formwerk (Erholung)</b><div class="small muted">${esc(FW.statusLine())}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
         ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn ghost danger" data-a="reset">Alle Daten löschen</button>'}
         <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung</p></div>`;
@@ -1946,7 +1964,7 @@
     async cloudKw() { const k = Cloud.kochwerk(); if (!k) return; st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
     async cloudConnect() { const v = ($('#cl-code') || {}).value || ''; const k = Cloud.parse(v); if (!k) { st.sheet.err = 'Das ist kein Zugangscode. Er beginnt mit „kochwerk-zugang:“.'; renderSheet(); return; } st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
     async cloudNow() { st.sheet.busy = true; renderSheet(); const ok = await Cloud.push(true); if (st.sheet && st.sheet.type === 'cloud') { st.sheet.busy = false; renderSheet(); } toast(ok ? 'Gesichert' : Cloud.state().conflict ? 'Nicht gesichert – erst aus GitHub laden' : 'Nicht gesichert – ' + (Cloud.state().err || 'offline?')); },
-    async cloudPull() { const r = await Cloud.pull(); if (r.error) { toast(r.error); return; } if (!validBackup(r.d)) { toast('Die Sicherung auf GitHub ist kein Satzwerk-Backup'); return; } openSheet({ type: 'importPreview', d: r.d }); },
+    async cloudPull() { const r = await Cloud.pull(); if (r.error) { toast(r.error); return; } if (!validBackup(r.d)) { toast('Die Sicherung ist kein Satzwerk-Backup'); return; } openSheet({ type: 'importPreview', d: r.d }); },
     cloudOff() { Cloud.disconnect(); renderSheet(); render(); toast('Automatische Sicherung aus'); },
     exportData() { exportData(); },
     reset() { st.sheet.confirm = true; renderSheet(); },
@@ -1998,7 +2016,7 @@
   function cloudLine() {
     const c = Cloud.cfg(), cs = Cloud.state();
     if (!c) return 'Aus – einmal einrichten, dann sichert die App von selbst';
-    if (cs.conflict) return 'Wartet: auf GitHub liegen Trainings, die hier fehlen';
+    if (cs.conflict) return 'Wartet: in der Sicherung (' + Cloud.where() + ') liegen Trainings, die hier fehlen';
     if (cs.err) return 'Problem: ' + cs.err;
     return cs.last ? 'An · zuletzt ' + dateDE(new Date(cs.last).toISOString().slice(0, 10)) + ', ' + new Date(cs.last).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'An · sichert beim nächsten Speichern';
   }
@@ -2251,7 +2269,7 @@
     }
     restoreTimers();
     render();
-    FW.init({ workouts: () => st.workouts, getEx, onChange(force) { if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
+    FW.init({ workouts: () => st.workouts, getEx, bwLog: () => (P() && P().bwLog) || [], onWeight: syncWeight, onChange(force) { if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
     Cloud.auto(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Cloud.flush(); });
     // Daten beschädigt oder verschwunden? Sicherungen anbieten
     let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }

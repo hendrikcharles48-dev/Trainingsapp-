@@ -58,6 +58,7 @@ muss nur `formwerk-link.js` (Repo-Root) dieses Format weiter liefern – sonst n
 }
 ```
 
+`weight`: `{date, kg, src}` (neuester Wert, `src` `formwerk`/`satzwerk`/`garmin`), `weights`: die letzten 60 Werte.
 `color`: `green` | `yellow` | `red` | `none`. `level`: `full` | `light` | `rest` | `done`.
 Satzwerk zeigt das nur an und ändert nichts am Plan.
 
@@ -71,9 +72,21 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 | `GET /v1/ping` | Verbindungstest |
 | `GET /v1/raw?days=7` | Rohdaten von Garmin + was daraus gelesen wurde (Testseite unter `/`) |
 | `GET /v1/sessions?days=60` | gespeicherte Satzwerk-Einheiten (zur Kontrolle) |
+| `POST /v1/weight` | Körpergewicht `{date, kg}` (kg `null` = löschen) oder `{entries:[{date, kg, ifMissing, src}]}` |
+| `GET /v1/weight` | alle von Hand eingetragenen Gewichte |
+| `PUT/GET /v1/backup/satzwerk` | Satzwerk-Sicherung (Export-JSON, `app: 'satzwerk'`); vorige Fassung bleibt im Worker |
 
 ## Garmin-Abruf (sparsam)
 
 - Ohne Ziehen höchstens alle 30 min, mit Ziehen höchstens alle 90 s, dazu morgens 2× per Cron vorab.
 - Erster Abruf: 120 Tage (Basis + Verlauf) in 28-Tage-Stücken. Danach die letzten 3 Tage, einmal täglich 7 Tage.
 - Endpunkte laut Garmins offiziellem Client `connect-personal-api-python` 1.0.0 (`formwerk-worker/src/garmin.js`).
+
+## Körpergewicht und Sicherung (ab Satzwerk 3.11 / Worker 1.2)
+
+- Eingetragen wird nur noch in **Formwerk** (Karte „Körpergewicht“). Garmin-Werte (falls in Garmin Connect gewogen) zählen
+  auch, von Hand gewinnt am selben Tag. Satzwerk übernimmt die Werte aus `/v1/today` in `profile.bwLog` (nur ergänzen).
+  Beim ersten Abgleich schickt Satzwerk sein bisheriges `bwLog` mit `ifMissing: true` (überschreibt nichts).
+- Satzwerk sichert automatisch in den Worker (`Cloud` mit `cfg().worker`), wenn Formwerk verbunden ist und kein
+  GitHub-Zugang eingerichtet ist. Gleicher Schutz wie bei GitHub: fehlen hier Trainings, die in der Sicherung liegen,
+  wird nicht überschrieben.

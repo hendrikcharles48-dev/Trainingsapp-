@@ -6,7 +6,7 @@ import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
 import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr } from './model.js';
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.1.0';
+export const WORKER_VERSION = '1.2.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 2; // 2: Tageswerte v2 verschachtelt (Ruhepuls, Schritte, Stress, Body Battery)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -95,6 +95,10 @@ export class FormwerkStore {
       if (p === '/v1/sessions') return json({ sessions: await this.sessions(+url.searchParams.get('days') || 60) });
       if (p === '/v1/settings' && (req.method === 'PUT' || req.method === 'POST')) return json(await this.putSettings(await req.json()));
       if (p === '/v1/settings') return json(await this.settings());
+      if (p === '/v1/weight' && req.method === 'POST') return json(await this.putWeights(await req.json()));
+      if (p === '/v1/weight') return json({ weights: await this.weights() });
+      if (p === '/v1/backup/satzwerk' && req.method === 'PUT') return json(await this.putBackup('satzwerk', await req.text()));
+      if (p === '/v1/backup/satzwerk') return this.getBackup('satzwerk');
       if (p === '/v1/refetch' && req.method === 'POST') { const m = await this.meta(); m.backfilled = false; m.lastFetch = 0; await this.st.put('meta', m); await this.refresh('force'); return json({ ok: true, meta: await this.meta() }); }
       return json({ error: 'not_found' }, 404);
     } catch (e) {
@@ -132,16 +136,17 @@ export class FormwerkStore {
     const from = !meta.backfilled ? addDays(today, -(HISTORY_DAYS - 1)) : meta.lastWeekSync !== today ? addDays(today, -6) : addDays(today, -2);
     const g = new Garmin(this.env.GARMIN_API_KEY, this.st);
     const errors = [];
-    const src = { hrv: [], sleep: [], daily: [], bb: [], stress: [], steps: [] };
+    const src = { hrv: [], sleep: [], daily: [], bb: [], stress: [], steps: [], weight: [] };
     const acts = [];
     try {
       await g.token(false);
       for (const [a, b] of chunks(from, today)) {
         const res = await Promise.all([
           g.safe(PATHS.hrvRange(a, b)), g.safe(PATHS.sleepRange(a, b)), g.safe(PATHS.dailySummaries(a, b)),
-          g.safe(PATHS.bodyBattery(a, b)), g.safe(PATHS.activities(a, b, 0, 100))
+          g.safe(PATHS.bodyBattery(a, b)), g.safe(PATHS.activities(a, b, 0, 100)), g.safe(PATHS.weight(a, b))
         ]);
-        const [hrv, sleep, daily, bb, act] = res;
+        const [hrv, sleep, daily, bb, act, wt] = res;
+        if (wt.ok) src.weight.push(wt.data); // Gewicht ist optional – Fehler hier nicht melden
         for (const [name, r] of [['HRV', hrv], ['Schlaf', sleep], ['Tageswerte', daily], ['Body Battery', bb], ['Aktivitäten', act]]) if (!r.ok) errors.push(name + ': ' + r.error);
         if (hrv.ok) src.hrv.push(hrv.data);
         if (sleep.ok) src.sleep.push(sleep.data);
@@ -206,13 +211,57 @@ export class FormwerkStore {
     const from = addDays(today, -(HISTORY_DAYS + 28));
     const [days, acts, sessions, settings, hrz] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr')]);
     const now = Date.now();
-    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
+    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, manualWeights: await this.weights(), hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
     const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
-      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short } };
+      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60) };
     }
     return Object.assign(sum, { status, settings });
+  }
+
+  /* ----- Körpergewicht (von Hand in Formwerk, Übernahme aus Satzwerk) ----- */
+  async weights() { const m = await this.st.list({ prefix: 'w:' }); return [...m.values()].sort((a, b) => (a.date < b.date ? -1 : 1)); }
+  async putWeights(b) {
+    const list = Array.isArray(b && b.entries) ? b.entries.slice(0, 1000) : [b];
+    const today = this.today(); const put = {}, del = [];
+    for (const e of list) {
+      if (!e || !/^\d{4}-\d{2}-\d{2}$/.test(e.date || '') || e.date > today) continue;
+      if (e.kg === null) { del.push('w:' + e.date); continue; }
+      const kg = Number(e.kg); if (!(kg >= 25 && kg <= 300)) continue;
+      // „nur ergänzen“: Übernahmen aus Satzwerk überschreiben keinen Eintrag, der schon da ist
+      if (e.ifMissing && (await this.st.get('w:' + e.date))) continue;
+      put['w:' + e.date] = { date: e.date, kg: Math.round(kg * 10) / 10, src: e.src === 'satzwerk' ? 'satzwerk' : 'formwerk', t: Date.now() };
+    }
+    const ent = Object.entries(put);
+    for (let i = 0; i < ent.length; i += 100) await this.st.put(Object.fromEntries(ent.slice(i, i + 100)));
+    if (del.length) await this.st.delete(del);
+    return { ok: true, stored: ent.length, deleted: del.length };
+  }
+
+  /* ----- Sicherung von Satzwerk (Export-JSON, in Stücken; die vorige Fassung bleibt erhalten) ----- */
+  async putBackup(app, text) {
+    if (!text || text.length > 12e6) return { ok: false, error: 'Sicherung leer oder zu groß' };
+    try { const j = JSON.parse(text); if (!j || j.app !== app) return { ok: false, error: 'Keine ' + app + '-Sicherung' }; } catch (e) { return { ok: false, error: 'Kein gültiges JSON' }; }
+    const meta = (await this.st.get('bk:' + app)) || {};
+    const slot = meta.slot === 'a' ? 'b' : 'a';
+    const size = 100000, n = Math.ceil(text.length / size), put = {};
+    for (let i = 0; i < n; i++) put['bk:' + app + ':' + slot + ':' + i] = text.slice(i * size, (i + 1) * size);
+    const ent = Object.entries(put);
+    for (let i = 0; i < ent.length; i += 50) await this.st.put(Object.fromEntries(ent.slice(i, i + 50)));
+    const old = (await this.st.list({ prefix: 'bk:' + app + ':' + slot + ':' })).keys();
+    const stale = [...old].filter(k => +k.split(':').pop() >= n); if (stale.length) await this.st.delete(stale);
+    const m = { slot, n, len: text.length, t: Date.now(), prev: meta.slot ? { slot: meta.slot, n: meta.n, t: meta.t } : null };
+    await this.st.put('bk:' + app, m);
+    return { ok: true, t: m.t, len: m.len };
+  }
+  async getBackup(app) {
+    const meta = await this.st.get('bk:' + app);
+    if (!meta) return json({ error: 'none', message: 'Noch keine Sicherung im Worker.' }, 404);
+    const keys = Array.from({ length: meta.n }, (_, i) => 'bk:' + app + ':' + meta.slot + ':' + i);
+    const parts = await this.st.get(keys);
+    const text = keys.map(k => parts.get(k) || '').join('');
+    return new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Backup-Time': String(meta.t) } });
   }
 
   /* ----- Satzwerk-Einheiten ----- */
@@ -245,7 +294,7 @@ export class FormwerkStore {
       'Schlaf Zeitraum': PATHS.sleepRange(from, today), 'Schlaf heute (Detail)': PATHS.sleepDay(today), 'Schlaf gestern (Detail)': PATHS.sleepDay(yest),
       'Body Battery': PATHS.bodyBattery(from, today), 'Tageszusammenfassungen': PATHS.dailySummaries(from, today),
       'Stress': PATHS.stress(from, today), 'Schritte': PATHS.steps(from, today),
-      'Aktivitäten': PATHS.activities(from, today, 0, 50), 'Herzfrequenz-Zonen': PATHS.hrZones()
+      'Aktivitäten': PATHS.activities(from, today, 0, 50), 'Herzfrequenz-Zonen': PATHS.hrZones(), 'Gewicht': PATHS.weight(from, today)
     };
     const out = { range: [from, today], worker: WORKER_VERSION, calls: {} };
     try { await g.token(false); } catch (e) { return { range: [from, today], error: e.message, status: e.status, body: e.body }; }

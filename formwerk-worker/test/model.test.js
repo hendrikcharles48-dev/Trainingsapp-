@@ -130,6 +130,28 @@ await t('Worker: Satzwerk-Einheit landet bei den Muskeln', async () => {
   const t2 = await (await call('/v1/today')).json(); assert.equal(t2.recommendation.level, 'done');
   const del = await (await call('/v1/sessions', { method: 'POST', body: JSON.stringify({ deleted: ['w1'] }) })).json(); assert.equal(del.have.w1, undefined);
 });
+await t('Worker: Gewicht – Garmin, von Hand, Übernahme nur ergänzend', async () => {
+  const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(Date.now());
+  let j = await (await call('/v1/summary')).json();
+  assert.equal(j.weight.latest.kg, 90.5); assert.equal(j.weight.latest.src, 'garmin');
+  await call('/v1/weight', { method: 'POST', body: JSON.stringify({ date: d, kg: 91.2 }) });
+  await call('/v1/weight', { method: 'POST', body: JSON.stringify({ entries: [{ date: d, kg: 80, ifMissing: true, src: 'satzwerk' }, { date: '2026-10-01', kg: 93, ifMissing: true, src: 'satzwerk' }] }) });
+  j = await (await call('/v1/summary')).json();
+  assert.equal(j.weight.latest.kg, 91.2, 'von Hand gewinnt, Übernahme überschreibt nicht');
+  assert.ok(j.weight.series.some(x => x.date === '2026-10-01' && x.kg === 93));
+  const t2 = await (await call('/v1/today')).json(); assert.equal(t2.weight.kg, 91.2);
+  const bad = await (await call('/v1/weight', { method: 'POST', body: JSON.stringify({ date: d, kg: 5 }) })).json(); assert.equal(bad.stored, 0);
+});
+await t('Worker: Satzwerk-Sicherung speichern und laden (große Datei, vorige bleibt)', async () => {
+  const big = JSON.stringify({ app: 'satzwerk', version: 2, workouts: Array.from({ length: 3000 }, (_, i) => ({ id: 'w' + i, name: 'x'.repeat(60) })) });
+  assert.ok(big.length > 200000);
+  const r = await (await call('/v1/backup/satzwerk', { method: 'PUT', body: big })).json(); assert.ok(r.ok);
+  const back = await (await call('/v1/backup/satzwerk')).text(); assert.equal(back, big);
+  const small = JSON.stringify({ app: 'satzwerk', version: 2, workouts: [] });
+  await call('/v1/backup/satzwerk', { method: 'PUT', body: small });
+  assert.equal(await (await call('/v1/backup/satzwerk')).text(), small);
+  const wrong = await (await call('/v1/backup/satzwerk', { method: 'PUT', body: '{"app":"kochwerk"}' })).json(); assert.equal(wrong.ok, false);
+});
 await t('Worker: Rohdaten-Test', async () => { const j = await (await call('/v1/raw?days=7')).json(); assert.ok(Object.keys(j.parsed).length >= 7); assert.ok(j.calls['HRV Zeitraum'].ok); });
 await t('Worker: Einstellungen', async () => { const j = await (await call('/v1/settings', { method: 'PUT', body: JSON.stringify({ sportDays: [1, 3, 9], strengthPerWeek: 3 }) })).json(); assert.deepEqual(j.sportDays, [1, 3]); assert.equal(j.strengthPerWeek, 3); });
 
