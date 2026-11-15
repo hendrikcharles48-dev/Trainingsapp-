@@ -132,7 +132,12 @@ Nachbarn (Auswahlfenster mit empfohlener Variante).
    Den Namen, den der Nutzer benutzt hat, als `alias` eintragen.
 2. `howto.js`: Anleitung (`s` Schritte, `w` Darauf achten, `f` häufiger Fehler).
 3. `figures.js`: Figur/Template + Eintrag in der `map`, Bewegung realistisch (Blickrichtung,
-   Füße, Geräteposition) – mit `figcheck` prüfen.
+   Füße, Geräteposition). **Ausrichtung prüfen (Nutzerwunsch 15.11.): Brustkorb, Ellbogen, Knie, Füße.**
+   `node tools/figcheck.js <id>` muss 0 melden, dann `node tools/figcheck.js --sheet <datei.html> <id>` mit Playwright
+   fotografieren und ansehen. Regeln: Knie beugt nur nach hinten, Ellbogen nur nach vorn, Zehen zur Schienbein-Vorderseite,
+   Bauchlage/brustgestützt = Brust zum Polster/Boden, Rückenlage = Brust nach oben. Seit 3.14.5 wählt `figures.js` Knie
+   und Füße bei Ziel-Füßen (`f`) automatisch anatomisch (außer Beugung > 140°, z. B. Tuck: Vorlage `ks` entscheidet,
+   oder `kfree: true`). Echte Haltung zuerst: liegt die Person auf der Bank, kniet sie, stehen die Füße weit hinten?
 
 Ab 3.14.4 mit Bestätigung (Nutzerwunsch 15.11.): Passt der Name (oder ein `alias`) einer eigenen Übung zu einer
 eingebauten (`findBuiltin`), zeigt die App auf Heute die Karte „Neue feste Übung“ (`cxReadyCard`, auch im Wochenbericht)
