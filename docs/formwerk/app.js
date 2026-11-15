@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.4';
+  const VERSION = '1.0.5';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -269,7 +269,7 @@
       </div>
       <div class="eyebrow sethead">App</div>
       <div class="list"><button class="li" data-a="forget"><div class="grow"><b class="c-red">Auf diesem Gerät abmelden</b><div class="small muted">Löscht nur Formwerks Zugang und Zwischenspeicher hier</div></div></button></div>
-      <p class="tiny muted" style="text-align:center;margin:8px 0 0">Formwerk ${VERSION}${status ? ' · Worker ' + esc(status.worker || '') : ''}<br>Trainingshilfe – keine medizinischen Aussagen.</p></div>`;
+      <p class="tiny muted" style="text-align:center;margin:8px 0 0">Formwerk ${VERSION} · Anzeige ${innerWidth}×${innerHeight}/${screen.height}, Ausgleich ${getComputedStyle(document.documentElement).getPropertyValue('--vgap').trim() || '0px'}${status ? ' · Worker ' + esc(status.worker || '') : ''}<br>Trainingshilfe – keine medizinischen Aussagen.</p></div>`;
   }
 
   /* ----- Einrichtung ----- */
