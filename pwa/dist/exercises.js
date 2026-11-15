@@ -335,5 +335,8 @@
   X('crow', 'Krähe (Crow)', 'skill', 's', 'hold', ['bw'], ['fdelt', 'abs'], ['triceps'], { lvl: 1, grp: 'planche', rank: 0.5, rr: [10, 30], d: 'Hände schulterbreit am Boden, Knie auf die Oberarme legen und nach vorn lehnen, bis die Füße abheben.', c: ['Blick nach vorn', 'Kissen vor den Kopf'], skill: 'planche', inj: ['wrist'] });
   X('chest-wall-hs', 'Handstand, Brust zur Wand', 'skill', 's', 'hold', ['bw'], ['fdelt'], ['triceps', 'abs'], { lvl: 2, grp: 'hsskill', rank: 2, rr: [20, 60], d: 'Bauch zur Wand, Hände 10–20 cm vor der Wand, Körper ganz gerade und nur die Zehenspitzen berühren die Wand.', c: ['Schultern ganz hochschieben', 'Bauch und Po fest'], skill: 'hs', inj: ['wrist'] });
 
+  /* ---------- Eigene Übungen des Nutzers, fest eingebaut (Wochenbericht) ---------- */
+  X('machine-high-row', 'Hohes Rudern an der Maschine (brustgestützt)', 'hpull', 'c', 'load', ['mach'], ['lats', 'upperback'], ['rdelt', 'biceps'], { lvl: 1, std: 0.6, rr: [8, 12], alias: ['Rudern beustgestützt von oben 45grad Winkel', 'Rudern beustgestützt 45*', 'Rudern brustgestützt von oben 45 Grad', 'High Row Maschine', 'gym80 High Row'], d: 'Brust ans Polster, Griffe schräg von oben (etwa 45°) nach hinten unten ziehen – zwischen Latzug und Rudern. Z. B. gym80 Pure Kraft High Row.', c: ['Brust bleibt am Polster', 'Ellbogen nach hinten unten, nah am Körper vorbei'] });
+
   window.EXDB = { list: L, byId: Object.fromEntries(L.map(e => [e.id, e])), MUSCLES, GROUPS, EQUIP, PATTERNS };
 })();

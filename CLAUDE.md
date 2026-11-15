@@ -157,9 +157,11 @@ Wo die eigenen Übungen zu finden sind:
   (Artifact https://claude.ai/artifact/9rhKGs5pYvdeqRx7ymim9L).
 - Wenn nichts davon vorliegt: den Nutzer kurz fragen, ob er neue Übungen angelegt hat.
 
-Übungsbestand: 248 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
+Übungsbestand: 249 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
 neue Figuren nutzen vorhandene Vorlagen). Prüfen: jede Übung braucht Eintrag in allen drei Dateien.
-Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`).
+Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`),
+„Hohes Rudern an der Maschine (brustgestützt)“ (`machine-high-row`, gym80 High Row; Block „Eigene Übungen des Nutzers“ am Ende von
+`exercises.js`/`howto.js`). Namen nie doppelt (vorher prüfen); den Namen des Nutzers als `alias`, sinnvollen Namen als `name`.
 Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
 Reiter „Eigene“ in Übungen (`st.libTab = 'own'`): Bearbeiten (`cxEdit`, gleiche ID, Verlauf bleibt) und Löschen (`cxDelYes`):
 aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favoriten; mit Verlauf nur `hidden: true`

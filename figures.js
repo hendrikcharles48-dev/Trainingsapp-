@@ -157,6 +157,8 @@
   T.bentrow = (eq) => ({ k: [{ hip: [84, 102], t: 112, f: [[104, 182], [96, 182]], h: [[126, 150], [122, 150]] }, { hip: [84, 102], t: 112, f: [[104, 182], [96, 182]], h: [[104, 116], [100, 116]], es: [1, 1] }], p: [eqProp(eq)] });
   T.chestrow = { k: [{ hip: [70, 128], t: 130, f: [[14, 182], [22, 182]], tp: [1, 1], h: [[128, 160], [124, 160]], rw: 1 }, { hip: [70, 128], t: 130, f: [[14, 182], [22, 182]], tp: [1, 1], h: [[100, 118], [96, 118]], rw: 1 }], p: [{ k: 'bench', x1: 60, y1: 140, x2: 124, y2: 92 }, { k: 'db', h: [0, 1] }] };
   T.seatedrow = { k: [{ rw: 1, hip: [70, 160], t: 160, f: [[152, 172], [150, 175]], ks: [1, 1], h: [[150, 120], [146, 120]] }, { rw: 1, hip: [70, 160], t: 186, f: [[152, 172], [150, 175]], ks: [1, 1], h: [[100, 136], [96, 136]], es: [1, 1] }], p: [{ k: 'cable', from: [200, 128] }, { k: 'box', x: 40, y: 164, w: 50 }] };
+  // Hohes Rudern an der Maschine: sitzend, Brust am Polster, Zug schräg von oben (~45°) nach hinten unten
+  T.machhighrow = { k: [{ rw: 1, hip: [70, 150], t: 168, f: [[118, 182], [112, 182]], h: [[124, 62], [120, 62]] }, { rw: 1, hip: [70, 150], t: 170, f: [[118, 182], [112, 182]], h: [[84, 116], [80, 116]] }], p: [{ k: 'seat', x: 70, y: 152, pad: [96, 104] }] };
   T.machinerow = { k: [{ rw: 1, hip: [70, 150], t: 175, f: [[118, 182], [112, 182]], h: [[140, 102], [136, 102]] }, { rw: 1, hip: [70, 150], t: 180, f: [[118, 182], [112, 182]], h: [[92, 106], [88, 106]], es: [1, 1] }], p: [{ k: 'seat', x: 70, y: 152, pad: [110, 96] }] };
   T.highrow = { k: [kneel({ rw: 1, t: 176, h: [[160, 50], [156, 50]] }), kneel({ rw: 1, t: 184, h: [[120, 80], [116, 80]], es: [1, 1] })], p: [{ k: 'cable', from: [205, 10] }] };
 
@@ -303,7 +305,7 @@
     'dead-hang': 'hang', 'scap-pull': 'scap', 'neg-pullup': 'pullup', 'band-pullup': 'pullup', 'chinup': 'pullup', 'pullup': 'pullup', 'ring-pullup': 'ringpull', 'lsit-pullup': 'lsitpull', 'archer-pullup': 'archerF', 'oap-neg': 'pullup',
     'cable-pulldown': 'kneelpd', 'cable-1arm-pulldown': 'kneelpd', 'lat-pulldown': 'latpd',
     'table-row': 'tablerow', 'door-row': 'doorrow', 'ring-row-incline': 'ringrowinc', 'ring-row': 'ringrow', 'ring-row-elev': 'ringrowelev', 'ring-archer-row': 'ringrow', 'tuck-fl-row': 'flrow',
-    'db-row': 'dbrow', 'db-row-pair': ['bentrow', 'db'], 'db-chest-row': 'chestrow', 'cable-high-row': 'highrow', 'bb-row': ['bentrow', 'bb'], 'seated-row': 'seatedrow', 'machine-row': 'machinerow', 'inverted-row': 'inverted',
+    'db-row': 'dbrow', 'db-row-pair': ['bentrow', 'db'], 'db-chest-row': 'chestrow', 'cable-high-row': 'highrow', 'bb-row': ['bentrow', 'bb'], 'seated-row': 'seatedrow', 'machine-row': 'machinerow', 'machine-high-row': 'machhighrow', 'inverted-row': 'inverted',
     'pike-pushup': 'pike', 'pike-pushup-elev': 'pikeelev', 'wall-hspu-neg': 'hspu', 'wall-hspu': 'hspu', 'db-press': ['press', 'db'], 'db-press-1arm': ['press', 'db1'], 'arnold-press': ['press', 'db'], 'ohp': ['press', 'bb'], 'machine-shoulder': ['press', 'none', true],
     'incline-pushup': 'inclinepu', 'pushup': 'pushup', 'diamond-pushup': 'pushup', 'ring-pushup': 'ringpu', 'decline-pushup': 'declinepu', 'archer-pushup': 'pushup', 'pseudo-planche-pu': 'pseudo',
     'db-floor-press': ['floorpress', 'db'], 'db-floor-press-1arm': ['floorpress', 'db1'], 'db-bench': ['bench', 'db'], 'db-incline': ['incline', 'db'], 'bench': ['bench', 'bb'], 'incline-bench': ['incline', 'bb'], 'machine-chest': 'chestpress',
