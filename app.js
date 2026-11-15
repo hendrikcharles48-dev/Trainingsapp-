@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.7';
+  const APP_VERSION = '3.14.8';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -2086,7 +2086,7 @@
   }
   // Export: Konto-Download (Artifact) → Teilen-Menü (iPhone: „In Dateien sichern“) → Download → Zwischenablage
   // Messwerte der Anzeige (iOS-Höhenfehler bei Home-Bildschirm-Apps), zum Nachfragen bei Darstellungsproblemen
-  function dispLine() { const cs = getComputedStyle(document.documentElement); const v = k => (cs.getPropertyValue(k) || '').trim() || '0px'; return 'Anzeige ' + innerWidth + '×' + innerHeight + '/' + screen.height + ' · oben ' + v('--sat') + ' unten ' + v('--sab') + ' · Ausgleich ' + v('--vgap'); }
+  function dispLine() { const m = window.__disp || {}; const tb = document.querySelector('.tabs'); const r = tb ? tb.getBoundingClientRect() : null; return 'Anzeige ' + innerWidth + '×' + innerHeight + '/' + screen.height + ' · fix ' + m.fix + ' lvh ' + m.lvh + ' svh ' + m.svh + ' vv ' + m.vv + ' · oben ' + m.sat + ' unten ' + m.sab + ' · Leiste ' + (r ? Math.round(r.top) + '–' + Math.round(r.bottom) : '–') + (m.sa ? ' · App' : ' · Browser'); }
   function cloudLine() {
     const c = Cloud.cfg(), cs = Cloud.state();
     if (!c) return 'Aus – einmal einrichten, dann sichert die App von selbst';
