@@ -111,6 +111,13 @@ await t('Worker: Zusammenfassung lädt Verlauf und rechnet', async () => {
   assert.ok(counter.calls < 50, 'Garmin-Abrufe ' + counter.calls);
   assert.equal(j.history.length, 90); assert.ok(j.load.activities.length === 1);
 });
+await t('Worker: Tageswerte v2 (verschachtelt) werden gelesen', async () => {
+  const j = await (await call('/v1/summary')).json();
+  assert.ok(j.vitals.rhr >= 51 && j.vitals.rhr <= 53, 'Ruhepuls ' + j.vitals.rhr);
+  assert.equal(j.vitals.steps, 8000); assert.equal(j.vitals.stress, 30); assert.equal(j.bodyBattery.high, 90);
+  assert.ok(j.recovery.parts.some(p => p.k === 'rhr'), 'Ruhepuls fließt ein');
+  assert.equal(j.sleep.score, 72);
+});
 await t('Worker: zweiter Abruf nutzt Cache', async () => { const before = counter.calls; await call('/v1/today'); assert.equal(counter.calls, before); });
 await t('Worker: Satzwerk-Einheit landet bei den Muskeln', async () => {
   const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(Date.now());

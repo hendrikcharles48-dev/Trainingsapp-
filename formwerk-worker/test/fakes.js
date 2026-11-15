@@ -23,11 +23,11 @@ export function installFakeGarmin() { globalThis.fetch = async (url, opt = {}) =
   if (p.startsWith('/hrv-service/hrv/daily/')) return J({ hrvSummaries: range(sa, sb).map((d, i) => ({ calendarDate: d, lastNightAvg: 50 + (i % 7), weeklyAvg: 53, status: 'BALANCED' })) });
   if (p.startsWith('/hrv-service/hrv/')) return J({ hrvSummary: { calendarDate: sb, lastNightAvg: 47 } });
   if (p.endsWith('dailySleepSummariesByDate')) return J(range(qa, qb).map(d => ({ calendarDate: d, sleepTimeSeconds: 26000 + 300 * (d.charCodeAt(9) % 5), deepSleepSeconds: 4800, remSleepSeconds: 5400 })));
-  if (p.endsWith('/dailySleep')) return J({ dailySleepDTO: { calendarDate: u.searchParams.get('date'), sleepTimeSeconds: 25000, deepSleepSeconds: 4000, lightSleepSeconds: 15000, remSleepSeconds: 5000, awakeSleepSeconds: 1000, sleepScores: { overall: { value: 72 } } } });
+  if (p.endsWith('/dailySleep')) return J({ id: 1, calendarDate: u.searchParams.get('date'), sleepTimeSeconds: 25000, deepSleepSeconds: 4000, lightSleepSeconds: 15000, remSleepSeconds: 5000, awakeSleepSeconds: 1000, sleepStartTimestampLocal: Date.now() - 9 * 3600e3, sleepEndTimestampLocal: Date.now() - 2 * 3600e3, sleepScores: { overall: { value: 72, qualifierKey: 'FAIR' } } });
   if (p.includes('bodyBattery')) return J(range(qa, qb).map(d => ({ date: d, charged: 50, drained: 60, bodyBatteryValuesArray: [[1, 40], [2, 85], [3, 30]] })));
-  if (p.endsWith('dailysummaries')) return J({ data: range(qa, qb).map((d, i) => ({ calendarDate: d, restingHeartRate: 51 + (i % 3), totalSteps: 8000, averageStressLevel: 30 })) });
+  if (p.endsWith('dailysummaries')) return J({ data: range(qa, qb).map((d, i) => ({ calendarDate: d, source: 'garmin', movement: { steps: { goal: 7500, value: 8000 } }, heartRate: { minValue: 45, maxValue: 120, restingValue: 51 + (i % 3) }, intensityMinutes: { moderate: 10, vigorous: 0 }, stress: { avgLevel: 30 }, bodyBattery: { minValue: 20, maxValue: 90, chargedValue: 70, drainedValue: 75, latestValue: 40 } })) });
   if (p.includes('/activities/search/')) return J([{ activityId: 9, activityName: 'Baseball', activityType: { typeKey: 'baseball' }, startTimeLocal: qb + ' 18:00:00', duration: 7200, averageHR: 120, maxHR: 175 }]);
   if (p.includes('stats/stress') || p.includes('stats/steps')) return J([]);
-  if (p.includes('heartRateZones')) return J([]);
+  if (p.includes('heartRateZones')) return J([{ trainingMethod: 'HR_MAX', restingHeartRateUsed: 50, zone1Floor: 95, zone2Floor: 115, zone3Floor: 135, zone4Floor: 155, zone5Floor: 175, maxHeartRateUsed: 192, sport: 'DEFAULT' }]);
   return new Response('not found', { status: 404 });
 }; }
