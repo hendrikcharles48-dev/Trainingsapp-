@@ -256,7 +256,8 @@ Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen A
   `partial` = nur Baseball-Frage). Stufe 1 `applySoreness`/`applyPain` (Schmerz 3 → Pause, 3 von 5 Tagen → „abklären lassen“, keine Diagnose),
   Stufe 2 `calibrate` (Faktor je Gruppe für Kraft `s` und Baseball `b`, ab 4 Tagen, 0,6–1,8), Stufe 3 `insights` (Muster 6 Wochen,
   gute Kraft-Tage). Satzwerk: `FW.painHint(ex)` im Training über `ex.inj`.
-- Baseball ist unregelmäßig (Nutzer 15.11.): Standard keine festen Baseball-Tage (`DEFAULT_SETTINGS.sportDays = []`). Schalter auf der
-  Morgen-Check-Karte: „Heute Baseball“ (`bbToday`, wirkt auf Empfehlung, abends auf Muskeln) und „Gestern Baseball“ (`bb`). Uhr-Aktivität zählt automatisch.
+- Baseball (Nutzerwunsch 15.11.): feste Zeiten in Mehr (`settings.sportDays` + `sportTimes[tag] = {from, dur, since}`) zählen ab `since`
+  automatisch (`baseballDay`/`withCheckinBaseball`), abwählbar über „Heute Baseball“ (`bbToday:false`) bzw. am Morgen danach „Gestern Baseball“
+  (`bb:false`). Ohne feste Zeiten: antippen. Uhr-Aktivität zählt immer (Schalter dann fest „(Uhr)“). Standard: keine festen Zeiten.
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

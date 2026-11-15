@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -104,6 +104,19 @@ await t('Lernen: wer länger Muskelkater hat, bekommt einen höheren Faktor', ()
   assert.ok(cal.find(m => m.k === 'vorn').pct > base.find(m => m.k === 'vorn').pct);
 });
 
+await t('Baseball: feste Zeiten zählen automatisch, abwählbar, sonst antippen', () => {
+  const S = { sportDays: [0], sportTimes: { 0: { from: '19:00', dur: 90, since: '2026-11-01' } } }; // 0 = Montag
+  const mo = '2026-11-09', di = '2026-11-10', moAlt = '2026-10-26';
+  assert.equal(baseballDay({}, S, mo, {}).on, true);
+  assert.equal(baseballDay({}, S, moAlt, {}).on, false, 'vor „since“ nicht rückwirkend');
+  assert.equal(baseballDay({ [mo]: { bbToday: false } }, S, mo, {}).on, false, 'heute abgewählt');
+  assert.equal(baseballDay({ [di]: { bb: false } }, S, mo, {}).on, false, 'am Morgen danach abgewählt');
+  assert.equal(baseballDay({ [di]: { bbToday: true } }, S, di, {}).on, true, 'Dienstag angetippt');
+  assert.equal(baseballDay({}, S, di, {}).on, false);
+  const acts = withCheckinBaseball({}, {}, null, 0, S, '2026-11-15', 20);
+  assert.equal(acts[mo][0].time, '19:00'); assert.equal(acts[mo][0].dur, 5400); assert.ok(!acts[di]);
+});
+
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */
 installFakeGarmin();
 const storage = new FakeStorage();
@@ -186,7 +199,7 @@ await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, H
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, bbOnly: true, bbToday: true }) });
   let jj = await (await call('/v1/summary')).json(); assert.ok(jj.recommendation.sportToday, 'Heute Baseball wirkt'); assert.ok(jj.recommendation.level !== 'full');
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, bbOnly: true, bbToday: false }) });
-  jj = await (await call('/v1/summary')).json(); assert.ok(!jj.recommendation.sportToday);
+  jj = await (await call('/v1/summary')).json(); assert.ok(jj.body.baseball.today.recorded ? jj.recommendation.sportToday : !jj.recommendation.sportToday, 'Uhr-Aktivität zählt immer, sonst abgewählt');
   const o = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -10), bbOnly: true, bb: true }) })).json(); assert.equal(o.checkin.partial, true);
 });
 await t('Worker: Rohdaten-Test', async () => { const j = await (await call('/v1/raw?days=7')).json(); assert.ok(Object.keys(j.parsed).length >= 7); assert.ok(j.calls['HRV Zeitraum'].ok); });
