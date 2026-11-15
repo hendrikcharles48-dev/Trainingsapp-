@@ -163,9 +163,9 @@
     // Schmerz aus dem Formwerk-Morgen-Check: Hinweis bei Übungen, die diese Stelle belasten (ex.inj)
     painHint(ex) {
       const T = get(K.today, null); const d = T && T.data; if (!d || d.date !== iso(new Date()) || !ex || !ex.inj) return '';
-      const hit = (d.pain || []).filter(p => p.inj && ex.inj.includes(p.inj)); if (!hit.length) return '';
+      const hit = (d.pain || []).filter(p => p.inj && ex.inj.includes(p.inj) && p.lvl >= 2); if (!hit.length) return '';
       const p = hit[0];
-      return `<div class="card flat small" style="border:1px solid var(--highlight,#C9D8EA);margin-top:8px"><b>${esc(p.label)} schmerzt heute (${p.lvl}/3)</b> – diese Übung belastet sie. ${p.lvl >= 3 ? 'Heute besser auslassen.' : 'Leichter oder über „Tauschen“ eine schonendere Variante wählen.'}${p.days >= 3 ? ' Seit mehreren Tagen – bitte abklären lassen.' : ''}</div>`;
+      return `<div class="card flat small" style="border:1px solid var(--highlight,#C9D8EA);margin-top:8px"><b>${esc(p.label)} schmerzt heute (${p.lvl}/5)</b> – diese Übung belastet sie. ${p.lvl >= 4 ? 'Heute besser auslassen.' : 'Leichter oder über „Tauschen“ eine schonendere Variante wählen.'}${p.days >= 3 ? ' Seit mehreren Tagen – bitte abklären lassen.' : ''}</div>`;
     },
     // Sicherung von Satzwerk im Worker (Export-JSON). get → Objekt oder null (noch keine), Fehler werfen.
     async backupPut(text) { const r = await api('/v1/backup/satzwerk', { method: 'PUT', raw: text, timeout: 60000 }); if (!r || !r.ok) throw new Error((r && r.error) || 'Sicherung fehlgeschlagen'); return r; },

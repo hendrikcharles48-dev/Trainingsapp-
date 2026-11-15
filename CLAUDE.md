@@ -252,8 +252,9 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   `syncWeight` in `bwLog` (nur ergänzen) und blendet seine Gewichtseingabe aus, solange Formwerk verbunden ist (`FW.configured()`).
 - Automatische Sicherung: ohne GitHub-Zugang sichert Satzwerk über den Worker (`Cloud.cfg()` → `{worker:true}`, `Cloud.where()`,
   `FW.backupPut/backupGet`, Worker `bk:satzwerk` mit zwei Fassungen). Ausschalten setzt `cloudState.wOff`.
-- Körpergefühl (Formwerk 1.2/Worker 1.3): Morgen-Check `c:<Datum>` (Muskelkater je Gruppe 1–2, Schmerz je Stelle 1–3, `bb` Baseball gestern,
-  `partial` = nur Baseball-Frage). Stufe 1 `applySoreness`/`applyPain` (Schmerz 3 → Pause, 3 von 5 Tagen → „abklären lassen“, keine Diagnose),
+- Körpergefühl (Formwerk 1.2/Worker 1.3, ab Worker 1.7 Skala 1–5 für beides, Nutzerwunsch): Morgen-Check `c:<Datum>` (`v: 5`; ältere
+  Einträge mit 1–2/1–3 rechnet `normCheckin` beim Lesen um, gespeichert bleibt alles), `bb` Baseball gestern,
+  `partial` = nur Baseball-Frage). Stufe 1 `applySoreness`/`applyPain` (Schmerz ab 2 schonen, ab 4 Pause, ≥ 2 an 3 von 5 Tagen → „abklären lassen“, keine Diagnose),
   Stufe 2 `calibrate` (Faktor je Gruppe für Kraft `s` und Baseball `b`, ab 4 Tagen, 0,6–1,8), Stufe 3 `insights` (Muster 6 Wochen,
   gute Kraft-Tage). Satzwerk: `FW.painHint(ex)` im Training über `ex.inj`.
 - Baseball (Nutzerwunsch 15.11.): feste Zeiten in Mehr (`settings.sportDays` + `sportTimes[tag] = {from, dur, since}`) zählen ab `since`
@@ -265,5 +266,6 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   aus Formwerk“), Wochen-Check-in vorausgefüllt (`FW.weekPrefill`, nur „diff“ bleibt offen), `deloadNeeded` = Leistung ODER Formwerk-Signale
   (2 Zeichen oder 1 + fallende Leistung), Baseball-Tage aus Formwerk (`sportDaysEff()`, `FW.plan().baseballToday`), gute Kraft-Tage in der
   Wochenleiste (`.wd.good`). Ohne Formwerk alles wie vorher.
+- Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

@@ -139,6 +139,13 @@ await t('Vorschläge: Tagesform und Wochen-Check-in aus Formwerk', () => {
   assert.ok(Array.isArray(s.body.insights.strengthDays.idx));
 });
 
+await t('Skala 1–5: alte Check-ins werden umgerechnet', async () => {
+  const { normCheckin } = await import('../src/model.js');
+  const c = normCheckin({ date: '2026-11-01', sore: { vorn: 2, brust: 1 }, pain: { knie: 3 } });
+  assert.deepEqual(c.sore, { vorn: 4, brust: 2 }); assert.deepEqual(c.pain, { knie: 4 }); assert.equal(c.v, 5);
+  assert.deepEqual(normCheckin({ date: 'x', v: 5, sore: { vorn: 2 } }).sore, { vorn: 2 });
+});
+
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */
 installFakeGarmin();
 const storage = new FakeStorage();
@@ -203,18 +210,18 @@ await t('Worker: Satzwerk-Sicherung speichern und laden (große Datei, vorige bl
 });
 await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, Hinweis bei anhaltendem Schmerz', async () => {
   const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(Date.now());
-  for (let i = 3; i >= 1; i--) await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -i), pain: { schulter: 1 } }) });
-  const r = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, sore: { vorn: 2, xyz: 2 }, pain: { schulter: 2 }, bb: true }) })).json();
-  assert.deepEqual(r.checkin.sore, { vorn: 2 });
+  for (let i = 3; i >= 1; i--) await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -i), pain: { schulter: 2 } }) });
+  const r = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, sore: { vorn: 5, xyz: 2 }, pain: { schulter: 3 }, bb: true }) })).json();
+  assert.deepEqual(r.checkin.sore, { vorn: 5 });
   let j = await (await call('/v1/summary')).json();
   assert.equal(j.muscles.find(m => m.k === 'vorn').status, 'tired');
-  assert.equal(j.muscles.find(m => m.k === 'schultern').pain, 2);
+  assert.equal(j.muscles.find(m => m.k === 'schultern').pain, 3);
   assert.ok(!j.recommendation.good.includes('Schultern'));
   assert.ok(j.recommendation.notes.some(n => /abklären/.test(n)), 'Hinweis abklären');
   assert.ok(j.body.insights.items.some(x => x.kind === 'pain' && x.k === 'schulter'));
   assert.equal(j.body.insights.strengthDays.days.length, 2);
   const t2 = await (await call('/v1/today')).json(); assert.equal(t2.pain[0].inj, 'shoulder'); assert.equal(t2.checkin, true);
-  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, pain: { knie: 3 } }) });
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, pain: { knie: 5 } }) });
   j = await (await call('/v1/summary')).json(); assert.equal(j.recommendation.level, j.recommendation.level === 'done' ? 'done' : 'rest');
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d }) });
   const y = addDays(d, 5); // Baseball-Frage allein zählt nicht als Check

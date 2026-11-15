@@ -3,11 +3,11 @@
 // - Speicher: Durable Object „FormwerkStore“ (SQLite, Free-Plan). Schnittstelle: formwerk/SCHNITTSTELLE.md
 import { Garmin, PATHS, chunks, addDays } from './garmin.js';
 import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
-import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS } from './model.js';
+import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, normCheckin } from './model.js';
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.6.0';
+export const WORKER_VERSION = '1.7.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -233,17 +233,17 @@ export class FormwerkStore {
   }
 
   /* ----- Morgen-Check: Muskelkater und Schmerz ----- */
-  async checkins(days) { const m = await this.st.list({ prefix: 'c:', start: 'c:' + addDays(this.today(), -days) }); return [...m.values()]; }
+  async checkins(days) { const m = await this.st.list({ prefix: 'c:', start: 'c:' + addDays(this.today(), -days) }); return [...m.values()].map(normCheckin); }
   async putCheckin(b) {
     const date = b && /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : this.today();
     if (date > this.today()) return { ok: false, error: 'Datum in der Zukunft' };
     const lv = (o, max, keys) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([k, v]) => keys.has(k) && Number.isInteger(v) && v >= 1 && v <= max));
-    const old = await this.st.get('c:' + date);
+    const old = normCheckin(await this.st.get('c:' + date));
     // nur die Baseball-Frage beantwortet: kein vollständiger Check (Muskelkater/Schmerz bleiben offen)
     // Nur Baseball-Schalter (gestern/heute): ändert keinen Muskelkater/Schmerz; ohne Check bleibt er „offen“ (partial)
     const flags = c => { for (const f of ['bb', 'bbToday']) { if (b[f] === true || b[f] === false) c[f] = b[f]; else if (old && old[f] != null) c[f] = old[f]; } return c; };
     if (b.bbOnly) { const c0 = flags(Object.assign({ date, sore: {}, pain: {} }, old || { partial: true }, { t: Date.now() })); await this.st.put('c:' + date, c0); return { ok: true, checkin: c0 }; }
-    const c = flags({ date, sore: lv(b.sore, 2, GROUP_KEYS), pain: lv(b.pain, 3, PAIN_KEYS), t: Date.now() });
+    const c = flags({ date, v: 5, sore: lv(b.sore, 5, GROUP_KEYS), pain: lv(b.pain, 5, PAIN_KEYS), t: Date.now() });
     await this.st.put('c:' + date, c);
     return { ok: true, checkin: c };
   }
