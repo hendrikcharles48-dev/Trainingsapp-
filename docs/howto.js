@@ -277,5 +277,8 @@
   A('crow', ['In die Hocke, Hände schulterbreit vor dir, Finger gespreizt.', 'Knie auf die Rückseite der Oberarme legen.', 'Gewicht langsam nach vorn verlagern, bis die Füße abheben.', 'Halten, Blick nach vorn.'], ['Ellbogen leicht gebeugt', 'Kissen vor den Kopf legen', 'Finger drücken in den Boden'], 'Nach unten schauen – dann kippt man eher nach vorn.');
   A('chest-wall-hs', ['Mit dem Rücken zur Wand in den Liegestütz, Füße an die Wand.', 'Mit den Füßen die Wand hochlaufen, Hände Richtung Wand bringen.', 'Hände 10–20 cm vor der Wand, Körper ganz gerade.', 'Halten, dann kontrolliert herunterlaufen.'], ['Schultern ganz zu den Ohren schieben', 'Bauch und Po fest, kein Hohlkreuz', 'Nur die Zehen berühren die Wand'], 'Ins Hohlkreuz fallen und mit dem Bauch die Wand berühren.');
 
+  /* ---------- Eigene Übungen des Nutzers, fest eingebaut ---------- */
+  A('machine-high-row', ['Sitz so einstellen, dass die Brust oben am Polster liegt und die Griffe gestreckt schräg vor und über dir sind.', 'Brust fest ans Polster, Füße flach auf den Boden oder die Fußstütze.', 'Schultern zuerst nach unten-hinten ziehen, dann die Griffe schräg nach hinten unten Richtung untere Brust ziehen.', 'Ellbogen enden hinter dem Körper, kurz halten, langsam zurück in die volle Dehnung.'], ['Brust bleibt am Polster', 'Ellbogen nah am Körper vorbei nach hinten unten', 'Oben 1 s halten, Schulterblätter zusammen'], 'Mit den Schultern hochziehen und den Oberkörper vom Polster lösen – dann arbeitet der Nacken statt Rücken.');
+
   window.HOWTO = H;
 })();
