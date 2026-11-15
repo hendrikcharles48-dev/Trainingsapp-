@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -197,13 +197,16 @@
   function checkCard(d) {
     const b = d.body; if (!b) return '';
     const c = b.checkin; const ms = d.muscles || [];
+    const fl = b.flags || {};
+    const tog = (k, l, on) => `<button class="ckchip ${on ? 'on' : ''}" data-a="ckFlag" data-k="${k}" data-on="${on ? 1 : 0}" style="flex:1;min-height:44px"><b>${l}</b><span>${on ? 'ja' : '–'}</span></button>`;
+    const bbRow = `<div style="display:flex;gap:6px;margin-top:10px">${tog('bbToday', 'Heute Baseball', fl.bbToday === true)}${tog('bb', 'Gestern Baseball', fl.bb === true)}</div>`;
     const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball gespielt?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
     if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
-      <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ}</div>`;
+      <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ || bbRow}</div>`;
     const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
     const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/3`);
     const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
-    return `<div class="card"><div class="ctitle"><h3>Körpergefühl heute</h3><button class="btn ghost" data-a="ckOpen" style="min-height:36px;padding:0 12px;font-size:14px">Ändern</button></div><div class="small ink2">${esc(txt)}</div>${bbQ}</div>`;
+    return `<div class="card"><div class="ctitle"><h3>Körpergefühl heute</h3><button class="btn ghost" data-a="ckOpen" style="min-height:36px;padding:0 12px;font-size:14px">Ändern</button></div><div class="small ink2">${esc(txt)}</div>${bbQ || bbRow}</div>`;
   }
   function ckSheet() {
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
@@ -318,7 +321,7 @@
     const status = d && d.status;
     return header('Mehr') + `<div class="stack">
       <div class="eyebrow sethead">Mein Wochenrhythmus</div>
-      <div class="card stack"><div><div class="lblf">Baseball (abends)</div><div class="days7">${DAYS.map((l, i) => `<button data-a="sport" data-k="${i}" aria-pressed="${s.sportDays.includes(i)}">${l}</button>`).join('')}</div></div>
+      <div class="card stack"><div><div class="lblf">Feste Baseball-Tage (nur wenn regelmäßig – sonst „Heute/Gestern Baseball“ auf Heute antippen)</div><div class="days7">${DAYS.map((l, i) => `<button data-a="sport" data-k="${i}" aria-pressed="${s.sportDays.includes(i)}">${l}</button>`).join('')}</div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div style="font-weight:600">Kraft-Einheiten pro Woche</div><div class="tiny muted">Ziel für die Empfehlung</div></div>
         <div class="stepper"><button data-a="spw" data-d="-1" aria-label="Weniger">−</button><b class="num">${s.strengthPerWeek}</b><button data-a="spw" data-d="1" aria-label="Mehr">+</button></div></div></div>
       <div class="eyebrow sethead">Verstehen</div>
@@ -394,7 +397,8 @@
     ckTap(t) { const bag = st.ck[t.dataset.kind]; const k = t.dataset.k; const v = ((bag[k] || 0) + 1) % (+t.dataset.max + 1); if (v) bag[k] = v; else delete bag[k];
       t.className = 'ckchip' + (v ? ' on lv' + v : ''); t.querySelector('span').textContent = t.dataset.kind === 'sore' ? (SORE_L[v] || '–') : v ? v + '/3' : '–'; },
     ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain }); },
-    ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend(Object.assign(c ? { sore: c.sore, pain: c.pain } : { bbOnly: true }, { bb: t.dataset.v === '1' })); },
+    ckFlag(t) { ckSend({ bbOnly: true, [t.dataset.k]: t.dataset.on !== '1' }).then(() => toast(t.dataset.on !== '1' ? (t.dataset.k === 'bb' ? 'Gestern Baseball eingetragen' : 'Heute Baseball – Empfehlung angepasst') : 'Entfernt')); },
+    ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend({ bbOnly: true, bb: t.dataset.v === '1' }); },
     wAdj(t) { st.wIn = Math.min(300, Math.max(25, Math.round((st.wIn + +t.dataset.d) * 10) / 10)); const v = $('#wVal'); if (v) v.textContent = fmt(st.wIn, 1); },
     async wSave() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: st.wIn } }); closeSheet(); toast('Gespeichert'); load(true); } catch (e) { toast(e.message, 3500); } },
     async wDel() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: null } }); closeSheet(); toast('Gelöscht'); load(true); } catch (e) { toast(e.message, 3500); } },
