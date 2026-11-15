@@ -7,9 +7,9 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.5.0';
+export const WORKER_VERSION = '1.6.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
-const NORM_VERSION = 2; // 2: Tageswerte v2 verschachtelt (Ruhepuls, Schritte, Stress, Body Battery)
+const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
 const AUTO_REFRESH_MIN = 30;       // ohne Ziehen höchstens alle 30 min zu Garmin
 const FORCE_REFRESH_SEC = 90;      // „Ziehen zum Aktualisieren“ höchstens alle 90 s
@@ -226,7 +226,8 @@ export class FormwerkStore {
     const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
-      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday) };
+      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday),
+        signals: sum.signals, prefill: sum.prefill, plan: { sportDays: settings.sportDays || [], baseballToday: !!sum.body.baseball.today.on, strengthDays: sum.body.insights.strengthDays.idx || [] } };
     }
     return Object.assign(sum, { status, settings });
   }

@@ -338,7 +338,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const ckT = ckBy[today] || {};
   const bbT = baseballDay(ckBy, S, today, actsByDate), bbY = baseballDay(ckBy, S, addDays(today, -1), actsByDate);
   const S2 = Object.assign({}, S, { sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
-  const recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings: S2, now }), pain, muscles);
+  let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings: S2, now }), pain, muscles);
   const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: false, pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
@@ -353,9 +353,12 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
       bb: x.bbHigh ?? null, kg: kgBy[d] ?? null
     });
   }
+  const signals = physio(days, today, history, ckBy);
+  recommendation = applySignals(recommendation, signals);
+  const prefill = prefillFor({ days, today, history, ckBy, rec, sleep, recommendation, muscles, pain, allActs });
   const b = baselines(days, today);
   return {
-    model: MODEL_VERSION, date: today,
+    model: MODEL_VERSION, date: today, signals, prefill,
     recovery: rec,
     recommendation,
     muscles,
@@ -562,6 +565,93 @@ export function insights({ ckBy, allActs, today, calib, settings }) {
   pick.sort((a, b) => a - b);
   return {
     items: out, checkins: cks.length, enough: cks.length >= 14,
-    strengthDays: { days: pick.map(d => DAYN[d]), why: bbHurts ? 'Nicht an Baseball-Tagen, nicht am Tag davor – und weil Baseball dich spürbar ermüdet, auch nicht direkt danach.' : 'Nicht an Baseball-Tagen und möglichst nicht am Tag davor, mit mindestens einem Tag Pause dazwischen.' }
+    strengthDays: { idx: pick, days: pick.map(d => DAYN[d]), why: bbHurts ? 'Nicht an Baseball-Tagen, nicht am Tag davor – und weil Baseball dich spürbar ermüdet, auch nicht direkt danach.' : 'Nicht an Baseball-Tagen und möglichst nicht am Tag davor, mit mindestens einem Tag Pause dazwischen.' }
   };
+}
+
+/* =====================================================================
+   8) SIGNALE: STRESSZEICHEN UND LEICHTERE WOCHE (alles relativ zur eigenen Basis)
+   ---------------------------------------------------------------------
+   Stresszeichen (heute, „Körper kämpft vielleicht mit etwas“ – keine Diagnose):
+     nächtliche Atemfrequenz ≥ Basis + max(1,0; 2·SD)  UND  (Ruhepuls ≥ Basis + 3  ODER  HRV-z ≤ −1,5),
+     oder zwei der drei ohne Atemfrequenz, plus Sauerstoff (SpO2) ≥ 2 Punkte unter Basis als Zusatzgrund.
+     Dann: heute locker (Empfehlung „Locker bleiben“).
+   Leichtere Woche (Deload-Melder, 7 Tage gegen die 30 Tage davor):
+     HRV-Schnitt deutlich unter Basis (ln-HRV ≤ −0,5 SD) · Ruhepuls-Schnitt ≥ Basis + 2 · Erholung im Schnitt < 50 ·
+     an ≥ 3 Morgen-Checks starker Muskelkater oder Schmerz. Ab 2 Zeichen → Vorschlag; Satzwerk nimmt seine Leistung dazu.
+   ===================================================================== */
+function windowStats(vals) { const v = vals.filter(x => x != null && !isNaN(x)); return v.length ? { n: v.length, m: mean(v), sd: sd(v) } : { n: 0 }; }
+export function physio(days, today, history, ckBy) {
+  const day = k => days[addDays(today, -k)] || {};
+  const base = (f, from, to) => windowStats(Array.from({ length: to - from + 1 }, (_, i) => f(day(from + i))));
+  // heute
+  const t = day(0); const reasons = [];
+  const rb = base(d => d.sleep && d.sleep.resp, 1, 30), hb = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 1, 30), pb = base(d => d.rhr, 1, 30), ob = base(d => d.sleep && d.sleep.spo2, 1, 30);
+  let resp = false, rhr = false, hrv = false, spo2 = false;
+  if (t.sleep && t.sleep.resp && rb.n >= 7) resp = t.sleep.resp >= rb.m + Math.max(1, 2 * rb.sd);
+  if (t.rhr && pb.n >= 7) rhr = t.rhr >= pb.m + 3;
+  if (t.hrv > 0 && hb.n >= 7) hrv = (Math.log(t.hrv) - hb.m) / Math.max(hb.sd, 0.05) <= -1.5;
+  if (t.sleep && t.sleep.spo2 && ob.n >= 7) spo2 = t.sleep.spo2 <= ob.m - 2;
+  if (resp) reasons.push(`Atemfrequenz nachts ${round(t.sleep.resp, 1)} statt ~${round(rb.m, 1)}`);
+  if (rhr) reasons.push(`Ruhepuls ${t.rhr} statt ~${round(pb.m)}`);
+  if (hrv) reasons.push(`HRV ${t.hrv} ms deutlich unter deiner Basis`);
+  if (spo2) reasons.push(`Sauerstoff nachts ${t.sleep.spo2} % statt ~${round(ob.m)} %`);
+  const stress = (resp && (rhr || hrv)) || (rhr && hrv);
+  // Woche
+  const wk = [], h7 = history.slice(-7);
+  const lnh7 = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 0, 6), lnhB = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 7, 36);
+  if (lnh7.n >= 4 && lnhB.n >= 10 && (lnh7.m - lnhB.m) / Math.max(lnhB.sd, 0.05) <= -0.5) wk.push(`HRV seit einer Woche unter deiner Basis (Ø ${round(Math.exp(lnh7.m))} statt ${round(Math.exp(lnhB.m))} ms)`);
+  const r7 = base(d => d.rhr, 0, 6), rB = base(d => d.rhr, 7, 36);
+  if (r7.n >= 4 && rB.n >= 10 && r7.m >= rB.m + 2) wk.push(`Ruhepuls seit einer Woche erhöht (Ø ${round(r7.m, 1)} statt ${round(rB.m, 1)})`);
+  const rec7 = h7.map(x => x.rec).filter(x => x != null);
+  if (rec7.length >= 4 && mean(rec7) < 50) wk.push(`Erholung im Wochenschnitt nur ${Math.round(mean(rec7))} %`);
+  const ck7 = Array.from({ length: 7 }, (_, i) => ckBy[addDays(today, -i)]).filter(c => c && !c.partial);
+  const hard = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 2) || Object.values(c.pain || {}).some(v => v >= 2)).length;
+  if (hard >= 3) wk.push(`An ${hard} Morgen-Checks starker Muskelkater oder Schmerz`);
+  return { stress: { flag: !!stress, reasons }, deload: { suggest: wk.length >= 2, count: wk.length, reasons: wk } };
+}
+export function applySignals(r, sig) {
+  if (!sig) return r;
+  const x = Object.assign({}, r, { notes: r.notes.slice() });
+  if (sig.stress.flag && x.level !== 'done') {
+    x.level = 'rest'; x.title = 'Locker bleiben'; x.good = [];
+    x.text = 'Dein Körper zeigt heute Stresszeichen. Nur lockere Bewegung, viel trinken, früh schlafen.';
+    x.notes.unshift('Stresszeichen: ' + sig.stress.reasons.join(' · ') + '. Fühlst du dich krank: ganz Pause.');
+  }
+  if (sig.deload.suggest) x.notes.push('Leichtere Woche empfohlen: ' + sig.deload.reasons.join(' · ') + '.');
+  return x;
+}
+
+// Vorschläge für Satzwerk: Tagesform vor dem Training und Wochen-Check-in (der Nutzer bestätigt immer selbst)
+export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendation, muscles, pain, allActs }) {
+  const why = [];
+  let en = null, sl = null;
+  if (rec.score != null) {
+    en = recommendation.level === 'rest' || rec.score < 40 ? 0 : rec.score >= 75 && !muscles.some(m => m.sore === 2) ? 2 : 1;
+    why.push(`Erholung ${rec.score} %`);
+  } else if (recommendation.level === 'rest') en = 0;
+  if (pain.some(p => p.lvl >= 2) && en === 2) en = 1;
+  if (sleep && sleep.has) {
+    sl = sleep.short ? 0 : (sleep.ofAvg >= 98 && (sleep.score == null || sleep.score >= 75)) ? 2 : 1;
+    why.push(`Schlaf ${Math.floor(sleep.total / 3600)}:${String(Math.round(sleep.total % 3600 / 60)).padStart(2, '0')} h`);
+  }
+  // Woche: die letzten 7 Tage
+  const h7 = history.slice(-7); const rec7 = h7.map(x => x.rec).filter(x => x != null);
+  const ck7 = Array.from({ length: 7 }, (_, i) => ckBy[addDays(today, -i)]).filter(c => c && !c.partial);
+  const ans = {}, src = {};
+  if (rec7.length >= 3) { const r = mean(rec7);
+    ans.exh = r >= 85 ? 1 : r >= 70 ? 2 : r >= 55 ? 3 : r >= 40 ? 4 : 5; ans.fit = r >= 85 ? 5 : r >= 70 ? 4 : r >= 55 ? 3 : r >= 40 ? 2 : 1; src.exh = src.fit = `Erholung Ø ${Math.round(r)} %`; }
+  const sl7 = h7.map(x => x.sleep).filter(x => x != null);
+  if (sl7.length >= 3) { const need = Math.max(7, Math.min(9, mean(history.slice(-37, -7).map(x => x.sleep).filter(x => x != null)) || 8)); const q = mean(sl7) / need;
+    ans.sleep = q >= 0.95 ? 3 : q >= 0.85 ? 2 : 1; src.sleep = `Schlaf Ø ${round(mean(sl7), 1)} h`; }
+  if (ck7.length >= 3) {
+    const strong = ck7.filter(c => Object.values(c.sore || {}).some(v => v >= 2)).length, any = ck7.filter(c => Object.keys(c.sore || {}).length).length;
+    ans.sore = strong >= 3 ? 4 : strong >= 1 ? 3 : any ? 2 : 1; src.sore = `${ck7.length} Morgen-Checks`;
+    const pmax = Math.max(0, ...ck7.flatMap(c => Object.values(c.pain || {})));
+    ans.pain = pmax >= 2 ? 2 : pmax === 1 ? 1 : 0; src.pain = src.sore;
+  }
+  let games = 0, other = 0;
+  for (let i = 0; i < 7; i++) for (const a of allActs[addDays(today, -i)] || []) { const k = sportKind(a.type, a.name); if (k === 'baseball') games++; else if (k) other++; }
+  const sp = games + other * 0.5; ans.sport = sp >= 3 ? 3 : sp >= 2 ? 2 : sp >= 0.5 ? 1 : 0; src.sport = `${games}× Baseball${other ? `, ${other}× anderer Sport` : ''}`;
+  return { tf: { en, sl, why: why.join(' · ') }, week: { ans, src } };
 }

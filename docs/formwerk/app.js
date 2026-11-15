@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.4.0';
+  const VERSION = '1.5.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -111,7 +111,7 @@
   function todayView() {
     const d = st.data;
     if (!d) return header('Heute') + banners() + (st.loading ? '<div class="stack"><div class="skeleton" style="height:340px"></div><div class="skeleton"></div><div class="skeleton"></div></div>' : `<div class="card"><p class="ink2" style="margin:0">Noch keine Daten. Nach unten ziehen oder oben rechts aktualisieren.</p></div>`);
-    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${checkCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
+    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${checkCard(d)}${signalCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
   }
   function ringCard(d) {
     const r = d.recovery, v = d.vitals;
@@ -191,6 +191,14 @@
   }
   function actName(t) { return ({ baseball: 'Baseball', cycling: 'Radfahren', road_biking: 'Rennrad', running: 'Laufen', walking: 'Gehen', hiking: 'Wandern', strength_training: 'Krafttraining' })[t] || (t || 'Aktivität').replace(/_/g, ' '); }
 
+  // Stresszeichen (heute) und „leichtere Woche“ – nur wenn etwas auffällt
+  function signalCard(d) {
+    const g = d.signals; if (!g) return '';
+    let h = '';
+    if (g.stress && g.stress.flag) h += `<div class="banner bad"><div><b>Stresszeichen heute.</b> ${esc(g.stress.reasons.join(' · '))}. Locker bleiben, viel trinken, früh schlafen – fühlst du dich krank, ganz Pause. Keine Diagnose.</div></div>`;
+    if (g.deload && g.deload.suggest) h += `<div class="banner warn"><div><b>Leichtere Woche empfohlen.</b> ${esc(g.deload.reasons.join(' · '))}. In Satzwerk erscheint der Vorschlag für eine Deload-Woche.</div></div>`;
+    return h;
+  }
   /* ----- Morgen-Check: Muskelkater und Schmerz ----- */
   const SORE_L = ['', 'leicht', 'stark'];
   const PAIN_AREAS = [['nacken', 'Nacken'], ['schulter', 'Schulter'], ['ellbogen', 'Ellbogen'], ['handgelenk', 'Handgelenk'], ['oberer_ruecken', 'Oberer Rücken'], ['unterer_ruecken', 'Unterer Rücken'], ['huefte', 'Hüfte'], ['leiste', 'Leiste'], ['oberschenkel', 'Oberschenkel hinten'], ['knie', 'Knie'], ['sprunggelenk', 'Sprunggelenk'], ['achilles', 'Achilles / Wade']];
@@ -391,6 +399,8 @@
       <p><b>Belastung (0–100).</b> Aus der Zeit in deinen Herzfrequenz-Zonen bei jeder Garmin-Aktivität (Zone 1 zählt 1×, Zone 5 zählt 5×) plus Alltagsschritte. Die Skala flacht oben ab: 1 h locker ≈ 35, 2 h Baseball ≈ 55–65.</p>
       <p><b>Muskelgruppen.</b> Jeder Satz aus Satzwerk zählt für die Hauptmuskeln voll, für mitbeteiligte halb – je weniger Wiederholungen in Reserve, desto mehr. 5 sehr harte Sätze = voll ermüdet. Die Ermüdung klingt ab: große Beinmuskeln und unterer Rücken am langsamsten (2–3 Tage), Arme, Waden und Bauch schneller (1–2 Tage). Baseball belastet Schultern, Rumpf, Unterarme und Beinbeuger mit.</p>
       <p><b>Körpergefühl.</b> Morgens kurz Muskelkater und Schmerzen antippen. Muskelkater macht die Gruppe für heute mindestens „teilweise“ (leicht) bzw. „ermüdet“ (stark). Schmerz ist kein Muskelkater: die Stelle wird geschont, bei 3/3 heute keine Kraft, an 3 von 5 Tagen kommt der Hinweis, es abklären zu lassen. Mit der Zeit vergleicht Formwerk deine Angaben mit der Rechnung und passt je Muskelgruppe an, wie lange du nach Kraft und nach Baseball brauchst. Im Verlauf erscheinen Muster und deine guten Kraft-Tage.</p>
+      <p><b>Stresszeichen und leichtere Woche.</b> Steigen nachts Atemfrequenz und Ruhepuls deutlich über deinen Schnitt oder fällt die HRV stark ab, zeigt Formwerk „Stresszeichen“ und rät heute zu lockerer Bewegung. Liegen über eine Woche mindestens zwei Zeichen vor (HRV unter Basis, Ruhepuls erhöht, Erholung im Schnitt unter 50 %, oft starker Muskelkater oder Schmerz), wird eine leichtere Woche empfohlen – Satzwerk nimmt dazu seine Leistungsentwicklung.</p>
+      <p><b>Satzwerk.</b> Satzwerk füllt mit Formwerk vor dem Training Energie und Schlaf vor, beim Wochen-Check-in fast alle Fragen, und übernimmt Baseball-Zeiten und gute Kraft-Tage. Du bestätigst immer selbst.</p>
       <p><b>Empfehlung.</b> Rot → Pause. Grün → Kraft voll, gelb → Kraft leicht (⅔ der Sätze, 3 Wdh. Reserve). Eine Stufe leichter bei wenig Schlaf oder deutlich mehr Wochenbelastung als gewohnt. An Baseball-Tagen höchstens leicht, am Tag davor keine schweren Beine/Überkopf. Letzte Kraft-Einheit unter 48 h und Muskeln noch müde → Kraft-Pause. Ziel: ${(st.data && st.data.settings && st.data.settings.strengthPerWeek) || 2} Einheiten pro Woche.</p>
       <p class="muted">Trainingshilfe, keine medizinische Aussage. Wenn du dich krank fühlst, zählt dein Gefühl.</p></div>
       <button class="btn block" data-a="closeSheet">Schließen</button></div>`);

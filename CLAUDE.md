@@ -239,7 +239,7 @@ Abgleich iPad über privates GitHub-Repo + Export/Import). Bei größeren Änder
 **Offene Schritte (Einrichtung Cloudflare/Garmin, Anpassung an echte Daten): `formwerk/OFFEN.md` – zuerst lesen und den Nutzer erinnern.**
 Whoop-Alternative für die Garmin Vivoactive 5, Fokus Krafttraining. Erholung (HRV 50 %, Ruhepuls 25 %, Schlaf 25 % gegen die
 eigene 30-Tage-Basis, Body Battery nur Anzeige), Belastung (Zonen-TRIMP aus Garmin-Aktivitäten), Muskel-Ermüdung aus Satzwerk,
-Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen Aussagen.
+Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen Aussagen.
 - Rechnen nur im Worker: `formwerk-worker/src/model.js` (Formeln dort dokumentiert), Garmin-Auslesen tolerant in `normalize.js`,
   Endpunkte in `garmin.js` (aus Garmins offiziellem Python-Client, nicht raten). Nach Änderungen an `normalize.js`
   `NORM_VERSION` in `src/index.js` erhöhen (lädt Garmin einmal neu). Tests: `node formwerk-worker/test/model.test.js`.
@@ -259,5 +259,11 @@ Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen A
 - Baseball (Nutzerwunsch 15.11.): feste Zeiten in Mehr (`settings.sportDays` + `sportTimes[tag] = {from, dur, since}`) zählen ab `since`
   automatisch (`baseballDay`/`withCheckinBaseball`), abwählbar über „Heute Baseball“ (`bbToday:false`) bzw. am Morgen danach „Gestern Baseball“
   (`bb:false`). Ohne feste Zeiten: antippen. Uhr-Aktivität zählt immer (Schalter dann fest „(Uhr)“). Standard: keine festen Zeiten.
+- Signale (Worker 1.6): `physio` – Stresszeichen heute (Atemfrequenz/SpO2 aus dem Schlaf, Ruhepuls, HRV gegen Basis → „Locker bleiben“,
+  keine Diagnose) und Deload-Melder (7 Tage: HRV, Ruhepuls, Erholung, Morgen-Checks; ab 2 Zeichen). `prefillFor` liefert Vorschläge.
+- Satzwerk nutzt Formwerk (3.13, nur Vorschläge, Nutzer bestätigt): Tagesform-Fenster vorausgefüllt (`FW.tfPrefill`, Hinweis „Vorausgefüllt
+  aus Formwerk“), Wochen-Check-in vorausgefüllt (`FW.weekPrefill`, nur „diff“ bleibt offen), `deloadNeeded` = Leistung ODER Formwerk-Signale
+  (2 Zeichen oder 1 + fallende Leistung), Baseball-Tage aus Formwerk (`sportDaysEff()`, `FW.plan().baseballToday`), gute Kraft-Tage in der
+  Wochenleiste (`.wd.good`). Ohne Formwerk alles wie vorher.
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

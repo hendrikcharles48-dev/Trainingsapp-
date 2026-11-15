@@ -154,6 +154,12 @@
     // nach jeder Änderung an Trainings (speichern/löschen) – gebündelt nach 4 s
     changed() { if (!cfg()) return; clearTimeout(timer); timer = setTimeout(sync, 4000); },
     card, sheet,
+    // Heutige Formwerk-Daten (nur wenn von heute) – Grundlage für Vorschläge in Satzwerk
+    today() { const T = get(K.today, null); const d = T && T.data; return d && d.date === iso(new Date()) ? d : null; },
+    plan() { const T = get(K.today, null); return cfg() && T && T.data && T.data.plan ? T.data.plan : null; }, // Baseball-Tage/gute Kraft-Tage gelten auch von gestern
+    tfPrefill() { const d = this.today(); const p = d && d.prefill && d.prefill.tf; if (!p || (p.en == null && p.sl == null)) return {}; const o = { fw: p.why || 'Formwerk' }; if (p.en != null) o.en = p.en; if (p.sl != null) o.sl = p.sl; return o; },
+    weekPrefill() { const d = this.today(); return (d && d.prefill && d.prefill.week) || null; },
+    signals() { const d = this.today(); return (d && d.signals) || null; },
     // Schmerz aus dem Formwerk-Morgen-Check: Hinweis bei Übungen, die diese Stelle belasten (ex.inj)
     painHint(ex) {
       const T = get(K.today, null); const d = T && T.data; if (!d || d.date !== iso(new Date()) || !ex || !ex.inj) return '';

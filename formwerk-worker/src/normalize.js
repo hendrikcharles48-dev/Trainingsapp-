@@ -69,6 +69,7 @@ export function sleepFrom(o) {
     // Garmin liefert die Zeitstempel teils als lokale Millisekunden: für die Uhrzeit-Anzeige als „lokal“ markieren
     local: pick(s, 'sleepStartTimestampLocal') != null,
     resp: n(pick(s, 'averageRespirationValue', 'avgSleepRespirationValue')),
+    spo2: n(pick(s, 'averageSpO2Value', 'avgSpO2')),
     sleepRhr: n(pick(o, 'restingHeartRate', 'dailySleepDTO.restingHeartRate')),
     sleepHrv: n(pick(o, 'avgOvernightHrv', 'dailySleepDTO.avgOvernightHrv'))
   };
