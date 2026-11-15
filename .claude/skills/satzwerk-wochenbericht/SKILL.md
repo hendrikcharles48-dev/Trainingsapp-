@@ -33,7 +33,8 @@ mit WebSearch (Modus standard) nach Name + `info` suchen, bei Maschinen nach Her
 Griff, beanspruchte Muskeln, typische Fehler. Tippfehler wohlwollend lesen („beustgestützt 45*“ = brustgestützt 45°). Gibt es die
 Übung schon (gleiche Bewegung, gleiches Gerät), nur den Namen des Nutzers als `alias` dort ergänzen. Für jede neue: Regel
 „eigene Übungen“ aus `CLAUDE.md` (exercises.js mit `alias` = Name des Nutzers, howto.js, figures.js-`map`).
-Danach `node --check`, `node pwa/build.js`, kurz mit Playwright prüfen, `APP_VERSION`/`CACHE` hochzählen,
+Figur: `node tools/figcheck.js <id>` (0 Meldungen) und Übersicht mit `--sheet` fotografieren und ansehen (Brustkorb,
+Ellbogen, Knie, Füße). Danach `node --check`, `node pwa/build.js`, kurz mit Playwright prüfen, `APP_VERSION`/`CACHE` hochzählen,
 `cp pwa/dist/* docs/`, committen, Pull Request nach `main` und mergen (dauerhafte Freigabe). Namen in `built` des Berichts.
 Unklar, was gemeint ist (z. B. „Übung 1“)? Nicht raten – im Bericht als Punkt nachfragen.
 Die App stellt nicht still um: Der Nutzer sieht die Daten der neuen festen Übung auf „Heute“ und bestätigt. Hat er eine

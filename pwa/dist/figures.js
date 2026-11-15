@@ -20,7 +20,18 @@
     const l1 = isArm ? L.UA : L.TH, l2 = isArm ? L.FA : L.SH;
     const tg = isArm ? P.h : P.f, ang = isArm ? P.a : P.l, sg = isArm ? (P.es || [1, 1]) : (P.ks || [-1, -1]);
     if (ang && ang[i]) { const j = add(root, dir(ang[i][0]), l1); return [j, add(j, dir(ang[i][1]), l2)]; }
-    if (tg && tg[i]) return ik(root, tg[i], l1, l2, sg[i]);
+    if (tg && tg[i]) {
+      // Knie beugt anatomisch nur nach hinten: von beiden Lösungen die nehmen, bei der der Unterschenkel zur Rückseite geht (3.14.5)
+      if (!isArm && P._ant && !P.kfree) {
+        const a = ik(root, tg[i], l1, l2, 1), b = ik(root, tg[i], l1, l2, -1);
+        const back = s => { const th = [s[0][0] - root[0], s[0][1] - root[1]], sk = [s[1][0] - s[0][0], s[1][1] - s[0][1]]; const an = P._ant(th); return (sk[0] * an[0] + sk[1] * an[1]) / (Math.hypot(sk[0], sk[1]) || 1); };
+        // sehr enge Hocke (Tuck, Krähe): Vorlage entscheidet
+        const t0 = ik(root, tg[i], l1, l2, sg[i]); const bend = q => { const th = [q[0][0] - root[0], q[0][1] - root[1]], sk = [q[1][0] - q[0][0], q[1][1] - q[0][1]]; return Math.acos(Math.max(-1, Math.min(1, (th[0] * sk[0] + th[1] * sk[1]) / ((Math.hypot(th[0], th[1]) * Math.hypot(sk[0], sk[1])) || 1)))) * 180 / Math.PI; };
+        if (bend(t0) > 140) return t0;
+        return back(a) <= back(b) ? a : b;
+      }
+      return ik(root, tg[i], l1, l2, sg[i]);
+    }
     const j = add(root, dir(isArm ? 0 : 0), l1); return [j, add(j, dir(0), l2)];
   }
   function joints(P) {
@@ -29,6 +40,10 @@
     const F = P.fr ? 1 : 0, sw = 17 * F, hw = 10 * F;
     const pp = rot(dir(P.t), 90), dn = dir(P.t);
     const shs = [add(add(sh, pp, sw), dn, -4 * F), add(add(sh, pp, -sw), dn, -4 * F)], hips = [add(hip, pp, hw), add(hip, pp, -hw)];
+    // Vorderseite eines Glieds: Blickrichtung, mitgedreht (Rumpf nach unten = Blickrichtung)
+    const fd0 = rot(dir(P.t), 90 * (P.fc || 1)), dw = [-dir(P.t)[0], -dir(P.t)[1]];
+    const sgn = (rot(dw, -90)[0] * fd0[0] + rot(dw, -90)[1] * fd0[1]) >= 0 ? 1 : -1;
+    P = Object.assign({}, P, { _ant: v => { const n = Math.hypot(v[0], v[1]) || 1; return rot([v[0] / n, v[1] / n], -90 * sgn); } });
     const A = [limb(shs[0], P, 0, 'a'), limb(shs[1], P, 1, 'a')];
     const G = [limb(hips[0], P, 0, 'l'), limb(hips[1], P, 1, 'l')];
     // Blickrichtung: senkrecht zum Rumpf, fc = -1 dreht auf die andere Körperseite (z. B. Rückenlage, Rudern)
@@ -37,8 +52,8 @@
       const v = [an[0] - kn[0], an[1] - kn[1]]; const n = Math.hypot(v[0], v[1]) || 1; const u = [v[0] / n, v[1] / n];
       if (P.fr) return add(an, [i ? -1 : 1, 0], 7);
       if (P.tp && P.tp[i] > 0.5) return add(an, u, L.FT * 0.8);
-      const a = rot(u, -90), b = rot(u, 90);
-      return add(an, (b[0] * fd[0] + b[1] * fd[1]) > (a[0] * fd[0] + a[1] * fd[1]) + 0.05 ? b : a, L.FT);
+      // Zehen zeigen zur Vorderseite des Unterschenkels (3.14.5; vorher nach Blickrichtung – kippte bei Rückenlage)
+      return add(an, P._ant(u), L.FT);
     });
     const nose = add(add(head, fd, 9), dir(P.t), -2);
     const cA = add(add(hip, dir(P.t), L.T * (P.tl || 1) * 0.42), fd, 3), cB = add(add(sh, dir(P.t), -5), fd, 3);
@@ -120,7 +135,7 @@
   const FLH = [[150, 20], [146, 20]];
   T.fl = { k: [{ fc: -1, hip: [102, 78], t: 90, h: FLH, f: [[20, 80], [22, 83]], es: [1, 1], tp: [1, 1] }], p: [{ k: 'bar', x: 150, y: 20 }], sc: 1 };
   T.fltuck = { k: [{ fc: -1, hip: [104, 80], t: 88, h: FLH, f: [[112, 64], [110, 66]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'bar', x: 150, y: 20 }] };
-  T.fladv = { k: [{ fc: -1, hip: [102, 80], t: 90, h: FLH, f: [[88, 110], [86, 112]], ks: [1, 1], es: [1, 1] }], p: [{ k: 'bar', x: 150, y: 20 }] };
+  T.fladv = { k: [{ fc: -1, hip: [102, 80], t: 90, h: FLH, f: [[64, 40], [66, 42]], es: [1, 1] }], p: [{ k: 'bar', x: 150, y: 20 }] };
   T.flrow = { k: [{ rw: 1, fc: -1, hip: [104, 80], t: 88, h: FLH, f: [[112, 64], [110, 66]], ks: [1, 1] }, { rw: 1, fc: -1, hip: [102, 42], t: 90, h: FLH, f: [[110, 26], [108, 28]], ks: [1, 1] }], p: [{ k: 'bar', x: 150, y: 20 }] };
   T.mu = { k: [hangK(95), hangK(58, { f: [[106, 138], [99, 139]] }), { hip: [102, -24], t: 178, h: [[108, BAR], [101, BAR]], f: [[98, 54], [94, 56]], es: [1, 1] }], p: [{ k: 'bar', x: 104, y: BAR }], sc: 0.6 };
   T.ringmu = Object.assign({}, T.mu, { p: [{ k: 'rings', top: -22 }] });
@@ -140,7 +155,7 @@
   T.doorrow = { k: [lineBodyR(152, 182, 200, [[166, 78], [162, 80]], { es: [1, 1], fc: 1 }), lineBodyR(152, 182, 188, [[166, 78], [162, 80]], { es: [1, 1], fc: 1 })], p: [{ k: 'door', x: 172 }] };
   T.dbrow = { k: [{ hip: [80, 104], t: 100, f: [[96, 182], [74, 182]], h: [[128, 156], [150, 122]], es: [1, 1] }, { hip: [80, 104], t: 100, f: [[96, 182], [74, 182]], h: [[104, 116], [150, 122]], es: [1, 1] }], p: [{ k: 'bench', x1: 132, y1: 126, x2: 196, y2: 126 }, { k: 'db', h: [0] }] };
   T.bentrow = (eq) => ({ k: [{ hip: [84, 102], t: 112, f: [[104, 182], [96, 182]], h: [[126, 150], [122, 150]] }, { hip: [84, 102], t: 112, f: [[104, 182], [96, 182]], h: [[104, 116], [100, 116]], es: [1, 1] }], p: [eqProp(eq)] });
-  T.chestrow = { k: [{ hip: [70, 128], t: 130, f: [[48, 182], [56, 182]], ks: [1, 1], h: [[128, 160], [124, 160]] }, { hip: [70, 128], t: 130, f: [[48, 182], [56, 182]], ks: [1, 1], h: [[100, 118], [96, 118]], es: [1, 1] }], p: [{ k: 'bench', x1: 60, y1: 140, x2: 124, y2: 92 }, { k: 'db', h: [0, 1] }] };
+  T.chestrow = { k: [{ hip: [70, 128], t: 130, f: [[14, 182], [22, 182]], tp: [1, 1], h: [[128, 160], [124, 160]], rw: 1 }, { hip: [70, 128], t: 130, f: [[14, 182], [22, 182]], tp: [1, 1], h: [[100, 118], [96, 118]], rw: 1 }], p: [{ k: 'bench', x1: 60, y1: 140, x2: 124, y2: 92 }, { k: 'db', h: [0, 1] }] };
   T.seatedrow = { k: [{ rw: 1, hip: [70, 160], t: 160, f: [[152, 172], [150, 175]], ks: [1, 1], h: [[150, 120], [146, 120]] }, { rw: 1, hip: [70, 160], t: 186, f: [[152, 172], [150, 175]], ks: [1, 1], h: [[100, 136], [96, 136]], es: [1, 1] }], p: [{ k: 'cable', from: [200, 128] }, { k: 'box', x: 40, y: 164, w: 50 }] };
   T.machinerow = { k: [{ rw: 1, hip: [70, 150], t: 175, f: [[118, 182], [112, 182]], h: [[140, 102], [136, 102]] }, { rw: 1, hip: [70, 150], t: 180, f: [[118, 182], [112, 182]], h: [[92, 106], [88, 106]], es: [1, 1] }], p: [{ k: 'seat', x: 70, y: 152, pad: [110, 96] }] };
   T.highrow = { k: [kneel({ rw: 1, t: 176, h: [[160, 50], [156, 50]] }), kneel({ rw: 1, t: 184, h: [[120, 80], [116, 80]], es: [1, 1] })], p: [{ k: 'cable', from: [205, 10] }] };
@@ -162,6 +177,13 @@
 
   // Drücken
   T.pushup = { k: [plank(140, 182, 16, 181), plank(140, 182, 16, 181, true)], p: [] };
+  // Knie-Liegestütz: Knie bleiben am Boden (Drehpunkt), Unterschenkel liegen hinten, Füße leicht angehoben (3.14.5)
+  function kneePush(kx, ky, shY, hx, hy) {
+    const R = L.T + L.TH - 1, dy = shY - ky, dx = Math.sqrt(Math.max(0, R * R - dy * dy)), u = [dx / R, dy / R];
+    const hip = [kx + u[0] * (L.TH - 1), ky + u[1] * (L.TH - 1)], t = Math.atan2(u[0], u[1]) * 180 / Math.PI;
+    return { hip, t, h: [[hx, hy], [hx - 4, hy]], l: [[t + 180, -100], [t + 180, -98]], es: [1, 1], tp: [1, 1] };
+  }
+  T.kneepush = { k: [kneePush(62, 180, 125, 140, 182), kneePush(62, 180, 158, 140, 182)], p: [] };
   T.inclinepu = { k: [plank(140, 134, 30, 182), plank(140, 134, 30, 182, true)], p: [{ k: 'box', x: 122, y: 134, w: 60 }] };
   T.declinepu = { k: [plank(150, 182, 22, 136), plank(150, 182, 22, 136, true)], p: [{ k: 'box', x: 0, y: 140, w: 40 }] };
   T.ringpu = { k: [plank(140, 172, 16, 181), plank(140, 172, 16, 181, true)], p: [{ k: 'rings', top: -22 }] };
@@ -233,6 +255,10 @@
   // Rumpf
   T.plank = { k: [{ hip: [96, 160], t: 100, f: [[16, 180], [20, 180]], a: [[0, 90], [0, 90]], ks: [1, 1] }, { hip: [96, 158], t: 101, f: [[16, 180], [20, 180]], a: [[0, 90], [0, 90]], ks: [1, 1] }], p: [] };
   T.sideplank = { k: [{ fr: 1, hip: [92, 150], t: 112, a: [[0, 90], [180, 180]], f: [[18, 182], [22, 176]], ks: [1, 1] }, { fr: 1, hip: [92, 144], t: 110, a: [[0, 90], [180, 180]], f: [[18, 182], [22, 176]], ks: [1, 1] }], p: [] };
+  // Crunch: Rückenlage, Knie angewinkelt, Füße flach am Boden, Oberkörper rollt ein (3.14.5)
+  T.crunch = { k: [{ hip: [110, 177], t: -90, f: [[160, 182], [156, 182]], h: [[70, 156], [68, 158]] }, { hip: [110, 177], t: -118, f: [[160, 182], [156, 182]], h: [[86, 140], [84, 142]] }], p: [] };
+  // Bauchlage-Rudern: flach auf hoher Bank, Beine gestreckt, Arme hängen und ziehen zur Hüfte (3.14.5)
+  T.sealrow = { k: [{ hip: [78, 108], t: 90, f: [[-2, 109], [2, 109]], tp: [1, 1], h: [[128, 166], [124, 166]], rw: 1 }, { hip: [78, 108], t: 90, f: [[-2, 109], [2, 109]], tp: [1, 1], h: [[104, 122], [100, 122]], rw: 1 }], p: [{ k: 'bench', x1: -6, y1: 119, x2: 150, y2: 119 }, { k: 'db', h: [0, 1] }] };
   T.hollow = { k: [{ hip: [110, 174], t: -80, f: [[190, 160], [188, 162]], h: [[10, 150], [12, 152]], ks: [1, 1], tp: [1, 1] }, { hip: [110, 174], t: -82, f: [[190, 156], [188, 158]], h: [[10, 146], [12, 148]], ks: [1, 1], tp: [1, 1] }], p: [] };
   T.deadbug = { k: [{ hip: [110, 178], t: -90, f: [[150, 136], [146, 138]], h: [[62, 118], [58, 118]], ks: [1, 1] }, { hip: [110, 178], t: -90, f: [[190, 170], [146, 138]], h: [[62, 118], [8, 170]], ks: [1, 1] }], p: [] };
   T.dragon = { k: [{ hip: [90, 108], t: -30, f: [[140, 40], [138, 42]], h: [[34, 148], [30, 148]], tp: [1, 1] }, { hip: [104, 132], t: -62, f: [[182, 106], [180, 108]], h: [[34, 148], [30, 148]], tp: [1, 1] }], p: [{ k: 'bench', x1: 24, y1: 158, x2: 120, y2: 158 }] };
@@ -301,9 +327,9 @@
     'burpees': 'burpee', 'mountain': 'climber', 'db-thruster': 'thruster', 'swing-int': 'swing', 'jump-squat': 'jump',
     // Erweiterung 3.6
     'neutral-pulldown': 'latpd', 'wide-pullup': 'pullup', 'neutral-pullup': 'pullup', 'active-hang': 'scap',
-    'tbar-row': ['bentrow', 'bb'], 'pendlay-row': ['bentrow', 'bb'], 'cable-row-1arm': 'seatedrow', 'seal-row': 'chestrow', 'wide-cable-row': 'seatedrow',
+    'tbar-row': ['bentrow', 'bb'], 'pendlay-row': ['bentrow', 'bb'], 'cable-row-1arm': 'seatedrow', 'seal-row': 'sealrow', 'wide-cable-row': 'seatedrow',
     'seated-db-press': ['press', 'db'], 'landmine-press': ['press', 'db1'], 'push-press': ['press', 'bb'],
-    'wall-pushup': 'inclinepu', 'knee-pushup': 'pushup', 'deficit-pushup': 'pushup', 'cable-press': 'cflyF', 'incline-machine': 'chestpress', 'db-squeeze-press': ['bench', 'db'],
+    'wall-pushup': 'inclinepu', 'knee-pushup': 'kneepush', 'deficit-pushup': 'pushup', 'cable-press': 'cflyF', 'incline-machine': 'chestpress', 'db-squeeze-press': ['bench', 'db'],
     'machine-dip': ['dip', 'post'], 'straight-bar-dip': ['dip', 'post'], 'incline-db-fly': ['fly', 'db'], 'cable-fly-low': 'cflyF',
     'db-lateral-seated': ['latF', 'db'], 'db-upright-row': ['latF', 'db'], 'db-rear-row': 'chestrow', 'ytw-raise': ['revflyFB', 'db'],
     'cable-curl': 'cablecurl', 'bb-curl': ['curl', 'bb'], 'spider-curl': 'preacher', 'db-preacher': 'preacher', 'cross-hammer': ['curl', 'db'],
@@ -313,7 +339,7 @@
     'good-morning': ['rdl', 'bb'], 'cable-pull-through': 'swing', 'sumo-dl': 'deadlift', 'db-sumo-dl': 'deadlift',
     'frog-pump': 'bridge', 'db-glute-bridge': 'bridge', 'machine-hip-thrust': ['hipthrust', 'bb'], 'cable-abduction': 'abduct', 'cable-glute-kick': ['slrdl', null],
     'seated-leg-curl': 'legcurl', 'db-leg-curl': 'legcurl', 'seated-calf': ['calf', null], 'db-calf': ['calf', 'db1'], 'leg-press-calf': ['calf', null],
-    'pallof': 'woodchop', 'reverse-crunch': 'deadbug', 'crunch': 'hollow', 'bird-dog': 'plank', 'side-plank-hip': 'sideplank', 'copenhagen': 'sideplank', 'hanging-oblique': 'knee', 'v-up': 'hollow', 'plank-tap': 'plank',
+    'pallof': 'woodchop', 'reverse-crunch': 'deadbug', 'crunch': 'crunch', 'bird-dog': 'plank', 'side-plank-hip': 'sideplank', 'copenhagen': 'sideplank', 'hanging-oblique': 'knee', 'v-up': 'hollow', 'plank-tap': 'plank',
     'jumping-jacks': 'jump', 'high-knees': 'jump', 'skater-jumps': 'jump', 'db-snatch': 'thruster', 'bear-crawl': 'climber',
     'crow': 'tuckplanche', 'chest-wall-hs': 'wallhs'
   };
