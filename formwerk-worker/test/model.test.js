@@ -66,7 +66,7 @@ await t('Empfehlung: grün an Samstag → Kraft voll', () => {
   assert.equal(r.level, 'full'); assert.equal(r.title, 'Kraft voll');
 });
 await t('Empfehlung: grün an Baseball-Dienstag → höchstens leicht', () => {
-  const r = recommend({ date: '2026-11-10', rec: { color: 'green', hasData: true }, muscles: fresh, sessions: [], ratio: null, sleepPart: { ofNeed: 100 }, now: Date.now() });
+  const r = recommend({ date: '2026-11-10', rec: { color: 'green', hasData: true }, muscles: fresh, sessions: [], ratio: null, sleepPart: { ofNeed: 100 }, settings: { sportDays: [1, 3] }, now: Date.now() });
   assert.equal(r.level, 'light'); assert.ok(r.sportToday); assert.ok(!r.good.includes('vorn'));
 });
 await t('Empfehlung: rot → Pause; Training heute → erledigt', () => {
@@ -177,12 +177,16 @@ await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, H
   assert.ok(!j.recommendation.good.includes('Schultern'));
   assert.ok(j.recommendation.notes.some(n => /abklären/.test(n)), 'Hinweis abklären');
   assert.ok(j.body.insights.items.some(x => x.kind === 'pain' && x.k === 'schulter'));
-  assert.equal(j.body.insights.strengthDays.days.length, 2); assert.ok(!j.body.insights.strengthDays.days.includes('Di'));
+  assert.equal(j.body.insights.strengthDays.days.length, 2);
   const t2 = await (await call('/v1/today')).json(); assert.equal(t2.pain[0].inj, 'shoulder'); assert.equal(t2.checkin, true);
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, pain: { knie: 3 } }) });
   j = await (await call('/v1/summary')).json(); assert.equal(j.recommendation.level, j.recommendation.level === 'done' ? 'done' : 'rest');
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d }) });
   const y = addDays(d, 5); // Baseball-Frage allein zählt nicht als Check
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, bbOnly: true, bbToday: true }) });
+  let jj = await (await call('/v1/summary')).json(); assert.ok(jj.recommendation.sportToday, 'Heute Baseball wirkt'); assert.ok(jj.recommendation.level !== 'full');
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, bbOnly: true, bbToday: false }) });
+  jj = await (await call('/v1/summary')).json(); assert.ok(!jj.recommendation.sportToday);
   const o = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -10), bbOnly: true, bb: true }) })).json(); assert.equal(o.checkin.partial, true);
 });
 await t('Worker: Rohdaten-Test', async () => { const j = await (await call('/v1/raw?days=7')).json(); assert.ok(Object.keys(j.parsed).length >= 7); assert.ok(j.calls['HRV Zeitraum'].ok); });

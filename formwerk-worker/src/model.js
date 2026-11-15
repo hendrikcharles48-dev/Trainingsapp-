@@ -240,7 +240,8 @@ export function muscleFatigue(sessions, acts, now, calib) {
    Abzüge um eine Stufe: Schlaf < 75 % des Bedarfs, Belastungsquote > 1,5.
    Wochenziel erreicht → Kraft wird „optional“. Tag vor Baseball → keine schweren Beine/Überkopf.
    ===================================================================== */
-export const DEFAULT_SETTINGS = { sportDays: [1, 3], strengthPerWeek: 2 };
+// Baseball-Tage: Standard keine (unregelmäßig) – gespielt wird per Schalter „Heute/Gestern Baseball“ oder Uhr-Aktivität
+export const DEFAULT_SETTINGS = { sportDays: [], strengthPerWeek: 2 };
 
 export function recommend({ date, rec, muscles, sessions, ratio, sleepPart, settings, now }) {
   const S = Object.assign({}, DEFAULT_SETTINGS, settings || {});
@@ -334,10 +335,12 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const sleep = sleepView(days, today);
   const ratio = loadRatio(loadBy, today);
   const sleepPart = rec.parts.find(p => p.k === 'sleep');
-  const recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings, now }), pain, muscles);
+  const ckT = ckBy[today] || {};
+  const S2 = Object.assign({}, S, { sportDays: ckT.bbToday ? [...new Set(S.sportDays.concat(weekday(today)))] : ckT.bbToday === false ? S.sportDays.filter(x => x !== weekday(today)) : S.sportDays });
+  const recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings: S2, now }), pain, muscles);
   const ydSport = S.sportDays.includes(weekday(addDays(today, -1)));
   const ydBaseball = (allActs[addDays(today, -1)] || []).some(a => sportKind(a.type, a.name) === 'baseball');
-  const body = { checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: ydSport && !ydBaseball && !(ckBy[today] && ckBy[today].bb != null), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
+  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: ydSport && !ydBaseball && !(ckBy[today] && ckBy[today].bb != null), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
   for (let k = histDays - 1; k >= 0; k--) {
@@ -440,9 +443,13 @@ const TIPS = {
 // Baseball aus dem Check-in („gestern Baseball? ja“), wenn Garmin dafür keine Aktivität hat: 2 h mittlere Intensität
 export function withCheckinBaseball(actsByDate, ckBy, hr, tzOff = 0) {
   const out = Object.assign({}, actsByDate);
+  const plays = [];
   for (const c of Object.values(ckBy)) {
-    if (c.bb !== true) continue;
-    const y = addDays(c.date, -1);
+    if (c.bb === true) plays.push(addDays(c.date, -1));
+    // „Heute Baseball“ angetippt: zählt ab abends für diesen Tag, außer am nächsten Morgen „gestern nein“
+    if (c.bbToday === true && !(ckBy[addDays(c.date, 1)] && ckBy[addDays(c.date, 1)].bb === false)) plays.push(c.date);
+  }
+  for (const y of [...new Set(plays)]) {
     if ((out[y] || []).some(a => sportKind(a.type, a.name) === 'baseball')) continue;
     out[y] = (out[y] || []).concat([{ id: 'ck-' + y, date: y, time: '18:30', name: 'Baseball (laut Check-in)', type: 'baseball', dur: 7200, avgHr: null, assumed: true, trimp: 180, ts: Date.parse(y + 'T18:30:00Z') - tzOff }]);
   }
