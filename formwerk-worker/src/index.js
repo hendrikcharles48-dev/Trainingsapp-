@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.6.0';
+export const WORKER_VERSION = '1.7.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -102,6 +102,8 @@ export class FormwerkStore {
       if (p === '/v1/weight') return json({ weights: await this.weights() });
       if (p === '/v1/backup/satzwerk' && req.method === 'PUT') return json(await this.putBackup('satzwerk', await req.text()));
       if (p === '/v1/backup/satzwerk') return this.getBackup('satzwerk');
+      if (p === '/v1/coach' && (req.method === 'PUT' || req.method === 'POST')) return json(await this.putCoach(await req.text()));
+      if (p === '/v1/coach') return json({ coach: (await this.st.get('coach')) || null, prev: (await this.st.get('coachPrev')) || null });
       if (p === '/v1/refetch' && req.method === 'POST') { const m = await this.meta(); m.backfilled = false; m.lastFetch = 0; await this.st.put('meta', m); await this.refresh('force'); return json({ ok: true, meta: await this.meta() }); }
       return json({ error: 'not_found' }, 404);
     } catch (e) {
@@ -268,6 +270,15 @@ export class FormwerkStore {
   }
 
   /* ----- Sicherung von Satzwerk (Export-JSON, in Stücken; die vorige Fassung bleibt erhalten) ----- */
+  // Wochenbericht von Claude (Satzwerk zeigt ihn an, nichts wird automatisch geändert). Vorige Fassung bleibt.
+  async putCoach(text) {
+    if (!text || text.length > 64000) return { ok: false, error: 'Bericht leer oder zu groß' };
+    let j; try { j = JSON.parse(text); } catch (e) { return { ok: false, error: 'Kein gültiges JSON' }; }
+    if (!j || j.v !== 1 || typeof j.id !== 'string' || typeof j.title !== 'string') return { ok: false, error: 'Kein Wochenbericht (v 1, id, title)' };
+    const old = await this.st.get('coach'); if (old && old.id !== j.id) await this.st.put('coachPrev', old);
+    j.stored = Date.now(); await this.st.put('coach', j);
+    return { ok: true, id: j.id, stored: j.stored };
+  }
   async putBackup(app, text) {
     if (!text || text.length > 12e6) return { ok: false, error: 'Sicherung leer oder zu groß' };
     try { const j = JSON.parse(text); if (!j || j.app !== app) return { ok: false, error: 'Keine ' + app + '-Sicherung' }; } catch (e) { return { ok: false, error: 'Kein gültiges JSON' }; }
