@@ -2,9 +2,9 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
-  const DEFAULT_URL = '';
+  const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
   /* ---------- Speicher ---------- */
   const LS = {

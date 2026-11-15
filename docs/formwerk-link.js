@@ -8,6 +8,7 @@
   'use strict';
   const K = { cfg: 'satzwerk.formwerk', sync: 'satzwerk.formwerkSync', today: 'satzwerk.formwerkToday' };
   const WINDOW_DAYS = 45;
+  const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev'; // Adresse des Formwerk-Workers (kein Geheimnis)
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
   const set = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -99,7 +100,7 @@
       <div class="small muted">Satzwerk schickt jede beendete Einheit an Formwerk und zeigt hier die heutige Erholung. Am Plan ändert sich nichts.</div></div>
       ${today ? `<div class="card" style="border:1px solid var(--line)"><div class="eyebrow">Heute</div><b style="font-size:20px">${esc(today.recommendation.title)}</b><div class="small muted">Erholung ${today.recovery.building ? 'wird aufgebaut' : today.recovery.score == null ? '–' : today.recovery.score + ' %'}${today.recommendation.week ? ' · Kraft diese Woche ' + today.recommendation.week.done + '/' + today.recommendation.week.goal : ''}</div>
         <div class="small" style="margin-top:6px">${esc(today.recommendation.text || '')}</div>${(today.recommendation.notes || []).map(n => `<div class="small muted" style="margin-top:4px">· ${esc(n)}</div>`).join('')}</div>` : ''}
-      <div><label class="lbl" for="fw-url">Worker-Adresse</label><input class="field" id="fw-url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://formwerk.….workers.dev" value="${esc(c.url || '')}"></div>
+      <div><label class="lbl" for="fw-url">Worker-Adresse</label><input class="field" id="fw-url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://formwerk.….workers.dev" value="${esc(c.url || DEFAULT_URL)}"></div>
       <div><label class="lbl" for="fw-pw">App-Passwort</label><input class="field" id="fw-pw" type="password" autocomplete="current-password" value="${esc(c.pw || '')}"></div>
       <div class="small" id="fw-msg" style="min-height:20px;color:var(--muted)">${esc(msg || (cfg() ? 'Zuletzt abgeglichen: ' + ago(S.last) + (S.err ? ' · Fehler: ' + S.err : '') : 'Noch nicht verbunden.'))}</div>
       <button class="btn primary" data-fw="save">${cfg() ? 'Speichern & abgleichen' : 'Verbinden'}</button>
