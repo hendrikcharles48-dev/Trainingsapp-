@@ -210,3 +210,11 @@ h3 { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: u
 .ckchip.on { border-color: var(--accent); background: var(--navy); }
 .ckchip.on span { color: var(--highlight); font-weight: 700; }
 .ckchip.lv2 { border-color: var(--yellow); } .ckchip.lv3 { border-color: var(--red); }
+
+/* Morgen-Check erledigt: kompakt */
+.card.ckdone { padding: 6px 14px 10px; }
+.ckline { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; text-align: left; }
+.ckok { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; background: rgba(127, 191, 154, .16); color: var(--green); display: flex; align-items: center; justify-content: center; }
+.ckpills { display: flex; gap: 6px; }
+.ckpill { min-height: 36px; padding: 0 12px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--muted); }
+.ckpill.on { background: var(--navy); border-color: var(--accent); color: var(--highlight); }
