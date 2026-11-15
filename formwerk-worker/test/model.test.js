@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -90,6 +90,20 @@ await t('Normalisieren: bekannte Garmin-Formen', () => {
   assert.equal(a.date, '2026-11-12'); assert.equal(a.type, 'baseball'); assert.deepEqual(a.zones, [1000, 2000, 0, 0, 0]);
 });
 
+await t('Lernen: wer länger Muskelkater hat, bekommt einen höheren Faktor', () => {
+  const today = '2026-11-14'; const sessions = [], checkins = [];
+  for (let w = 0; w < 8; w++) {
+    const d = addDays(today, -7 * w - 3);
+    sessions.push({ id: 's' + w, date: d, end: Date.parse(d + 'T18:00:00Z'), exercises: [{ muscles: { primary: ['quads'], secondary: [] }, sets: Array(3).fill({ rir: 1 }) }] });
+    checkins.push({ date: addDays(d, 2), sore: { vorn: 2 } }); // zwei Tage später noch starker Muskelkater
+  }
+  const c = calibrate({ sessions, allActs: {}, checkins, today, hr: { rest: 50, max: 190 } });
+  assert.ok(c.groups.vorn.s > 1.2, 'Faktor ' + JSON.stringify(c.groups.vorn));
+  const base = muscleFatigue(sessions.slice(0, 1), [], Date.parse(addDays(today, -1) + 'T08:00:00Z'));
+  const cal = muscleFatigue(sessions.slice(0, 1), [], Date.parse(addDays(today, -1) + 'T08:00:00Z'), c.groups);
+  assert.ok(cal.find(m => m.k === 'vorn').pct > base.find(m => m.k === 'vorn').pct);
+});
+
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */
 installFakeGarmin();
 const storage = new FakeStorage();
@@ -151,6 +165,25 @@ await t('Worker: Satzwerk-Sicherung speichern und laden (große Datei, vorige bl
   await call('/v1/backup/satzwerk', { method: 'PUT', body: small });
   assert.equal(await (await call('/v1/backup/satzwerk')).text(), small);
   const wrong = await (await call('/v1/backup/satzwerk', { method: 'PUT', body: '{"app":"kochwerk"}' })).json(); assert.equal(wrong.ok, false);
+});
+await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, Hinweis bei anhaltendem Schmerz', async () => {
+  const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(Date.now());
+  for (let i = 3; i >= 1; i--) await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -i), pain: { schulter: 1 } }) });
+  const r = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, sore: { vorn: 2, xyz: 2 }, pain: { schulter: 2 }, bb: true }) })).json();
+  assert.deepEqual(r.checkin.sore, { vorn: 2 });
+  let j = await (await call('/v1/summary')).json();
+  assert.equal(j.muscles.find(m => m.k === 'vorn').status, 'tired');
+  assert.equal(j.muscles.find(m => m.k === 'schultern').pain, 2);
+  assert.ok(!j.recommendation.good.includes('Schultern'));
+  assert.ok(j.recommendation.notes.some(n => /abklären/.test(n)), 'Hinweis abklären');
+  assert.ok(j.body.insights.items.some(x => x.kind === 'pain' && x.k === 'schulter'));
+  assert.equal(j.body.insights.strengthDays.days.length, 2); assert.ok(!j.body.insights.strengthDays.days.includes('Di'));
+  const t2 = await (await call('/v1/today')).json(); assert.equal(t2.pain[0].inj, 'shoulder'); assert.equal(t2.checkin, true);
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, pain: { knie: 3 } }) });
+  j = await (await call('/v1/summary')).json(); assert.equal(j.recommendation.level, j.recommendation.level === 'done' ? 'done' : 'rest');
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d }) });
+  const y = addDays(d, 5); // Baseball-Frage allein zählt nicht als Check
+  const o = await (await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -10), bbOnly: true, bb: true }) })).json(); assert.equal(o.checkin.partial, true);
 });
 await t('Worker: Rohdaten-Test', async () => { const j = await (await call('/v1/raw?days=7')).json(); assert.ok(Object.keys(j.parsed).length >= 7); assert.ok(j.calls['HRV Zeitraum'].ok); });
 await t('Worker: Einstellungen', async () => { const j = await (await call('/v1/settings', { method: 'PUT', body: JSON.stringify({ sportDays: [1, 3, 9], strengthPerWeek: 3 }) })).json(); assert.deepEqual(j.sportDays, [1, 3]); assert.equal(j.strengthPerWeek, 3); });

@@ -2,7 +2,7 @@
 // Reine Funktionen ohne Netz/Speicher – getestet in test/model.test.js.
 // Alles relativ zur EIGENEN Basis (gleitender Durchschnitt), nie zu Normwerten. Trainingshilfe, keine Medizin.
 
-export const MODEL_VERSION = 1;
+export const MODEL_VERSION = 2;
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
@@ -193,32 +193,37 @@ export function sportKind(type, name) {
 }
 
 // sessions: Satzwerk-Einheiten (Format siehe SCHNITTSTELLE.md), acts: Garmin-Aktivitäten mit {ts, type, name, dur, trimp}
-export function muscleFatigue(sessions, acts, now) {
-  const f = {}; const last = {};
-  const add = (m, v, ts) => { const h = (now - ts) / 3600e3; if (h < 0 || !TAU[m]) return; f[m] = (f[m] || 0) + v * Math.exp(-h / TAU[m]); if (!last[m] || ts > last[m]) last[m] = ts; };
+// calib (Stufe 2, gelernt): {gruppe: {s: Faktor Kraft, b: Faktor Baseball/Sport}} – fehlt er, gilt 1.
+// Ergebnis je Gruppe: pct (kalibriert), raw = {s, b} ungekalibrierte Anteile in % (für das Lernen)
+export function muscleFatigue(sessions, acts, now, calib) {
+  const fS = {}, fB = {}; const last = {};
+  const add = (bag, m, v, ts) => { const h = (now - ts) / 3600e3; if (h < 0 || !TAU[m]) return; bag[m] = (bag[m] || 0) + v * Math.exp(-h / TAU[m]); if (!last[m] || ts > last[m]) last[m] = ts; };
   for (const s of sessions || []) {
     const ts = s.end || s.start || Date.parse(s.date + 'T18:00:00');
     for (const ex of s.exercises || []) {
       const prim = (ex.muscles && ex.muscles.primary) || [], sec = (ex.muscles && ex.muscles.secondary) || [];
       for (const set of ex.sets || []) {
         const e = effort(set.rir);
-        for (const m of prim) add(m, e, ts);
-        for (const m of sec) add(m, e * 0.5, ts);
+        for (const m of prim) add(fS, m, e, ts);
+        for (const m of sec) add(fS, m, e * 0.5, ts);
       }
     }
   }
   for (const a of acts || []) {
     const kind = sportKind(a.type, a.name); if (!kind || !a.ts) continue;
     const intensity = clamp((a.trimp || a.dur / 60 * 1.5) / Math.max(1, a.dur / 60) / 2.5, 0.4, 1.4);
-    for (const [m, v] of Object.entries(SPORT[kind])) add(m, v * a.dur / 3600 * intensity, a.ts + a.dur * 1000);
+    for (const [m, v] of Object.entries(SPORT[kind])) add(fB, m, v * a.dur / 3600 * intensity, a.ts + a.dur * 1000);
   }
-  const pct = m => clamp(Math.round((f[m] || 0) / FULL_SETS * 100), 0, 100);
+  const P = v => (v || 0) / FULL_SETS * 100;
   return GROUPS.map(g => {
-    const p = Math.max(...g.m.map(pct));
+    const c = (calib && calib[g.k]) || {}; const cs = c.s || 1, cb = c.b || 1;
+    const per = g.m.map(m => ({ m, s: P(fS[m]), b: P(fB[m]), v: P(fS[m]) * cs + P(fB[m]) * cb }));
+    const top = per.reduce((x, y) => (y.v > x.v ? y : x), per[0]);
+    const p = clamp(Math.round(top.v), 0, 100);
     const lastTs = Math.max(0, ...g.m.map(m => last[m] || 0));
     // Stunden bis „erholt“ (< 25 %) für den langsamsten Muskel der Gruppe
-    const hrs = Math.max(0, ...g.m.map(m => { const v = (f[m] || 0) / FULL_SETS * 100; return v > 25 ? TAU[m] * Math.log(v / 25) : 0; }));
-    return { k: g.k, label: g.label, pct: p, status: p >= 55 ? 'tired' : p >= 25 ? 'partial' : 'fresh', last: lastTs || null, readyIn: Math.round(hrs) };
+    const hrs = Math.max(0, ...per.map(x => (x.v > 25 ? TAU[x.m] * Math.log(x.v / 25) : 0)));
+    return { k: g.k, label: g.label, pct: p, status: p >= 55 ? 'tired' : p >= 25 ? 'partial' : 'fresh', last: lastTs || null, readyIn: Math.round(hrs), raw: { s: round(top.s, 1), b: round(top.b, 1) } };
   });
 }
 
@@ -304,7 +309,7 @@ export function sleepView(days, date) {
    GESAMT: alles für die App in einem Rutsch
    ===================================================================== */
 // days: {iso: Tageswerte}, actsByDate: {iso: [Aktivität]}, sessions: [Satzwerk-Einheit], hr: {rest, max}
-export function buildSummary({ days, actsByDate, sessions, settings, today, now, hr, tzOff = 0, histDays = 90, manualWeights = [] }) {
+export function buildSummary({ days, actsByDate, sessions, settings, today, now, hr, tzOff = 0, histDays = 90, manualWeights = [], checkins = [] }) {
   const weight = weightView(days, manualWeights, today);
   const kgBy = Object.fromEntries(weight.series.map(x => [x.date, x.kg]));
   const hrv = hr || estimateHr(days, actsByDate);
@@ -317,13 +322,22 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   // Muskeln: Satzwerk + Sport-Aktivitäten der letzten 7 Tage
   const recentActs = [];
   for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of actsByDate[d] || []) recentActs.push(Object.assign({}, a, { trimp: activityTrimp(a, hrv), ts: Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })); }
+  const S = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+  const ckBy = Object.fromEntries((checkins || []).map(c => [c.date, c]));
+  const allActs = withCheckinBaseball(actsByDate, ckBy, hrv, tzOff);
+  for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of allActs[d] || []) if (a.assumed) recentActs.push(a); }
+  const calib = calibrate({ sessions, allActs, checkins, today, tzOff, hr: hrv });
   const recentS = (sessions || []).filter(s => s.date >= addDays(today, -10));
-  const muscles = muscleFatigue(recentS, recentActs, now);
+  const muscles = applySoreness(muscleFatigue(recentS, recentActs, now, calib.groups), ckBy[today]);
+  const pain = painToday(ckBy, today);
   const rec = recovery(days, today);
   const sleep = sleepView(days, today);
   const ratio = loadRatio(loadBy, today);
   const sleepPart = rec.parts.find(p => p.k === 'sleep');
-  const recommendation = recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings, now });
+  const recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings, now }), pain, muscles);
+  const ydSport = S.sportDays.includes(weekday(addDays(today, -1)));
+  const ydBaseball = (allActs[addDays(today, -1)] || []).some(a => sportKind(a.type, a.name) === 'baseball');
+  const body = { checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: ydSport && !ydBaseball && !(ckBy[today] && ckBy[today].bb != null), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
   for (let k = histDays - 1; k >= 0; k--) {
@@ -348,6 +362,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
     bodyBattery: { high: t.bbHigh ?? null, low: t.bbLow ?? null, now: t.bbNow ?? null, wake: t.bbWake ?? null, charged: t.bbCharged ?? null, drained: t.bbDrained ?? null, curve: t.bbCurve || [] },
     vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null },
     weight,
+    body,
     strength: { last: (sessions || []).filter(s => s.date <= today).sort((a, c) => (c.end || 0) - (a.end || 0))[0] || null },
     history
   };
@@ -376,4 +391,163 @@ export function weightView(days, manual, today) {
   const avg = (from, to) => { const v = series.filter(x => x.date > from && x.date <= to).map(x => x.kg); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const a = avg(addDays(today, -7), today), b = avg(addDays(today, -14), addDays(today, -7));
   return { latest: series[series.length - 1] || null, series, trend: a && b ? { pct: round((a / b - 1) * 100, 2), a: round(a, 1), b: round(b, 1) } : null };
+}
+
+/* =====================================================================
+   7) KÖRPERGEFÜHL: MUSKELKATER UND SCHMERZ (Morgen-Check)
+   ---------------------------------------------------------------------
+   Check-in je Tag: {date, sore: {gruppe: 1 leicht | 2 stark}, pain: {stelle: 1–3}, bb: Baseball gestern ja/nein}
+   Stufe 1 – heute: Muskelkater hebt eine Gruppe mindestens auf „teilweise“ (leicht, 40 %) bzw. „ermüdet“ (stark, 75 %).
+     Schmerz ist kein Muskelkater: die betroffenen Gruppen werden geschont, bei Stärke 3 heute keine Kraft,
+     an 3 von 5 Tagen → Hinweis „abklären lassen“. Keine Diagnose.
+   Stufe 2 – lernen: An Check-in-Tagen wird die Rechnung (morgens 8 Uhr) mit deiner Angabe verglichen
+     (kein = 10 %, leicht = 40 %, stark = 75 %). Daraus je Gruppe ein Faktor für Kraft- bzw. Baseball-Ermüdung,
+     vorsichtig zur 1 hin gezogen (n/(n+6)), 0,6–1,8, wirksam ab 4 passenden Tagen.
+   Stufe 3 – Muster (6 Wochen): wiederkehrende Beschwerden, Zusammenhang mit Baseball, gute Kraft-Tage.
+   ===================================================================== */
+export const PAIN_AREAS = [
+  { k: 'nacken', label: 'Nacken', groups: ['schultern'] },
+  { k: 'schulter', label: 'Schulter', groups: ['schultern', 'brust'], inj: 'shoulder' },
+  { k: 'ellbogen', label: 'Ellbogen', groups: ['bizeps', 'trizeps', 'griff'], inj: 'elbow' },
+  { k: 'handgelenk', label: 'Handgelenk', groups: ['griff'], inj: 'wrist' },
+  { k: 'oberer_ruecken', label: 'Oberer Rücken', groups: ['ruecken'] },
+  { k: 'unterer_ruecken', label: 'Unterer Rücken', groups: ['rumpf', 'hinten'], inj: 'lowback' },
+  { k: 'huefte', label: 'Hüfte', groups: ['hinten', 'vorn'] },
+  { k: 'leiste', label: 'Leiste', groups: ['vorn', 'hinten'] },
+  { k: 'oberschenkel', label: 'Oberschenkel hinten', groups: ['hinten'] },
+  { k: 'knie', label: 'Knie', groups: ['vorn'], inj: 'knee' },
+  { k: 'sprunggelenk', label: 'Sprunggelenk', groups: ['waden'] },
+  { k: 'achilles', label: 'Achillessehne / Wade', groups: ['waden'] }
+];
+const AREA = Object.fromEntries(PAIN_AREAS.map(a => [a.k, a]));
+const GLABEL = Object.fromEntries(GROUPS.map(g => [g.k, g.label]));
+const SORE_PCT = [10, 40, 75];
+const TIPS = {
+  schulter: 'Schulter-Vorbeugung 2× pro Woche (Außenrotation mit Band, Face Pulls); Überkopf-Kraft nicht am Tag nach Baseball.',
+  ellbogen: 'Wurf- und Zugvolumen dosieren, Unterarme langsam kräftigen (Hängen, Handgelenk-Curls).',
+  handgelenk: 'Stütz-Übungen mit neutralem Griff oder Parallettes, Unterarme kräftigen.',
+  nacken: 'Schulterblätter kräftigen (Face Pulls), Nacken zwischendurch lockern.',
+  oberer_ruecken: 'Zugübungen sauber ausführen, Brustwirbelsäule mobilisieren.',
+  unterer_ruecken: 'Rumpf-Stabilität (Plank, Dead Bug); Hüftbeuge-Übungen sauber und nicht bis ans Limit.',
+  huefte: 'Hüftmobilität täglich ein paar Minuten, Po kräftigen; Sprints gut aufwärmen.',
+  leiste: 'Adduktoren behutsam kräftigen (leichte Copenhagen-Plank), Sprints gut aufwärmen.',
+  oberschenkel: 'Beinbeuger exzentrisch kräftigen (Nordic Curls) – nicht am Tag nach Baseball.',
+  knie: 'Kniebeugen-Tiefe und Gewicht anpassen, Oberschenkel vorn und Po kräftigen.',
+  sprunggelenk: 'Waden und Fußgelenk kräftigen, Sprünge dosieren.',
+  achilles: 'Waden exzentrisch kräftigen (langsam absenken), Sprünge dosieren.'
+};
+
+// Baseball aus dem Check-in („gestern Baseball? ja“), wenn Garmin dafür keine Aktivität hat: 2 h mittlere Intensität
+export function withCheckinBaseball(actsByDate, ckBy, hr, tzOff = 0) {
+  const out = Object.assign({}, actsByDate);
+  for (const c of Object.values(ckBy)) {
+    if (c.bb !== true) continue;
+    const y = addDays(c.date, -1);
+    if ((out[y] || []).some(a => sportKind(a.type, a.name) === 'baseball')) continue;
+    out[y] = (out[y] || []).concat([{ id: 'ck-' + y, date: y, time: '18:30', name: 'Baseball (laut Check-in)', type: 'baseball', dur: 7200, avgHr: null, assumed: true, trimp: 180, ts: Date.parse(y + 'T18:30:00Z') - tzOff }]);
+  }
+  return out;
+}
+
+export function applySoreness(muscles, ck) {
+  if (!ck) return muscles;
+  return muscles.map(m => {
+    const lv = (ck.sore || {})[m.k] || 0; const pn = Math.max(0, ...PAIN_AREAS.filter(a => a.groups.includes(m.k)).map(a => (ck.pain || {})[a.k] || 0));
+    const x = Object.assign({}, m, { sore: lv || 0, pain: pn || 0 });
+    if (lv === 2) x.pct = Math.max(x.pct, 75); else if (lv === 1) x.pct = Math.max(x.pct, 40);
+    if (pn >= 2) x.pct = Math.max(x.pct, 60); else if (pn === 1) x.pct = Math.max(x.pct, 30);
+    x.status = x.pct >= 55 ? 'tired' : x.pct >= 25 ? 'partial' : 'fresh';
+    return x;
+  });
+}
+
+export function painToday(ckBy, today) {
+  const ck = ckBy[today]; if (!ck || !ck.pain) return [];
+  return Object.entries(ck.pain).filter(([k, v]) => v > 0 && AREA[k]).map(([k, lvl]) => {
+    let days = 0; for (let i = 0; i < 5; i++) { const c = ckBy[addDays(today, -i)]; if (c && c.pain && c.pain[k] > 0) days++; }
+    return { k, label: AREA[k].label, lvl, inj: AREA[k].inj || null, days, groups: AREA[k].groups };
+  }).sort((a, b) => b.lvl - a.lvl);
+}
+
+export function applyPain(r, pain, muscles) {
+  if (!pain || !pain.length) return r;
+  const x = Object.assign({}, r, { notes: r.notes.slice() });
+  const hard = pain.filter(p => p.lvl >= 3);
+  if (hard.length && x.level !== 'done') { x.level = 'rest'; x.title = 'Pause'; x.text = `Starker Schmerz (${hard.map(p => p.label).join(', ')}): heute keine Kraft. Schonen, nur was schmerzfrei geht.`; x.good = []; }
+  for (const p of pain) {
+    x.notes.unshift(`${p.label} schmerzt (${p.lvl}/3): schonen – keine Übungen, die ${p.label === 'Nacken' ? 'den Nacken' : 'diese Stelle'} belasten.`);
+    if (p.days >= 3) x.notes.unshift(`${p.label} schmerzt seit ${p.days} von 5 Tagen – bitte abklären lassen (Arzt oder Physio).`);
+  }
+  const blocked = new Set(pain.flatMap(p => p.groups));
+  x.good = (x.good || []).filter(l => !muscles.some(m => m.label === l && blocked.has(m.k)));
+  return x;
+}
+
+// Stufe 2: Faktoren je Gruppe aus Check-ins der letzten 90 Tage
+export function calibrate({ sessions, allActs, checkins, today, tzOff = 0, hr }) {
+  const acc = {}; let used = 0;
+  const flatActs = Object.entries(allActs).flatMap(([d, list]) => (list || []).map(a => Object.assign({}, a, { trimp: a.trimp || activityTrimp(a, hr), ts: a.ts || Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })));
+  for (const c of checkins || []) {
+    if (!c || c.partial || c.date > today || c.date < addDays(today, -90)) continue;
+    const t = Date.parse(c.date + 'T08:00:00Z') - tzOff;
+    const ses = (sessions || []).filter(s => s.date >= addDays(c.date, -10) && s.date <= c.date);
+    const ac = flatActs.filter(a => a.ts < t && a.ts > t - 7 * 864e5);
+    const pred = muscleFatigue(ses, ac, t, null);
+    let any = false;
+    for (const m of pred) {
+      const rep = (c.sore || {})[m.k] || 0; const P = m.raw.s + m.raw.b;
+      if (P < 10 && !rep) continue; // ruhiger Tag ohne Aussage
+      const k = m.raw.b > m.raw.s ? 'b' : 's';
+      const g = acc[m.k] || (acc[m.k] = { s: { t: 0, p: 0, n: 0 }, b: { t: 0, p: 0, n: 0 } });
+      g[k].t += SORE_PCT[rep]; g[k].p += P; g[k].n++; any = true;
+    }
+    if (any) used++;
+  }
+  const groups = {}, info = [];
+  for (const [k, g] of Object.entries(acc)) {
+    const f = x => { if (x.n < 4) return 1; const raw = (x.t + 5) / (x.p + 5); return round(clamp(1 + (clamp(raw, 0.4, 2.5) - 1) * x.n / (x.n + 6), 0.6, 1.8), 2); };
+    groups[k] = { s: f(g.s), b: f(g.b), nS: g.s.n, nB: g.b.n };
+    for (const [kind, val] of [['s', groups[k].s], ['b', groups[k].b]]) if (Math.abs(val - 1) >= 0.15) info.push({ k, label: GLABEL[k], kind, f: val });
+  }
+  return { groups, info, checkins: (checkins || []).filter(c => c.date >= addDays(today, -90)).length, used };
+}
+
+// Stufe 3: Muster der letzten 6 Wochen und gute Kraft-Tage
+export function insights({ ckBy, allActs, today, calib, settings }) {
+  const from = addDays(today, -41);
+  const cks = Object.values(ckBy).filter(c => c.date >= from && c.date <= today && !c.partial);
+  const afterBB = c => c.bb === true || (allActs[addDays(c.date, -1)] || []).some(a => sportKind(a.type, a.name) === 'baseball');
+  const out = [];
+  for (const a of PAIN_AREAS) {
+    const hit = cks.filter(c => (c.pain || {})[a.k] > 0); if (hit.length < 2) continue;
+    const nb = hit.filter(afterBB).length;
+    out.push({ kind: 'pain', k: a.k, n: hit.length, bb: nb, text: `${a.label}: ${hit.length}× Schmerz in 6 Wochen${nb ? `, davon ${nb}× am Tag nach Baseball` : ''}.`, tip: TIPS[a.k] });
+  }
+  const bbGroups = [];
+  for (const g of GROUPS) {
+    const hit = cks.filter(c => (c.sore || {})[g.k] > 0); if (hit.length < 3) continue;
+    const nb = hit.filter(afterBB).length;
+    if (nb / hit.length >= 0.6) { bbGroups.push(g.k); out.push({ kind: 'sore', k: g.k, n: hit.length, bb: nb, text: `${g.label}: Muskelkater meist nach Baseball (${nb} von ${hit.length}).`, tip: 'Diese Muskeln nicht am Tag nach Baseball hart trainieren.' }); }
+    else out.push({ kind: 'sore', k: g.k, n: hit.length, bb: nb, text: `${g.label}: ${hit.length}× Muskelkater in 6 Wochen.`, tip: '' });
+  }
+  for (const i of (calib && calib.info) || []) out.push({ kind: 'learn', k: i.k, text: `${i.label} ${i.kind === 'b' ? 'nach Baseball' : 'nach Kraft'}: erholt sich bei dir ${i.f > 1 ? 'langsamer' : 'schneller'} als gedacht (${i.f > 1 ? '+' : '−'}${Math.round(Math.abs(i.f - 1) * 100)} %) – Formwerk rechnet jetzt so.`, tip: '' });
+  // gute Kraft-Tage: nicht an Baseball-Tagen, ungern am Tag davor; Tag danach schlechter, wenn Baseball dich spürbar ermüdet
+  const sd = settings.sportDays || [];
+  const bbHurts = bbGroups.length >= 1 || out.some(x => x.kind === 'pain' && x.bb >= 2);
+  const score = [0, 1, 2, 3, 4, 5, 6].map(d => {
+    let v = 0; if (sd.includes(d)) v -= 5; if (sd.includes((d + 1) % 7)) v -= 1; if (sd.includes((d + 6) % 7)) v -= bbHurts ? 2 : 0.5;
+    return { d, v };
+  });
+  const want = Math.max(1, Math.min(4, settings.strengthPerWeek || 2)); const pick = [];
+  for (const x of score.slice().sort((a, b) => b.v - a.v || a.d - b.d)) {
+    if (pick.length >= want) break;
+    if (x.v <= -5) continue;
+    if (pick.some(p => Math.min(Math.abs(p - x.d), 7 - Math.abs(p - x.d)) < 2)) continue; // mind. 1 Tag Pause dazwischen
+    pick.push(x.d);
+  }
+  pick.sort((a, b) => a - b);
+  return {
+    items: out, checkins: cks.length, enough: cks.length >= 14,
+    strengthDays: { days: pick.map(d => DAYN[d]), why: bbHurts ? 'Nicht an Baseball-Tagen, nicht am Tag davor – und weil Baseball dich spürbar ermüdet, auch nicht direkt danach.' : 'Nicht an Baseball-Tagen und möglichst nicht am Tag davor, mit mindestens einem Tag Pause dazwischen.' }
+  };
 }

@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.11.0';
+  const APP_VERSION = '3.12.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '' };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '' };
   const Store = {
     mode: 'local', db: null, uid: null, q: {}, timers: {},
     async init() {
@@ -1106,6 +1106,7 @@
       ${(() => { const L = ssLabels(st.active.exercises)[idx]; if (!L) return ''; const partners = st.active.exercises.filter((x, k) => k !== idx && x.ss === entry.ss).map(x => getEx(x.exId).name); return `<div class="sschip">⇄ Supersatz ${L} · mit ${esc(partners.join(', '))}<span class="tiny muted"> – nach jedem Satz direkt weiter</span></div>`; })()}
       ${bandRow(entry, idx, ex)}
       <div class="card flat howcard"><button class="howtgl" data-a="howToggle" aria-expanded="${!!st.howOpen}"><span>${I.info} So geht's: ${esc(ex.name)}</span><span class="chev" style="transform:rotate(${st.howOpen ? -90 : 90}deg)">${I.chev}</span></button>${st.howOpen ? `<div class="stack" style="gap:12px;margin-top:10px">${howtoHTML(ex, true)}</div>` : ''}</div>
+      ${FW.painHint(ex)}
       ${(() => { const n = entry.note || (exNote(ex.id) || {}).t || lastNote; if (!n) return ''; const src = entry.note ? '' : '<span class="muted">Deine Notiz:</span> '; return `<div class="card flat small notecard" data-a="noteOpen" data-i="${idx}" style="cursor:pointer">${I.note.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} ${src}${esc(n)}</div>`; })()}
       <table class="sets"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
       <div class="exfoot">${isHold && !finished && kind === 'hold' ? `<button class="btn sm primary" data-a="holdStart" data-i="${idx}">${I.play} Halten starten</button>` : ''}${kind === 'int' && !finished ? `<button class="btn sm primary" data-a="intStart" data-i="${idx}">${I.play} Intervall</button>` : ''}

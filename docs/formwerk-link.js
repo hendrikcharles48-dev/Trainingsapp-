@@ -93,7 +93,7 @@
       <span style="width:12px;height:12px;flex:0 0 12px;border-radius:50%;background:${COLOR[r.color] || COLOR.none}"></span>
       <span style="flex:1;min-width:0"><span style="display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#8D97A8);font-weight:600">Formwerk · Erholung ${esc(val)}</span>
       <b style="display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '–')}</b>
-      ${good ? `<span style="display:block;font-size:13px;color:var(--muted,#8D97A8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Gut heute: ${esc(good)}</span>` : ''}</span></button>`;
+      ${good ? `<span style="display:block;font-size:13px;color:var(--muted,#8D97A8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Gut heute: ${esc(good)}</span>` : ''}${(d.pain || []).length ? `<span style="display:block;font-size:13px;color:var(--highlight,#C9D8EA);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Schonen: ${esc(d.pain.map(p => p.label).join(', '))}</span>` : ''}</span></button>`;
   }
 
   // Fenster „Formwerk“ (Einstellungen + heutige Details). Knöpfe über data-fw, nicht über Satzwerks data-a.
@@ -154,6 +154,13 @@
     // nach jeder Änderung an Trainings (speichern/löschen) – gebündelt nach 4 s
     changed() { if (!cfg()) return; clearTimeout(timer); timer = setTimeout(sync, 4000); },
     card, sheet,
+    // Schmerz aus dem Formwerk-Morgen-Check: Hinweis bei Übungen, die diese Stelle belasten (ex.inj)
+    painHint(ex) {
+      const T = get(K.today, null); const d = T && T.data; if (!d || d.date !== iso(new Date()) || !ex || !ex.inj) return '';
+      const hit = (d.pain || []).filter(p => p.inj && ex.inj.includes(p.inj)); if (!hit.length) return '';
+      const p = hit[0];
+      return `<div class="card flat small" style="border:1px solid var(--highlight,#C9D8EA);margin-top:8px"><b>${esc(p.label)} schmerzt heute (${p.lvl}/3)</b> – diese Übung belastet sie. ${p.lvl >= 3 ? 'Heute besser auslassen.' : 'Leichter oder über „Tauschen“ eine schonendere Variante wählen.'}${p.days >= 3 ? ' Seit mehreren Tagen – bitte abklären lassen.' : ''}</div>`;
+    },
     // Sicherung von Satzwerk im Worker (Export-JSON). get → Objekt oder null (noch keine), Fehler werfen.
     async backupPut(text) { const r = await api('/v1/backup/satzwerk', { method: 'PUT', raw: text, timeout: 60000 }); if (!r || !r.ok) throw new Error((r && r.error) || 'Sicherung fehlgeschlagen'); return r; },
     async backupGet() { const t = await api('/v1/backup/satzwerk', { text: true, timeout: 60000 }); return t ? JSON.parse(t) : null; },
