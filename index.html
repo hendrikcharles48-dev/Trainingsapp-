@@ -645,6 +645,8 @@ details.fold[open]>summary::after{transform:rotate(-135deg);margin-bottom:-4px}
 .wkrow{min-height:38px;padding:7px 12px}
 /* 3.9: vier Reiter in Übungen ohne Umbruch */
 .toptabs button{white-space:nowrap;font-size:13px;letter-spacing:.02em;min-width:0;padding-left:2px;padding-right:2px}
+/* 3.10.5 (Nutzerwunsch): Kopfleiste reicht bis ganz oben – Kamera-Insel liegt in der Leiste, Schrift bleibt darunter voll sichtbar */
+.homebar,.topbar{top:0;margin-top:calc(-1 * env(safe-area-inset-top,0px));padding-top:calc(env(safe-area-inset-top,0px) + 8px)}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
