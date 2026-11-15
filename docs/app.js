@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.2';
+  const APP_VERSION = '3.14.3';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -319,7 +319,7 @@
     return done;
   }
   function customReport(ex) {
-    return `Satzwerk – neue eigene Übung, bitte mit allen Daten einbauen:\nName: ${ex.name}\nBewegung: ${D.PATTERNS[ex.pat] || ex.pat}\nArt: ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' : 'Halten'}\nMuskeln: ${ex.prim.map(m => D.MUSCLES[m]).join(', ') || '–'}\nGeräte: ${ex.eq.map(e => D.EQUIP[e]).join(', ')}\nZiel: ${ex.rr[0]}–${ex.rr[1]}`;
+    return `Satzwerk – neue eigene Übung, bitte mit allen Daten einbauen:\nName: ${ex.name}\n${ex.info ? 'Gerät & Hinweise: ' + ex.info + '\n' : ''}Bewegung: ${D.PATTERNS[ex.pat] || ex.pat}\nArt: ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' : 'Halten'}\nMuskeln: ${ex.prim.map(m => D.MUSCLES[m]).join(', ') || '–'}\nGeräte: ${ex.eq.map(e => D.EQUIP[e]).join(', ')}\nZiel: ${ex.rr[0]}–${ex.rr[1]}`;
   }
   function defLoc() { const a = (P() && P().answers) || {}; return a.location === 'gym' ? 'gym' : 'home'; }
   function locs() { const a = (P() && P().answers) || {}; return a.location === 'both' ? ['home', 'gym'] : [defLoc()]; }
@@ -1312,6 +1312,7 @@
         ${h.length ? `<div class="card stack" style="gap:8px"><b>Deine Leistung</b>${h.length >= 2 ? lineChart(exSeries(ex.id), exUnit(ex)) : ''}<div class="list" style="background:var(--surface2)">${last.map(x => `<div class="li"><div class="grow small">${dateDE(x.date)}</div><div class="small">${x.entry.sets.map(z => setTxt(ex, z)).join(' · ')}</div></div>`).join('')}</div></div>` : '<div class="small muted">Noch nicht trainiert.</div>'}
         ${pctTable}
         <div class="row wrap">${st.active ? `<button class="btn primary grow" data-a="addToWorkout" data-id="${ex.id}">${I.plus} Ins Training</button>` : ''}<button class="btn grow" data-a="addToPlanAsk" data-id="${ex.id}">${I.plus} In den Plan</button><button class="btn ${isFav(ex.id) ? 'primary' : ''} grow" data-a="favToggle" data-id="${ex.id}">★ ${isFav(ex.id) ? 'Favorit' : 'Favorit machen'}</button>${ex.custom ? `<button class="btn danger" data-a="delCustom" data-id="${ex.id}">Löschen</button>` : ''}</div>
+        ${ex.custom && ex.info ? `<div class="small muted">Gerät & Hinweise: ${esc(ex.info)}</div>` : ''}
         ${ex.custom ? `<div class="row"><button class="btn grow" data-a="cxEdit" data-id="${ex.id}">${I.note} Bearbeiten</button><button class="btn grow danger" data-a="cxDel" data-id="${ex.id}">Löschen</button></div>` : ''}
         ${ex.custom ? `<div class="card flat stack" style="gap:8px"><b>Bild & Anleitung ergänzen lassen</b><div class="small muted">Eigene Übungen liegen nur auf deinem Handy. Schick sie Claude – beim nächsten Update kommt die Übung mit Bild, Anleitung und allen Daten zurück, dein Verlauf bleibt erhalten.</div><button class="btn" data-a="shareCustom" data-id="${ex.id}">An Claude schicken</button></div>` : ''}</div>`;
     },
@@ -1647,6 +1648,7 @@
       const c = s.c || (s.c = { name: '', pat: 'biceps', kind: 'load', prim: [], eq: ['bw'], lo: 8, hi: 12 });
       return `<div class="stack"><div>${s.ret ? `<div class="eyebrow">${s.ret.mode === 'swapWorkout' || s.ret.mode === 'slot' ? 'Ersetzt ' + esc(s.base || 'die Übung') : s.ret.mode === 'plan' ? 'Kommt in den Plan' : 'Kommt ins Training'}</div>` : ''}<h2>${s.edit ? 'Übung bearbeiten' : 'Eigene Übung'}</h2>${s.base ? `<div class="small muted">Vorausgefüllt wie „${esc(s.base)}“ – nur Name und Unterschiede anpassen.</div>` : ''}</div>
         <div><label class="lbl" for="cx-name">Name</label><input class="field" id="cx-name" data-in="cx" data-k="name" value="${esc(c.name)}" placeholder="z. B. Zottman-Curls"><div id="cx-hit">${cxHit(c.name, !!s.ret)}</div></div>
+        <div><label class="lbl" for="cx-info">Gerät & Hinweise für Claude</label><textarea class="field" id="cx-info" rows="2" data-in="cx" data-k="info" style="font-size:16px" placeholder="z. B. Gym80 Sygnum, Brustpolster 45°, enger Griff">${esc(c.info || '')}</textarea><div class="small muted" style="margin-top:6px">Hersteller, Modell, Winkel, Griff – Claude schaut sonntags nach, was gemeint ist, und baut die Übung mit Bild und Anleitung ein.</div></div>
         <div class="row"><div class="grow"><label class="lbl" for="cx-pat">Bewegung</label><select class="field" id="cx-pat" data-in="cx" data-k="pat">${Object.entries(D.PATTERNS).map(([k, v]) => `<option value="${k}" ${c.pat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
         <div class="grow"><label class="lbl" for="cx-kind">Art</label><select class="field" id="cx-kind" data-in="cx" data-k="kind">${[['load', 'Mit Gewicht'], ['bw', 'Körpergewicht'], ['hold', 'Halten (Sekunden)']].map(([k, v]) => `<option value="${k}" ${c.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
         <div><div class="lbl">Muskeln</div><div class="row wrap">${Object.entries(D.MUSCLES).map(([k, v]) => `<button class="chip ${c.prim.includes(k) ? 'on' : ''}" data-a="cxMuscle" data-k="${k}">${v}</button>`).join('')}</div></div>
@@ -1951,17 +1953,18 @@
       const c = st.sheet.c; if (!c.name.trim()) { toast('Bitte einen Namen eingeben'); return; } if (!c.prim.length) { toast('Bitte mindestens einen Muskel wählen'); return; }
       if (st.sheet.edit) { const ex = (P().custom || []).find(x => x.id === st.sheet.edit); if (!ex) return; Backup.snapshot('vor-uebung-aendern');
         const role = ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i';
-        Object.assign(ex, { name: c.name.trim(), pat: c.pat, role, kind: c.kind, eq: c.eq.length ? c.eq.slice() : ['bw'], prim: c.prim.slice(), rr: [+c.lo || 8, +c.hi || 12], edited: new Date().toISOString() });
+        Object.assign(ex, { name: c.name.trim(), pat: c.pat, role, kind: c.kind, eq: c.eq.length ? c.eq.slice() : ['bw'], prim: c.prim.slice(), rr: [+c.lo || 8, +c.hi || 12], edited: new Date().toISOString() }); if ((c.info || '').trim()) ex.info = c.info.trim(); else delete ex.info;
         if (c.kind === 'bw') ex.bwf = ex.bwf || 0.6; if (c.skill && ex.pat === 'skill') ex.skill = c.skill;
         registerCustom(); exCache.clear(); Store.saveProfile(); render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung geändert'); return; }
       const ex = { id: 'c-' + uid(), custom: true, name: c.name.trim(), pat: c.pat, role: ['core'].includes(c.pat) ? 'k' : ['skill'].includes(c.pat) ? 's' : ['cond'].includes(c.pat) ? 'x' : ['vpull', 'hpull', 'vpush', 'hpush', 'dip', 'squat', 'lunge', 'hinge'].includes(c.pat) ? 'c' : 'i', kind: c.kind, eq: c.eq.length ? c.eq : ['bw'], prim: c.prim, sec: [], lvl: 2, rr: [+c.lo || 8, +c.hi || 12], d: 'Eigene Übung.', c: [], std: 0.3, bwf: c.kind === 'bw' ? 0.6 : undefined };
       if (c.skill && ex.pat === 'skill') ex.skill = c.skill;
+      if ((c.info || '').trim()) ex.info = c.info.trim();
       P().custom = P().custom || []; P().custom.push(ex); registerCustom(); Store.saveProfile();
       const ret = st.sheet.ret;
       if (ret) { closeSheet(); applyPick(ret, ex.id); toast('Übung angelegt und eingesetzt'); return; }
       render(); openSheet({ type: 'exInfo', id: ex.id }); toast('Übung angelegt');
     },
-    cxEdit(t) { const ex = getEx(t.dataset.id); if (!ex || !ex.custom) return; openSheet({ type: 'custom', edit: ex.id, c: { name: ex.name, pat: ex.pat, kind: ex.kind, prim: ex.prim.slice(), eq: ex.eq.slice(), lo: (ex.rr || [8])[0], hi: (ex.rr || [8, 12])[1], skill: ex.skill } }); },
+    cxEdit(t) { const ex = getEx(t.dataset.id); if (!ex || !ex.custom) return; openSheet({ type: 'custom', edit: ex.id, c: { name: ex.name, pat: ex.pat, kind: ex.kind, prim: ex.prim.slice(), eq: ex.eq.slice(), lo: (ex.rr || [8])[0], hi: (ex.rr || [8, 12])[1], skill: ex.skill, info: ex.info || '' } }); },
     cxDel(t) { openSheet({ type: 'cxDel', id: t.dataset.id }); },
     cxDelYes() {
       const id = st.sheet.id; const pr = P(); const ex = (pr.custom || []).find(x => x.id === id); if (!ex) return;

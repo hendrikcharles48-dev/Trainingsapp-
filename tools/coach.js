@@ -83,7 +83,7 @@ function facts(f, summaryF, checkF) {
 }
 
 function customOpen(p, ws) {
-  return (p.custom || []).filter(c => !c.hidden && !findBuiltin(c.name)).map(c => ({ id: c.id, name: c.name, pat: c.pat, kind: c.kind, eq: c.eq, prim: c.prim, rr: c.rr, skill: c.skill || null,
+  return (p.custom || []).filter(c => !c.hidden && !findBuiltin(c.name)).map(c => ({ id: c.id, name: c.name, pat: c.pat, kind: c.kind, eq: c.eq, prim: c.prim, rr: c.rr, skill: c.skill || null, info: c.info || null,
     sessions: ws.filter(w => (w.exercises || []).some(e => e.exId === c.id)).length, note: ((p.exNotes || {})[c.id] || {}).t || null }));
 }
 

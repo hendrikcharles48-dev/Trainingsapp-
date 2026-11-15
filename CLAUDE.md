@@ -141,6 +141,8 @@ eingebaute Übung umgestellt und die eigene Übung entfernt.
 Wo die eigenen Übungen zu finden sind:
 - Zuerst (ab 3.14): Sicherung im Formwerk-Worker (`GET /v1/backup/satzwerk`) → `node tools/coach.js custom <datei>` listet
   noch nicht eingebaute eigene Übungen. Die Sonntags-Aufgabe (Skill `satzwerk-wochenbericht`) macht das jede Woche automatisch.
+- Eigene Übungen haben das Feld „Gerät & Hinweise“ (`ex.info`, z. B. Hersteller/Modell/Winkel). Vor dem Einbau danach recherchieren
+  (WebSearch), was genau gemeint ist (Nutzerwunsch 15.11.).
 - Die installierte App (GitHub Pages) speichert nur lokal auf dem iPhone – dort nicht lesbar.
   Der Nutzer schickt sie über den Knopf „An Claude schicken“ (im Info-Fenster der eigenen Übung)
   als Text in den Chat, oder nennt sie im Chat.

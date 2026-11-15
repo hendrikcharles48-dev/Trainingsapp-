@@ -27,7 +27,11 @@ abbrechen und melden (Zugangsdaten fehlen) – nichts erfinden.
 
 ## 2. Eigene Übungen einbauen
 
-`node tools/coach.js custom $S/bk.json` listet eigene Übungen, die noch nicht eingebaut sind. Für jede: Regel
+`node tools/coach.js custom $S/bk.json` listet eigene Übungen, die noch nicht eingebaut sind (mit `info` = „Gerät &
+Hinweise“ des Nutzers, z. B. Hersteller/Modell/Winkel, und `note`). **Erst recherchieren, was genau gemeint ist** (Nutzerwunsch):
+mit WebSearch (Modus standard) nach Name + `info` suchen, bei Maschinen nach Hersteller und Modell – Bewegung, Sitz-/Polsterposition,
+Griff, beanspruchte Muskeln, typische Fehler. Tippfehler wohlwollend lesen („beustgestützt 45*“ = brustgestützt 45°). Gibt es die
+Übung schon (gleiche Bewegung, gleiches Gerät), nur den Namen des Nutzers als `alias` dort ergänzen. Für jede neue: Regel
 „eigene Übungen“ aus `CLAUDE.md` (exercises.js mit `alias` = Name des Nutzers, howto.js, figures.js-`map`).
 Danach `node --check`, `node pwa/build.js`, kurz mit Playwright prüfen, `APP_VERSION`/`CACHE` hochzählen,
 `cp pwa/dist/* docs/`, committen, Pull Request nach `main` und mergen (dauerhafte Freigabe). Namen in `built` des Berichts.
