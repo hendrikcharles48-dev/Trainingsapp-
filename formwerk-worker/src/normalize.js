@@ -79,16 +79,20 @@ export function sleepFrom(o) {
 
 export function dailyFrom(o) {
   if (!o) return null;
+  // Personal API v2: verschachtelt (heartRate.restingValue, movement.steps.value, stress.avgLevel, bodyBattery.*)
+  const intens = (n(pick(o, 'intensityMinutes.moderate', 'moderateIntensityMinutes')) || 0) + 2 * (n(pick(o, 'intensityMinutes.vigorous', 'vigorousIntensityMinutes')) || 0);
+  const stress = n(pick(o, 'stress.avgLevel', 'averageStressLevel', 'avgStressLevel', 'values.overallStressLevel'));
   return {
-    rhr: n(pick(o, 'restingHeartRate', 'restingHeartRateInBeatsPerMinute', 'values.restingHR')),
-    steps: n(pick(o, 'totalSteps', 'steps', 'values.totalSteps')),
-    stress: n(pick(o, 'averageStressLevel', 'avgStressLevel', 'values.overallStressLevel')),
-    bbHigh: n(pick(o, 'bodyBatteryHighestValue', 'bodyBatteryHighValue')),
-    bbLow: n(pick(o, 'bodyBatteryLowestValue', 'bodyBatteryLowValue')),
-    bbWake: n(pick(o, 'bodyBatteryAtWakeTime', 'bodyBatteryMostRecentValue')),
-    bbCharged: n(pick(o, 'bodyBatteryChargedValue')),
-    bbDrained: n(pick(o, 'bodyBatteryDrainedValue')),
-    intensity: (n(pick(o, 'moderateIntensityMinutes')) || 0) + 2 * (n(pick(o, 'vigorousIntensityMinutes')) || 0) || null
+    rhr: n(pick(o, 'heartRate.restingValue', 'restingHeartRate', 'restingHeartRateInBeatsPerMinute', 'values.restingHR')),
+    steps: n(pick(o, 'movement.steps.value', 'totalSteps', 'steps', 'values.totalSteps')),
+    stress: stress === null || stress < 0 ? null : stress,
+    bbHigh: n(pick(o, 'bodyBattery.maxValue', 'bodyBatteryHighestValue', 'bodyBatteryHighValue')),
+    bbLow: n(pick(o, 'bodyBattery.minValue', 'bodyBatteryLowestValue', 'bodyBatteryLowValue')),
+    bbNow: n(pick(o, 'bodyBattery.latestValue', 'bodyBatteryMostRecentValue')),
+    bbWake: n(pick(o, 'bodyBatteryAtWakeTime')),
+    bbCharged: n(pick(o, 'bodyBattery.chargedValue', 'bodyBatteryChargedValue')),
+    bbDrained: n(pick(o, 'bodyBattery.drainedValue', 'bodyBatteryDrainedValue')),
+    intensity: intens || null
   };
 }
 
@@ -138,11 +142,12 @@ export function mergeDays(sources) {
   const days = {};
   const put = (d, obj) => { if (!d || !obj) return; const t = days[d] || (days[d] = { date: d });
     for (const [k, v] of Object.entries(obj)) if (v !== null && v !== undefined && !(Array.isArray(v) && !v.length)) t[k] = v; };
+  // Body Battery zuerst: die genauen Tageswerte (min/max/aktuell) aus der Tageszusammenfassung überschreiben die Kurve
+  for (const raw of sources.bb || []) for (const o of list(raw)) put(dateOf(o), bodyBatteryFrom(o));
   for (const raw of sources.hrv || []) for (const o of list(raw)) put(dateOf(o), hrvFrom(o));
   for (const raw of sources.daily || []) for (const o of list(raw)) put(dateOf(o), dailyFrom(o));
   for (const raw of sources.stress || []) for (const o of list(raw)) put(dateOf(o), stressFrom(o));
   for (const raw of sources.steps || []) for (const o of list(raw)) put(dateOf(o), stepsFrom(o));
-  for (const raw of sources.bb || []) for (const o of list(raw)) put(dateOf(o), bodyBatteryFrom(o));
   for (const raw of sources.sleep || []) for (const o of list(raw)) {
     const s = sleepFrom(o); const d = dateOf(o);
     if (!s || !d) continue;
@@ -153,4 +158,12 @@ export function mergeDays(sources) {
     if (s.sleepRhr && t.rhr == null) t.rhr = s.sleepRhr;
   }
   return days;
+}
+
+// Herzfrequenz-Zonen (biometric-service/heartRateZones/v2): Ruhe-/Maximalpuls für die Belastung ohne Zonenzeiten
+export function hrFrom(x) {
+  const z = list(x).find(o => o && (o.sport === 'DEFAULT' || o.maxHeartRateUsed)) || null;
+  if (!z) return null;
+  const max = n(z.maxHeartRateUsed), rest = n(z.restingHeartRateUsed);
+  return max ? { max, rest: rest || null, floors: [1, 2, 3, 4, 5].map(i => n(z['zone' + i + 'Floor'])) } : null;
 }

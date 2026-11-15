@@ -2,13 +2,13 @@
 // - Garmin-Schlüssel nur als Secret GARMIN_API_KEY, Zugang für die Apps nur mit Secret APP_PASSWORD.
 // - Speicher: Durable Object „FormwerkStore“ (SQLite, Free-Plan). Schnittstelle: formwerk/SCHNITTSTELLE.md
 import { Garmin, PATHS, chunks, addDays } from './garmin.js';
-import { mergeDays, list, activityFrom } from './normalize.js';
-import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION } from './model.js';
+import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
+import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr } from './model.js';
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.0.1';
+export const WORKER_VERSION = '1.1.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
-const NORM_VERSION = 1;
+const NORM_VERSION = 2; // 2: Tageswerte v2 verschachtelt (Ruhepuls, Schritte, Stress, Body Battery)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
 const AUTO_REFRESH_MIN = 30;       // ohne Ziehen höchstens alle 30 min zu Garmin
 const FORCE_REFRESH_SEC = 90;      // „Ziehen zum Aktualisieren“ höchstens alle 90 s
@@ -150,7 +150,8 @@ export class FormwerkStore {
         if (act.ok) acts.push(...list(act.data));
       }
       // Detail-Schlaf (Phasen, Schlafwert) und HRV der letzten Nacht einzeln – die Zusammenfassungen sind manchmal knapper
-      const [sd, hd] = await Promise.all([g.safe(PATHS.sleepDay(today)), g.safe(PATHS.hrvDay(today))]);
+      const [sd, hd, hz] = await Promise.all([g.safe(PATHS.sleepDay(today)), g.safe(PATHS.hrvDay(today)), meta.hrDay !== today ? g.safe(PATHS.hrZones()) : Promise.resolve({ ok: false })]);
+      if (hz.ok) { const hr = hrFrom(hz.data); if (hr) { await this.st.put('hr', hr); meta.hrDay = today; } }
       if (sd.ok && sd.data) src.sleep.push(withDate(sd.data, today));
       if (hd.ok && hd.data) src.hrv.push(withDate(hd.data, today));
       // Stress/Schritte nur, wenn die Tageszusammenfassung sie nicht enthält
@@ -203,9 +204,9 @@ export class FormwerkStore {
     const meta = await this.refresh(force ? 'force' : 'auto');
     const today = this.today();
     const from = addDays(today, -(HISTORY_DAYS + 28));
-    const [days, acts, sessions, settings] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings()]);
+    const [days, acts, sessions, settings, hrz] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr')]);
     const now = Date.now();
-    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, tzOff: tzOffset(this.tz(), now), histDays: 90 });
+    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
     const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
