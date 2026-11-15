@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.2';
+  const VERSION = '1.0.3';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -379,6 +379,9 @@
 
   // Beim Zurückkehren in die App auffrischen, wenn älter als 15 min
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.cfg && Date.now() - st.fetchedAt > 15 * 60e3) load(false); });
+
+  // iOS: nach dem Schließen der Tastatur bleibt die Seite sonst manchmal verschoben
+  document.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) window.scrollTo(0, 0); }, 60));
 
   render();
   if (st.cfg) load(false);
