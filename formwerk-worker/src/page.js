@@ -24,7 +24,7 @@ pre{background:var(--bg);border-radius:12px;padding:12px;font-size:11px;line-hei
 <p class="mu sm" style="margin:0">Zeigt, welche Werte deine Uhr wirklich liefert – roh und so, wie Formwerk sie liest.</p>
 <div class="card" id="login"><div class="lbl">App-Passwort</div><input id="pw" type="password" autocomplete="current-password" placeholder="Passwort aus dem Cloudflare-Secret APP_PASSWORD">
 <div class="row" style="margin-top:10px"><button class="p" id="go7">7 Tage laden</button><button id="go14">14 Tage</button></div>
-<div class="row" style="margin-top:8px"><button id="sum">Zusammenfassung</button><button id="ping">Verbindung</button></div></div>
+<div class="row" style="margin-top:8px"><button id="sum">Zusammenfassung</button><button id="ping">Verbindung</button></div><div class="row" style="margin-top:8px"><button id="copy">Für Claude kopieren</button></div><div class="mu sm" id="copymsg" style="margin-top:6px"></div></div>
 <div id="out"></div>
 <script>
 const $=s=>document.querySelector(s), out=$('#out');
@@ -36,7 +36,7 @@ async function call(path){const pw=$('#pw').value.trim();try{localStorage.setIte
   if(!r.ok){out.innerHTML='<div class="card err">'+esc(j.message||j.error||r.status)+'</div>';return null}return j}
 const h=s=>s==null?'–':(s/3600).toFixed(1).replace('.',',');
 const v=x=>x==null?'<span class="mu">–</span>':esc(typeof x==='number'?Math.round(x*10)/10:x);
-async function raw(days){const j=await call('/v1/raw?days='+days);if(!j)return;
+async function raw(days){const j=await call('/v1/raw?days='+days);if(!j)return;last=j;
   if(j.error){out.innerHTML='<div class="card err"><b>'+esc(j.error)+'</b><pre>'+esc(j.body||'')+'</pre></div>';return}
   const ds=Object.keys(j.parsed||{}).sort().reverse();
   const rows=ds.map(d=>{const x=j.parsed[d],s=x.sleep||{};return '<tr><td>'+d.slice(5)+'</td><td>'+v(x.hrv)+'</td><td>'+v(x.hrvWeek)+'</td><td>'+v(x.hrvStatus)+'</td><td>'+v(x.rhr)+'</td><td>'+h(s.total)+'</td><td>'+h(s.deep)+'</td><td>'+h(s.light)+'</td><td>'+h(s.rem)+'</td><td>'+h(s.awake)+'</td><td>'+v(s.score)+'</td><td>'+v(x.bbHigh)+'</td><td>'+v(x.bbLow)+'</td><td>'+v(x.stress)+'</td><td>'+v(x.steps)+'</td></tr>'}).join('');
@@ -45,6 +45,13 @@ async function raw(days){const j=await call('/v1/raw?days='+days);if(!j)return;
   out.innerHTML='<div class="card"><div class="lbl">Was Formwerk daraus liest · '+esc(j.range.join(' bis '))+'</div><div class="tw"><table><tr><th>Tag</th><th>HRV</th><th>HRV 7T</th><th>Status</th><th>Ruhepuls</th><th>Schlaf h</th><th>Tief</th><th>Leicht</th><th>REM</th><th>Wach</th><th>Score</th><th>BB max</th><th>BB min</th><th>Stress</th><th>Schritte</th></tr>'+(rows||'<tr><td colspan="15">Keine Tageswerte erkannt</td></tr>')+'</table></div></div>'
    +'<div class="card"><div class="lbl">Aktivitäten</div><div class="tw"><table><tr><th>Start</th><th style="text-align:left">Name</th><th>Min</th><th>Ø HF</th><th>Max</th><th>Zonen 1–5 (min)</th></tr>'+(acts||'<tr><td colspan="6">Keine</td></tr>')+'</table></div></div>'
    +'<div class="card"><div class="lbl">Rohdaten von Garmin ('+esc(j.garminCalls)+' Abrufe)</div>'+calls+'</div>'}
+function shape(x,d){if(Array.isArray(x)){const n=x.length,isNum=x.every(v=>typeof v!=='object'||v===null||Array.isArray(v));const k=isNum?3:2;const o=x.slice(0,k).map(v=>shape(v,d+1));if(n>k)o.push('…'+n+' Einträge');return o}if(x&&typeof x==='object'){if(d>6)return '{…}';const o={};for(const[k,v]of Object.entries(x))o[k]=shape(v,d+1);return o}if(typeof x==='string'&&x.length>40)return x.slice(0,40)+'…';return x}
+let last=null;
+$('#copy').onclick=async()=>{const j=last||await call('/v1/raw?days=3');if(!j)return;last=j;
+  let t='FORMWERK ROHDATEN '+(j.range||[]).join('..')+'\\n';
+  for(const[k,c]of Object.entries(j.calls||{})){let body=c.ok?JSON.stringify(shape(c.data,0)):'FEHLER '+c.status+' '+(c.error||'');if(body.length>2500)body=body.slice(0,2500)+'…';t+='\\n## '+k+' '+(c.path||'').split('?')[0]+'\\n'+body+'\\n'}
+  try{await navigator.clipboard.writeText(t);$('#copymsg').textContent='Kopiert ('+t.length+' Zeichen) – jetzt im Chat einfügen.'}catch(e){out.innerHTML='<div class="card"><div class="lbl">Text markieren und kopieren</div><pre>'+esc(t)+'</pre></div>'}
+  if(!out.innerHTML.includes('Text markieren'))raw(7)};
 $('#go7').onclick=()=>raw(7);$('#go14').onclick=()=>raw(14);
 $('#sum').onclick=async()=>{const j=await call('/v1/summary');if(j)out.innerHTML='<div class="card"><div class="lbl">/v1/summary</div><pre>'+esc(JSON.stringify(j,null,1))+'</pre></div>'};
 $('#ping').onclick=async()=>{const j=await call('/v1/ping');if(j)out.innerHTML='<div class="card"><div class="ok"><b>Verbunden.</b></div><div class="mu sm">Garmin-Schlüssel hinterlegt: '+(j.garminKey?'ja':'<span class=err>nein</span>')+'</div><pre>'+esc(JSON.stringify(j,null,1))+'</pre></div>'};

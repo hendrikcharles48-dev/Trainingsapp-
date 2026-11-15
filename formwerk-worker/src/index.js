@@ -6,7 +6,7 @@ import { mergeDays, list, activityFrom } from './normalize.js';
 import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION } from './model.js';
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.0.0';
+export const WORKER_VERSION = '1.0.1';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 1;
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
