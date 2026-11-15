@@ -139,6 +139,8 @@ zu einer eingebauten Übung (`findBuiltin` in `app.js`), werden Verlauf, Plan un
 eingebaute Übung umgestellt und die eigene Übung entfernt.
 
 Wo die eigenen Übungen zu finden sind:
+- Zuerst (ab 3.14): Sicherung im Formwerk-Worker (`GET /v1/backup/satzwerk`) → `node tools/coach.js custom <datei>` listet
+  noch nicht eingebaute eigene Übungen. Die Sonntags-Aufgabe (Skill `satzwerk-wochenbericht`) macht das jede Woche automatisch.
 - Die installierte App (GitHub Pages) speichert nur lokal auf dem iPhone – dort nicht lesbar.
   Der Nutzer schickt sie über den Knopf „An Claude schicken“ (im Info-Fenster der eigenen Übung)
   als Text in den Chat, oder nennt sie im Chat.
@@ -252,7 +254,7 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   `syncWeight` in `bwLog` (nur ergänzen) und blendet seine Gewichtseingabe aus, solange Formwerk verbunden ist (`FW.configured()`).
 - Automatische Sicherung: ohne GitHub-Zugang sichert Satzwerk über den Worker (`Cloud.cfg()` → `{worker:true}`, `Cloud.where()`,
   `FW.backupPut/backupGet`, Worker `bk:satzwerk` mit zwei Fassungen). Ausschalten setzt `cloudState.wOff`.
-- Körpergefühl (Formwerk 1.2/Worker 1.3, ab Worker 1.7 Skala 1–5 für beides, Nutzerwunsch): Morgen-Check `c:<Datum>` (`v: 5`; ältere
+- Körpergefühl (Formwerk 1.2/Worker 1.3, ab Worker 1.8 Skala 1–5 für beides, Nutzerwunsch): Morgen-Check `c:<Datum>` (`v: 5`; ältere
   Einträge mit 1–2/1–3 rechnet `normCheckin` beim Lesen um, gespeichert bleibt alles), `bb` Baseball gestern,
   `partial` = nur Baseball-Frage). Stufe 1 `applySoreness`/`applyPain` (Schmerz ab 2 schonen, ab 4 Pause, ≥ 2 an 3 von 5 Tagen → „abklären lassen“, keine Diagnose),
   Stufe 2 `calibrate` (Faktor je Gruppe für Kraft `s` und Baseball `b`, ab 4 Tagen, 0,6–1,8), Stufe 3 `insights` (Muster 6 Wochen,
@@ -262,6 +264,11 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   (`bb:false`). Ohne feste Zeiten: antippen. Uhr-Aktivität zählt immer (Schalter dann fest „(Uhr)“). Standard: keine festen Zeiten.
 - Signale (Worker 1.6): `physio` – Stresszeichen heute (Atemfrequenz/SpO2 aus dem Schlaf, Ruhepuls, HRV gegen Basis → „Locker bleiben“,
   keine Diagnose) und Deload-Melder (7 Tage: HRV, Ruhepuls, Erholung, Morgen-Checks; ab 2 Zeichen). `prefillFor` liefert Vorschläge.
+- Wochenbericht (Satzwerk 3.14, Worker 1.7): geplante Aufgabe sonntags → Skill `satzwerk-wochenbericht` → `tools/coach.js`
+  (`facts`/`check`/`custom`, lädt engine.js in Node) → `PUT /v1/coach` (Worker `coach` + `coachPrev`). Satzwerk holt `GET /v1/coach`
+  (`FW.coach()`, `refreshCoach`, höchstens alle 3 h, Speicher `satzwerk.formwerkCoach`), Karte `coachCard()` auf Heute (bis „Gelesen“)
+  und unter Fortschritt, Fenster `SHEETS.coach`. Aktionen `swap|sets|rr|deload` nur per Tipp (`coachYes`, vorher
+  `Backup.snapshot('vor-wochenbericht')`, Plan wird `edited`), Antworten in `profile.coachDone[id] = {seen, closed, a:{id:'ok'|'no'}}`.
 - Satzwerk nutzt Formwerk (3.13, nur Vorschläge, Nutzer bestätigt): Tagesform-Fenster vorausgefüllt (`FW.tfPrefill`, Hinweis „Vorausgefüllt
   aus Formwerk“), Wochen-Check-in vorausgefüllt (`FW.weekPrefill`, nur „diff“ bleibt offen), `deloadNeeded` = Leistung ODER Formwerk-Signale
   (2 Zeichen oder 1 + fallende Leistung), Baseball-Tage aus Formwerk (`sportDaysEff()`, `FW.plan().baseballToday`), gute Kraft-Tage in der

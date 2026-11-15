@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.13.1';
+  const APP_VERSION = '3.14.1';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -54,7 +54,7 @@
     }
   };
   /* ================= Sicherungen (IndexedDB „satzwerk“, Speicher „snap“) ================= */
-  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
+  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-wochenbericht': 'Vor Wochenbericht-Vorschlag', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
   const Backup = {
     p: null,
     open() {
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, coach: () => null, refreshCoach() { } };
   // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
   function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
@@ -524,6 +524,7 @@
     return `<div class="homebar"><div class="row"><div class="eyebrow grow ell">${dateTxt}</div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div>
     <div class="stack">
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
+      ${st.active ? '' : coachCard()}
       ${st.active ? '' : FW.card()}
       ${sport.size || ((FW.plan() || {}).strengthDays || []).length ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span>${sport.size ? '<span><i class="lg-sport"></i>Baseball</span>' : ''}${((FW.plan() || {}).strengthDays || []).length ? '<span><i class="lg-good"></i>Kraft-Tag</span>' : ''}<span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
       ${hero}
@@ -712,7 +713,8 @@
     const exWithHist = [...new Set(st.workouts.flatMap(w => w.exercises.map(e => e.exId)))].filter(id => getEx(id));
     if (!st.chartEx || !exWithHist.includes(st.chartEx)) st.chartEx = mostFrequent(exWithHist);
     if (!total) return `<div class="empty">Noch keine Trainings gespeichert. Nach deinem ersten Training siehst du hier Kraftkurven, Rekorde und Sätze pro Muskelgruppe.</div>`;
-    return `<div class="kpis"><div class="kpi"><b>${total}</b><span>Trainings gesamt</span></div><div class="kpi"><b>${w7.length}</b><span>Letzte 7 Tage</span></div><div class="kpi"><b>${weeksStreak()}</b><span>Wochen am Stück</span></div></div>
+    const cw = FW.coach();
+    return `${cw ? `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht · ${esc(cw.id)}</div><b class="ell">${esc(cw.title)}</b></div><span class="chev">${I.chev}</span></button>` : ''}<div class="kpis"><div class="kpi"><b>${total}</b><span>Trainings gesamt</span></div><div class="kpi"><b>${w7.length}</b><span>Letzte 7 Tage</span></div><div class="kpi"><b>${weeksStreak()}</b><span>Wochen am Stück</span></div></div>
       ${(() => { const rec = recovery(); return `<div class="card stack"><div class="row between"><h3>Erholung</h3><span class="small muted">Muskelgruppen</span></div><div class="bars">${rec.map(r => `<div class="bar"><span class="ell">${r.g}</span><div class="track"><i class="${r.pct < 50 ? 'warn' : ''}" style="width:${r.pct}%"></i></div><span class="num small" style="text-align:right">${r.pct}%</span></div>`).join('')}</div><div class="tiny muted">Geschätzt aus Sätzen und Zeit seit dem letzten Training. Voller Balken = bereit.</div></div>`; })()}
       <div class="section"><div class="head"><h3>Kraftentwicklung</h3></div>
         <div class="chips">${exWithHist.slice().sort((x, y) => (x === st.chartEx ? -1 : y === st.chartEx ? 1 : 0)).slice(0, 14).map(id => `<button class="chip ${id === st.chartEx ? 'on' : ''}" data-a="chartPick" data-id="${id}">${esc(getEx(id).name)}</button>`).join('')}</div>
@@ -1402,6 +1404,20 @@
         ${s.items.length ? `<div class="list">${s.items.map(x => `<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${new Date(x.ts).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b><div class="small muted">${esc(SNAP_LBL[x.reason] || x.reason)} · ${(x.workouts || []).length} Trainings${x.profile && x.profile.plan ? ' · ' + esc(x.profile.plan.name || x.profile.plan.splitName || '') : ''}</div></div>
           ${s.confirm === x.id ? `<button class="btn danger sm" data-a="bkRestoreYes" data-id="${x.id}">Wirklich wiederherstellen</button>` : `<button class="btn sm" data-a="bkRestore" data-id="${x.id}">Wiederherstellen</button>`}<button class="btn sm" data-a="bkFile" data-id="${x.id}">Als Datei</button></div>`).join('')}</div>` : '<div class="empty">Noch keine Sicherung vorhanden.</div>'}</div>`;
     },
+    coach(s) {
+      const c = FW.coach(); if (!c) return `<div class="stack"><h2>Wochenbericht</h2><div class="small muted">Noch kein Bericht. Er kommt jeden Sonntagabend.</div></div>`;
+      const rec = ((P() || {}).coachDone || {})[c.id] || { a: {} };
+      const act = (c.actions || []).map(a => { const st2 = rec.a[a.id], ok = coachTarget(a);
+        return `<div class="card flat stack" style="gap:6px"><b>${esc(a.label)}</b><div class="small muted">${esc(a.why)}</div>
+          ${st2 === 'ok' ? '<div class="small">Übernommen</div>' : st2 === 'no' ? '<div class="small muted">Abgelehnt</div>' : !ok ? '<div class="small muted">Passt nicht mehr zum aktuellen Plan</div>'
+          : `<div class="row"><button class="btn primary grow" data-a="coachYes" data-id="${esc(a.id)}">Übernehmen</button><button class="btn grow" data-a="coachNo" data-id="${esc(a.id)}">Nein</button></div>`}</div>`; }).join('');
+      return `<div class="stack"><div><div class="eyebrow">Wochenbericht · ${esc(c.id)}</div><h2>${esc(c.title)}</h2></div>
+        <div>${esc(c.summary)}</div>
+        ${(c.points || []).length ? `<div class="list">${c.points.map(p => `<div class="li"><div class="grow"><b>${esc(p.t)}</b>${p.d ? `<div class="small muted">${esc(p.d)}</div>` : ''}</div></div>`).join('')}</div>` : ''}
+        ${act ? `<div class="lbl">Vorschläge für den Plan</div>${act}<div class="small muted">Vor jeder Änderung legt die App eine Sicherung an.</div>` : ''}
+        ${(c.built || []).length ? `<div class="small muted">Neu eingebaut: ${c.built.map(esc).join(', ')}</div>` : ''}
+        <button class="btn" data-a="coachClose">Gelesen</button></div>`;
+    },
     cxDel(s) {
       const ex = getEx(s.id); if (!ex) return ''; const n = histOf(ex.id).length;
       const inPlans = (P().plans || []).filter(pl => (pl.days || []).some(d => d.slots.some(sl => Object.values(sl.ex || {}).includes(ex.id)))).map(pl => pl.name || pl.splitName);
@@ -1962,6 +1978,21 @@
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
+    coachOpen() { const c = FW.coach(); if (c) { const r = coachRec(c.id); if (!r.seen) { r.seen = Date.now(); Store.saveProfile(); } } openSheet({ type: 'coach' }); },
+    coachClose() { const c = FW.coach(); if (c) { coachRec(c.id).closed = Date.now(); Store.saveProfile(); } closeSheet(); render(); },
+    coachNo(t) { const c = FW.coach(); if (!c) return; coachRec(c.id).a[t.dataset.id] = 'no'; Store.saveProfile(); renderSheet(); },
+    coachYes(t) {
+      const c = FW.coach(); if (!c) return; const a = (c.actions || []).find(x => x.id === t.dataset.id); const tg = a && coachTarget(a);
+      if (!tg) { toast('Passt nicht mehr zum aktuellen Plan'); renderSheet(); return; }
+      Backup.snapshot('vor-wochenbericht');
+      const { pl, sl } = tg;
+      if (a.kind === 'deload') pl.forceDeload = true;
+      else if (a.kind === 'sets') sl.sets = a.sets;
+      else if (a.kind === 'rr') sl.custRR = [a.rr[0], a.rr[1]];
+      else if (a.kind === 'swap') { const ex = getEx(a.to); sl.ex[a.loc] = a.to; sl.why = Object.assign({}, sl.why, { [a.loc]: ['Vorschlag aus dem Wochenbericht'] }); sl.locked = Object.assign({}, sl.locked, { [a.loc]: true }); if (ex && sl.p && !sl.p.includes(ex.pat)) sl.p = [ex.pat, ...sl.p]; }
+      if (!pl.custom) pl.edited = true;
+      coachRec(c.id).a[a.id] = 'ok'; exCache.clear(); Store.saveProfile(true); renderSheet(); render(); toast('Übernommen: ' + a.label);
+    },
     cloudSheet() { openSheet({ type: 'cloud' }); },
     formwerkSheet() { openSheet({ type: 'formwerk' }); },
     async cloudKw() { const k = Cloud.kochwerk(); if (!k) return; st.sheet.busy = true; renderSheet(); const r = await Cloud.connect(k); if (!st.sheet || st.sheet.type !== 'cloud') return; st.sheet.busy = false; st.sheet.err = r.ok ? '' : r.msg; renderSheet(); if (r.ok) { render(); toast('Automatische Sicherung an'); } },
@@ -2022,6 +2053,27 @@
     if (cs.conflict) return 'Wartet: in der Sicherung (' + Cloud.where() + ') liegen Trainings, die hier fehlen';
     if (cs.err) return 'Problem: ' + cs.err;
     return cs.last ? 'An · zuletzt ' + dateDE(new Date(cs.last).toISOString().slice(0, 10)) + ', ' + new Date(cs.last).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'An · sichert beim nächsten Speichern';
+  }
+
+  /* ================= Wochenbericht (von Claude über den Formwerk-Worker, nur Vorschläge) =================
+     profile.coachDone[berichtId] = {seen, closed, a: {aktionId: 'ok'|'no'}} – liegt in der Sicherung, damit der
+     nächste Bericht weiß, was angenommen/abgelehnt wurde. Plan-Änderungen nur nach Tipp, vorher Sicherung. */
+  const coachRec = id => { const p = P(); if (!p) return {}; p.coachDone = p.coachDone || {}; return p.coachDone[id] || (p.coachDone[id] = { a: {} }); };
+  const coachOpenN = c => (c.actions || []).filter(a => !(((P() || {}).coachDone || {})[c.id] || { a: {} }).a[a.id] && coachTarget(a)).length;
+  function coachTarget(a) {
+    const pl = ((P() || {}).plans || []).find(x => x.id === a.planId); if (!pl) return null;
+    if (a.kind === 'deload') return pl.forceDeload ? null : { pl };
+    const d = (pl.days || []).find(x => x.id === a.dayId); const sl = d && d.slots.find(x => x.id === a.slotId); if (!sl) return null;
+    if (a.kind === 'swap' && (!getEx(a.to) || getEx(a.to).hidden || !['home', 'gym'].includes(a.loc))) return null;
+    if (a.kind === 'sets' && !(a.sets >= 1 && a.sets <= 6)) return null;
+    if (a.kind === 'rr' && !(Array.isArray(a.rr) && a.rr[0] >= 3 && a.rr[1] <= 30 && a.rr[0] < a.rr[1])) return null;
+    if (!['swap', 'sets', 'rr'].includes(a.kind)) return null;
+    return { pl, d, sl };
+  }
+  function coachCard() {
+    const c = FW.coach(); if (!c || !P() || coachRec(c.id).closed) return '';
+    const n = coachOpenN(c);
+    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen'}</div></div><span class="chev">${I.chev}</span></button>`;
   }
   async function exportData(src) {
     const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };

@@ -208,6 +208,15 @@ await t('Worker: Satzwerk-Sicherung speichern und laden (große Datei, vorige bl
   assert.equal(await (await call('/v1/backup/satzwerk')).text(), small);
   const wrong = await (await call('/v1/backup/satzwerk', { method: 'PUT', body: '{"app":"kochwerk"}' })).json(); assert.equal(wrong.ok, false);
 });
+await t('Worker: Wochenbericht ablegen und lesen, vorige Fassung bleibt', async () => {
+  assert.equal((await (await call('/v1/coach')).json()).coach, null);
+  const put = b => call('/v1/coach', { method: 'PUT', body: JSON.stringify(b) }).then(r => r.json());
+  assert.equal((await put({ v: 1, id: '2026-W46', title: 'A', summary: 's', points: [], actions: [] })).ok, true);
+  assert.equal((await put({ v: 2, id: 'x', title: 'B' })).ok, false);
+  assert.equal((await put({ v: 1, id: '2026-W47', title: 'B', summary: 's', points: [], actions: [] })).ok, true);
+  const g = await (await call('/v1/coach')).json(); assert.equal(g.coach.id, '2026-W47'); assert.equal(g.prev.id, '2026-W46');
+  assert.equal((await worker.fetch(new Request('https://w.example/v1/coach'), env)).status, 401);
+});
 await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, Hinweis bei anhaltendem Schmerz', async () => {
   const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(Date.now());
   for (let i = 3; i >= 1; i--) await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: addDays(d, -i), pain: { schulter: 2 } }) });

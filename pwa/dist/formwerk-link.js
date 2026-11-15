@@ -6,7 +6,7 @@
    Speicher nur unter satzwerk.formwerk* (nie im Export, nie in Sicherungen). */
 (function () {
   'use strict';
-  const K = { cfg: 'satzwerk.formwerk', sync: 'satzwerk.formwerkSync', today: 'satzwerk.formwerkToday' };
+  const K = { cfg: 'satzwerk.formwerk', sync: 'satzwerk.formwerkSync', today: 'satzwerk.formwerkToday', coach: 'satzwerk.formwerkCoach' };
   const WINDOW_DAYS = 45;
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev'; // Adresse des Formwerk-Workers (kein Geheimnis)
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
@@ -136,6 +136,14 @@
     if (b.dataset.fw === 'save') save(); else if (b.dataset.fw === 'off') off();
   });
 
+  // Wochenbericht (von Claude, liegt im Worker unter /v1/coach) – höchstens alle 3 h holen
+  async function refreshCoach(force) {
+    if (!cfg()) return; const C = get(K.coach, null);
+    if (!force && C && Date.now() - C.t < 3 * 3600e3) return;
+    try { const j = await api('/v1/coach'); const old = C && C.data && C.data.id; set(K.coach, { t: Date.now(), data: (j && j.coach) || null }); if (((j && j.coach) || {}).id !== old) opt.onChange(); }
+    catch (e) { /* offline: alten Bericht behalten */ }
+  }
+
   window.FormwerkLink = {
     // workouts(): alle gespeicherten Trainings, getEx(id): Übung mit prim/sec, onChange(): Ansicht neu zeichnen
     init(o) {
@@ -144,10 +152,11 @@
       setTimeout(sync, 2500);
       const T = get(K.today, null);
       if (!T || Date.now() - T.t > 20 * 60e3) setTimeout(() => refreshToday(true), 1200);
+      setTimeout(() => refreshCoach(), 3000);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible' || !cfg()) return;
         const t = get(K.today, null); if (!t || Date.now() - t.t > 20 * 60e3) refreshToday(true);
-        sync();
+        sync(); refreshCoach();
       });
       addEventListener('online', () => sync());
     },
@@ -171,6 +180,8 @@
     async backupPut(text) { const r = await api('/v1/backup/satzwerk', { method: 'PUT', raw: text, timeout: 60000 }); if (!r || !r.ok) throw new Error((r && r.error) || 'Sicherung fehlgeschlagen'); return r; },
     async backupGet() { const t = await api('/v1/backup/satzwerk', { text: true, timeout: 60000 }); return t ? JSON.parse(t) : null; },
     configured: () => !!cfg(),
+    coach() { const C = get(K.coach, null); return cfg() && C && C.data ? C.data : null; },
+    refreshCoach,
     statusLine() { if (!cfg()) return 'Nicht verbunden'; const S = get(K.sync, {}); return S.err ? 'Fehler: ' + S.err : 'Verbunden' + (S.last ? ' · abgeglichen ' + new Date(S.last).toLocaleDateString('de-DE') : ''); },
     _payload: payload, _sync: sync
   };

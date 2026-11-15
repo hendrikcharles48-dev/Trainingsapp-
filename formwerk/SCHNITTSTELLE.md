@@ -74,9 +74,10 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 | `GET /v1/raw?days=7` | Rohdaten von Garmin + was daraus gelesen wurde (Testseite unter `/`) |
 | `GET /v1/sessions?days=60` | gespeicherte Satzwerk-Einheiten (zur Kontrolle) |
 | `POST /v1/weight` | Körpergewicht `{date, kg}` (kg `null` = löschen) oder `{entries:[{date, kg, ifMissing, src}]}` |
-| `POST /v1/checkin` | Morgen-Check `{date, sore: {gruppe: 1–5}, pain: {stelle: 1–5}, bb, bbToday}` (ab Worker 1.7; ältere 1–2/1–3 werden umgerechnet); `{bbOnly: true, bb}` = nur „gestern Baseball?“ |
+| `POST /v1/checkin` | Morgen-Check `{date, sore: {gruppe: 1–5}, pain: {stelle: 1–5}, bb, bbToday}` (ab Worker 1.8; ältere 1–2/1–3 werden umgerechnet); `{bbOnly: true, bb}` = nur „gestern Baseball?“ |
 | `GET /v1/checkin?days=90` | Check-ins |
 | `GET /v1/weight` | alle von Hand eingetragenen Gewichte |
+| `PUT/GET /v1/coach` | Wochenbericht von Claude (`{v:1, id, title, summary, points, actions, built}`, max. 64 KB); GET → `{coach, prev}`. Format: Skill `satzwerk-wochenbericht` |
 | `PUT/GET /v1/backup/satzwerk` | Satzwerk-Sicherung (Export-JSON, `app: 'satzwerk'`); vorige Fassung bleibt im Worker |
 
 ## Garmin-Abruf (sparsam)
