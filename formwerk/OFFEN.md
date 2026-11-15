@@ -14,7 +14,7 @@ Schritt erinnern und erledigte Punkte abhaken. Ausführliche Anleitung: `formwer
 - [x] 5. Secrets setzen: Worker → Settings → Variables and Secrets → `GARMIN_API_KEY`, `APP_PASSWORD` (Typ Secret)
 - [x] 6. Testseite `https://formwerk.<name>.workers.dev` öffnen → Passwort → „7 Tage laden“
 - [x] 7. Screenshot der Tabelle „Was Formwerk daraus liest“ (bei roten Punkten auch Rohdaten) + Worker-Adresse an Claude schicken
-- [ ] 8. Formwerk in Safari öffnen → Teilen → „Zum Home-Bildschirm“ → Adresse + Passwort → Verbinden
+- [x] 8. Formwerk in Safari öffnen → Teilen → „Zum Home-Bildschirm“ → Adresse + Passwort → Verbinden
 - [ ] 9. Satzwerk: Einstellungen → Daten → „Formwerk (Erholung)“ → Adresse + Passwort → Verbinden
 
 ## Claude (nach Schritt 7)
@@ -25,3 +25,8 @@ Schritt erinnern und erledigte Punkte abhaken. Ausführliche Anleitung: `formwer
 
 Hinweis: Vivoactive 5 liefert HRV, Schlaf (Phasen, Schlafwert), Ruhepuls, Stress, Schritte, Body Battery, HF-Zonen (Worker 1.1.0 liest alles).
 Aktivitäten waren im Test leer – Baseball/Rad nur in der Belastung, wenn sie auf der Uhr als Aktivität aufgezeichnet werden.
+
+## Noch zu prüfen (Stand 15.11.)
+- [ ] Streifen unten / Tab-Leiste nach iOS-Höhenausgleich (Satzwerk 3.10.3, Formwerk 1.0.5) auf dem iPhone bestätigt? Sonst Zeile „Anzeige …“ unter Mehr erfragen
+- [ ] Satzwerk verbunden (Schritt 9) → Muskelgruppen in Formwerk + Karte auf Satzwerk-„Heute“
+- [ ] Cron-Vorabruf morgens aktiv? (Cloudflare → Settings → Trigger events → Cron triggers sollte „40 4,5 * * *“ zeigen)
