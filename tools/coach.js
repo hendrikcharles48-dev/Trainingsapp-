@@ -75,7 +75,8 @@ function facts(f, summaryF, checkF) {
     muscles, slots, rir, weight,
     checkins: (p.checkins || []).slice(-3), sportDays: p.sportDays || [],
     coachDone: p.coachDone || {},
-    customOpen: customOpen(p, ws).map(c => c.name)
+    customOpen: customOpen(p, ws).map(c => c.name),
+    customWaiting: (p.custom || []).filter(c => !c.hidden && findBuiltin(c.name) && !(p.cxNo || {})[c.id]).map(c => c.name + ' → ' + findBuiltin(c.name).name)
   };
   if (summaryF && fs.existsSync(summaryF)) { const s = read(summaryF); out.formwerk = { recovery: s.recovery, recommendation: s.recommendation, sleep: s.sleep, load: s.load, signals: s.signals, muscles: s.muscles, vitals: s.vitals, pain: s.pain, weight: s.weight }; }
   if (checkF && fs.existsSync(checkF)) { const c = read(checkF); out.morning = (c.checkins || c).slice ? (c.checkins || c).slice(-10) : c; }
@@ -83,7 +84,8 @@ function facts(f, summaryF, checkF) {
 }
 
 function customOpen(p, ws) {
-  return (p.custom || []).filter(c => !c.hidden && !findBuiltin(c.name)).map(c => ({ id: c.id, name: c.name, pat: c.pat, kind: c.kind, eq: c.eq, prim: c.prim, rr: c.rr, skill: c.skill || null, info: c.info || null,
+  // offen = noch keine feste Übung passt, oder der Nutzer hat die gefundene abgelehnt („Passt nicht“, profile.cxNo)
+  return (p.custom || []).filter(c => !c.hidden && (!findBuiltin(c.name) || (p.cxNo || {})[c.id])).map(c => ({ id: c.id, name: c.name, rejected: (p.cxNo || {})[c.id] || null, pat: c.pat, kind: c.kind, eq: c.eq, prim: c.prim, rr: c.rr, skill: c.skill || null, info: c.info || null,
     sessions: ws.filter(w => (w.exercises || []).some(e => e.exId === c.id)).length, note: ((p.exNotes || {})[c.id] || {}).t || null }));
 }
 

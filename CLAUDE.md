@@ -134,9 +134,11 @@ Nachbarn (Auswahlfenster mit empfohlener Variante).
 3. `figures.js`: Figur/Template + Eintrag in der `map`, Bewegung realistisch (Blickrichtung,
    Füße, Geräteposition) – mit `figcheck` prüfen.
 
-Die App übernimmt beim Start automatisch: Passt der Name (oder ein `alias`) einer eigenen Übung
-zu einer eingebauten Übung (`findBuiltin` in `app.js`), werden Verlauf, Plan und Favoriten auf die
-eingebaute Übung umgestellt und die eigene Übung entfernt.
+Ab 3.14.4 mit Bestätigung (Nutzerwunsch 15.11.): Passt der Name (oder ein `alias`) einer eigenen Übung zu einer
+eingebauten (`findBuiltin`), zeigt die App auf Heute die Karte „Neue feste Übung“ (`cxReadyCard`, auch im Wochenbericht)
+mit allen Daten (Fenster `cxReady`: Bild, Muskeln, Geräte, Stufe, Ziel, Anleitung). „Bestätigen“ → `upgradeOne`
+(Verlauf, alle Pläne, Favoriten, Notizen, Gewichtslisten umstellen, eigene Übung entfernen, vorher Sicherung).
+„Passt nicht“ → `profile.cxNo[eigeneId] = festeId`; `tools/coach.js custom` listet sie dann wieder (`rejected`) zum Nachbessern.
 
 Wo die eigenen Übungen zu finden sind:
 - Zuerst (ab 3.14): Sicherung im Formwerk-Worker (`GET /v1/backup/satzwerk`) → `node tools/coach.js custom <datei>` listet
