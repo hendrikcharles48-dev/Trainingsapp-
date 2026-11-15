@@ -99,3 +99,11 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 - Gruppen: `brust, ruecken, schultern, bizeps, trizeps, griff, rumpf, vorn, hinten, waden`.
 - Schmerz-Stellen: `nacken, schulter, ellbogen, handgelenk, oberer_ruecken, unterer_ruecken, huefte, leiste, oberschenkel, knie, sprunggelenk, achilles`.
 - Satzwerk zeigt `pain` im Training bei Übungen mit passendem `inj` (`FormwerkLink.painHint(ex)`) und auf der Formwerk-Karte.
+
+## Vorschläge und Signale (Worker 1.6, Satzwerk 3.13)
+
+`GET /v1/today` enthält zusätzlich:
+- `signals`: `{stress: {flag, reasons}, deload: {suggest, count, reasons}}`
+- `prefill`: `{tf: {en 0–2, sl 0–2, why}, week: {ans: {exh, fit, sleep, sore, pain, sport}, src}}` – Werte wie in Satzwerks
+  Tagesform (Energie/Schlaf: 0 niedrig/schlecht, 1 normal/okay, 2 hoch/gut) und `E.CHECKIN`.
+- `plan`: `{sportDays, baseballToday, strengthDays}` (0 = Mo … 6 = So).

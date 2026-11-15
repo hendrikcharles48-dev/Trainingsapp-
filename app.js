@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.12.0';
+  const APP_VERSION = '3.13.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,9 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '' };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null };
+  // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
+  function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
     mode: 'local', db: null, uid: null, q: {}, timers: {},
     async init() {
@@ -335,7 +337,7 @@
   // Hinweis, wenn eine Isolationsübung vor einer Grundübung für denselben Muskel steht
   // Diese Woche Mo–So: heute in Navy, Baseball als feste Termine, erledigte Trainings mit Haken
   function weekList(p) {
-    const sow = E.startOfWeek(); const todayIdx = (new Date().getDay() + 6) % 7; const sport = new Set(P().sportDays || []);
+    const sow = E.startOfWeek(); const todayIdx = (new Date().getDay() + 6) % 7; const sport = new Set(sportDaysEff());
     const LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
     const rows = LONG.map((dn, i) => {
       const iso = E.todayISO(new Date(sow.getTime() + i * 864e5)); const ws = st.workouts.filter(w => w.date === iso);
@@ -499,7 +501,7 @@
     const weekW = st.workouts.filter(w => w.date >= sowIso);
     const doneDays = new Set(weekW.map(w => (new Date(w.date + 'T12:00:00').getDay() + 6) % 7));
     const todayIdx = (new Date().getDay() + 6) % 7;
-    const sport = new Set(P().sportDays || []);
+    const sport = new Set(sportDaysEff());
     const di = st.homeDay ?? nextDayIdx(); const day = p.days[di] || p.days[0];
     const loc = st.homeLoc || defLoc();
     const slots = day.slots.filter(s => s.ex[loc]);
@@ -511,7 +513,7 @@
     const name = (a.name || '').trim();
     const dateTxt = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
     const rec = recovery();
-    const week = DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); const cls = [i === todayIdx ? 'today' : '', doneDays.has(i) ? 'done' : '', sport.has(i) ? 'sport' : ''].join(' ');
+    const week = DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); const good = ((FW.plan() || {}).strengthDays || []).includes(i) && i >= todayIdx && !doneDays.has(i); const cls = [i === todayIdx ? 'today' : '', doneDays.has(i) ? 'done' : '', sport.has(i) ? 'sport' : '', good ? 'good' : ''].join(' ');
       return `<div class="wd ${cls}"><span>${d}</span><b>${dt.getDate()}</b><i>${doneDays.has(i) ? I.check : sport.has(i) ? '<em></em>' : ''}</i></div>`; }).join('');
     const hero = st.active ? `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl clamp2">${esc(st.active.name)}</h2><div class="small ink2">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div></div><div class="figtile hero">${figSVG(getEx((st.active.exercises[st.active.cur || 0] || {}).exId), { anim: 2.8 })}</div></div>
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
@@ -523,7 +525,7 @@
     <div class="stack">
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
       ${st.active ? '' : FW.card()}
-      ${sport.size ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span><span><i class="lg-sport"></i>Baseball</span><span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
+      ${sport.size || ((FW.plan() || {}).strengthDays || []).length ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span>${sport.size ? '<span><i class="lg-sport"></i>Baseball</span>' : ''}${((FW.plan() || {}).strengthDays || []).length ? '<span><i class="lg-good"></i>Kraft-Tag</span>' : ''}<span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
       ${hero}
       ${st.active ? '' : `<div class="row"><button class="btn grow" data-a="dayPick">Andere Einheit</button><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button></div>`}
       ${(() => { const h = (checkinDue() ? checkinCard() : '') + homeCards() + bwNudge(); return h ? `<div class="section"><div class="head"><h3>Hinweise</h3></div>${h}</div>` : ''; })()}
@@ -705,7 +707,7 @@
     // Heatmap 12 Wochen
     const start = new Date(E.startOfWeek().getTime() - 11 * 7 * 864e5);
     const byDay = {}; for (const w of st.workouts) byDay[w.date] = (byDay[w.date] || 0) + 1;
-    const sport = new Set(P().sportDays || []); const todayIso = E.todayISO(); const firstIso = st.workouts.length ? st.workouts[0].date : todayIso;
+    const sport = new Set(sportDaysEff()); const todayIso = E.todayISO(); const firstIso = st.workouts.length ? st.workouts[0].date : todayIso;
     let heat = ''; for (let i = 0; i < 84; i++) { const d = new Date(start.getTime() + i * 864e5); const iso = E.todayISO(d); const c = byDay[iso] || 0; const sp = !c && iso <= todayIso && iso >= firstIso && sport.has(i % 7); heat += `<span class="${c ? 'l2' : sp ? 'sp' : ''}${iso === todayIso ? ' td' : ''}" title="${dateDE(iso)}${c ? ': ' + c + ' Training' : sp ? ': Baseball' : ''}"></span>`; }
     const exWithHist = [...new Set(st.workouts.flatMap(w => w.exercises.map(e => e.exId)))].filter(id => getEx(id));
     if (!st.chartEx || !exWithHist.includes(st.chartEx)) st.chartEx = mostFrequent(exWithHist);
@@ -1306,7 +1308,7 @@
     },
     checkin(s) {
       const done = E.CHECKIN.filter(q => s.ans[q.id] != null).length;
-      return `<div class="stack"><div><h2>Wochen-Check-in</h2><div class="small muted">Wie war die letzte Woche? Daraus passe ich Sätze und Reserve für diese Woche an.</div></div>
+      return `<div class="stack"><div><h2>Wochen-Check-in</h2><div class="small muted">Wie war die letzte Woche? Daraus passe ich Sätze und Reserve für diese Woche an.</div>${s.fw ? `<div class="small" style="margin-top:6px;color:var(--highlight)">${s.fw} von ${E.CHECKIN.length} Antworten aus Formwerk vorausgefüllt – nur prüfen und den Rest antippen.</div>` : ''}</div>
         ${E.CHECKIN.map(q => `<div class="stack" style="gap:8px"><b>${q.q}</b><div class="chips" style="flex-wrap:wrap">${q.o.map(([v, n]) => `<button class="chip ${s.ans[q.id] === v ? 'on' : ''}" data-a="ciPick" data-q="${q.id}" data-v="${v}">${n}</button>`).join('')}</div></div>`).join('')}
         <button class="btn primary big" data-a="ciSave" ${done < E.CHECKIN.length ? 'disabled' : ''}>Auswerten (${done}/${E.CHECKIN.length})</button></div>`;
     },
@@ -1523,7 +1525,7 @@
       const min = tp ? tp.minutes : estMinutes(day, s.l);
       const grp = (k, label, opts, v) => `<div><div class="eyebrow" style="margin-bottom:8px">${label}</div><div class="tfrow">${opts.map((o, i) => `<button class="tf" data-a="tfPick" data-k="${k}" data-v="${i}" aria-pressed="${v === i}">${o}</button>`).join('')}</div></div>`;
       const label = { '-2': 'Deutlich kürzer', '-1': 'Etwas kürzer', '0': 'Wie geplant', '1': 'Etwas länger', '2': 'Deutlich länger' }[delta];
-      return `<div class="stack"><div><div class="eyebrow">${esc(day.name)}</div><h2>Wie geht’s dir heute?</h2></div>
+      return `<div class="stack"><div><div class="eyebrow">${esc(day.name)}</div><h2>Wie geht’s dir heute?</h2>${s.fw ? `<div class="small muted">Vorausgefüllt aus Formwerk (${esc(s.fw)}) – nur ändern, wenn es nicht passt.</div>` : ''}</div>
         ${grp('en', 'Energie', ['Niedrig', 'Normal', 'Hoch'], en)}${grp('sl', 'Schlaf', ['Schlecht', 'Okay', 'Gut'], sl)}${grp('ti', 'Zeit', ['Knapp', 'Normal', 'Viel'], ti)}
         <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">Dein Plan heute</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
           <div class="planlist">${items.map(it => `<div class="pl-row">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span><span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
@@ -1602,7 +1604,7 @@
         ${head('Training')}<div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         ${head('Signale')}<div class="list">${tog('sound', 'Töne', 'Auf dem iPhone nur ohne Stumm-Schalter')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}</div>
         <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden; im Training bleibt der Bildschirm an.</div>
-        ${head('Baseball-Tage')}<div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div>
+        ${head('Baseball-Tage')}${FW.plan() ? `<div class="card flat small">Kommen aus Formwerk (Mehr → Feste Baseball-Zeiten): <b>${sportDaysEff().length ? sportDaysEff().map(k => DAYS[k]).join(', ') : 'keine festen Tage'}</b>. Einmal-Termine und Absagen trägst du in Formwerk auf „Heute“ ein.</div>` : `<div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div>`}
         <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
         ${head('Studio-Gewichte')}<div class="row"><div class="grow"><label class="lbl" for="set-bb">Langhantel-Schritt</label><select class="field" id="set-bb" data-in="setNum" data-k="bbStep">${[1, 2, 2.5, 5].map(v => `<option value="${v}" ${se.bbStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div><div class="grow"><label class="lbl" for="set-st">Maschinen-Schritt</label><select class="field" id="set-st" data-in="setNum" data-k="stackStep">${[1.25, 2.5, 5, 7].map(v => `<option value="${v}" ${se.stackStep == v ? 'selected' : ''}>${fmt(v)} kg</option>`).join('')}</select></div></div>
         ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button>${FW.configured() ? `<div class="li"><div class="grow"><b>Körpergewicht</b><div class="small muted">${fmt(E.bodyweight(P()), 1)} kg · kommt aus Formwerk</div></div></div>` : `<button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button>`}</div>
@@ -1658,7 +1660,7 @@
       if (!on) toast('Favorit entfernt. Die Übungsauswahl wurde neu bewertet.', 3500);
       else toast(where.length ? '★ Favorit. Passt gut und ist jetzt im Plan: ' + [...new Set(where)].join(', ') : '★ Favorit gespeichert. Sie wird bevorzugt, sobald sie sinnvoll passt. Gerade passt sie an keine freie Stelle, die Ausrüstung fehlt oder sie liegt noch zu weit über deinem Level.', 5000);
     },
-    ciOpen() { openSheet({ type: 'checkin', ans: {} }); },
+    ciOpen() { const w = FW.weekPrefill(); const ans = {}; if (w && w.ans) for (const q of E.CHECKIN) if (w.ans[q.id] != null && q.o.some(o => o[0] === w.ans[q.id])) ans[q.id] = w.ans[q.id]; openSheet({ type: 'checkin', ans, fw: w && Object.keys(ans).length ? Object.keys(ans).length : 0 }); },
     ciPick(t) { st.sheet.ans[t.dataset.q] = +t.dataset.v; renderSheet(); },
     ciSave() {
       const s2 = st.sheet; if (E.CHECKIN.some(q => s2.ans[q.id] == null)) { toast('Bitte alle Fragen beantworten'); return; }
@@ -1781,7 +1783,7 @@
     planLoc(t) { st.planLoc = t.dataset.l; render(); },
     startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; }
       const d0 = plan().days[+t.dataset.d]; if (!d0 || !d0.slots.some(s => s.ex[t.dataset.l])) { st.tab = 'plan'; render(); toast('Füge diesem Tag zuerst Übungen hinzu'); return; }
-      openSheet({ type: 'time', d: +t.dataset.d, l: t.dataset.l }); },
+      openSheet(Object.assign({ type: 'time', d: +t.dataset.d, l: t.dataset.l }, FW.tfPrefill())); },
     rateW(t) { const w = st.summary; if (!w) return; w.rating = +t.dataset.r; Store.saveWorkout(w); renderSheet(); },
     chartPick(t) { st.chartEx = t.dataset.id; render(); },
     tfPick(t) { st.sheet[t.dataset.k] = +t.dataset.v; renderSheet(); },
@@ -2089,14 +2091,17 @@
       const b = h.map(x => E.sessionBest(ex, x.entry, x.bw || E.bodyweight(P())));
       if (b[1] < b[0] * 0.97 && b[2] < b[1] * 0.97) falling++;
     }
-    return falling >= 2;
+    // Formwerk-Signale (HRV, Ruhepuls, Erholung, Muskelkater/Schmerz) zählen mit: 2 Formwerk-Zeichen oder 1 + fallende Leistung
+    const fs = FW.signals(); const fc = fs && fs.deload ? fs.deload.count : 0;
+    return falling >= 2 || fc >= 2 || (falling >= 1 && fc >= 1);
   }
   // Baseball & Co.: vor/an Spieltagen keine schweren Bein- oder Überkopf-Grundübungen
   function heavyDay(d, loc) { return d.slots.some(sl => sl.r === 'main' && (getEx(sl.ex[loc]) || {}).pat && ['squat', 'hinge', 'lunge', 'vpush'].includes(getEx(sl.ex[loc]).pat)); }
   function sportHint() {
-    const sd = P().sportDays || []; if (!sd.length || st.active) return '';
+    const sd = sportDaysEff(); const fp = FW.plan(); if ((!sd.length && !(fp && fp.baseballToday)) || st.active) return '';
     const ti = (new Date().getDay() + 6) % 7; const tm = (ti + 1) % 7;
-    const when = sd.includes(ti) ? 'Heute' : sd.includes(tm) ? 'Morgen' : ''; if (!when) return '';
+    const today = fp && FW.today() ? !!fp.baseballToday : sd.includes(ti); // in Formwerk abgewählt/angetippt zählt
+    const when = today ? 'Heute' : sd.includes(tm) ? 'Morgen' : ''; if (!when) return '';
     const p = plan(); const loc = st.homeLoc || defLoc(); const di = st.homeDay ?? nextDayIdx(); const d = p.days[di];
     if (!d || !heavyDay(d, loc)) return '';
     const alt = p.days.map((x, i) => ({ x, i })).find(o => o.i !== di && o.x.slots.some(s => s.ex[loc]) && !heavyDay(o.x, loc));
@@ -2107,7 +2112,7 @@
     const g = (p.answers || {}).goal;
     if (!(p.seen || {}).recomp && ['muscle', 'fit', 'health'].includes(g)) out += `<div class="card stack" style="gap:10px"><b>Neues Ziel: Fett weg & Muskeln aufbauen</b><div class="small muted">Für die Zeit, in der du Körperfett verlierst: gleiche Übungen, etwas weniger Zusatzvolumen, Fokus darauf, die Kraft zu halten. Dein Plan bleibt, wie er ist.</div><div class="row"><button class="btn primary grow" data-a="recompYes">Umstellen</button><button class="btn grow" data-a="recompNo">Nein danke</button></div></div>`;
     out += sportHint();
-    if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Leistung fällt – Deload-Woche empfohlen</b><div class="small muted">Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. Eine leichtere Woche (halbe Sätze, mehr Reserve) bringt dich meist stärker zurück.</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
+    if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Deload-Woche empfohlen</b><div class="small muted">${(() => { const fs = FW.signals(); const r = fs && fs.deload ? fs.deload.reasons : []; return (r.length ? 'Formwerk: ' + esc(r.join(' · ')) + '. ' : 'Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. ') + 'Eine leichtere Woche (halbe Sätze, mehr Reserve) bringt dich meist stärker zurück.'; })()}</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
     const since = p.lastExport || ''; const nNew = st.workouts.filter(w => w.date > since).length;
     const days = since ? (Date.now() - new Date(since + 'T12:00:00').getTime()) / 864e5 : 999;
     const cs = Cloud.state(), cOn = !!Cloud.cfg();

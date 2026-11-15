@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, prefillFor } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -115,6 +115,28 @@ await t('Baseball: feste Zeiten zählen automatisch, abwählbar, sonst antippen'
   assert.equal(baseballDay({}, S, di, {}).on, false);
   const acts = withCheckinBaseball({}, {}, null, 0, S, '2026-11-15', 20);
   assert.equal(acts[mo][0].time, '19:00'); assert.equal(acts[mo][0].dur, 5400); assert.ok(!acts[di]);
+});
+
+await t('Signale: Stresszeichen und leichtere Woche', () => {
+  const days = synthDays(45, (k) => ({ sleep: { total: 7.5 * 3600, resp: 14 + (k % 3) * 0.2, spo2: 95 } }));
+  let sig = physio(days, today, [], {});
+  assert.equal(sig.stress.flag, false); assert.equal(sig.deload.suggest, false);
+  days[today].sleep.resp = 17.5; days[today].rhr = 58;
+  sig = physio(days, today, [], {});
+  assert.equal(sig.stress.flag, true, JSON.stringify(sig.stress)); assert.ok(sig.stress.reasons.length >= 2);
+  const d2 = synthDays(45); for (let k = 0; k < 7; k++) { d2[addDays(today, -k)].hrv = 40; d2[addDays(today, -k)].rhr = 57; }
+  sig = physio(d2, today, [], {});
+  assert.equal(sig.deload.suggest, true, JSON.stringify(sig.deload));
+  const r = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T07:00:00Z') });
+  assert.equal(r.recommendation.title, 'Locker bleiben'); assert.equal(r.prefill.tf.en, 0);
+});
+await t('Vorschläge: Tagesform und Wochen-Check-in aus Formwerk', () => {
+  const days = synthDays(45);
+  const ckBy = {}; for (let i = 0; i < 4; i++) ckBy[addDays(today, -i)] = { date: addDays(today, -i), sore: i === 1 ? { vorn: 2 } : {}, pain: {} };
+  const s = buildSummary({ days, actsByDate: { [addDays(today, -2)]: [{ id: 1, type: 'baseball', dur: 7200, time: '18:00' }] }, sessions: [], settings: {}, today, now: Date.parse(today + 'T07:00:00Z'), checkins: Object.values(ckBy) });
+  assert.ok([1, 2].includes(s.prefill.tf.en)); assert.ok([1, 2].includes(s.prefill.tf.sl));
+  const w = s.prefill.week.ans; assert.equal(w.sore, 3); assert.equal(w.pain, 0); assert.equal(w.sport, 1); assert.ok(w.exh >= 1 && w.exh <= 5); assert.ok(w.sleep >= 1);
+  assert.ok(Array.isArray(s.body.insights.strengthDays.idx));
 });
 
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */
