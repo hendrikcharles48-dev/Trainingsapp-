@@ -21,7 +21,8 @@ export const PATHS = {
   steps: (a, b) => `/usersummary-service/stats/steps/daily/${a}/${b}`,
   activities: (a, b, start = 0, limit = 100) => `/activitylist-service/activities/search/activities?start=${start}&limit=${limit}&startDate=${a}&endDate=${b}`,
   activity: id => `/activity-service/activity/${id}`,
-  hrZones: () => '/biometric-service/heartRateZones/v2'
+  hrZones: () => '/biometric-service/heartRateZones/v2',
+  weight: (a, b) => `/weight-service/weight/range/${a}/${b}?includeAll=true`
 };
 
 export class GarminError extends Error {

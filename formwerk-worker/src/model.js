@@ -304,7 +304,9 @@ export function sleepView(days, date) {
    GESAMT: alles für die App in einem Rutsch
    ===================================================================== */
 // days: {iso: Tageswerte}, actsByDate: {iso: [Aktivität]}, sessions: [Satzwerk-Einheit], hr: {rest, max}
-export function buildSummary({ days, actsByDate, sessions, settings, today, now, hr, tzOff = 0, histDays = 90 }) {
+export function buildSummary({ days, actsByDate, sessions, settings, today, now, hr, tzOff = 0, histDays = 90, manualWeights = [] }) {
+  const weight = weightView(days, manualWeights, today);
+  const kgBy = Object.fromEntries(weight.series.map(x => [x.date, x.kg]));
   const hrv = hr || estimateHr(days, actsByDate);
   const loadBy = {}, loads = {};
   for (let k = 0; k < histDays + 28; k++) {
@@ -332,7 +334,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
       date: d, rec: r.score, color: r.color, hrv: x.hrv ?? null, rhr: x.rhr ?? null,
       sleep: x.sleep ? round(x.sleep.total / 3600, 2) : null, sleepScore: x.sleep ? x.sleep.score ?? null : null,
       load: loads[d].score, strength: strength.length, sets: strength.reduce((s, x2) => s + (x2.exercises || []).reduce((u, e) => u + (e.sets || []).length, 0), 0),
-      bb: x.bbHigh ?? null
+      bb: x.bbHigh ?? null, kg: kgBy[d] ?? null
     });
   }
   const b = baselines(days, today);
@@ -345,6 +347,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
     load: Object.assign({}, loads[today], { ratio }),
     bodyBattery: { high: t.bbHigh ?? null, low: t.bbLow ?? null, now: t.bbNow ?? null, wake: t.bbWake ?? null, charged: t.bbCharged ?? null, drained: t.bbDrained ?? null, curve: t.bbCurve || [] },
     vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null },
+    weight,
     strength: { last: (sessions || []).filter(s => s.date <= today).sort((a, c) => (c.end || 0) - (a.end || 0))[0] || null },
     history
   };
@@ -356,4 +359,21 @@ export function estimateHr(days, actsByDate) {
   const r = Object.values(days).map(d => d.rhr).filter(v => v > 0).sort((a, b) => a - b);
   const mx = Math.max(185, ...Object.values(actsByDate).flat().map(a => a.maxHr || 0));
   return { rest: r.length ? r[Math.floor(r.length / 2)] : 60, max: mx };
+}
+
+/* =====================================================================
+   6) KÖRPERGEWICHT
+   ---------------------------------------------------------------------
+   Quellen: von Hand (Formwerk, übernommene Satzwerk-Werte) und Garmin (falls in Garmin Connect gewogen).
+   Von Hand gewinnt am selben Tag. Trend: Schnitt der letzten 7 Tage gegen die 7 Tage davor, in % pro Woche
+   (Ziel beim Abnehmen mit Muskelerhalt: −0,25 bis −0,75 %/Woche).
+   ===================================================================== */
+export function weightView(days, manual, today) {
+  const by = {};
+  for (const d of Object.values(days || {})) if (d.gKg) by[d.date] = { date: d.date, kg: d.gKg, src: 'garmin' };
+  for (const m of manual || []) if (m && m.kg) by[m.date] = { date: m.date, kg: m.kg, src: m.src || 'formwerk' };
+  const series = Object.values(by).filter(x => x.date <= today).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const avg = (from, to) => { const v = series.filter(x => x.date > from && x.date <= to).map(x => x.kg); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const a = avg(addDays(today, -7), today), b = avg(addDays(today, -14), addDays(today, -7));
+  return { latest: series[series.length - 1] || null, series, trend: a && b ? { pct: round((a / b - 1) * 100, 2), a: round(a, 1), b: round(b, 1) } : null };
 }

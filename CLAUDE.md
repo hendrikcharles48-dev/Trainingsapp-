@@ -248,5 +248,9 @@ Empfehlung (Baseball Di/Do, 2× Kraft/Woche, einstellbar). Keine medizinischen A
 - Schnittstelle: `formwerk/SCHNITTSTELLE.md`. Satzwerk-Seite NUR in `formwerk-link.js` (Abgleich über Prüfsummen, Karte auf
   „Heute“, Fenster `SHEETS.formwerk`, Einstellungen → Daten). In `app.js` nur Aufrufe über `FW` (`FW.changed()` in
   `Store.saveWorkout/deleteWorkout`, `FW.init` in `boot`, `FW.card()` in `homeView`). Speicher `satzwerk.formwerk*`.
+- Körpergewicht (Satzwerk 3.11): Eingabe nur in Formwerk (Worker `w:<Datum>`, Garmin-Gewicht `gKg`), Satzwerk übernimmt per
+  `syncWeight` in `bwLog` (nur ergänzen) und blendet seine Gewichtseingabe aus, solange Formwerk verbunden ist (`FW.configured()`).
+- Automatische Sicherung: ohne GitHub-Zugang sichert Satzwerk über den Worker (`Cloud.cfg()` → `{worker:true}`, `Cloud.where()`,
+  `FW.backupPut/backupGet`, Worker `bk:satzwerk` mit zwei Fassungen). Ausschalten setzt `cloudState.wOff`.
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

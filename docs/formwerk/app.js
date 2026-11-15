@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.7';
+  const VERSION = '1.1.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -110,7 +110,7 @@
   function todayView() {
     const d = st.data;
     if (!d) return header('Heute') + banners() + (st.loading ? '<div class="stack"><div class="skeleton" style="height:340px"></div><div class="skeleton"></div><div class="skeleton"></div></div>' : `<div class="card"><p class="ink2" style="margin:0">Noch keine Daten. Nach unten ziehen oder oben rechts aktualisieren.</p></div>`);
-    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${bbCard(d)}</div>`;
+    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
   }
   function ringCard(d) {
     const r = d.recovery, v = d.vitals;
@@ -189,6 +189,30 @@
   }
   function actName(t) { return ({ baseball: 'Baseball', cycling: 'Radfahren', road_biking: 'Rennrad', running: 'Laufen', walking: 'Gehen', hiking: 'Wandern', strength_training: 'Krafttraining' })[t] || (t || 'Aktivität').replace(/_/g, ' '); }
 
+  function weightCard(d) {
+    const w = d.weight || {}; const L = w.latest; const tr = w.trend;
+    const when = L ? (L.date === todayIso() ? 'heute' : dShort(L.date)) + (L.src === 'garmin' ? ' · Garmin' : '') : '';
+    const trTxt = tr ? `${tr.pct > 0 ? '+' : tr.pct < 0 ? '−' : '±'}${fmt(Math.abs(tr.pct), 2)} % pro Woche` : '';
+    const trHint = tr ? (tr.pct <= -0.25 && tr.pct >= -0.75 ? 'im Ziel (−0,25 bis −0,75 %)' : tr.pct < -0.75 ? 'schneller als Ziel – Muskeln schützen' : 'langsamer als Ziel (−0,25 bis −0,75 %)') : 'Trend nach zwei Wochen mit Werten';
+    return `<div class="card"><div class="ctitle"><h3>Körpergewicht</h3><span class="aside">${when}</span></div>
+      <div class="split"><div class="bigval num">${L ? fmt(L.kg, 1) : '–'}<small>kg</small></div>
+        <button class="btn" data-a="weightSheet" style="min-height:44px">Eintragen</button></div>
+      <div class="small ink2" style="margin-top:8px">${trTxt ? '<b>' + trTxt + '</b> · ' : ''}${trHint}</div>
+      <div class="tiny muted" style="margin-top:4px">Satzwerk übernimmt den Wert für Klimmzüge, Dips & Co.</div></div>`;
+  }
+  function weightSheet() {
+    const L = st.data && st.data.weight && st.data.weight.latest;
+    st.wIn = st.wIn || (L ? L.kg : 85);
+    openSheet(`<div class="stack"><div><div class="eyebrow">Heute, morgens nüchtern am besten</div><h2>Körpergewicht</h2></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+        <button class="btn" data-a="wAdj" data-d="-1" style="width:56px">−1</button><button class="btn" data-a="wAdj" data-d="-0.1" style="width:56px">−</button>
+        <div class="num" id="wVal" style="font-size:44px;font-weight:900;min-width:120px;text-align:center">${fmt(st.wIn, 1)}</div>
+        <button class="btn" data-a="wAdj" data-d="0.1" style="width:56px">+</button><button class="btn" data-a="wAdj" data-d="1" style="width:56px">+1</button></div>
+      <div class="small muted" style="text-align:center">kg</div>
+      <button class="btn primary block" data-a="wSave">Speichern</button>
+      ${L && L.date === todayIso() ? '<button class="btn ghost danger block" data-a="wDel">Heutigen Wert löschen</button>' : ''}
+      <button class="btn ghost block" data-a="closeSheet">Abbrechen</button></div>`);
+  }
   function bbCard(d) {
     const b = d.bodyBattery; if (b.high == null && b.now == null) return '';
     const c = b.curve || []; let path = '';
@@ -212,6 +236,7 @@
       ${chartCard('hrv', 'HRV', h, { key: 'hrv', type: 'line', unit: 'ms', avg: avg('hrv'), aside: avg('hrv') != null ? 'Ø ' + fmt(avg('hrv')) + ' ms' : '' })}
       ${chartCard('rhr', 'Ruhepuls', h, { key: 'rhr', type: 'line', unit: 'bpm', avg: avg('rhr'), aside: avg('rhr') != null ? 'Ø ' + fmt(avg('rhr'), 1) + ' bpm' : '' })}
       ${chartCard('sleep', 'Schlaf', h, { key: 'sleep', type: 'bar', unit: 'h', fmtv: v => hm(v * 3600) + ' h', avg: avg('sleep'), aside: avg('sleep') != null ? 'Ø ' + hm(avg('sleep') * 3600) + ' h' : '' })}
+      ${chartCard('kg', 'Körpergewicht', h, { key: 'kg', type: 'line', unit: 'kg', fmtv: v => fmt(v, 1) + ' kg', avg: avg('kg'), aside: avg('kg') != null ? 'Ø ' + fmt(avg('kg'), 1) + ' kg' : '' })}
       ${chartCard('load', 'Belastung', h, { key: 'load', type: 'bar', max: 100, unit: '', marks: 'strength', aside: (() => { const n = h.reduce((t, x) => t + (x.strength || 0), 0); return n + '× Kraft'; })() })}
       <div class="tiny muted" style="text-align:center">Auf ein Diagramm tippen zeigt den Tageswert. Punkte unter der Belastung = Kraft-Einheit aus Satzwerk.</div></div>`;
   }
@@ -323,6 +348,10 @@
     tab(t) { st.tab = t.dataset.k; LS.set('tab', st.tab); render(); window.scrollTo(0, 0); },
     refresh() { load(true); },
     why() { if (st.data) whySheet(); },
+    weightSheet() { st.wIn = null; weightSheet(); },
+    wAdj(t) { st.wIn = Math.min(300, Math.max(25, Math.round((st.wIn + +t.dataset.d) * 10) / 10)); const v = $('#wVal'); if (v) v.textContent = fmt(st.wIn, 1); },
+    async wSave() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: st.wIn } }); closeSheet(); toast('Gespeichert'); load(true); } catch (e) { toast(e.message, 3500); } },
+    async wDel() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: null } }); closeSheet(); toast('Gelöscht'); load(true); } catch (e) { toast(e.message, 3500); } },
     explain: explainSheet,
     closeSheet,
     range(t) { st.range = +t.dataset.n; st.sel = {}; LS.set('range', st.range); render(); },

@@ -26,7 +26,7 @@ export function deep(o, names, depth = 0) {
 export function list(x) {
   if (Array.isArray(x)) return x;
   if (!isObj(x)) return [];
-  for (const k of ['data', 'hrvSummaries', 'dailySleepSummaries', 'sleepSummaries', 'activityList', 'activities', 'items', 'entries', 'results', 'dailySummaries']) if (Array.isArray(x[k])) return x[k];
+  for (const k of ['data', 'dailyWeightSummaries', 'dateWeightList', 'hrvSummaries', 'dailySleepSummaries', 'sleepSummaries', 'activityList', 'activities', 'items', 'entries', 'results', 'dailySummaries']) if (Array.isArray(x[k])) return x[k];
   for (const v of Object.values(x)) if (Array.isArray(v) && v.length && isObj(v[0])) return v;
   return [x];
 }
@@ -145,6 +145,7 @@ export function mergeDays(sources) {
   // Body Battery zuerst: die genauen Tageswerte (min/max/aktuell) aus der Tageszusammenfassung überschreiben die Kurve
   for (const raw of sources.bb || []) for (const o of list(raw)) put(dateOf(o), bodyBatteryFrom(o));
   for (const raw of sources.hrv || []) for (const o of list(raw)) put(dateOf(o), hrvFrom(o));
+  for (const raw of sources.weight || []) for (const o of list(raw)) put(dateOf(o), weightFrom(o));
   for (const raw of sources.daily || []) for (const o of list(raw)) put(dateOf(o), dailyFrom(o));
   for (const raw of sources.stress || []) for (const o of list(raw)) put(dateOf(o), stressFrom(o));
   for (const raw of sources.steps || []) for (const o of list(raw)) put(dateOf(o), stepsFrom(o));
@@ -166,4 +167,12 @@ export function hrFrom(x) {
   if (!z) return null;
   const max = n(z.maxHeartRateUsed), rest = n(z.restingHeartRateUsed);
   return max ? { max, rest: rest || null, floors: [1, 2, 3, 4, 5].map(i => n(z['zone' + i + 'Floor'])) } : null;
+}
+
+// Gewicht (weight-service/weight/range): Garmin speichert Gramm. Nur vorhanden, wenn in Garmin Connect gewogen/eingetragen.
+export function weightFrom(o) {
+  const w = n(pick(o, 'latestWeight.weight', 'weight', 'allWeightMetrics.0.weight'));
+  if (w === null || w <= 0) return null;
+  const kg = w > 500 ? w / 1000 : w;
+  return kg >= 25 && kg <= 300 ? { gKg: Math.round(kg * 10) / 10 } : null;
 }

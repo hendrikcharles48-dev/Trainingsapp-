@@ -13,7 +13,7 @@
   const set = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  let opt = { workouts: () => [], getEx: () => null, onChange: () => { } };
+  let opt = { workouts: () => [], getEx: () => null, onChange: () => { }, bwLog: () => [], onWeight: () => { } };
   let timer = null, busy = false, msg = '';
 
   function cfg() { const c = get(K.cfg, null); return c && c.url && c.pw ? c : null; }
@@ -37,9 +37,11 @@
 
   async function api(path, o = {}) {
     const c = cfg(); if (!c) throw new Error('nicht eingerichtet');
-    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), o.timeout || 20000);
     try {
-      const r = await fetch(c.url.replace(/\/+$/, '') + path, { method: o.method || 'GET', headers: Object.assign({ Authorization: 'Bearer ' + c.pw }, o.body ? { 'Content-Type': 'application/json' } : {}), body: o.body ? JSON.stringify(o.body) : undefined, signal: ctl.signal, cache: 'no-store' });
+      const r = await fetch(c.url.replace(/\/+$/, '') + path, { method: o.method || 'GET', headers: Object.assign({ Authorization: 'Bearer ' + c.pw }, o.body || o.raw ? { 'Content-Type': 'application/json' } : {}), body: o.raw != null ? o.raw : o.body ? JSON.stringify(o.body) : undefined, signal: ctl.signal, cache: 'no-store' });
+      if (o.text && r.ok) return await r.text();
+      if (o.text && r.status === 404) return null;
       let j = null; try { j = await r.json(); } catch (e) { }
       if (!r.ok) throw new Error(r.status === 401 ? 'Passwort falsch' : (j && j.message) || 'Fehler ' + r.status);
       return j;
@@ -60,7 +62,10 @@
       if (!changed.length && !deleted.length && S.last && Date.now() - S.last < 24 * 3600e3) { busy = false; return; }
       let res = null;
       for (let i = 0; i < Math.max(1, changed.length); i += 50) res = await api('/v1/sessions', { method: 'POST', body: { sessions: changed.slice(i, i + 50), deleted: i === 0 ? deleted : [] } });
-      set(K.sync, { sent: (res && res.have) || {}, last: Date.now(), err: null });
+      // Einmalig: bisherige Gewichtseinträge aus Satzwerk an Formwerk geben (überschreibt dort nichts)
+      let bwSent = S.bwSent;
+      if (!bwSent) { const log = (opt.bwLog() || []).filter(x => x && x.d && x.kg); if (log.length) await api('/v1/weight', { method: 'POST', body: { entries: log.map(x => ({ date: x.d, kg: x.kg, ifMissing: true, src: 'satzwerk' })) } }); bwSent = Date.now(); }
+      set(K.sync, { sent: (res && res.have) || {}, last: Date.now(), err: null, bwSent });
       if (changed.some(p => p.date === iso(new Date()))) refreshToday(true);
     } catch (e) {
       set(K.sync, Object.assign(S, { err: e.message, errAt: Date.now() }));
@@ -70,7 +75,7 @@
 
   async function refreshToday(quiet) {
     if (!cfg()) return;
-    try { const j = await api('/v1/today'); set(K.today, { t: Date.now(), data: j }); }
+    try { const j = await api('/v1/today'); set(K.today, { t: Date.now(), data: j }); if (j && j.weight) try { opt.onWeight(j.weight, j.weights || []); } catch (e) { } }
     catch (e) { const T = get(K.today, {}); set(K.today, Object.assign(T, { err: e.message })); }
     opt.onChange();
   }
@@ -149,6 +154,9 @@
     // nach jeder Änderung an Trainings (speichern/löschen) – gebündelt nach 4 s
     changed() { if (!cfg()) return; clearTimeout(timer); timer = setTimeout(sync, 4000); },
     card, sheet,
+    // Sicherung von Satzwerk im Worker (Export-JSON). get → Objekt oder null (noch keine), Fehler werfen.
+    async backupPut(text) { const r = await api('/v1/backup/satzwerk', { method: 'PUT', raw: text, timeout: 60000 }); if (!r || !r.ok) throw new Error((r && r.error) || 'Sicherung fehlgeschlagen'); return r; },
+    async backupGet() { const t = await api('/v1/backup/satzwerk', { text: true, timeout: 60000 }); return t ? JSON.parse(t) : null; },
     configured: () => !!cfg(),
     statusLine() { if (!cfg()) return 'Nicht verbunden'; const S = get(K.sync, {}); return S.err ? 'Fehler: ' + S.err : 'Verbunden' + (S.last ? ' · abgeglichen ' + new Date(S.last).toLocaleDateString('de-DE') : ''); },
     _payload: payload, _sync: sync

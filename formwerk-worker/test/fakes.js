@@ -28,6 +28,7 @@ export function installFakeGarmin() { globalThis.fetch = async (url, opt = {}) =
   if (p.endsWith('dailysummaries')) return J({ data: range(qa, qb).map((d, i) => ({ calendarDate: d, source: 'garmin', movement: { steps: { goal: 7500, value: 8000 } }, heartRate: { minValue: 45, maxValue: 120, restingValue: 51 + (i % 3) }, intensityMinutes: { moderate: 10, vigorous: 0 }, stress: { avgLevel: 30 }, bodyBattery: { minValue: 20, maxValue: 90, chargedValue: 70, drainedValue: 75, latestValue: 40 } })) });
   if (p.includes('/activities/search/')) return J([{ activityId: 9, activityName: 'Baseball', activityType: { typeKey: 'baseball' }, startTimeLocal: qb + ' 18:00:00', duration: 7200, averageHR: 120, maxHR: 175 }]);
   if (p.includes('stats/stress') || p.includes('stats/steps')) return J([]);
+  if (p.startsWith('/weight-service/')) return J({ dailyWeightSummaries: [{ summaryDate: sb, latestWeight: { weight: 90500, sourceType: 'MANUAL' } }] });
   if (p.includes('heartRateZones')) return J([{ trainingMethod: 'HR_MAX', restingHeartRateUsed: 50, zone1Floor: 95, zone2Floor: 115, zone3Floor: 135, zone4Floor: 155, zone5Floor: 175, maxHeartRateUsed: 192, sport: 'DEFAULT' }]);
   return new Response('not found', { status: 404 });
 }; }
