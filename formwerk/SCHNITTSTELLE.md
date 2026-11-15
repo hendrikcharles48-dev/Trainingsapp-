@@ -58,6 +58,7 @@ muss nur `formwerk-link.js` (Repo-Root) dieses Format weiter liefern – sonst n
 }
 ```
 
+`pain`: `[{k, label, lvl 1–3, inj, days}]` heutiger Schmerz (`inj` = Satzwerk-Belastung `shoulder|elbow|wrist|lowback|knee`), `checkin`: heute eingetragen.
 `weight`: `{date, kg, src}` (neuester Wert, `src` `formwerk`/`satzwerk`/`garmin`), `weights`: die letzten 60 Werte.
 `color`: `green` | `yellow` | `red` | `none`. `level`: `full` | `light` | `rest` | `done`.
 Satzwerk zeigt das nur an und ändert nichts am Plan.
@@ -73,6 +74,8 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 | `GET /v1/raw?days=7` | Rohdaten von Garmin + was daraus gelesen wurde (Testseite unter `/`) |
 | `GET /v1/sessions?days=60` | gespeicherte Satzwerk-Einheiten (zur Kontrolle) |
 | `POST /v1/weight` | Körpergewicht `{date, kg}` (kg `null` = löschen) oder `{entries:[{date, kg, ifMissing, src}]}` |
+| `POST /v1/checkin` | Morgen-Check `{date, sore: {gruppe: 1–2}, pain: {stelle: 1–3}, bb}`; `{bbOnly: true, bb}` = nur „gestern Baseball?“ |
+| `GET /v1/checkin?days=90` | Check-ins |
 | `GET /v1/weight` | alle von Hand eingetragenen Gewichte |
 | `PUT/GET /v1/backup/satzwerk` | Satzwerk-Sicherung (Export-JSON, `app: 'satzwerk'`); vorige Fassung bleibt im Worker |
 
@@ -90,3 +93,9 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 - Satzwerk sichert automatisch in den Worker (`Cloud` mit `cfg().worker`), wenn Formwerk verbunden ist und kein
   GitHub-Zugang eingerichtet ist. Gleicher Schutz wie bei GitHub: fehlen hier Trainings, die in der Sicherung liegen,
   wird nicht überschrieben.
+
+## Körpergefühl (Worker 1.3, Formwerk 1.2, Satzwerk 3.12)
+
+- Gruppen: `brust, ruecken, schultern, bizeps, trizeps, griff, rumpf, vorn, hinten, waden`.
+- Schmerz-Stellen: `nacken, schulter, ellbogen, handgelenk, oberer_ruecken, unterer_ruecken, huefte, leiste, oberschenkel, knie, sprunggelenk, achilles`.
+- Satzwerk zeigt `pain` im Training bei Übungen mit passendem `inj` (`FormwerkLink.painHint(ex)`) und auf der Formwerk-Karte.

@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -110,7 +110,7 @@
   function todayView() {
     const d = st.data;
     if (!d) return header('Heute') + banners() + (st.loading ? '<div class="stack"><div class="skeleton" style="height:340px"></div><div class="skeleton"></div><div class="skeleton"></div></div>' : `<div class="card"><p class="ink2" style="margin:0">Noch keine Daten. Nach unten ziehen oder oben rechts aktualisieren.</p></div>`);
-    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
+    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${checkCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
   }
   function ringCard(d) {
     const r = d.recovery, v = d.vitals;
@@ -148,12 +148,13 @@
       ${c.good && c.good.length ? `<div class="eyebrow" style="margin-top:14px">Gut heute</div><div class="pills">${c.good.map(g => `<span class="pill">${esc(g)}</span>`).join('')}</div>` : ''}
       ${c.avoid && c.avoid.length && c.level !== 'rest' && c.level !== 'done' ? `<div class="eyebrow" style="margin-top:12px">Wegen Baseball schonen</div><div class="pills">${c.avoid.map(g => `<span class="pill dim">${esc(g)}</span>`).join('')}</div>` : ''}
       ${c.notes && c.notes.length ? `<ul class="notes">${c.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
-      <div class="weekdots"><div class="dots">${dots}</div><span>Kraft diese Woche: ${w.done} von ${w.goal}</span></div></div>`;
+      <div class="weekdots"><div class="dots">${dots}</div><span>Kraft diese Woche: ${w.done} von ${w.goal}</span></div>
+      ${d.body && d.body.insights && d.body.insights.strengthDays.days.length ? `<div class="tiny muted" style="margin-top:8px">Gute Kraft-Tage für dich: <b style="color:var(--ink2)">${d.body.insights.strengthDays.days.join(' · ')}</b></div>` : ''}</div>`;
   }
 
   function muscleCard(d) {
     const ms = d.muscles || []; const last = d.strength && d.strength.last;
-    const txt = m => m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
+    const txt = m => m.pain ? 'Schmerz ' + m.pain + '/3 · schonen' : m.sore ? 'Muskelkater ' + (m.sore === 2 ? 'stark' : 'leicht') : m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
     const lastTxt = last ? `${esc(last.name || 'Kraft')} · ${last.date === todayIso() ? 'heute' : dShort(last.date)}` : 'Noch keine Einheit von Satzwerk';
     return `<div class="card"><div class="ctitle"><h3>Muskelgruppen</h3><span class="aside ell">${lastTxt}</span></div>
       <div class="muscles">${ms.map(m => `<div class="mus ${m.status}"><div class="top"><b class="ell">${esc(m.label)}</b><span>${txt(m)}</span></div><div class="bar"><i style="width:${Math.max(3, m.pct)}%"></i></div></div>`).join('')}</div>
@@ -188,6 +189,43 @@
       <div class="tiny muted" style="margin-top:8px">Aus Herzfrequenz-Zonen deiner Garmin-Aktivitäten (auch Baseball, Rad). Kraft zählt bei den Muskelgruppen.</div></div>`;
   }
   function actName(t) { return ({ baseball: 'Baseball', cycling: 'Radfahren', road_biking: 'Rennrad', running: 'Laufen', walking: 'Gehen', hiking: 'Wandern', strength_training: 'Krafttraining' })[t] || (t || 'Aktivität').replace(/_/g, ' '); }
+
+  /* ----- Morgen-Check: Muskelkater und Schmerz ----- */
+  const SORE_L = ['', 'leicht', 'stark'];
+  const PAIN_AREAS = [['nacken', 'Nacken'], ['schulter', 'Schulter'], ['ellbogen', 'Ellbogen'], ['handgelenk', 'Handgelenk'], ['oberer_ruecken', 'Oberer Rücken'], ['unterer_ruecken', 'Unterer Rücken'], ['huefte', 'Hüfte'], ['leiste', 'Leiste'], ['oberschenkel', 'Oberschenkel hinten'], ['knie', 'Knie'], ['sprunggelenk', 'Sprunggelenk'], ['achilles', 'Achilles / Wade']];
+  const painLabel = k => (PAIN_AREAS.find(a => a[0] === k) || [k, k])[1];
+  function checkCard(d) {
+    const b = d.body; if (!b) return '';
+    const c = b.checkin; const ms = d.muscles || [];
+    const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball gespielt?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
+    if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
+      <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ}</div>`;
+    const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
+    const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/3`);
+    const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
+    return `<div class="card"><div class="ctitle"><h3>Körpergefühl heute</h3><button class="btn ghost" data-a="ckOpen" style="min-height:36px;padding:0 12px;font-size:14px">Ändern</button></div><div class="small ink2">${esc(txt)}</div>${bbQ}</div>`;
+  }
+  function ckSheet() {
+    const ms = (st.data && st.data.muscles) || []; const c = st.ck;
+    const chip = (kind, k, label, v, max) => `<button class="ckchip ${v ? 'on lv' + v : ''}" data-a="ckTap" data-kind="${kind}" data-k="${k}" data-max="${max}"><b class="ell">${esc(label)}</b><span>${kind === 'sore' ? (SORE_L[v] || '–') : v ? v + '/3' : '–'}</span></button>`;
+    openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Antippen wechselt: – → leicht → stark. Schmerz: 1 = spürbar, 2 = stört, 3 = stark.</div></div>
+      <div><div class="lblf">Muskelkater</div><div class="ckgrid">${ms.map(m => chip('sore', m.k, m.label, c.sore[m.k] || 0, 2)).join('')}</div></div>
+      <div><div class="lblf">Schmerz (Gelenke, Sehnen, stechend)</div><div class="ckgrid">${PAIN_AREAS.map(([k, l]) => chip('pain', k, l, c.pain[k] || 0, 3)).join('')}</div></div>
+      <div class="tiny muted">Formwerk stellt keine Diagnose. Hält Schmerz an oder wird stärker: Arzt oder Physio.</div>
+      <button class="btn primary block" data-a="ckSave">Speichern</button><button class="btn ghost block" data-a="closeSheet">Abbrechen</button></div>`);
+  }
+  async function ckSend(body) {
+    try { await api('/v1/checkin', { method: 'POST', body: Object.assign({ date: todayIso() }, body) }); closeSheet(); load(true); }
+    catch (e) { toast(e.message, 3500); }
+  }
+  function bodyCard(d) {
+    const b = d.body; if (!b || !b.insights) return '';
+    const I2 = b.insights; const items = I2.items || [];
+    const list = items.map(x => `<div style="padding:10px 0;border-top:1px solid var(--line)"><div class="small">${esc(x.text)}</div>${x.tip ? `<div class="tiny muted" style="margin-top:3px">${esc(x.tip)}</div>` : ''}</div>`).join('');
+    return `<div class="card"><div class="ctitle"><h3>Körpergefühl · 6 Wochen</h3><span class="aside">${I2.checkins} Check-ins</span></div>
+      ${I2.strengthDays.days.length ? `<div class="small ink2">Gute Kraft-Tage für dich: <b>${I2.strengthDays.days.join(' · ')}</b></div><div class="tiny muted" style="margin:3px 0 6px">${esc(I2.strengthDays.why)}</div>` : ''}
+      ${list || `<div class="small muted" style="padding-top:8px;border-top:1px solid var(--line)">${I2.enough ? 'Keine wiederkehrenden Beschwerden – gut so.' : `Noch ${Math.max(0, 14 - I2.checkins)} Morgen-Checks, dann erkennt Formwerk deine Muster und lernt, wie lange du nach Kraft und Baseball brauchst.`}</div>`}</div>`;
+  }
 
   function weightCard(d) {
     const w = d.weight || {}; const L = w.latest; const tr = w.trend;
@@ -232,6 +270,7 @@
     const avg = k => { const v = h.map(x => x[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
     const recCol = x => COL[x.color] || COL.none;
     return header('Verlauf') + `<div class="stack">${banners()}${seg}
+      ${bodyCard(d)}
       ${chartCard('rec', 'Erholung', h, { key: 'rec', type: 'bar', max: 100, color: recCol, unit: '%', aside: avg('rec') != null ? 'Ø ' + fmt(avg('rec')) + ' %' : '' })}
       ${chartCard('hrv', 'HRV', h, { key: 'hrv', type: 'line', unit: 'ms', avg: avg('hrv'), aside: avg('hrv') != null ? 'Ø ' + fmt(avg('hrv')) + ' ms' : '' })}
       ${chartCard('rhr', 'Ruhepuls', h, { key: 'rhr', type: 'line', unit: 'bpm', avg: avg('rhr'), aside: avg('rhr') != null ? 'Ø ' + fmt(avg('rhr'), 1) + ' bpm' : '' })}
@@ -338,6 +377,7 @@
       <p><b>Erholung (0–100 %).</b> Nächtliche HRV (50 %), Ruhepuls (25 %) und Schlaf (25 %) – immer im Vergleich zu deinem eigenen 30-Tage-Schnitt, nie zu Normwerten. HRV wird logarithmisch verglichen (übliche Methode in der Sportwissenschaft). Schlaf = Dauer im Verhältnis zu deinem Bedarf (dein Schnitt, 7–9 h) plus Qualität (Garmin-Schlafwert). Grün ab 67, gelb 34–66, rot darunter. Body Battery wird nur angezeigt.</p>
       <p><b>Belastung (0–100).</b> Aus der Zeit in deinen Herzfrequenz-Zonen bei jeder Garmin-Aktivität (Zone 1 zählt 1×, Zone 5 zählt 5×) plus Alltagsschritte. Die Skala flacht oben ab: 1 h locker ≈ 35, 2 h Baseball ≈ 55–65.</p>
       <p><b>Muskelgruppen.</b> Jeder Satz aus Satzwerk zählt für die Hauptmuskeln voll, für mitbeteiligte halb – je weniger Wiederholungen in Reserve, desto mehr. 5 sehr harte Sätze = voll ermüdet. Die Ermüdung klingt ab: große Beinmuskeln und unterer Rücken am langsamsten (2–3 Tage), Arme, Waden und Bauch schneller (1–2 Tage). Baseball belastet Schultern, Rumpf, Unterarme und Beinbeuger mit.</p>
+      <p><b>Körpergefühl.</b> Morgens kurz Muskelkater und Schmerzen antippen. Muskelkater macht die Gruppe für heute mindestens „teilweise“ (leicht) bzw. „ermüdet“ (stark). Schmerz ist kein Muskelkater: die Stelle wird geschont, bei 3/3 heute keine Kraft, an 3 von 5 Tagen kommt der Hinweis, es abklären zu lassen. Mit der Zeit vergleicht Formwerk deine Angaben mit der Rechnung und passt je Muskelgruppe an, wie lange du nach Kraft und nach Baseball brauchst. Im Verlauf erscheinen Muster und deine guten Kraft-Tage.</p>
       <p><b>Empfehlung.</b> Rot → Pause. Grün → Kraft voll, gelb → Kraft leicht (⅔ der Sätze, 3 Wdh. Reserve). Eine Stufe leichter bei wenig Schlaf oder deutlich mehr Wochenbelastung als gewohnt. An Baseball-Tagen höchstens leicht, am Tag davor keine schweren Beine/Überkopf. Letzte Kraft-Einheit unter 48 h und Muskeln noch müde → Kraft-Pause. Ziel: ${(st.data && st.data.settings && st.data.settings.strengthPerWeek) || 2} Einheiten pro Woche.</p>
       <p class="muted">Trainingshilfe, keine medizinische Aussage. Wenn du dich krank fühlst, zählt dein Gefühl.</p></div>
       <button class="btn block" data-a="closeSheet">Schließen</button></div>`);
@@ -349,6 +389,12 @@
     refresh() { load(true); },
     why() { if (st.data) whySheet(); },
     weightSheet() { st.wIn = null; weightSheet(); },
+    ckOk() { ckSend({ sore: {}, pain: {} }).then(() => toast('Eingetragen')); },
+    ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain) }; ckSheet(); },
+    ckTap(t) { const bag = st.ck[t.dataset.kind]; const k = t.dataset.k; const v = ((bag[k] || 0) + 1) % (+t.dataset.max + 1); if (v) bag[k] = v; else delete bag[k];
+      t.className = 'ckchip' + (v ? ' on lv' + v : ''); t.querySelector('span').textContent = t.dataset.kind === 'sore' ? (SORE_L[v] || '–') : v ? v + '/3' : '–'; },
+    ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain }); },
+    ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend(Object.assign(c ? { sore: c.sore, pain: c.pain } : { bbOnly: true }, { bb: t.dataset.v === '1' })); },
     wAdj(t) { st.wIn = Math.min(300, Math.max(25, Math.round((st.wIn + +t.dataset.d) * 10) / 10)); const v = $('#wVal'); if (v) v.textContent = fmt(st.wIn, 1); },
     async wSave() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: st.wIn } }); closeSheet(); toast('Gespeichert'); load(true); } catch (e) { toast(e.message, 3500); } },
     async wDel() { try { await api('/v1/weight', { method: 'POST', body: { date: todayIso(), kg: null } }); closeSheet(); toast('Gelöscht'); load(true); } catch (e) { toast(e.message, 3500); } },

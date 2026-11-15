@@ -3,10 +3,11 @@
 // - Speicher: Durable Object „FormwerkStore“ (SQLite, Free-Plan). Schnittstelle: formwerk/SCHNITTSTELLE.md
 import { Garmin, PATHS, chunks, addDays } from './garmin.js';
 import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
-import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr } from './model.js';
+import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS } from './model.js';
+const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.2.0';
+export const WORKER_VERSION = '1.3.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 2; // 2: Tageswerte v2 verschachtelt (Ruhepuls, Schritte, Stress, Body Battery)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -95,6 +96,8 @@ export class FormwerkStore {
       if (p === '/v1/sessions') return json({ sessions: await this.sessions(+url.searchParams.get('days') || 60) });
       if (p === '/v1/settings' && (req.method === 'PUT' || req.method === 'POST')) return json(await this.putSettings(await req.json()));
       if (p === '/v1/settings') return json(await this.settings());
+      if (p === '/v1/checkin' && req.method === 'POST') return json(await this.putCheckin(await req.json()));
+      if (p === '/v1/checkin') return json({ checkins: await this.checkins(+url.searchParams.get('days') || 90) });
       if (p === '/v1/weight' && req.method === 'POST') return json(await this.putWeights(await req.json()));
       if (p === '/v1/weight') return json({ weights: await this.weights() });
       if (p === '/v1/backup/satzwerk' && req.method === 'PUT') return json(await this.putBackup('satzwerk', await req.text()));
@@ -209,15 +212,31 @@ export class FormwerkStore {
     const meta = await this.refresh(force ? 'force' : 'auto');
     const today = this.today();
     const from = addDays(today, -(HISTORY_DAYS + 28));
-    const [days, acts, sessions, settings, hrz] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr')]);
+    const [days, acts, sessions, settings, hrz, checkins] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr'), this.checkins(100)]);
     const now = Date.now();
-    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, manualWeights: await this.weights(), hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
+    const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, manualWeights: await this.weights(), checkins, hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
     const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
-      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60) };
+      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin };
     }
     return Object.assign(sum, { status, settings });
+  }
+
+  /* ----- Morgen-Check: Muskelkater und Schmerz ----- */
+  async checkins(days) { const m = await this.st.list({ prefix: 'c:', start: 'c:' + addDays(this.today(), -days) }); return [...m.values()]; }
+  async putCheckin(b) {
+    const date = b && /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : this.today();
+    if (date > this.today()) return { ok: false, error: 'Datum in der Zukunft' };
+    const lv = (o, max, keys) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([k, v]) => keys.has(k) && Number.isInteger(v) && v >= 1 && v <= max));
+    const old = await this.st.get('c:' + date);
+    // nur die Baseball-Frage beantwortet: kein vollständiger Check (Muskelkater/Schmerz bleiben offen)
+    if (b.bbOnly) { const c0 = Object.assign({ date, sore: {}, pain: {}, partial: true }, old || {}, { bb: !!b.bb, t: Date.now() }); await this.st.put('c:' + date, c0); return { ok: true, checkin: c0 }; }
+    const c = { date, sore: lv(b.sore, 2, GROUP_KEYS), pain: lv(b.pain, 3, PAIN_KEYS), t: Date.now() };
+    if (b.bb === true || b.bb === false) c.bb = b.bb;
+    else if (old && old.bb != null) c.bb = old.bb;
+    await this.st.put('c:' + date, c);
+    return { ok: true, checkin: c };
   }
 
   /* ----- Körpergewicht (von Hand in Formwerk, Übernahme aus Satzwerk) ----- */

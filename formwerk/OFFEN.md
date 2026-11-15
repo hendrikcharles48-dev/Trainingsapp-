@@ -30,3 +30,4 @@ Aktivitäten waren im Test leer – Baseball/Rad nur in der Belastung, wenn sie 
 - [ ] Streifen unten / Tab-Leiste nach iOS-Höhenausgleich (Satzwerk 3.10.3, Formwerk 1.0.5) auf dem iPhone bestätigt? Sonst Zeile „Anzeige …“ unter Mehr erfragen
 - [ ] Satzwerk verbunden (Schritt 9) → Muskelgruppen in Formwerk + Karte auf Satzwerk-„Heute“
 - [x] Cron-Vorabruf morgens aktiv (04:40 + 05:40 UTC, im Dashboard bestätigt 15.11.)
+- [ ] Körpergefühl: nach ~14 Morgen-Checks prüfen, ob Muster/Lernen sinnvoll aussehen (Verlauf → Körpergefühl)
