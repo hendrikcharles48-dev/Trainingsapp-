@@ -657,6 +657,13 @@ html.scrolled .homebar,html.scrolled .topbar{background:rgba(9,11,15,.72);-webki
 .legend .lg-good{display:inline-block;width:12px;height:3px;border-radius:2px;background:var(--accent);vertical-align:3px;margin-right:6px}
 /* 3.14: Karten als Knopf (Wochenbericht, Sicherung) ohne Browser-Rahmen */
 button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:pointer}
+/* 3.14.7: iOS legt unter die Statusleiste einen Weichzeichner – Titel und Fenster bleiben darunter */
+.homebar,.topbar{padding-top:calc(env(safe-area-inset-top,0px) + 22px)}
+.overlay .inner{padding-top:calc(env(safe-area-inset-top,0px) + 22px)}
+.sheet{max-height:calc(100% - env(safe-area-inset-top,0px) - 28px)}
+/* 3.14.7: Tab-Leiste und Trainings-Panel: Unterkante gegen den iOS-Höhenfehler ausgleichen (--vgap aus build.js), Abstand unten höchstens 34 px */
+.tabs{bottom:calc(max(6px, calc(min(env(safe-area-inset-bottom,0px), 34px) - 16px)) - var(--vgap,0px))}
+.panel{bottom:calc(min(env(safe-area-inset-bottom,0px), 34px) + 10px - var(--vgap,0px))}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
@@ -668,4 +675,4 @@ button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:point
 <script src="figures.js"></script>
 <script src="formwerk-link.js"></script>
 <script src="app.js"></script>
-<script>addEventListener('scroll',function(){document.documentElement.classList.toggle('scrolled',scrollY>4)},{passive:true});</script><script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return}let a=null;try{a=JSON.parse(localStorage.getItem('satzwerk.active'))}catch(e){}if(!a)location.reload()})}</script></body></html>
+<script>(function(){function f(){var d=document.documentElement,p=document.createElement('div');p.style.cssText='position:fixed;left:0;top:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';document.body.appendChild(p);var cs=getComputedStyle(p),t=parseFloat(cs.paddingTop)||0,b=parseFloat(cs.paddingBottom)||0;p.remove();var g=0;try{var sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(sa&&t>0&&innerHeight<innerWidth*3&&innerHeight>innerWidth){g=Math.round(screen.height-innerHeight);if(g<20||g>110)g=0}}catch(e){}d.style.setProperty('--sat',t+'px');d.style.setProperty('--sab',b+'px');d.style.setProperty('--vgap',g+'px')}f();addEventListener('resize',f);addEventListener('orientationchange',function(){setTimeout(f,300)})})();</script><script>addEventListener('scroll',function(){document.documentElement.classList.toggle('scrolled',scrollY>4)},{passive:true});</script><script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return}let a=null;try{a=JSON.parse(localStorage.getItem('satzwerk.active'))}catch(e){}if(!a)location.reload()})}</script></body></html>
