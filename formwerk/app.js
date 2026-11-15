@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.0.6';
+  const VERSION = '1.0.7';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -320,7 +320,7 @@
 
   /* ---------- Aktionen ---------- */
   const A = {
-    tab(t) { st.tab = t.dataset.k; LS.set('tab', st.tab); render(); $('#scroller').scrollTop = 0; },
+    tab(t) { st.tab = t.dataset.k; LS.set('tab', st.tab); render(); window.scrollTo(0, 0); },
     refresh() { load(true); },
     why() { if (st.data) whySheet(); },
     explain: explainSheet,
@@ -329,7 +329,7 @@
     chartSel(t, e) {
       const r = t.getBoundingClientRect(); const n = +t.dataset.n; const id = t.dataset.id;
       const i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / r.width * n)));
-      st.sel[id] = st.sel[id] === i ? null : i; const top = $('#scroller').scrollTop; render(); $('#scroller').scrollTop = top;
+      st.sel[id] = st.sel[id] === i ? null : i; const top = window.scrollY; render(); window.scrollTo(0, top);
     },
     async sport(t) { const s = Object.assign({ sportDays: [1, 3], strengthPerWeek: 2 }, st.data && st.data.settings); const k = +t.dataset.k; const sd = s.sportDays.includes(k) ? s.sportDays.filter(x => x !== k) : s.sportDays.concat(k).sort(); await saveSettings({ sportDays: sd }); },
     async spw(t) { const s = Object.assign({ strengthPerWeek: 2 }, st.data && st.data.settings); const v = Math.min(6, Math.max(1, s.strengthPerWeek + +t.dataset.d)); await saveSettings({ strengthPerWeek: v }); },
@@ -359,8 +359,8 @@
 
   /* ---------- Ziehen zum Aktualisieren ---------- */
   (function pull() {
-    const sc = $('#scroller'), v = $('#view'), ind = $('#ptr'); let y0 = null, dy = 0;
-    sc.addEventListener('touchstart', e => { if (sc.scrollTop <= 0 && st.cfg && !st.loading && !$('#layer').classList.contains('open')) { y0 = e.touches[0].clientY; dy = 0; } else y0 = null; }, { passive: true });
+    const sc = document, v = $('#view'), ind = $('#ptr'); let y0 = null, dy = 0;
+    sc.addEventListener('touchstart', e => { if (window.scrollY <= 0 && st.cfg && !st.loading && !$('#layer').classList.contains('open')) { y0 = e.touches[0].clientY; dy = 0; } else y0 = null; }, { passive: true });
     sc.addEventListener('touchmove', e => {
       if (y0 == null) return; dy = e.touches[0].clientY - y0;
       if (dy <= 0) { v.style.transform = ''; ind.classList.remove('show'); return; }
