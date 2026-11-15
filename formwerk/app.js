@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.3.0';
+  const VERSION = '1.3.1';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -40,6 +40,7 @@
     more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
     refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
     info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+    check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
     chev: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>'
   };
   function toast(msg, ms) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms || 2400); }
@@ -206,7 +207,10 @@
     const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
     const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/3`);
     const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
-    return `<div class="card"><div class="ctitle"><h3>Körpergefühl heute</h3><button class="btn ghost" data-a="ckOpen" style="min-height:36px;padding:0 12px;font-size:14px">Ändern</button></div><div class="small ink2">${esc(txt)}</div>${bbQ || bbRow}</div>`;
+    // fertig: kompakte Zeile – nur noch kurz, was eingetragen ist, plus die beiden Baseball-Schalter als kleine Pillen
+    const pill = (k, l, on) => `<button class="ckpill ${on ? 'on' : ''}" data-a="ckFlag" data-k="${k}" data-on="${on ? 1 : 0}">${l}${on ? ' ✓' : ''}</button>`;
+    return `<div class="card ckdone"><button class="ckline" data-a="ckOpen"><span class="ckok">${I.check}</span><span class="ell small ink2" style="flex:1">${esc(txt)}</span><span class="tiny muted">Ändern</span></button>
+      ${bbQ || `<div class="ckpills">${pill('bbToday', 'Heute Baseball', fl.bbToday === true)}${pill('bb', 'Gestern Baseball', fl.bb === true)}</div>`}</div>`;
   }
   function ckSheet() {
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
