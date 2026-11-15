@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.6';
+  const APP_VERSION = '3.14.7';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -654,7 +654,7 @@
     const chip = (k, label, val) => `<button class="chip ${val ? 'set' : ''}" data-a="libFilter" data-k="${k}">${val ? esc(val) : label} ▾</button>`;
     return `<div class="topbar"><h1>Übungen</h1><button class="iconbtn" data-a="customEx" aria-label="Eigene Übung">${I.plus}</button></div>
     <div class="stack">
-      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${st.libTab !== 'mine' && st.libTab !== 'fav'}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button><button data-a="libTab" data-k="own" aria-pressed="${st.libTab === 'own'}">Eigene</button></div>
+      <div class="toptabs"><button data-a="libTab" data-k="all" aria-pressed="${!['mine', 'fav', 'own'].includes(st.libTab)}">Alle</button><button data-a="libTab" data-k="fav" aria-pressed="${st.libTab === 'fav'}">Favoriten</button><button data-a="libTab" data-k="mine" aria-pressed="${st.libTab === 'mine'}">Trainiert</button><button data-a="libTab" data-k="own" aria-pressed="${st.libTab === 'own'}">Eigene</button></div>
       ${st.libTab === 'own' ? `<div class="row" style="gap:10px"><div class="grow small muted">Antippen zum Ansehen, Bearbeiten oder Löschen.</div><button class="btn sm" data-a="customEx">${I.plus} Neue eigene Übung</button></div>` : ''}
       ${st.libTab === 'fav' ? `<div class="card lime" style="padding:14px 16px"><b>Deine Lieblingsübungen</b><div class="small" style="opacity:.75">Mit ★ markierte Übungen gelten als „kann ich und vertrage ich“: Der Plan wählt sie bevorzugt, wenn die Ausrüstung da ist, sie an eine passende Stelle passen und höchstens 2 Stufen über deinem Level liegen. Maximal 2× pro Woche. Aufbau, Sätze und Volumen bestimmt weiter der Algorithmus.</div></div>` : ''}
       <label class="search">${I.search}<input id="libq" data-in="libQ" type="search" placeholder="Übungen suchen …" value="${esc(st.libQ)}" aria-label="Übungen suchen"></label>
@@ -1659,7 +1659,7 @@
         ${head('Profil')}<div class="list"><button class="li" data-a="quizEdit"><div class="grow"><b>Fragebogen bearbeiten</b><div class="small muted">Name, Ziel, Geräte, Tage, Level</div></div><span class="chev">${I.chev}</span></button>${FW.configured() ? `<div class="li"><div class="grow"><b>Körpergewicht</b><div class="small muted">${fmt(E.bodyweight(P()), 1)} kg · kommt aus Formwerk</div></div></div>` : `<button class="li" data-a="bwSheet"><div class="grow"><b>Körpergewicht eintragen</b><div class="small muted">Aktuell ${fmt(E.bodyweight(P()), 1)} kg</div></div><span class="chev">${I.chev}</span></button>`}</div>
         ${head('Daten')}<div class="list">${Store.mode !== 'db' ? `<button class="li" data-a="cloudSheet"><div class="grow"><b>Automatische Sicherung</b><div class="small muted">${cloudLine()}</div></div><span class="chev">${I.chev}</span></button>` : ''}<button class="li" data-a="formwerkSheet"><div class="grow"><b>Formwerk (Erholung)</b><div class="small muted">${esc(FW.statusLine())}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="backups"><div class="grow"><b>Sicherungen auf diesem Gerät</b><div class="small muted">${P() && P().lastExport ? 'Letztes Backup: ' + dateDE(P().lastExport) : 'Noch kein Backup exportiert'}</div></div><span class="chev">${I.chev}</span></button><button class="li" data-a="exportData"><div class="grow"><b>Backup exportieren</b><div class="small muted">${Store.mode === 'db' ? 'Daten liegen in deinem Konto' : 'Daten liegen nur auf diesem iPhone'}</div></div><span class="chev">${I.chev}</span></button><label class="li" for="importFile" style="cursor:pointer"><div class="grow"><b>Backup importieren</b><div class="small muted">Mit Vorschau, nichts geht verloren</div></div><span class="chev">${I.chev}</span></label></div><input type="file" id="importFile" accept=".json,application/json" data-in="importFile" hidden>
         ${s.confirm ? '<div class="small muted">Eine Sicherung bleibt unter „Sicherungen“ erhalten.</div><button class="btn danger" data-a="resetYes">Wirklich alles löschen</button>' : '<button class="btn ghost danger" data-a="reset">Alle Daten löschen</button>'}
-        <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung</p></div>`;
+        <p class="tiny muted" style="margin:0;text-align:center">Satzwerk ${APP_VERSION} · ersetzt keine ärztliche Beratung<br>${dispLine()}</p></div>`;
     },
     formwerk() { return FW.sheet(); },
     rebuild() {
@@ -2085,6 +2085,8 @@
     Store.saveActive(); closeSheet(); renderOverlay(); toast('Getauscht: ' + ex.name);
   }
   // Export: Konto-Download (Artifact) → Teilen-Menü (iPhone: „In Dateien sichern“) → Download → Zwischenablage
+  // Messwerte der Anzeige (iOS-Höhenfehler bei Home-Bildschirm-Apps), zum Nachfragen bei Darstellungsproblemen
+  function dispLine() { const cs = getComputedStyle(document.documentElement); const v = k => (cs.getPropertyValue(k) || '').trim() || '0px'; return 'Anzeige ' + innerWidth + '×' + innerHeight + '/' + screen.height + ' · oben ' + v('--sat') + ' unten ' + v('--sab') + ' · Ausgleich ' + v('--vgap'); }
   function cloudLine() {
     const c = Cloud.cfg(), cs = Cloud.state();
     if (!c) return 'Aus – einmal einrichten, dann sichert die App von selbst';
