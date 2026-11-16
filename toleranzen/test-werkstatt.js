@@ -87,6 +87,12 @@ module.exports = function (T, eq) {
   eq('Löser Ra', r(sv.val.Ra, 3), r(4 / 3.9, 3));
   eq('Löser Widerspruch', W.solve('mill', { d: 10, vc: 100, n: 5000 }).clash.length > 0, true);
   eq('Löser stimmig', W.solve('mill', { d: 10, vc: 100, n: 3183.0989 }).clash.length, 0);
+  // Spanungsdicke hm
+  eq('hm Vollnut = fz · 2/π', +W.solve('mill', { d: 10, ae: 10, fz: 0.1 }).val.hm.toFixed(4), 0.0637);
+  eq('hm ae 2 von 10', +W.solve('mill', { d: 10, ae: 2, fz: 0.1 }).val.hm.toFixed(4), 0.0431);
+  eq('fz aus hm', +W.solve('mill', { d: 10, ae: 2, hm: 0.05, z: 4 }).val.f.toFixed(4), 0.4636);
+  eq('Drehen h = f · sin κr', +W.solve('turn', { f: 0.3, kr: 45 }).val.hm.toFixed(4), 0.2121);
+  eq('Bohren f aus h', +W.solve('drill', { hm: 0.08, sig: 140 }).val.f.toFixed(4), 0.1703);
   eq('Löser Drehen', r(W.solve('turn', { r: 0.8, Rz: 6.25, d: 50, vc: 200 }).val.vf, 1), r(0.2 * 200000 / (Math.PI * 50), 1));
   eq('Löser Bohren rückwärts', r(W.solve('drill', { vf: 300, f: 0.15, d: 10 }).val.vc, 2), r(Math.PI * 10 * 2000 / 1000, 2));
 

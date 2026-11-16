@@ -457,9 +457,9 @@
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
     thread: { q: 'M8', kind: 'M', n: '' },
-    mill: { sk: 'Rz', d: '10', z: '4', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', holder: 'shrink', cool: 'emul', L: '', lc: '', way: '', ord: ['d', 'z'] },
-    drill: { d: '8', vc: '', n: '', f: '', vf: '', Q: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', holder: 'er', cool: 'emul', depth: '', ord: ['d'] },
-    turn: { sk: 'Rz', d: '50', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', mat: 's235', tool: 'tmed', auto: 'on', cool: 'emul', way: '', ord: ['d'] },
+    mill: { sk: 'Rz', d: '10', z: '4', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', hm: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', holder: 'shrink', cool: 'emul', L: '', lc: '', way: '', ord: ['d', 'z'] },
+    drill: { d: '8', vc: '', n: '', f: '', vf: '', Q: '', hm: '', sig: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', holder: 'er', cool: 'emul', depth: '', ord: ['d'] },
+    turn: { sk: 'Rz', d: '50', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', hm: '', kr: '', mat: 's235', tool: 'tmed', auto: 'on', cool: 'emul', way: '', ord: ['d'] },
     ref: { proc: 'turn', mat: 's235', tool: 'tmed', d: '', z: '', sk: 'Rz', R: '', r: '' },
     mach: { nmax: '', vfmax: '', pmax: '', nmaxT: '', pmaxT: '' },
     sw: { d: '8' },
@@ -1855,7 +1855,10 @@
     Ra: { s: 'Ra', all: 'Mittenrauwert', u: 'µm', dec: 2 },
     ae: { s: 'ae', mill: 'Eingriffsbreite', u: 'mm', dec: 2 },
     ap: { s: 'ap', mill: 'Schnitttiefe', turn: 'Schnitttiefe', u: 'mm', dec: 2 },
-    Q: { s: 'Q', all: 'Zeitspanvolumen', u: 'cm³/min', dec: 1 }
+    Q: { s: 'Q', all: 'Zeitspanvolumen', u: 'cm³/min', dec: 1 },
+    hm: { s: 'hm', all: 'Spanungsdicke', mill: 'mittl. Spanungsdicke', u: 'mm', dec: 4 },
+    kr: { s: 'κr', turn: 'Einstellwinkel', u: '°', dec: 0 },
+    sig: { s: 'σ', drill: 'Spitzenwinkel', u: '°', dec: 0 }
   };
   const SV_GROUPS = {
     mill: [['Werkzeug', ['d', 'z', 'r']], ['Schnitt', ['vc', 'n']], ['Vorschub', ['fz', 'f', 'vf']], ['Oberfläche', ['Rz', 'Ra']], ['Eingriff (für Leistung und Durchbiegung)', ['ae', 'ap', 'Q']]],
@@ -1881,7 +1884,7 @@
     if (before.val[key] != null && before.deps[key]) {
       const deps = before.deps[key];
       // Lieber Ergebniswerte (Oberfläche, Vorschub, Drehzahl) freigeben als Werkzeugmaße
-      const PRIO = ['Ra', 'Rz', 'Q', 'fz', 'f', 'vf', 'vc', 'n', 'ae', 'ap', 'r', 'z', 'd'];
+      const PRIO = ['Ra', 'Rz', 'Q', 'hm', 'fz', 'f', 'vf', 'vc', 'n', 'ae', 'ap', 'r', 'z', 'd'];
       const old = PRIO.find(x => deps.includes(x)) || deps[0];
       st[old] = '';
       st.ord = st.ord.filter(x => x !== old);
@@ -1909,7 +1912,7 @@
     const auxNum = (k, s, l, u, ph) => `<div class="field sv-f"><label for="sv-${mode}-${k}"><b>${s}</b><span>${l}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, mode + '.' + k, u, ph)}</div>`;
     const favs = myTools().filter(t => t.mode === mode);
     const inputs = mode === 'mill' ? ['d', 'z'] : ['d'];
-    const tiles = mode === 'mill' ? ['vc', 'n', 'fz', 'f', 'vf'] : ['vc', 'n', 'f', 'vf'];
+    const tiles = mode === 'mill' ? ['vc', 'n', 'fz', 'f', 'vf', 'hm'] : ['vc', 'n', 'f', 'vf', 'hm'];
     // Ergebnis-Kachel: zeigt den Wert grün; antippen macht daraus ein Eingabefeld für einen eigenen Wert
     const tile = k => `<div class="rt" id="svf-${mode}-${k}">
         <button type="button" class="rt-face" data-act="rt-edit" data-m="${mode}" data-k="${k}"><span class="rt-l"><b>${SV[k].s}</b> ${esc(SV[k][mode] || SV[k].all)}</span><span class="rt-v"><b id="rtv-${mode}-${k}">?</b> <small>${SV[k].u}</small></span><span class="rt-tag" id="rtt-${mode}-${k}"></span></button>
@@ -1919,7 +1922,7 @@
     // Oberfläche sichtbar: Wunsch eingeben, Vorschub wird daraus gerechnet
     const surf = mode === 'drill' ? '' : `<div class="surf-box"><div class="surf-h"><span class="sv-h">Oberfläche</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']], 'mini')}</div><div class="fields">${field(sk)}${field('r')}</div><div class="chips">${(sk === 'Ra' ? ['0,4', '0,8', '1,6', '3,2', '6,3'] : ['2,5', '4', '6,3', '10', '16', '25']).map(v => `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="${sk}" data-v="${v}">${sk} ${v}</button>`).join('')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`;
     const load = fold(`f-${mode}-load`, mode === 'drill' ? 'Bohrtiefe, Leistung und Zeit' : mode === 'mill' ? 'Eingriff, Leistung und Zeit' : 'Schnitttiefe, Leistung und Zeit',
-      `<div class="fields">${mode === 'mill' ? field('ae') + field('ap') : mode === 'turn' ? field('ap') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
+      `<div class="fields">${mode === 'mill' ? field('ae') + field('ap') : mode === 'turn' ? field('ap') + field('kr') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30') + field('sig')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
     const setup = fold(`f-${mode}-setup`, mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', `<div class="fields">
         ${mode === 'mill' ? auxNum('L', 'L', 'Auskraglänge', 'mm', 'ab Aufnahme') + auxNum('lc', 'lc', 'Schneidenlänge', 'mm', '') : ''}
         ${mode !== 'turn' ? `<div class="field"><label for="sv-${mode}-holder">Aufnahme</label>${selInp(`sv-${mode}-holder`, mode + '.holder', ZZ.HOLDERS.filter(h => h.modes.includes(mode)).map(h => [h.id, h.name]))}</div>` : ''}
@@ -1941,7 +1944,7 @@
     inputs.forEach(k => blk(k, k === 'd' ? 'Ø d' : 'Schneiden z', field(k), true));
     if (surf) blk('surf', 'Oberfläche', surf);
     blk('top', 'Ergebnis S und F', `<div id="top-${mode}" class="sv-top" aria-live="polite"></div>`);
-    tiles.forEach(k => blk(k, { vc: 'vc Schnittgeschw.', n: 'n Drehzahl', fz: 'fz je Zahn', f: 'f je Umdrehung', vf: 'vf Vorschub F' }[k], tile(k), true));
+    tiles.forEach(k => blk(k, { vc: 'vc Schnittgeschw.', n: 'n Drehzahl', fz: 'fz je Zahn', f: 'f je Umdrehung', vf: 'vf Vorschub F', hm: 'hm Spanungsdicke' }[k], tile(k), true));
     blk('load', mode === 'drill' ? 'Bohrtiefe, Leistung, Zeit' : mode === 'mill' ? 'Eingriff, Leistung, Zeit' : 'Schnitttiefe, Leistung, Zeit', load);
     blk('setup', mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', setup);
     blk('tips', 'Tipps', fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`));
@@ -2056,6 +2059,13 @@
         resolve();
         info.push(tool.id === 'ball' ? 'Für die Oberfläche rechnet die App mit dem Kugelradius als Eckenradius.' : `Für die Oberfläche fehlt der Eckenradius der Schneide. Vorgeschlagen ist ${T.fmt(soft.r, 0, 1)} mm${tool.inserts ? ' (übliche Platte)' : ' (kleine Eckenfase eines Schaftfräsers)'}, trag deinen Wert ein.`);
       }
+      if (mode === 'turn' && !known(['kr'])) { soft.kr = 95; resolve(); }   // übliche Platte (CNMG, 95°)
+      if (mode === 'drill' && !known(['sig'])) { soft.sig = tool.fam === 'dhss' ? 118 : 140; resolve(); }
+      if (mode === 'mill' && !known(['ae']) && r.val.d && (g.hm || rec.ae || c.op === 'slot')) {   // Eingriffsbreite für die Spanungsdicke hm
+        soft.ae = c.op === 'slot' ? r.val.d : rec.ae ? Math.min(rec.ae[1], r.val.d) : r.val.d / 2;
+        resolve();
+        if (g.hm) info.push(`Für fz aus hm braucht die App die Eingriffsbreite. Angenommen ist ae ${T.fmt(soft.ae, 0, 2)} mm, trag deinen Wert unter „Eingriff, Leistung und Zeit“ ein.`);
+      }
       if (!known(['vc', 'n']) && rec.vc) {
         if (rec.deff && rec.deff < r.val.d) soft.n = rec.vc[1] * 1000 / (Math.PI * rec.deff);   // Kugelfräser: Drehzahl für den wirksamen Ø
         else soft.vc = rec.vc[1];
@@ -2138,7 +2148,7 @@
       nc += `<div class="nc-l"><code>${`${v.n ? 'S' + Math.round(v.n) : ''}${v.vf ? ' F' + Math.round(v.vf) : ''} M3`.trim()}</code><span>F in mm/min (G94)${mode === 'drill' && v.f ? ` · oder F${ncNum(v.f)} in mm/U (G95)${thr && thr.ok ? ' im Gewindezyklus' : ''}` : ''}</span></div>`;
     }
     if (v.n || v.vf) top += `<div class="sf-box"><div class="sf-hero"><div><span>Drehzahl</span><b>S${v.n ? Math.round(v.n) : '?'}</b></div><div><span>${mode === 'turn' ? 'Vorschub je U' : 'Vorschub'}</span><b>F${mode === 'turn' ? (v.f ? ncNum(v.f) : '?') : (v.vf ? Math.round(v.vf) : '?')}</b></div></div>${nc ? `<div class="nc nc-in">${nc}</div>` : ''}</div>`;
-    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q', 'Rz', 'Ra', 'r'].includes(k));
+    const missing = WK.SOLVE_VARS[mode].filter(k => v[k] == null && !['ae', 'ap', 'Q', 'Rz', 'Ra', 'r', 'hm', 'kr', 'sig'].includes(k));
     if (missing.length) top += msgHTML(`Noch offen: ${missing.map(k => '<b>' + esc(SV[k].s) + '</b>').join(', ')}. ${!v.d ? 'Gib den Durchmesser ein.' : mode === 'mill' && !v.z ? 'Gib die Zahl der Schneiden ein.' : ''}`);
     // Oberfläche gegen Werkzeug prüfen
     const fk = mode === 'mill' ? 'fz' : 'f', rf = mode === 'mill' ? rec.fz : rec.f;
@@ -2178,6 +2188,14 @@
     if (k === 'f' && rec.f) return `Empfohlen ${rr(rec.f, 3)}`;
     if (k === 'f' && mode === 'mill' && rec.fz && v.z) return `≈ ${T.fmt(rec.fz[0] * v.z, 0, 2)}–${T.fmt(rec.fz[2] * v.z, 0, 2)}`;
     if (k === 'vf' && v.n && mode === 'mill' && rec.fz && v.z) return `≈ ${Math.round(rec.fz[0] * v.z * v.n)}–${Math.round(rec.fz[2] * v.z * v.n)}`;
+    if (k === 'hm') {
+      const k2 = mode === 'mill' ? (v.ae && v.d ? v.hm / v.fz : null) : mode === 'turn' ? (v.kr ? Math.sin(v.kr * Math.PI / 180) : null) : (v.sig ? Math.sin(v.sig * Math.PI / 360) / 2 : null);
+      const rf = mode === 'mill' ? rec.fz : rec.f;
+      if (rf && k2 && isFinite(k2)) return `Empfohlen ${T.fmt(rf[0] * k2, 0, 3)}–${T.fmt(rf[2] * k2, 0, 3)}`;
+      return mode === 'mill' && !v.ae ? 'braucht ae (Eingriff)' : '';
+    }
+    if (k === 'kr') return 'meist 95°, Kopierplatte 93°, 45° Fase';
+    if (k === 'sig') return 'VHM meist 140°, HSS 118°';
     if (k === 'ae' && rec.ae) return `Empfohlen ${rr(rec.ae, 1)}`;
     if (k === 'ap' && rec.ap) return `Empfohlen ${rr(rec.ap, 1)}`;
     if (k === 'r' && rec.r) return `Platte meist ${T.fmt(rec.r, 0, 1)}`;

@@ -211,6 +211,9 @@
     { out: 'f', ins: ['vf', 'n'], fn: v => v.vf / v.n, f: 'f = vf / n' },
     { out: 'n', ins: ['vf', 'f'], fn: v => v.vf / v.f, f: 'n = vf / f' }
   ];
+  // Mittlere Spanungsdicke beim Fräsen: hm = fz · 360 / (π · φ) · ae / d, φ = Eingriffswinkel in Grad
+  const hmK = v => { const e = Math.min(v.ae, v.d), phi = Math.acos(1 - 2 * e / v.d) * 180 / PI; return 360 / (PI * phi) * e / v.d; };
+  const sinD = a => Math.sin(a * PI / 180);
   W.RULES = {
     // Fräsen: der Vorschub je Zahn fz bestimmt die Rillen (theoretisch, alle Schneiden gleich hoch)
     mill: RULES_BASE.concat(RULES_RA, [
@@ -221,23 +224,29 @@
       { out: 'fz', ins: ['Rz', 'r'], fn: v => Math.sqrt(8 * v.r * v.Rz / 1000), f: 'fz = √(8 · r · Rz / 1000)' },
       { out: 'r', ins: ['fz', 'Rz'], fn: v => v.fz * v.fz * 1000 / (8 * v.Rz), f: 'r = fz² · 1000 / (8 · Rz)' },
       { out: 'Q', ins: ['ae', 'ap', 'vf'], fn: v => v.ae * v.ap * v.vf / 1000, f: 'Q = ae · ap · vf / 1000' },
-      { out: 'vf', ins: ['Q', 'ae', 'ap'], fn: v => v.Q * 1000 / (v.ae * v.ap), f: 'vf = Q · 1000 / (ae · ap)' }
+      { out: 'vf', ins: ['Q', 'ae', 'ap'], fn: v => v.Q * 1000 / (v.ae * v.ap), f: 'vf = Q · 1000 / (ae · ap)' },
+      { out: 'hm', ins: ['fz', 'ae', 'd'], fn: v => v.fz * hmK(v), f: 'hm = fz · 360 / (π · φ) · ae / d' },
+      { out: 'fz', ins: ['hm', 'ae', 'd'], fn: v => v.hm / hmK(v), f: 'fz = hm · π · φ / 360 · d / ae' }
     ]),
     drill: RULES_BASE.concat(RULES_FEED, [
-      { out: 'Q', ins: ['d', 'vf'], fn: v => PI * v.d * v.d / 4 * v.vf / 1000, f: 'Q = π · d² / 4 · vf / 1000' }
+      { out: 'Q', ins: ['d', 'vf'], fn: v => PI * v.d * v.d / 4 * v.vf / 1000, f: 'Q = π · d² / 4 · vf / 1000' },
+      { out: 'hm', ins: ['f', 'sig'], fn: v => v.f / 2 * sinD(v.sig / 2), f: 'h = f / 2 · sin(σ / 2)' },
+      { out: 'f', ins: ['hm', 'sig'], fn: v => 2 * v.hm / sinD(v.sig / 2), f: 'f = 2 · h / sin(σ / 2)' }
     ]),
     turn: RULES_BASE.concat(RULES_RA, RULES_FEED, [
       { out: 'Rz', ins: ['f', 'r'], fn: v => v.f * v.f / (8 * v.r) * 1000, f: 'Rz = f² / (8 · r) · 1000' },
       { out: 'f', ins: ['Rz', 'r'], fn: v => Math.sqrt(8 * v.r * v.Rz / 1000), f: 'f = √(8 · r · Rz / 1000)' },
       { out: 'r', ins: ['f', 'Rz'], fn: v => v.f * v.f * 1000 / (8 * v.Rz), f: 'r = f² · 1000 / (8 · Rz)' },
       { out: 'Q', ins: ['vc', 'ap', 'f'], fn: v => v.vc * v.ap * v.f, f: 'Q = vc · ap · f' },
-      { out: 'ap', ins: ['Q', 'vc', 'f'], fn: v => v.Q / (v.vc * v.f), f: 'ap = Q / (vc · f)' }
+      { out: 'ap', ins: ['Q', 'vc', 'f'], fn: v => v.Q / (v.vc * v.f), f: 'ap = Q / (vc · f)' },
+      { out: 'hm', ins: ['f', 'kr'], fn: v => v.f * sinD(v.kr), f: 'h = f · sin(κr)' },
+      { out: 'f', ins: ['hm', 'kr'], fn: v => v.hm / sinD(v.kr), f: 'f = h / sin(κr)' }
     ])
   };
   W.SOLVE_VARS = {
-    mill: ['d', 'z', 'r', 'vc', 'n', 'fz', 'f', 'vf', 'Rz', 'Ra', 'ae', 'ap', 'Q'],
-    drill: ['d', 'vc', 'n', 'f', 'vf', 'Q'],
-    turn: ['d', 'r', 'vc', 'n', 'f', 'vf', 'Rz', 'Ra', 'ap', 'Q']
+    mill: ['d', 'z', 'r', 'vc', 'n', 'fz', 'f', 'vf', 'Rz', 'Ra', 'ae', 'ap', 'Q', 'hm'],
+    drill: ['d', 'vc', 'n', 'f', 'vf', 'Q', 'hm', 'sig'],
+    turn: ['d', 'r', 'vc', 'n', 'f', 'vf', 'Rz', 'Ra', 'ap', 'Q', 'hm', 'kr']
   };
   // given: {Name: Zahl}. Liefert alle Werte, die Rechenschritte, welche Eingaben hinter jedem Wert stecken (deps) und Widersprüche
   W.solve = function (mode, given) {
