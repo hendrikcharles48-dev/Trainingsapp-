@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.1.0';
+export const WORKER_VERSION = '2.1.1';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -321,6 +321,9 @@ export class FormwerkStore {
     const cache = (await this.st.get('bbauto')) || {};
     const ckBy = Object.fromEntries((checkins || []).map(c => [c.date, c]));
     const tzOff = tzOffset(this.tz(), now); let g = null, changed = false;
+    // Lernen: Puls-Schnitt der Tage, an denen du „ja, war da“ bestätigt hast (Antwort am Morgen danach oder „Heute Baseball“)
+    const yesMeans = Object.entries(cache).filter(([d, v]) => v.mean && ((ckBy[addDays(d, 1)] || {}).bb === true || (ckBy[d] || {}).bbToday === true)).map(([, v]) => v.mean);
+    const learned = yesMeans.length >= 2 ? { minMean: Math.min(...yesMeans) } : null;
     for (const d of [addDays(today, -1), today]) {
       const p = planned(settings, d); if (!p) continue;
       if ((acts[d] || []).some(a => sportKind(a.type, a.name) === 'baseball')) continue;       // Uhr-Aktivität zählt ohnehin
@@ -332,8 +335,8 @@ export class FormwerkStore {
       g = g || new Garmin(this.env.GARMIN_API_KEY, this.st);
       const r = await g.safe(PATHS.heartRateDay(d));
       if (!r.ok) continue;
-      const rest = (hrz && hrz.rest) || 55;
-      cache[d] = Object.assign(detectBaseball(r.data, start, end, rest), { checked: now }); changed = true;
+      const rest = (r.data && r.data.restingHeartRate) || (hrz && hrz.rest) || 55;
+      cache[d] = Object.assign(detectBaseball(r.data, start, end, rest, learned), { checked: now }); changed = true;
     }
     for (const k of Object.keys(cache)) if (k < addDays(today, -120)) { delete cache[k]; changed = true; }
     if (changed) await this.st.put('bbauto', cache);

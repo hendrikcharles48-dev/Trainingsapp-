@@ -776,11 +776,14 @@ export function applyLife(r, { today, ck, allStrength, watchStrength, rec }) {
 /* =====================================================================
    10) BASEBALL AM PULS ERKENNEN (feste Zeiten, Nutzerwunsch 16.11.)
    ---------------------------------------------------------------------
-   Im festen Zeitfenster den Tagespuls der Uhr ansehen: getragen (≥ 40 % des Fensters mit Werten) und
-   ≥ 20 % der Werte über Ruhepuls + 30 ODER Schnitt ≥ Ruhepuls + 22 → warst da. Getragen, aber ruhig → warst nicht da.
-   Kaum Werte (Uhr nicht getragen) → unbekannt (dann zählt der Termin und Formwerk fragt am Morgen).
+   Tagespuls der Uhr im festen Zeitfenster. Geprüft an echten Daten (16.11.): ein normaler Tag erreicht in
+   2-h-Fenstern höchstens Schnitt ≈ Ruhepuls + 29 und ≤ 13 % der Werte über Ruhepuls + 40 – daher:
+   - warst da:  Schnitt ≥ Ruhepuls + 35 und ≥ 30 % über Ruhepuls + 40, ODER ≥ 20 % über Ruhepuls + 50 (Sprints),
+                ODER Schnitt ≥ (niedrigster Schnitt deiner bestätigten Baseball-Tage − 5)  ← lernt aus deinen Antworten
+   - nicht da:  Schnitt < Ruhepuls + 22 und < 8 % über Ruhepuls + 40
+   - dazwischen oder Uhr kaum getragen (< 40 % des Fensters mit Werten): unbekannt → Termin zählt, Rückfrage am Morgen.
    ===================================================================== */
-export function detectBaseball(hrJson, startTs, endTs, rest = 55) {
+export function detectBaseball(hrJson, startTs, endTs, rest = 55, learned = null) {
   let vals = hrJson && (hrJson.heartRateValues || hrJson.values || (Array.isArray(hrJson) ? hrJson : null));
   if (!Array.isArray(vals)) return { v: null, reason: 'keine Daten', complete: false };
   vals = vals.map(x => (Array.isArray(x) ? [Number(x[0]), Number(x[1])] : [Number(x.timestamp || x.startGMT), Number(x.value || x.heartRate)])).filter(x => x[0] > 0);
@@ -792,6 +795,9 @@ export function detectBaseball(hrJson, startTs, endTs, rest = 55) {
   const win = vals.filter(x => x[0] >= startTs && x[0] <= endTs && x[1] > 0);
   const coverage = Math.min(1, win.length * step / Math.max(1, endTs - startTs));
   if (coverage < 0.4) return { v: null, reason: 'Uhr im Zeitfenster kaum getragen', coverage: round(coverage, 2), complete };
-  const m = mean(win.map(x => x[1])); const active = win.filter(x => x[1] >= rest + 30).length / win.length;
-  return { v: active >= 0.2 || m >= rest + 22, coverage: round(coverage, 2), active: round(active, 2), mean: Math.round(m), complete };
+  const hr = win.map(x => x[1]); const m = mean(hr);
+  const a40 = hr.filter(x => x >= rest + 40).length / hr.length, a50 = hr.filter(x => x >= rest + 50).length / hr.length;
+  const yes = (m >= rest + 35 && a40 >= 0.3) || a50 >= 0.2 || (learned && learned.minMean && m >= learned.minMean - 5);
+  const no = !yes && m < rest + 22 && a40 < 0.08;
+  return { v: yes ? true : no ? false : null, reason: yes || no ? null : 'unsicher', coverage: round(coverage, 2), mean: Math.round(m), a40: round(a40, 2), a50: round(a50, 2), rest, complete };
 }

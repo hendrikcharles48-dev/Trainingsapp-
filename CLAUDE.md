@@ -298,7 +298,8 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   'strength'`, nicht doppelt mit Satzwerk ± 3 h, nicht im Lernen), Baseball-Rückfrage am Morgen (`body.askBaseball`), Schlüssel abgelaufen
   (`status.errorKind 'key'` mit Anleitung), Uhr > 14 h nicht synchronisiert (`vitals.watchLast`).
 - Baseball am Puls (Worker 2.1, Nutzerwunsch 16.11.): feste Zeiten → nach dem Termin `dailyHeartRate` holen, `detectBaseball` (Fenster ≥ 40 %
-  getragen; ≥ 20 % Werte über Ruhepuls+30 oder Schnitt ≥ Ruhepuls+22), Ergebnis im Worker `bbauto`, in `S.autoBB`. Vorrang: Uhr-Aktivität >
+  getragen; ja: Schnitt ≥ Ruhe+35 und ≥ 30 % über Ruhe+40, oder ≥ 20 % über Ruhe+50, oder gelernt aus bestätigten Tagen; nein: Schnitt
+  < Ruhe+22; dazwischen unbekannt → Rückfrage; an echtem Alltag geprüft: max. Schnitt Ruhe+29), Ergebnis im Worker `bbauto`, in `S.autoBB`. Vorrang: Uhr-Aktivität >
   Antwort > Puls > Termin. Nicht getragen → Termin zählt + Rückfrage.
 - Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
