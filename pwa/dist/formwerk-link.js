@@ -87,7 +87,7 @@
     const T = get(K.today, null); const d = T && T.data;
     if (!d || d.date !== iso(new Date())) return '';
     const r = d.recovery || {}, c = d.recommendation || {};
-    const val = r.building ? 'Basis im Aufbau' : r.score == null ? 'noch keine Werte' : r.score + ' %';
+    const val = r.building ? 'Basis im Aufbau' : r.score == null ? 'noch keine Werte' : r.estimated ? '~' + r.score + ' % (geschätzt)' : r.score + ' %';
     const good = (c.good || []).slice(0, 4).join(', ');
     return `<button class="card fwcard" data-a="formwerkSheet" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:1px solid var(--line,#232A35);padding:14px 16px;min-height:64px;color:inherit">
       <span style="width:12px;height:12px;flex:0 0 12px;border-radius:50%;background:${COLOR[r.color] || COLOR.none}"></span>

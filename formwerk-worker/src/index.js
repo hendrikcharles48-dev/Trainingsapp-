@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.8.2';
+export const WORKER_VERSION = '1.9.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -228,7 +228,7 @@ export class FormwerkStore {
     const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
-      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday),
+      return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional, estimated: !!r.estimated }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday),
         signals: sum.signals, prefill: sum.prefill, plan: { sportDays: settings.sportDays || [], baseballToday: !!sum.body.baseball.today.on, strengthDays: sum.body.insights.strengthDays.idx || [] } };
     }
     return Object.assign(sum, { status, settings });
@@ -243,7 +243,14 @@ export class FormwerkStore {
     const old = normCheckin(await this.st.get('c:' + date));
     // nur die Baseball-Frage beantwortet: kein vollständiger Check (Muskelkater/Schmerz bleiben offen)
     // Nur Baseball-Schalter (gestern/heute): ändert keinen Muskelkater/Schmerz; ohne Check bleibt er „offen“ (partial)
-    const flags = c => { for (const f of ['bb', 'bbToday']) { if (b[f] === true || b[f] === false) c[f] = b[f]; else if (old && old[f] != null) c[f] = old[f]; } return c; };
+    const flags = c => {
+      for (const f of ['bb', 'bbToday']) { if (b[f] === true || b[f] === false) c[f] = b[f]; else if (old && old[f] != null) c[f] = old[f]; }
+      // eigene Schlafangabe, wenn die Uhr nachts nichts gemessen hat: {h: 3–12 Stunden, q: 0 schlecht / 1 okay / 2 gut}
+      if (b.sleepEst === null) delete c.sleepEst;
+      else if (b.sleepEst && typeof b.sleepEst === 'object') { const h = Math.round(+b.sleepEst.h * 2) / 2, q = +b.sleepEst.q; if (h >= 3 && h <= 12) c.sleepEst = { h, q: [0, 1, 2].includes(q) ? q : 1 }; }
+      else if (old && old.sleepEst) c.sleepEst = old.sleepEst;
+      return c;
+    };
     if (b.bbOnly) { const c0 = flags(Object.assign({ date, sore: {}, pain: {} }, old || { partial: true }, { t: Date.now() })); await this.st.put('c:' + date, c0); return { ok: true, checkin: c0 }; }
     const c = flags({ date, v: 5, sore: lv(b.sore, 5, GROUP_KEYS), pain: lv(b.pain, 5, PAIN_KEYS), t: Date.now() });
     await this.st.put('c:' + date, c);

@@ -239,3 +239,6 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
 .ckl span { font-size: 10px; color: var(--muted); line-height: 1.15; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .ckl.on { background: var(--navy); border-color: var(--accent); }
 .ckl.lv3 b { color: var(--yellow); } .ckl.lv4 b, .ckl.lv5 b { color: var(--red); }
+
+.ckpills .ckpill { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ckpills:not([style*=wrap]) .ckpill { flex: 0 1 auto; }

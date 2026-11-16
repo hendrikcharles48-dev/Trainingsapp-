@@ -34,11 +34,14 @@ export const REC = { window: 30, minBase: 5, solidBase: 14, w: { hrv: 0.5, rhr: 
 export const zToScore = z => 100 / (1 + Math.exp(-(0.9 + 1.2 * z)));
 export const color = s => (s == null ? 'none' : s >= REC.green ? 'green' : s >= REC.red ? 'yellow' : 'red');
 
+// Ruhepuls zählt nur, wenn die Nacht gemessen wurde (Schlaf oder HRV da). Ohne Nacht rechnet Garmin ihn aus
+// Tageswerten – der liegt immer höher und würde Erholung und Basis verfälschen (Nutzer 16.11.: 41 % nach unbemessener Nacht).
+export const rhrValid = d => (d && (d.sleep || d.hrv > 0) ? d.rhr : null);
 export function baselines(days, date) {
   const win = [];
   for (let k = 1; k <= REC.window; k++) { const d = days[addDays(date, -k)]; if (d) win.push(d); }
   const hrv = win.map(d => d.hrv).filter(v => v > 0);
-  const rhr = win.map(d => d.rhr).filter(v => v > 0);
+  const rhr = win.map(rhrValid).filter(v => v > 0);
   const sl = win.map(d => d.sleep && d.sleep.total).filter(v => v > 0);
   const lnh = hrv.map(Math.log);
   return {
@@ -60,7 +63,29 @@ export function sleepQuality(s) {
   return null;
 }
 
-export function recovery(days, date) {
+// opts: { ck: Check-in des Tages (sleepEst = eigene Schlafangabe), settled: Tag ist synchronisiert (Nacht fehlt wirklich) }
+export function recovery(days, date, opts = {}) {
+  const core = recoveryCore(days, date);
+  if (core.score != null || core.hasNight || !opts.settled) return core;
+  return estimateRecovery(days, date, core, opts.ck);
+}
+/* Nacht ohne Messung (Uhr nicht getragen): Erholung SCHÄTZEN statt aus dem Tages-Ruhepuls rechnen.
+   Basis = gewichteter Schnitt der letzten bis zu 3 gemessenen Tage (3:2:1) aus den 7 Tagen davor.
+   Mit eigener Schlafangabe (Stunden, Gefühl schlecht/okay/gut) zählt die Angabe 40 %, die Basis 60 %. */
+const FEEL_Q = [40, 70, 90];
+export function estimateRecovery(days, date, core, ck) {
+  const prev = [];
+  for (let k = 1; k <= 7 && prev.length < 3; k++) { const r = recoveryCore(days, addDays(date, -k)); if (r.score != null && r.hasNight) prev.push(r.score); }
+  const wts = [3, 2, 1].slice(0, prev.length);
+  const base = prev.length ? prev.reduce((s, v, i) => s + v * wts[i], 0) / wts.reduce((a, b) => a + b, 0) : null;
+  const se = ck && ck.sleepEst; const b = baselines(days, date);
+  let sleepSub = null;
+  if (se && se.h) sleepSub = clamp(100 * (0.65 * Math.min(1, se.h * 3600 / b.need) ** 1.5 + 0.35 * (FEEL_Q[se.q ?? 1] / 100)), 0, 100);
+  const score = base == null && sleepSub == null ? null : Math.round(base == null ? sleepSub : sleepSub == null ? base : 0.6 * base + 0.4 * sleepSub);
+  const why = [{ k: 'est', good: true, text: `Nacht ohne Messung (Uhr nicht getragen) – geschätzt aus ${prev.length ? `deinen letzten ${prev.length} gemessenen Tagen (Ø ${Math.round(base)} %)` : 'deiner Angabe'}${sleepSub != null ? ` und deiner Schlafangabe (${String(se.h).replace('.', ',')} h, ${['schlecht', 'okay', 'gut'][se.q ?? 1]})` : ''}. Der Ruhepuls von heute ist ein Tageswert und zählt nicht.` }];
+  return Object.assign({}, core, { score, color: color(score), building: score == null, estimated: true, estBase: base == null ? null : Math.round(base), estSleep: sleepSub == null ? null : Math.round(sleepSub), parts: [], why, hasData: true });
+}
+export function recoveryCore(days, date) {
   const d = days[date] || { date };
   const b = baselines(days, date);
   const parts = [];
@@ -68,7 +93,7 @@ export function recovery(days, date) {
     const z = (Math.log(d.hrv) - b.lnHrvMean) / b.lnHrvSd;
     parts.push({ k: 'hrv', label: 'HRV', unit: 'ms', value: round(d.hrv), base: round(b.hrv), z: round(z, 2), score: zToScore(z), deltaPct: round((d.hrv / b.hrv - 1) * 100) });
   }
-  if (d.rhr > 0 && b.nRhr >= REC.minBase) {
+  if (rhrValid(d) > 0 && b.nRhr >= REC.minBase) {
     const z = (b.rhr - d.rhr) / b.rhrSd;
     parts.push({ k: 'rhr', label: 'Ruhepuls', unit: 'bpm', value: round(d.rhr), base: round(b.rhr, 1), z: round(z, 2), score: zToScore(z), delta: round(d.rhr - b.rhr, 1) });
   }
@@ -89,7 +114,7 @@ export function recovery(days, date) {
   const nBase = Math.max(b.nHrv, b.nRhr);
   return {
     date, score, color: color(score), building, provisional: !building && nBase < REC.solidBase,
-    baseNights: nBase, hasData: !!(d.hrv || d.rhr || d.sleep), parts, why: explain(parts, score)
+    baseNights: nBase, hasData: !!(d.hrv || d.rhr || d.sleep), hasNight: !!(d.hrv > 0 || d.sleep), parts, why: explain(parts, score)
   };
 }
 
@@ -265,7 +290,7 @@ export function recommend({ date, rec, muscles, sessions, ratio, sleepPart, sett
   } else {
     let lv = rec.color === 'green' ? 2 : rec.color === 'yellow' ? 1 : (sleepPart ? (sleepPart.ofNeed < 80 ? 1 : 2) : 1);
     if (!rec.hasData) notes.push('Noch keine Werte von heute Nacht – Uhr in Garmin Connect synchronisieren und neu laden.');
-    else if (sleepPart == null && rec.parts.every(p => p.k !== 'hrv')) notes.push('Ohne Schlaf und HRV von heute Nacht – Bewertung nur aus dem Ruhepuls, also grob.');
+    else if (rec.estimated) notes.push('Erholung geschätzt (Nacht ohne Messung) – hör zusätzlich auf dein Gefühl.');
     if (sleepPart && sleepPart.ofNeed < 75 && lv > 1) { lv--; notes.push('Wenig Schlaf – lieber eine Stufe leichter.'); }
     if (ratio && ratio.ratio > 1.5 && lv > 1) { lv--; notes.push('Deutlich mehr Belastung als sonst diese Woche.'); }
     const recentHeavy = hoursSince != null && hoursSince < 48 && tired.length >= 2;
@@ -339,7 +364,8 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const recentS = (sessions || []).filter(s => s.date >= addDays(today, -10));
   const muscles = applySoreness(muscleFatigue(recentS, recentActs, now, calib.groups), ckBy[today]);
   const pain = painToday(ckBy, today);
-  const rec = recovery(days, today);
+  const sleepNow = sleepView(days, today);
+  const rec = recovery(days, today, { ck: ckBy[today], settled: sleepNow.reason === 'notWorn' || sleepNow.reason === 'noSleep' });
   const sleep = sleepView(days, today);
   const ratio = loadRatio(loadBy, today);
   const sleepPart = rec.parts.find(p => p.k === 'sleep');
@@ -347,12 +373,12 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const bbT = baseballDay(ckBy, S, today, actsByDate), bbY = baseballDay(ckBy, S, addDays(today, -1), actsByDate);
   const S2 = Object.assign({}, S, { sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
   let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings: S2, now }), pain, muscles);
-  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: false, pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
+  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: false, pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
   for (let k = histDays - 1; k >= 0; k--) {
     const d = addDays(today, -k); const x = days[d] || {};
-    const r = recovery(days, d);
+    const r = recovery(days, d, { ck: ckBy[d], settled: d < today });
     const strength = (sessions || []).filter(s => s.date === d);
     history.push({
       date: d, rec: r.score, color: r.color, hrv: x.hrv ?? null, rhr: x.rhr ?? null,
@@ -373,7 +399,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
     sleep,
     load: Object.assign({}, loads[today], { ratio }),
     bodyBattery: { high: t.bbHigh ?? null, low: t.bbLow ?? null, now: t.bbNow ?? null, wake: t.bbWake ?? null, charged: t.bbCharged ?? null, drained: t.bbDrained ?? null, curve: t.bbCurve || [] },
-    vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null, syncedUntil: t.syncedUntil ? String(t.syncedUntil).slice(11, 16) : null },
+    vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrDay: !!(t.rhr && !rhrValid(t)), rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null, syncedUntil: t.syncedUntil ? String(t.syncedUntil).slice(11, 16) : null },
     weight,
     body,
     strength: { last: (sessions || []).filter(s => s.date <= today).sort((a, c) => (c.end || 0) - (a.end || 0))[0] || null },
@@ -602,10 +628,10 @@ export function physio(days, today, history, ckBy) {
   const base = (f, from, to) => windowStats(Array.from({ length: to - from + 1 }, (_, i) => f(day(from + i))));
   // heute
   const t = day(0); const reasons = [];
-  const rb = base(d => d.sleep && d.sleep.resp, 1, 30), hb = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 1, 30), pb = base(d => d.rhr, 1, 30), ob = base(d => d.sleep && d.sleep.spo2, 1, 30);
+  const rb = base(d => d.sleep && d.sleep.resp, 1, 30), hb = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 1, 30), pb = base(d => rhrValid(d), 1, 30), ob = base(d => d.sleep && d.sleep.spo2, 1, 30);
   let resp = false, rhr = false, hrv = false, spo2 = false;
   if (t.sleep && t.sleep.resp && rb.n >= 7) resp = t.sleep.resp >= rb.m + Math.max(1, 2 * rb.sd);
-  if (t.rhr && pb.n >= 7) rhr = t.rhr >= pb.m + 3;
+  if (rhrValid(t) && pb.n >= 7) rhr = t.rhr >= pb.m + 3;
   if (t.hrv > 0 && hb.n >= 7) hrv = (Math.log(t.hrv) - hb.m) / Math.max(hb.sd, 0.05) <= -1.5;
   if (t.sleep && t.sleep.spo2 && ob.n >= 7) spo2 = t.sleep.spo2 <= ob.m - 2;
   if (resp) reasons.push(`Atemfrequenz nachts ${round(t.sleep.resp, 1)} statt ~${round(rb.m, 1)}`);
@@ -617,7 +643,7 @@ export function physio(days, today, history, ckBy) {
   const wk = [], h7 = history.slice(-7);
   const lnh7 = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 0, 6), lnhB = base(d => (d.hrv > 0 ? Math.log(d.hrv) : null), 7, 36);
   if (lnh7.n >= 4 && lnhB.n >= 10 && (lnh7.m - lnhB.m) / Math.max(lnhB.sd, 0.05) <= -0.5) wk.push(`HRV seit einer Woche unter deiner Basis (Ø ${round(Math.exp(lnh7.m))} statt ${round(Math.exp(lnhB.m))} ms)`);
-  const r7 = base(d => d.rhr, 0, 6), rB = base(d => d.rhr, 7, 36);
+  const r7 = base(d => rhrValid(d), 0, 6), rB = base(d => rhrValid(d), 7, 36);
   if (r7.n >= 4 && rB.n >= 10 && r7.m >= rB.m + 2) wk.push(`Ruhepuls seit einer Woche erhöht (Ø ${round(r7.m, 1)} statt ${round(rB.m, 1)})`);
   const rec7 = h7.map(x => x.rec).filter(x => x != null);
   if (rec7.length >= 4 && mean(rec7) < 50) wk.push(`Erholung im Wochenschnitt nur ${Math.round(mean(rec7))} %`);
@@ -647,6 +673,9 @@ export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendat
     why.push(`Erholung ${rec.score} %`);
   } else if (recommendation.level === 'rest') en = 0;
   if (pain.some(p => p.lvl >= 3) && en === 2) en = 1;
+  const se = ckBy[today] && ckBy[today].sleepEst;
+  if (sleep && !sleep.has && se && se.h) { sl = se.h < 6 || se.q === 0 ? 0 : se.h >= 7.5 && se.q === 2 ? 2 : 1; why.push(`Schlaf ~${String(se.h).replace('.', ',')} h (deine Angabe)`); }
+  if (rec.estimated && rec.score != null) why[0] = `Erholung geschätzt ${rec.score} %`;
   if (sleep && sleep.has) {
     sl = sleep.short ? 0 : (sleep.ofAvg >= 98 && (sleep.score == null || sleep.score >= 75)) ? 2 : 1;
     why.push(`Schlaf ${Math.floor(sleep.total / 3600)}:${String(Math.round(sleep.total % 3600 / 60)).padStart(2, '0')} h`);
