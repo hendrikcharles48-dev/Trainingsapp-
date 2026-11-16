@@ -78,7 +78,12 @@ Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/` und `docs/formwer
 - Progression: doppelt (`recommend`, Gewichte mit Auswahlliste): gleiches Gewicht +1 Wdh. (gleich viele, wenn es härter
   war als geplant), alle Sätze an der Obergrenze → nächstes Gewicht und unten anfangen, unter der Untergrenze → leichter.
   Ab Satz 2 bleibt das Gewicht; bei Tagesform ±8 % und ohne frischen Verlauf (> 21 Tage) gilt die Leistungszahl.
-- Pausen: Grundübungen 2,5–3 min, Ergänzung 2 min, Isolation 1,5 min (`E.defaultRest`); Supersätze nur bei Übungen, die sich nicht stören.
+- Pausen (3.15, Nutzerwunsch: 2 min war zu kurz, Kraftverlust): Grundübungen 3,5 min (Kraftziel 4), Ergänzung 2:45, Isolation 2,
+  Rumpf 1,5, Skill 2,5 (`E.defaultRest`). Bei wenig Zeit nur Isolation/Rumpf kürzen. Pause lernt pro Übung (`learnRest` beim Abschluss,
+  `profile.restAdj[exId] = {s, d}`, in `newEntry` addiert, max. 5 min): Wdh.-Einbruch ≥ 3 bzw. ≥ 25 % bei gleichem Gewicht → +30 s;
+  regelmäßig ≥ 30 s länger pausiert ohne Verlust → echte Pause übernehmen. Timer ist Untergrenze: nach Ablauf normales Panel mit
+  „+0:40“ und „Satz fertig“ (bis 15 min). Alte Pläne einmalig angehoben (`restV 3`, nur Werte auf altem Standard). Supersätze nur bei
+  Übungen, die sich nicht stören.
 - Deload: Zyklus zählt nur trainierte Wochen (`mesoWeek`, `E.setWorkouts`), Länge 4/5/6/8 wählbar (`meso.len`),
   nach ≥ 14 Tagen Pause Neustart (`mesoBreak`); zusätzlich nach Bedarf (Check-in, `deloadNeeded` bei fallender Leistung):
   halbe Sätze, Reserve 3, Gewicht bleibt.

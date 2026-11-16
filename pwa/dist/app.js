@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.10';
+  const APP_VERSION = '3.15.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -54,7 +54,7 @@
     }
   };
   /* ================= Sicherungen (IndexedDB „satzwerk“, Speicher „snap“) ================= */
-  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-wochenbericht': 'Vor Wochenbericht-Vorschlag', 'vor-uebung-umstellen': 'Vor Umstellung eigener Übung', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
+  const SNAP_LBL = { training: 'Nach Training', 'vor-uebung-loeschen': 'Vor Übung löschen', 'vor-wochenbericht': 'Vor Wochenbericht-Vorschlag', 'vor-pausen': 'Vor längeren Pausen', 'vor-uebung-umstellen': 'Vor Umstellung eigener Übung', 'vor-uebung-aendern': 'Vor Übung ändern', 'vor-import': 'Vor Import', 'vor-reset': 'Vor „Alle Daten löschen“', 'vor-plan': 'Vor Plan-Neuberechnung', 'vor-update': 'Vor automatischem Plan-Update', 'vor-restore': 'Vor Wiederherstellen', 'vor-loeschen': 'Vor Löschen eines Trainings', 'vor-plaene': 'Vor Umstellung auf mehrere Pläne', 'vor-planloeschen': 'Vor Löschen eines Plans', manuell: 'Von Hand' };
   const Backup = {
     p: null,
     open() {
@@ -894,10 +894,11 @@
     if (JSON.stringify([r, h]) === JSON.stringify([a.rest || null, a.hold || null])) return;
     a.rest = r; a.hold = h; Store.saveActive();
   }
+  const restTxt = left => left > 0 ? mmss(left) : '+' + mmss(-left);
   function restoreTimers() {
     const a = st.active; if (!a) return;
     const now = Date.now();
-    if (a.rest && !st.rest) { if (a.rest.end > now - 4000) st.rest = Object.assign({}, a.rest); else { toast('Pause seit ' + mmss((now - a.rest.end) / 1000) + ' vorbei'); a.rest = null; } }
+    if (a.rest && !st.rest) { if (a.rest.end > now - 900000) st.rest = Object.assign({}, a.rest); else { toast('Pause seit ' + mmss((now - a.rest.end) / 1000) + ' vorbei'); a.rest = null; } }
     if (a.hold && !st.hold) st.hold = Object.assign({}, a.hold);
   }
   function toFocus() { const o = document.getElementById('ov'); if (o) o.scrollTop = 0; }
@@ -908,18 +909,18 @@
     if (st.hold) { el.innerHTML = holdPanel(); return; }
     const a = st.active; const ci = curIndex(); const S = ci >= 0 ? exState(a.exercises[ci]) : null;
     const left = st.rest ? (st.rest.end - Date.now()) / 1000 : 0;
-    const resting = st.rest && left > -4;
+    const resting = st.rest && left > 0, over = st.rest && left <= 0 && left > -900; // nach Ablauf: normales Panel (Satz fertig) mit Überzeit
     if (resting) {
       const C = 2 * Math.PI * 52, fr = Math.max(0, Math.min(1, left / (st.rest.total || 1)));
       const nx = S ? `${esc(S.ex.name)}` : 'Training beenden';
       const nd = S ? `Satz ${Math.min(S.done.length + 1, S.planned)} von ${S.planned} · ${S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + ' s' : (S.rec.w ? fmt(S.rec.w) + ' kg × ' : '') + fmt(S.rec.reps) + ' Wdh.'}` : '';
-      el.innerHTML = `<div class="panel resting"><div class="restrow"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rtrack" cx="60" cy="60" r="52"/><circle id="restRing" class="rbar ${left <= 10 ? 'hot' : ''}" cx="60" cy="60" r="52" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - fr)).toFixed(1)}" transform="rotate(-90 60 60)"/></svg><div class="rtxt"><b id="restT">${mmss(Math.max(0, left))}</b><small id="restOf">von ${mmss(st.rest.len ?? st.rest.total)}</small></div></div>
-        <div class="grow stack" style="gap:8px;min-width:0"><div class="eyebrow" id="restLbl">${left > 0 ? 'Pause' : 'Los geht’s'}</div><button class="nextup" data-a="toFocus"><small>Als Nächstes</small><b class="ell">${nx}</b><span class="ell">${nd}</span></button><div class="tiny muted">Dauer <span class="num" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</span></div></div></div>
+      el.innerHTML = `<div class="panel resting"><div class="restrow"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rtrack" cx="60" cy="60" r="52"/><circle id="restRing" class="rbar ${left <= 10 ? 'hot' : ''}" cx="60" cy="60" r="52" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - fr)).toFixed(1)}" transform="rotate(-90 60 60)"/></svg><div class="rtxt"><b id="restT">${restTxt(left)}</b><small id="restOf">von ${mmss(st.rest.len ?? st.rest.total)}</small></div></div>
+        <div class="grow stack" style="gap:8px;min-width:0"><div class="eyebrow" id="restLbl">${left > 0 ? 'Pause' : 'Bereit – du bestimmst'}</div><button class="nextup" data-a="toFocus"><small>Als Nächstes</small><b class="ell">${nx}</b><span class="ell">${nd}</span></button><div class="tiny muted">Dauer <span class="num" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</span></div></div></div>
         <div class="ctrl"><button data-a="restAdj" data-s="-15">−15 s</button><button class="go" data-a="restSkip">Stopp</button><button data-a="restAdj" data-s="15">+15 s</button></div></div>`;
       return;
     }
     el.innerHTML = `<div class="panel">${S ? `<button class="pname" data-a="toFocus">${esc(S.ex.name)}</button>` : ''}<div class="cols"><div><small>Dauer</small><div class="v" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</div></div>
-      <div><small style="text-align:center" id="restLbl">${resting ? (left > 0 ? 'Pause' : 'Los geht’s') : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${resting ? mmss(Math.max(0, left)) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div>${resting ? `<div class="restof" id="restOf">von ${mmss(st.rest.len ?? st.rest.total)} Pause</div>` : ''}</div>
+      <div><small style="text-align:center" id="restLbl">${over ? 'Pause · bereit' : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${over ? restTxt(left) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div>${resting ? `<div class="restof" id="restOf">von ${mmss(st.rest.len ?? st.rest.total)} Pause</div>` : ''}</div>
       <div style="text-align:right"><small>Satz</small><div class="v">${S ? Math.min(S.done.length + 1, S.planned) + '/' + S.planned : '–'}</div></div></div>
       ${resting ? `<div class="prog"><i id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></i></div>` : ''}
       <div class="ctrl">${resting ? `<button data-a="restAdj" data-s="-15">−15 s</button><button data-a="restAdj" data-s="15">+15 s</button><button class="go" data-a="restSkip">Weiter</button>` : S ? `<button data-a="manualRest">${I.timer.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Pause</button><button class="go" data-a="doneCur">Satz fertig ✓</button>` : `<button class="go" data-a="finishAsk">Training beenden</button>`}</div></div>`;
@@ -930,12 +931,12 @@
     if (!st.rest) return;
     const left = (st.rest.end - now) / 1000;
     const t = $('#restT'), p = $('#restProg');
-    if (t && left > -4) t.textContent = mmss(Math.max(0, left));
+    if (t) t.textContent = restTxt(left);
     if (p) p.style.width = Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100)) + '%';
     const rg = $('#restRing'); if (rg) { const C = 2 * Math.PI * 52; rg.setAttribute('stroke-dashoffset', (C * (1 - Math.max(0, Math.min(1, left / (st.rest.total || 1))))).toFixed(1)); rg.classList.toggle('hot', left <= 10); }
     if (left <= 3 && left > 0 && st.rest.beeped !== Math.ceil(left)) { st.rest.beeped = Math.ceil(left); beep(700, 0.1); }
-    if (left < -4 && !st.rest.fired) { const over = -left; st.rest = null; renderRest(); toast('Pause seit ' + mmss(over) + ' vorbei'); return; }
-    if (left <= 0 && !st.rest.fired) { st.rest.fired = true; syncTimers(); flashPanel(); beep(1100, 0.45); buzz([250, 120, 250]); const l = $('#restLbl'); if (l) l.textContent = 'Los geht’s'; setTimeout(() => { if (st.rest && st.rest.fired) { st.rest = null; renderRest(); } }, 4000); }
+    if (left < -900) { st.rest = null; renderRest(); return; } // nach 15 min ausblenden
+    if (left <= 0 && !st.rest.fired) { st.rest.fired = true; syncTimers(); flashPanel(); beep(1100, 0.45); buzz([250, 120, 250]); renderRest(); }
   }
   function tickHold(now) { if (st.hold) { const t = $('#holdT'); if (t) t.textContent = mmss((now - st.hold.start) / 1000); } }
 
@@ -943,6 +944,7 @@
   function newEntry(exId, slot) {
     const ex = getEx(exId);
     const presc = E.prescription(slot || null, ex, P(), plan());
+    const ra = ((P() && P().restAdj) || {})[exId]; if (ra && ra.s && presc.rest >= 60) presc.rest = Math.min(300, presc.rest + ra.s);
     return Object.assign({ key: uid(), exId, slotId: slot ? slot.id : null, presc, sets: [], extra: 0 }, slot && slot.ss ? { ss: slot.ss } : {});
   }
   function startWorkout(di, loc, delta) {
@@ -1171,7 +1173,7 @@
       if (a.cur < 0) a.cur = a.exercises.findIndex(e => !exState(e).finished);
       msg += a.cur >= 0 ? 'Übung fertig.' : 'Alle Übungen erledigt!';
       const nextE = a.cur >= 0 ? a.exercises[a.cur] : null;
-      if (nextE) startRest(Math.min(entry.presc.rest, 150), 'Nächste: ' + getEx(nextE.exId).name);
+      if (nextE) startRest(Math.min(entry.presc.rest, 180), 'Nächste: ' + getEx(nextE.exId).name);
     } else {
       a.cur = idx;
       const r = after.rec; const isHold = ex.kind === 'hold' || ex.kind === 'int';
@@ -1182,9 +1184,32 @@
     Store.saveActive(); closeSheet(); render(); toFocus();
   }
 
+  /* Pause lernt pro Übung (3.15, Nutzerwunsch): profile.restAdj[exId] = {s: Zusatz-Sekunden, d}.
+     Brechen die Wdh. bei gleichem Gewicht deutlich ein (≥ 3 bzw. ≥ 25 %) → +30 s. Pausiert er regelmäßig ≥ 30 s länger
+     und hält die Leistung (≤ 1 Wdh. Verlust) → seine echte Pause übernehmen. Höchstens 5 min, Supersätze/Deload ausgenommen. */
+  function learnRest(a) {
+    const p = P(); if (!p) return []; const out = [];
+    for (const e of a.exercises) {
+      const ex = getEx(e.exId); if (!ex || e.ss || !e.presc || (e.presc.deload) || !['load', 'bw'].includes(ex.kind)) continue;
+      const S = e.sets.filter(x => x.done && x.reps != null); if (S.length < 2) continue;
+      const same = S.filter(x => (x.w || 0) === (S[0].w || 0) && (x.band || '') === (S[0].band || '')); if (same.length < 2) continue;
+      const r0 = same[0].reps, rl = same[same.length - 1].reps, drop = r0 - rl;
+      const gaps = []; for (let i = 1; i < S.length; i++) if (S[i].t && S[i - 1].t) gaps.push((S[i].t - S[i - 1].t) / 1000 - 35);
+      gaps.sort((x, y) => x - y); const real = gaps.length ? gaps[Math.floor(gaps.length / 2)] : null;
+      const plan = e.presc.rest, cur = ((p.restAdj || {})[e.exId] || {}).s || 0, base = plan - cur;
+      let next = cur;
+      if (drop >= 3 || (r0 >= 6 && drop / r0 >= 0.25)) next = cur + 30;
+      else if (real != null && real >= plan + 30 && drop <= 1) next = Math.round((real - base) / 15) * 15;
+      next = Math.max(0, Math.min(300 - base, next));
+      if (next !== cur) { p.restAdj = p.restAdj || {}; p.restAdj[e.exId] = { s: next, d: E.todayISO() }; out.push(ex.name + ' ' + mmss(base + next)); }
+    }
+    return out;
+  }
   function finishWorkout(save, endTs) {
     const a = st.active; if (!a) return;
     if (save) {
+      const restNote = learnRest(a);
+      if (restNote.length) setTimeout(() => toast('Pause angepasst: ' + restNote.join(', '), 5000), 900);
       const bw = E.bodyweight(P());
       const exs = a.exercises.map(e => { const ex = getEx(e.exId); const sets = e.sets.filter(s => s.done).map(s => { const o = { rir: s.rir }; if (s.w != null) o.w = s.w; if (s.reps != null) o.reps = s.reps; if (s.sec != null) o.sec = s.sec; if (s.band) o.band = s.band; return o; }); return { exId: e.exId, sets, rirT: e.presc.rir, rr: e.presc.rr, note: (e.note || '').trim() || undefined, best: ex ? E.sessionBest(ex, { sets: sets.map(s => Object.assign({ done: true }, s)) }, bw) : 0 }; }).filter(e => e.sets.length);
       const prs = [];
@@ -2351,6 +2376,14 @@
     if (st.profile && st.profile.settings && st.profile.settings.font === 'hand' && !(st.profile.seen || {}).sysfont) { delete st.profile.settings.font; st.profile.seen = Object.assign({}, st.profile.seen, { sysfont: true }); Store.saveProfile(); }
     normalizePlans();
     // Pausen bei Isolationsübungen 75 → 90 s (nur unveränderte empfohlene Pläne)
+    // 3.15: Pausen, die noch auf altem Standard stehen, anheben (eigene Werte bleiben), vorher Sicherung
+    if (((st.profile && st.profile.plans) || []).some(pl => (pl.restV || 1) < 3)) {
+      Backup.snapshot('vor-pausen');
+      const goal = E.baseGoal ? E.baseGoal((st.profile.answers || {}).goal) : (st.profile.answers || {}).goal;
+      const OLD = { main: [90, 105, 120, 150], sec: [90, 105, 120], skill: [90, 120], iso: [45, 60, 75, 90], core: [45, 60] };
+      for (const pl of st.profile.plans) if ((pl.restV || 1) < 3) { for (const d of pl.days || []) for (const sl of d.slots || []) if ((OLD[sl.r] || []).includes(sl.rest)) sl.rest = E.defaultRest(sl.r, pl.goal || goal); pl.restV = 3; }
+      Store.saveProfile();
+    }
     for (const pl of (st.profile && st.profile.plans) || []) if ((pl.restV || 1) < 2) { if (autoPlan(pl)) for (const d of pl.days) for (const sl of d.slots) if (sl.r === 'iso' && sl.rest === 75) sl.rest = 90; pl.restV = 2; Store.saveProfile(); }
     if (plan() && E.mesoBreak(plan())) { Store.saveProfile(); setTimeout(() => toast('Nach der Pause beginnt dein Zyklus neu mit der Einstiegswoche', 4000), 500); }
     if (!LS.get('meta')) LS.set('meta', { schema: 1 });
