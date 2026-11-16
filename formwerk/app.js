@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.7.0';
+  const VERSION = '1.8.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -104,7 +104,16 @@
   function banners() {
     const d = st.data; let h = '';
     if (st.error) h += `<div class="banner bad"><div><b>Nicht aktualisiert.</b> ${esc(st.error)}${d ? ' Angezeigt wird der letzte Stand.' : ''}</div></div>`;
-    if (d && d.status && d.status.error) h += `<div class="banner warn"><div><b>Garmin meldet ein Problem.</b> ${esc(d.status.error)}</div></div>`;
+    const stt = d && d.status;
+    if (stt && stt.errorKind === 'key') h += `<div class="banner bad"><div><b>Garmin-Schlüssel abgelaufen oder ungültig.</b> Es kommen keine neuen Werte. So erneuern:
+      <ol style="margin:6px 0 0;padding-left:18px"><li>In Safari <b>connect.garmin.com/app/settings/personalApiToken</b> → „Create Key“, längste Gültigkeit, kopieren.</li>
+      <li>Cloudflare → Workers → <b>formwerk</b> → Settings → Variables and Secrets → bei <b>GARMIN_API_KEY</b> auf den Stift → neuen Schlüssel einfügen → Deploy.</li>
+      <li>Hier nach unten ziehen.</li></ol>${stt.lastOk ? `<div class="tiny muted" style="margin-top:6px">Letzte Werte von ${dShort(new Date(stt.lastOk).toISOString().slice(0, 10))}</div>` : ''}</div></div>`;
+    else if (stt && stt.errorKind === 'rate') h += `<div class="banner warn"><div><b>Garmin bremst gerade.</b> Zu viele Abrufe – Formwerk versucht es in ein paar Minuten von selbst wieder.</div></div>`;
+    else if (stt && stt.error) h += `<div class="banner warn"><div><b>Garmin meldet ein Problem.</b> ${esc(stt.error)}</div></div>`;
+    // Uhr synchronisiert seit vielen Stunden nicht (Akku leer, Bluetooth aus, Garmin-App beendet)
+    const wl = d && d.vitals && d.vitals.watchLast; const wlT = wl ? new Date(wl.length === 16 ? wl + ':00' : wl).getTime() : 0;
+    if (wlT && Date.now() - wlT > 14 * 3600e3) h += `<div class="banner warn"><div><b>Die Uhr hat seit ${dShort(wl.slice(0, 10))}, ${wl.slice(11, 16)} Uhr nicht synchronisiert.</b> Garmin Connect öffnen. Akku der Uhr leer? Bluetooth an?</div></div>`;
     if (d && d.date && d.date !== todayIso() && !st.loading) h += `<div class="banner warn"><div>Die Daten sind vom ${dShort(d.date)} – zum Aktualisieren nach unten ziehen.</div></div>`;
     return h;
   }
@@ -136,7 +145,7 @@
       <div class="vitals">
         <div><span>HRV</span><b class="num">${fmt(v.hrv)}<small>ms</small></b><em>${hrvDelta == null ? (v.hrvBase ? 'Ø ' + fmt(v.hrvBase) : '&nbsp;') : hrvDelta === 0 ? 'wie dein Ø' : (hrvDelta > 0 ? '+' : '−') + Math.abs(hrvDelta) + ' % zum Ø'}</em></div>
         <div><span>Ruhepuls</span><b class="num">${fmt(v.rhr)}<small>bpm</small></b><em>${v.rhrDay ? 'Tageswert' : rhrDelta == null ? (v.rhrBase ? 'Ø ' + fmt(v.rhrBase, 0) : '&nbsp;') : Math.abs(rhrDelta) < 0.5 ? 'wie dein Ø' : (rhrDelta > 0 ? '+' : '−') + fmt(Math.abs(rhrDelta), 1) + ' zum Ø'}</em></div>
-        <div><span>Schlaf</span><b class="num">${sl.has ? hm(sl.total) : '–'}<small>h</small></b><em>${sl.has && sl.ofAvg ? sl.ofAvg + ' % vom Ø' : sl.reason === 'notWorn' ? 'fehlt' : sl.avg ? 'Ø ' + hm(sl.avg) : '&nbsp;'}</em></div>
+        <div><span>Schlaf</span><b class="num">${sl.has ? hm(sl.total) : '–'}<small>h</small></b><em>${sl.has && sl.reason === 'partial' ? 'nur teilweise' : sl.has && sl.ofAvg ? sl.ofAvg + ' % vom Ø' : sl.reason === 'notWorn' ? 'fehlt' : sl.avg ? 'Ø ' + hm(sl.avg) : '&nbsp;'}</em></div>
       </div>
       <button class="why" data-a="why">${I.info} ${score == null ? 'So entsteht der Wert' : 'Warum heute ' + ({ green: 'grün', yellow: 'gelb', red: 'rot' }[col] || '') + '?'}</button>
     </div>`;
@@ -144,12 +153,13 @@
   // Nacht ohne Messung: klar sagen und die eigene Schlafangabe abfragen (fließt in die geschätzte Erholung ein)
   function nightCard(d) {
     const r = d.recovery, s = d.sleep || {};
-    if (!r.estimated && s.reason !== 'notWorn') return '';
+    const part = s.reason === 'partial' || r.partialNight;
+    if (!r.estimated && s.reason !== 'notWorn' && !part) return '';
     const se = (d.body && d.body.flags && d.body.flags.sleepEst) || {};
     const hrs = [5, 6, 7, 8, 9], feel = ['schlecht', 'okay', 'gut'];
     const pill = (attr, label, on) => `<button class="ckpill ${on ? 'on' : ''}" ${attr}>${label}</button>`;
-    return `<div class="card"><div class="ctitle"><h3>Nacht ohne Messung</h3><span class="aside">${s.noMeasureMin ? '~' + Math.round(s.noMeasureMin / 60) + ' h ohne Werte' : ''}</span></div>
-      <p class="small ink2" style="margin:0 0 10px">Die Uhr hat heute Nacht nichts gemessen. Die Erholung ist deshalb ${r.estimated && r.estBase != null ? 'aus deinen letzten Tagen geschätzt' : 'geschätzt'}; der Ruhepuls von heute ist ein Tageswert und zählt nicht. Wie hast du geschlafen?</p>
+    return `<div class="card"><div class="ctitle"><h3>${part ? 'Nacht nur teilweise gemessen' : 'Nacht ohne Messung'}</h3><span class="aside">${s.noMeasureMin ? '~' + Math.round(s.noMeasureMin / 60) + ' h ohne Werte' : ''}</span></div>
+      <p class="small ink2" style="margin:0 0 10px">${part ? `Die Uhr hat einen Teil der Nacht nicht gemessen – Garmin zeigt nur ${hm(s.total)} h Schlaf. Das zählt deshalb nicht als kurzer Schlaf; HRV und Ruhepuls zählen weiter.` : `Die Uhr hat heute Nacht nichts gemessen. Die Erholung ist deshalb ${r.estimated && r.estBase != null ? 'aus deinen letzten Tagen geschätzt' : 'geschätzt'}; der Ruhepuls von heute ist ein Tageswert und zählt nicht.`} Wie hast du geschlafen?</p>
       <div class="ckpills" style="flex-wrap:wrap">${hrs.map(h => pill(`data-a="nightSet" data-h="${h}"`, (h === 5 ? '≤ 5' : h === 9 ? '9+' : h) + ' h', se.h === h)).join('')}</div>
       <div class="ckpills" style="margin-top:6px">${feel.map((l, q) => pill(`data-a="nightSet" data-q="${q}"`, l, se.h && se.q === q)).join('')}</div>
       <div class="tiny muted" style="margin-top:8px">Für echte Werte: Uhr nachts tragen, laden lieber tagsüber.</div></div>`;
@@ -234,12 +244,12 @@
     const bbLabel = (x, l) => l + (x.recorded ? ' (Uhr)' : x.planned ? ' ' + x.from : '');
     const tog = (k, x, l) => `<button class="ckchip ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`} style="flex:1;min-height:44px"><b class="ell">${bbLabel(x, l)}</b><span>${x.on ? 'ja' : '–'}</span></button>`;
     const bbRow = `<div style="display:flex;gap:6px;margin-top:10px">${tog('bbToday', bb.today, 'Heute Baseball')}${tog('bb', bb.yesterday, 'Gestern Baseball')}</div>`;
-    const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball gespielt?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
+    const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball${b.askBaseball.from ? ' ' + b.askBaseball.from : ''} – warst du da?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
     if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
       <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ || bbRow}</div>`;
     const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
     const pain = Object.entries(c.pain || {}).map(([k, v]) => `${painLabel(k)} ${v}/5`);
-    const txt = !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
+    const txt = c.sick ? 'Krank' + (sore.length || pain.length ? ' · ' : '.') + [sore.join(', '), pain.join(', ')].filter(Boolean).join(' · ') : !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
     // fertig: kompakte Zeile – nur noch kurz, was eingetragen ist, plus die beiden Baseball-Schalter als kleine Pillen
     const pill = (k, x, l) => `<button class="ckpill ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`}>${bbLabel(x, l)}${x.on ? ' ✓' : ''}</button>`;
     return `<div class="card ckdone"><button class="ckline" data-a="ckOpen"><span class="ckok">${I.check}</span><span class="ell small ink2" style="flex:1">${esc(txt)}</span><span class="tiny muted">Ändern</span></button>
@@ -249,6 +259,7 @@
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
     const chip = (kind, k, label, v) => `<button class="ckchip ${v ? 'on lv' + v : ''}" data-a="ckTap" data-kind="${kind}" data-k="${k}" data-label="${esc(label)}" id="ck-${kind}-${k}"><b class="ell">${esc(label)}</b><span>${lvTxt(kind, v)}</span></button>`;
     openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Antippen und Stufe 1–5 wählen. Nichts antippen = alles gut.</div></div>
+      <button class="ckchip ${c.sick ? 'on lv5' : ''}" data-a="ckSick" id="ck-sick" style="width:100%"><b>Krank / angeschlagen</b><span>${c.sick ? 'ja – heute Pause' : '–'}</span></button>
       <div><div class="lblf">Muskelkater</div><div class="ckgrid">${ms.map(m => chip('sore', m.k, m.label, c.sore[m.k] || 0)).join('')}</div></div>
       <div><div class="lblf">Schmerz (Gelenke, Sehnen, stechend)</div><div class="ckgrid">${PAIN_AREAS.map(([k, l]) => chip('pain', k, l, c.pain[k] || 0)).join('')}</div></div>
       <div class="tiny muted">Formwerk stellt keine Diagnose. Hält Schmerz an oder wird stärker: Arzt oder Physio.</div>
@@ -426,6 +437,7 @@
       <p><b>Körpergefühl.</b> Morgens kurz Muskelkater und Schmerzen antippen. Muskelkater macht die Gruppe für heute mindestens „teilweise“ (leicht) bzw. „ermüdet“ (stark). Schmerz ist kein Muskelkater: die Stelle wird geschont, bei 3/3 heute keine Kraft, an 3 von 5 Tagen kommt der Hinweis, es abklären zu lassen. Mit der Zeit vergleicht Formwerk deine Angaben mit der Rechnung und passt je Muskelgruppe an, wie lange du nach Kraft und nach Baseball brauchst. Im Verlauf erscheinen Muster und deine guten Kraft-Tage.</p>
       <p><b>Stresszeichen und leichtere Woche.</b> Steigen nachts Atemfrequenz und Ruhepuls deutlich über deinen Schnitt oder fällt die HRV stark ab, zeigt Formwerk „Stresszeichen“ und rät heute zu lockerer Bewegung. Liegen über eine Woche mindestens zwei Zeichen vor (HRV unter Basis, Ruhepuls erhöht, Erholung im Schnitt unter 50 %, oft starker Muskelkater oder Schmerz), wird eine leichtere Woche empfohlen – Satzwerk nimmt dazu seine Leistungsentwicklung.</p>
       <p><b>Satzwerk.</b> Satzwerk füllt mit Formwerk vor dem Training Energie und Schlaf vor, beim Wochen-Check-in fast alle Fragen, und übernimmt Baseball-Zeiten und gute Kraft-Tage. Du bestätigst immer selbst.</p>
+      <p><b>Besondere Fälle.</b> Nacht ohne Messung → Erholung geschätzt (Tages-Ruhepuls zählt nicht). Nacht nur teilweise gemessen → zu kurzer Garmin-Schlaf zählt nicht. Krank (Morgen-Check) → Pause, der Tag zählt nicht zur Basis; einzelne Ausreißer werden ohnehin gekappt. Nach 10 Tagen ohne Kraft → „Wiedereinstieg“. Krafttraining nur auf der Uhr → zählt grob für die Muskeln. Fester Baseball-Termin ohne Uhr → am Morgen danach kurze Rückfrage. Garmin-Schlüssel abgelaufen oder Uhr lange nicht synchronisiert → Hinweis oben.</p>
       <p><b>Empfehlung.</b> Rot → Pause. Grün → Kraft voll, gelb → Kraft leicht (⅔ der Sätze, 3 Wdh. Reserve). Eine Stufe leichter bei wenig Schlaf oder deutlich mehr Wochenbelastung als gewohnt. An Baseball-Tagen höchstens leicht, am Tag davor keine schweren Beine/Überkopf. Letzte Kraft-Einheit unter 48 h und Muskeln noch müde → Kraft-Pause. Ziel: ${(st.data && st.data.settings && st.data.settings.strengthPerWeek) || 2} Einheiten pro Woche.</p>
       <p class="muted">Trainingshilfe, keine medizinische Aussage. Wenn du dich krank fühlst, zählt dein Gefühl.</p></div>
       <button class="btn block" data-a="closeSheet">Schließen</button></div>`);
@@ -440,8 +452,9 @@
     nightSet(t) { const cur = (st.data && st.data.body && st.data.body.flags && st.data.body.flags.sleepEst) || {};
       const se = { h: t.dataset.h ? +t.dataset.h : (cur.h || 7), q: t.dataset.q != null ? +t.dataset.q : (cur.q ?? 1) };
       ckSend({ bbOnly: true, sleepEst: se }).then(() => toast('Schlaf eingetragen – Erholung neu geschätzt')); },
-    ckOk() { ckSend({ sore: {}, pain: {} }).then(() => toast('Eingetragen')); },
-    ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain) }; ckSheet(); },
+    ckOk() { ckSend({ sore: {}, pain: {}, sick: false }).then(() => toast('Eingetragen')); },
+    ckSick() { st.ck.sick = !st.ck.sick; const b = $('#ck-sick'); if (b) { b.className = 'ckchip' + (st.ck.sick ? ' on lv5' : ''); b.querySelector('span').textContent = st.ck.sick ? 'ja – heute Pause' : '–'; } },
+    ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain), sick: !!c.sick }; ckSheet(); },
     // Kachel antippen → Auswahl 0–5 unten im Fenster
     ckTap(t) { const kind = t.dataset.kind, k = t.dataset.k; const cur = st.ck[kind][k] || 0; const L = kind === 'sore' ? SORE_L : PAIN_L;
       const box = $('#ckPick'); box.hidden = false;
@@ -450,7 +463,7 @@
     ckSet(t) { const kind = t.dataset.kind, k = t.dataset.k, v = +t.dataset.v; if (v) st.ck[kind][k] = v; else delete st.ck[kind][k];
       const chip = $('#ck-' + kind + '-' + k); if (chip) { chip.className = 'ckchip' + (v ? ' on lv' + v : ''); chip.querySelector('span').textContent = lvTxt(kind, v); }
       const box = $('#ckPick'); box.hidden = true; box.innerHTML = ''; },
-    ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain }); },
+    ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain, sick: !!st.ck.sick }); },
     ckFlag(t) { ckSend({ bbOnly: true, [t.dataset.k]: t.dataset.on !== '1' }).then(() => toast(t.dataset.on !== '1' ? (t.dataset.k === 'bb' ? 'Gestern Baseball eingetragen' : 'Heute Baseball – Empfehlung angepasst') : 'Entfernt')); },
     ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend({ bbOnly: true, bb: t.dataset.v === '1' }); },
     wAdj(t) { st.wIn = Math.min(300, Math.max(25, Math.round((st.wIn + +t.dataset.d) * 10) / 10)); const v = $('#wVal'); if (v) v.textContent = fmt(st.wIn, 1); },

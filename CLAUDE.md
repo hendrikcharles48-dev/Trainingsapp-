@@ -292,6 +292,11 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
 - Nacht ohne Messung (Nutzerwunsch 16.11.): Ruhepuls zählt nur mit Nachtdaten (`rhrValid`, sonst Tageswert – auch nicht für die Basis).
   `recovery(days, date, {ck, settled})` schätzt dann (`estimateRecovery`: letzte ≤ 3 gemessene Tage 3:2:1, mit eigener Schlafangabe
   `checkin.sleepEst {h, q}` 60/40), `estimated: true` → Ring „geschätzt“, Karte „Nacht ohne Messung“ mit Schlafangabe (`nightSet`).
+- Sonderfälle (Worker 2.0 / Formwerk 1.8, Nutzerwunsch 16.11.): Teilnacht (`sleepView.reason 'partial'`: < 80 % Schlaf + ≥ 90 min ohne Messung →
+  Garmin-Schlaf zählt nicht, eigene Angabe schon), krank (`checkin.sick` → „Krank – Pause“, Tag aus der Basis; Basis kappt Ausreißer
+  `trimOut` mit Mindeststreuung), Wiedereinstieg nach ≥ 10 Tagen ohne Kraft (`applyLife`), Krafttraining nur auf der Uhr (`sportKind
+  'strength'`, nicht doppelt mit Satzwerk ± 3 h, nicht im Lernen), Baseball-Rückfrage am Morgen (`body.askBaseball`), Schlüssel abgelaufen
+  (`status.errorKind 'key'` mit Anleitung), Uhr > 14 h nicht synchronisiert (`vitals.watchLast`).
 - Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

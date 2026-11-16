@@ -36,12 +36,21 @@ export const color = s => (s == null ? 'none' : s >= REC.green ? 'green' : s >= 
 
 // Ruhepuls zählt nur, wenn die Nacht gemessen wurde (Schlaf oder HRV da). Ohne Nacht rechnet Garmin ihn aus
 // Tageswerten – der liegt immer höher und würde Erholung und Basis verfälschen (Nutzer 16.11.: 41 % nach unbemessener Nacht).
+const FEEL_Q = [40, 70, 90];
+// floor = kleinste Streuung, damit normale Tagesschwankungen nie als Ausreißer gelten (Ruhepuls 1,5 Schläge, ln-HRV 0,08)
+export function trimOut(vals, f = x => x, floor = 0) {
+  if (vals.length < 10) return vals;
+  const t = vals.map(f), m = mean(t), s0 = Math.max(sd(t), floor) || 1;
+  return vals.filter((v, i) => Math.abs(t[i] - m) <= 2.5 * s0);
+}
 export const rhrValid = d => (d && (d.sleep || d.hrv > 0) ? d.rhr : null);
 export function baselines(days, date) {
   const win = [];
-  for (let k = 1; k <= REC.window; k++) { const d = days[addDays(date, -k)]; if (d) win.push(d); }
-  const hrv = win.map(d => d.hrv).filter(v => v > 0);
-  const rhr = win.map(rhrValid).filter(v => v > 0);
+  // Kranke Tage (Morgen-Check „krank“) zählen nicht zur Basis; einzelne Ausreißer (> 2,5 SD) werden gekappt,
+  // damit eine Erkältungswoche die Basis nicht verschiebt und danach alles zu gut aussieht.
+  for (let k = 1; k <= REC.window; k++) { const d = days[addDays(date, -k)]; if (d && !d.sick) win.push(d); }
+  const hrv = trimOut(win.map(d => d.hrv).filter(v => v > 0), Math.log, 0.08);
+  const rhr = trimOut(win.map(rhrValid).filter(v => v > 0), x => x, 1.5);
   const sl = win.map(d => d.sleep && d.sleep.total).filter(v => v > 0);
   const lnh = hrv.map(Math.log);
   return {
@@ -65,6 +74,15 @@ export function sleepQuality(s) {
 
 // opts: { ck: Check-in des Tages (sleepEst = eigene Schlafangabe), settled: Tag ist synchronisiert (Nacht fehlt wirklich) }
 export function recovery(days, date, opts = {}) {
+  // Nacht nur teilweise gemessen: Garmin-Schlaf (zu kurz) nicht werten, eigene Angabe stattdessen; HRV/Ruhepuls zählen weiter
+  if (opts.partial) {
+    const se = opts.ck && opts.ck.sleepEst;
+    const c = recoveryCore(days, date, { skipSleep: true, sleepEst: se });
+    c.partialNight = true;
+    c.why = [{ k: 'part', good: true, text: `Nacht nur teilweise gemessen – der Schlaf von Garmin ist zu kurz und zählt nicht${se ? ', stattdessen deine Angabe' : ''}.` }].concat(c.why || []);
+    if (c.score != null) return c;
+    return estimateRecovery(days, date, c, opts.ck);
+  }
   const core = recoveryCore(days, date);
   if (core.score != null || core.hasNight || !opts.settled) return core;
   return estimateRecovery(days, date, core, opts.ck);
@@ -72,7 +90,6 @@ export function recovery(days, date, opts = {}) {
 /* Nacht ohne Messung (Uhr nicht getragen): Erholung SCHÄTZEN statt aus dem Tages-Ruhepuls rechnen.
    Basis = gewichteter Schnitt der letzten bis zu 3 gemessenen Tage (3:2:1) aus den 7 Tagen davor.
    Mit eigener Schlafangabe (Stunden, Gefühl schlecht/okay/gut) zählt die Angabe 40 %, die Basis 60 %. */
-const FEEL_Q = [40, 70, 90];
 export function estimateRecovery(days, date, core, ck) {
   const prev = [];
   for (let k = 1; k <= 7 && prev.length < 3; k++) { const r = recoveryCore(days, addDays(date, -k)); if (r.score != null && r.hasNight) prev.push(r.score); }
@@ -85,7 +102,11 @@ export function estimateRecovery(days, date, core, ck) {
   const why = [{ k: 'est', good: true, text: `Nacht ohne Messung (Uhr nicht getragen) – geschätzt aus ${prev.length ? `deinen letzten ${prev.length} gemessenen Tagen (Ø ${Math.round(base)} %)` : 'deiner Angabe'}${sleepSub != null ? ` und deiner Schlafangabe (${String(se.h).replace('.', ',')} h, ${['schlecht', 'okay', 'gut'][se.q ?? 1]})` : ''}. Der Ruhepuls von heute ist ein Tageswert und zählt nicht.` }];
   return Object.assign({}, core, { score, color: color(score), building: score == null, estimated: true, estBase: base == null ? null : Math.round(base), estSleep: sleepSub == null ? null : Math.round(sleepSub), parts: [], why, hasData: true });
 }
-export function recoveryCore(days, date) {
+export function sleepScoreFrom(totalSec, quality, need) {
+  return clamp(100 * (0.65 * Math.min(1, clamp(totalSec / need, 0, 1.1)) ** 1.5 + 0.35 * (quality == null ? 70 : quality) / 100), 0, 100);
+}
+// o.skipSleep: Garmin-Schlaf nicht werten (Nacht nur teilweise gemessen); o.sleepEst: eigene Angabe {h, q} statt dessen
+export function recoveryCore(days, date, o = {}) {
   const d = days[date] || { date };
   const b = baselines(days, date);
   const parts = [];
@@ -97,7 +118,10 @@ export function recoveryCore(days, date) {
     const z = (b.rhr - d.rhr) / b.rhrSd;
     parts.push({ k: 'rhr', label: 'Ruhepuls', unit: 'bpm', value: round(d.rhr), base: round(b.rhr, 1), z: round(z, 2), score: zToScore(z), delta: round(d.rhr - b.rhr, 1) });
   }
-  if (d.sleep && d.sleep.total) {
+  if (o.sleepEst && o.sleepEst.h) {
+    const q = FEEL_Q[o.sleepEst.q ?? 1];
+    parts.push({ k: 'sleep', label: 'Schlaf (deine Angabe)', unit: 'h', value: o.sleepEst.h, base: round(b.need / 3600, 3), score: sleepScoreFrom(o.sleepEst.h * 3600, q, b.need), quality: q, ofNeed: round(o.sleepEst.h * 3600 / b.need * 100), est: true });
+  } else if (d.sleep && d.sleep.total && !o.skipSleep) {
     const durPart = clamp(d.sleep.total / b.need, 0, 1.1);
     const q = sleepQuality(d.sleep);
     const score = clamp(100 * (0.65 * Math.min(1, durPart) ** 1.5 + 0.35 * (q == null ? 70 : q) / 100), 0, 100);
@@ -203,6 +227,8 @@ export const GROUPS = [
 // Sport aus Garmin belastet bestimmte Muskeln mit (Reiz je 60 min, nach Intensität skaliert).
 // Baseball: Werfen/Schlagen (Schulter, Rumpfrotation, Griff), Sprints (Beinbeuger, Po).
 export const SPORT = {
+  // Krafttraining nur auf der Uhr (ohne Satzwerk): grob Ganzkörper je 60 min
+  strength: { chest: 2.2, lats: 2, upperback: 1.6, fdelt: 1.2, sdelt: 0.6, biceps: 1.2, triceps: 1.2, quads: 2.2, glutes: 1.8, hams: 1.2, abs: 1 },
   baseball: { rdelt: 1.2, sdelt: 0.8, upperback: 0.8, obliques: 1.2, forearms: 1, hams: 1, glutes: 0.8 },
   cycling: { quads: 1.4, glutes: 0.8, calves: 0.5 },
   running: { calves: 1.2, hams: 0.8, quads: 0.8, glutes: 0.6 },
@@ -211,6 +237,7 @@ export const SPORT = {
 export function sportKind(type, name) {
   const t = (type || '') + ' ' + (name || '').toLowerCase();
   if (/baseball|softball/.test(t)) return 'baseball';
+  if (/strength|kraft|weight|gym|hiit|functional/.test(t)) return 'strength';
   if (/cycl|bike|biking|rad|gravel|mountain/.test(t)) return 'cycling';
   if (/run|lauf|trail/.test(t)) return 'running';
   if (/hik|walk|wander/.test(t)) return 'hiking';
@@ -236,7 +263,7 @@ export function muscleFatigue(sessions, acts, now, calib) {
   }
   for (const a of acts || []) {
     const kind = sportKind(a.type, a.name); if (!kind || !a.ts) continue;
-    const intensity = clamp((a.trimp || a.dur / 60 * 1.5) / Math.max(1, a.dur / 60) / 2.5, 0.4, 1.4);
+    const intensity = kind === 'strength' ? 1 : clamp((a.trimp || a.dur / 60 * 1.5) / Math.max(1, a.dur / 60) / 2.5, 0.4, 1.4);
     for (const [m, v] of Object.entries(SPORT[kind])) add(fB, m, v * a.dur / 3600 * intensity, a.ts + a.dur * 1000);
   }
   const P = v => (v || 0) / FULL_SETS * 100;
@@ -330,7 +357,11 @@ export function sleepView(days, date) {
   }
   const s = d.sleep;
   const ofAvg = b.sleep ? s.total / b.sleep : null;
+  // Teilweise gemessen: deutlich kürzer als sonst UND ≥ 90 min ohne Messung (Uhr abgelegt/Akku leer)
+  const synced = d.syncedUntil ? String(d.syncedUntil).slice(11, 16) : null;
+  const partial = !!(ofAvg != null && ofAvg < 0.8 && (d.noMeasureMin || 0) >= 90 && b.nSleep >= 5);
   return {
+    reason: partial ? 'partial' : null, noMeasureMin: d.noMeasureMin ?? null, syncedUntil: synced,
     date, has: true, total: s.total, deep: s.deep, light: s.light, rem: s.rem, awake: s.awake, score: s.score ?? null,
     start: s.start || null, end: s.end || null, local: !!s.local, avg: b.sleep ? Math.round(b.sleep) : null, need: Math.round(b.need),
     ofAvg: ofAvg == null ? null : Math.round(ofAvg * 100),
@@ -352,12 +383,18 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
     const L = dayLoad(days[d], actsByDate[d], hrv);
     loads[d] = L; loadBy[d] = L.trimp;
   }
-  // Muskeln: Satzwerk + Sport-Aktivitäten der letzten 7 Tage
-  const recentActs = [];
-  for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of actsByDate[d] || []) recentActs.push(Object.assign({}, a, { trimp: activityTrimp(a, hrv), ts: Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })); }
   const S = Object.assign({}, DEFAULT_SETTINGS, settings || {});
   checkins = (checkins || []).map(normCheckin);
   const ckBy = Object.fromEntries(checkins.map(c => [c.date, c]));
+  // kranke Tage markieren (zählen nicht zur Basis)
+  if (checkins.some(c => c.sick)) { days = Object.assign({}, days); for (const c of checkins) if (c.sick) days[c.date] = Object.assign({ date: c.date }, days[c.date], { sick: true }); }
+  // Krafttraining auf der Uhr ohne passende Satzwerk-Einheit (± 3 h) → zählt grob für Muskeln, Woche und Wiedereinstieg
+  const covered = (a, d) => (sessions || []).some(s => s.date === d && (!s.end || !a.ts || Math.abs(s.end - (a.ts + (a.dur || 0) * 1000)) < 3 * 3600e3));
+  const watchStrength = [];
+  for (let k = 0; k < 30; k++) { const d = addDays(today, -k); for (const a of actsByDate[d] || []) if (sportKind(a.type, a.name) === 'strength') { const ts = Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff; if (!covered(Object.assign({ ts }, a), d)) watchStrength.push({ id: 'uhr-' + (a.id || d), date: d, time: a.time, dur: a.dur, end: ts + (a.dur || 0) * 1000, exercises: [], watch: true }); } }
+  // Muskeln: Satzwerk + Sport-Aktivitäten der letzten 7 Tage
+  const recentActs = [];
+  for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of actsByDate[d] || []) if (sportKind(a.type, a.name) !== 'strength' || watchStrength.some(w => w.date === d && w.time === a.time)) recentActs.push(Object.assign({}, a, { trimp: activityTrimp(a, hrv), ts: Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })); }
   const allActs = withCheckinBaseball(actsByDate, ckBy, hrv, tzOff, S, today);
   for (let k = 0; k < 7; k++) { const d = addDays(today, -k); for (const a of allActs[d] || []) if (a.assumed) recentActs.push(a); }
   const calib = calibrate({ sessions, allActs, checkins, today, tzOff, hr: hrv });
@@ -365,15 +402,17 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const muscles = applySoreness(muscleFatigue(recentS, recentActs, now, calib.groups), ckBy[today]);
   const pain = painToday(ckBy, today);
   const sleepNow = sleepView(days, today);
-  const rec = recovery(days, today, { ck: ckBy[today], settled: sleepNow.reason === 'notWorn' || sleepNow.reason === 'noSleep' });
+  const rec = recovery(days, today, { ck: ckBy[today], settled: sleepNow.reason === 'notWorn' || sleepNow.reason === 'noSleep', partial: sleepNow.reason === 'partial' });
+  const allStrength = (sessions || []).concat(watchStrength);
   const sleep = sleepView(days, today);
   const ratio = loadRatio(loadBy, today);
   const sleepPart = rec.parts.find(p => p.k === 'sleep');
   const ckT = ckBy[today] || {};
   const bbT = baseballDay(ckBy, S, today, actsByDate), bbY = baseballDay(ckBy, S, addDays(today, -1), actsByDate);
   const S2 = Object.assign({}, S, { sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
-  let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions, ratio, sleepPart, settings: S2, now }), pain, muscles);
-  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: false, pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
+  let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions: allStrength, ratio, sleepPart, settings: S2, now }), pain, muscles);
+  recommendation = applyLife(recommendation, { today, ck: ckBy[today], allStrength, watchStrength, rec });
+  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: bbY.planned && !bbY.recorded && ckT.bb == null && !(ckBy[addDays(today, -1)] && ckBy[addDays(today, -1)].bbToday != null) ? { date: addDays(today, -1), from: bbY.from } : false, sick: !!ckT.sick, watchStrength: watchStrength.filter(w => w.date >= addDays(today, -3)), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
   for (let k = histDays - 1; k >= 0; k--) {
@@ -399,7 +438,9 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
     sleep,
     load: Object.assign({}, loads[today], { ratio }),
     bodyBattery: { high: t.bbHigh ?? null, low: t.bbLow ?? null, now: t.bbNow ?? null, wake: t.bbWake ?? null, charged: t.bbCharged ?? null, drained: t.bbDrained ?? null, curve: t.bbCurve || [] },
-    vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrDay: !!(t.rhr && !rhrValid(t)), rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null, syncedUntil: t.syncedUntil ? String(t.syncedUntil).slice(11, 16) : null },
+    vitals: { hrv: t.hrv ?? null, hrvBase: round(b.hrv), hrvStatus: t.hrvStatus || null, rhr: t.rhr ?? null, rhrDay: !!(t.rhr && !rhrValid(t)), rhrBase: round(b.rhr, 1), stress: t.stress ?? null, steps: t.steps ?? null, syncedUntil: t.syncedUntil ? String(t.syncedUntil).slice(11, 16) : null,
+      // letzte Synchronisierung der Uhr überhaupt (für „Uhr hat seit … nicht synchronisiert“)
+      watchLast: Object.values(days).map(x => x.syncedUntil).filter(Boolean).map(v => String(v).slice(0, 16)).sort().pop() || null },
     weight,
     body,
     strength: { last: (sessions || []).filter(s => s.date <= today).sort((a, c) => (c.end || 0) - (a.end || 0))[0] || null },
@@ -545,7 +586,8 @@ export function applyPain(r, pain, muscles) {
 // Stufe 2: Faktoren je Gruppe aus Check-ins der letzten 90 Tage
 export function calibrate({ sessions, allActs, checkins, today, tzOff = 0, hr }) {
   const acc = {}; let used = 0;
-  const flatActs = Object.entries(allActs).flatMap(([d, list]) => (list || []).map(a => Object.assign({}, a, { trimp: a.trimp || activityTrimp(a, hr), ts: a.ts || Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })));
+  // Krafttraining von der Uhr nicht mitlernen (meist auch in Satzwerk – sonst doppelt)
+  const flatActs = Object.entries(allActs).flatMap(([d, list]) => (list || []).filter(a => sportKind(a.type, a.name) !== 'strength').map(a => Object.assign({}, a, { trimp: a.trimp || activityTrimp(a, hr), ts: a.ts || Date.parse(d + 'T' + (a.time || '18:00') + ':00Z') - tzOff })));
   for (const c of checkins || []) {
     if (!c || c.partial || c.date > today || c.date < addDays(today, -90)) continue;
     const t = Date.parse(c.date + 'T08:00:00Z') - tzOff;
@@ -673,6 +715,8 @@ export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendat
     why.push(`Erholung ${rec.score} %`);
   } else if (recommendation.level === 'rest') en = 0;
   if (pain.some(p => p.lvl >= 3) && en === 2) en = 1;
+  if (recommendation.title === 'Wiedereinstieg' && en === 2) en = 1;
+  if (ckBy[today] && ckBy[today].sick) en = 0;
   const se = ckBy[today] && ckBy[today].sleepEst;
   if (sleep && !sleep.has && se && se.h) { sl = se.h < 6 || se.q === 0 ? 0 : se.h >= 7.5 && se.q === 2 ? 2 : 1; why.push(`Schlaf ~${String(se.h).replace('.', ',')} h (deine Angabe)`); }
   if (rec.estimated && rec.score != null) why[0] = `Erholung geschätzt ${rec.score} %`;
@@ -699,4 +743,30 @@ export function prefillFor({ days, today, history, ckBy, rec, sleep, recommendat
   for (let i = 0; i < 7; i++) for (const a of allActs[addDays(today, -i)] || []) { const k = sportKind(a.type, a.name); if (k === 'baseball') games++; else if (k) other++; }
   const sp = games + other * 0.5; ans.sport = sp >= 3 ? 3 : sp >= 2 ? 2 : sp >= 0.5 ? 1 : 0; src.sport = `${games}× Baseball${other ? `, ${other}× anderer Sport` : ''}`;
   return { tf: { en, sl, why: why.join(' · ') }, week: { ans, src } };
+}
+
+/* =====================================================================
+   9) ALLTAG: krank, Wiedereinstieg nach Pause, Kraft nur auf der Uhr
+   ---------------------------------------------------------------------
+   Krank (Morgen-Check): heute Pause, Tag zählt nicht zur Basis.
+   ≥ 10 Tage ohne Kraft: „Wiedereinstieg“ (höchstens leicht), danach wieder normal.
+   Krafttraining nur auf der Uhr (ohne Satzwerk): zählt grob, Hinweis „in Satzwerk nachtragen“.
+   ===================================================================== */
+export function applyLife(r, { today, ck, allStrength, watchStrength, rec }) {
+  const x = Object.assign({}, r, { notes: r.notes.slice() });
+  if (ck && ck.sick) {
+    return Object.assign(x, { level: 'rest', title: 'Krank – Pause', text: 'Erst gesund werden: kein Training, viel schlafen und trinken. Kranke Tage zählen nicht zu deiner Basis.', good: [], notes: x.notes.filter(n => !/Baseball/.test(n)) });
+  }
+  const before = allStrength.filter(s => s.date < today).map(s => s.date).sort();
+  const last = before[before.length - 1];
+  const gap = last ? Math.round((Date.parse(today) - Date.parse(last)) / 864e5) : null;
+  const doneToday = allStrength.some(s => s.date === today);
+  if (gap != null && gap >= 10 && !doneToday && x.level !== 'rest') {
+    x.level = 'light'; x.title = 'Wiedereinstieg';
+    x.text = `Nach ${gap} Tagen ohne Kraft: leichter einsteigen – etwa ⅔ der Sätze, 3 Wdh. Reserve. Ab der zweiten Einheit wieder normal.`;
+  }
+  for (const w of watchStrength.filter(w => w.date >= addDays(today, -3))) {
+    x.notes.push(`Krafttraining auf der Uhr ${w.date === today ? 'heute' : 'am ' + w.date.slice(8, 10) + '.' + w.date.slice(5, 7) + '.'} ohne Satzwerk – Muskeln grob geschätzt. In Satzwerk nachtragen für genaue Werte.`);
+  }
+  return x;
 }

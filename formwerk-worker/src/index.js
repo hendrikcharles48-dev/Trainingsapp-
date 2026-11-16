@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '1.9.0';
+export const WORKER_VERSION = '2.0.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -197,11 +197,15 @@ export class FormwerkStore {
       const entries = Object.entries(put);
       for (let i = 0; i < entries.length; i += 100) await this.st.put(Object.fromEntries(entries.slice(i, i + 100)));
       meta.lastFetch = now; meta.calls = g.calls; meta.error = errors.length ? errors.join(' · ') : null;
+      // Fehlerart für die App: Schlüssel abgelehnt / Garmin bremst / sonst
+      meta.errorKind = !errors.length ? null : errors.every(e => /401|403/.test(e)) ? 'key' : errors.some(e => /429/.test(e)) ? 'rate' : 'partial';
+      if (!errors.length) meta.lastOk = now;
       if (!meta.backfilled && !errors.some(e => e.startsWith('HRV') || e.startsWith('Schlaf'))) meta.backfilled = true;
       if (meta.backfilled) meta.lastWeekSync = today;
       meta.firstDate = meta.firstDate && meta.firstDate < from ? meta.firstDate : from;
     } catch (e) {
       meta.error = String(e && e.message || e); meta.lastFetch = now - (AUTO_REFRESH_MIN - 5) * 60e3; // nach 5 min erneut versuchen
+      meta.errorKind = e && (e.status === 401 || e.status === 403) ? 'key' : e && e.status === 429 ? 'rate' : 'other';
     }
     meta.lastTry = now;
     await this.st.put('meta', meta);
@@ -225,7 +229,7 @@ export class FormwerkStore {
     const [days, acts, sessions, settings, hrz, checkins] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr'), this.checkins(100)]);
     const now = Date.now();
     const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, manualWeights: await this.weights(), checkins, hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
-    const status = { generated: now, lastFetch: meta.lastFetch || null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
+    const status = { generated: now, lastFetch: meta.lastFetch || null, lastOk: meta.lastOk || null, errorKind: meta.error ? meta.errorKind || 'other' : null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
       const r = sum.recovery, c = sum.recommendation;
       return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional, estimated: !!r.estimated }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday),
@@ -249,6 +253,7 @@ export class FormwerkStore {
       if (b.sleepEst === null) delete c.sleepEst;
       else if (b.sleepEst && typeof b.sleepEst === 'object') { const h = Math.round(+b.sleepEst.h * 2) / 2, q = +b.sleepEst.q; if (h >= 3 && h <= 12) c.sleepEst = { h, q: [0, 1, 2].includes(q) ? q : 1 }; }
       else if (old && old.sleepEst) c.sleepEst = old.sleepEst;
+      if (b.sick === true || b.sick === false) c.sick = b.sick; else if (old && old.sick != null) c.sick = old.sick;
       return c;
     };
     if (b.bbOnly) { const c0 = flags(Object.assign({ date, sore: {}, pain: {} }, old || { partial: true }, { t: Date.now() })); await this.st.put('c:' + date, c0); return { ok: true, checkin: c0 }; }

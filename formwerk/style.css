@@ -242,3 +242,6 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
 
 .ckpills .ckpill { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ckpills:not([style*=wrap]) .ckpill { flex: 0 1 auto; }
+
+.banner { overflow-wrap: anywhere; min-width: 0; }
+.banner > div { min-width: 0; }
