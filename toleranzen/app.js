@@ -457,9 +457,9 @@
     foto: { ml: 'm', hk: 'K', items: [], detected: null },
     chain: { rows: [{ op: 1, N: '10', mode: 'pm', pm: '0,2', up: '', lo: '', iso: '' }, { op: 1, N: '5', mode: 'pm', pm: '0,3', up: '', lo: '', iso: '' }] },
     thread: { q: 'M8', kind: 'M', n: '' },
-    mill: { sk: 'Rz', d: '10', z: '4', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', hm: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', holder: 'shrink', cool: 'emul', L: '', lc: '', way: '', ord: ['d', 'z'] },
-    drill: { d: '8', vc: '', n: '', f: '', vf: '', Q: '', hm: '', sig: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', holder: 'er', cool: 'emul', depth: '', ord: ['d'] },
-    turn: { sk: 'Rz', d: '50', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', hm: '', kr: '', mat: 's235', tool: 'tmed', auto: 'on', cool: 'emul', way: '', ord: ['d'] },
+    mill: { sk: 'Rz', d: '', z: '', r: '', vc: '', n: '', fz: '', f: '', vf: '', Rz: '', Ra: '', ae: '', ap: '', Q: '', hm: '', mat: 's235', tool: 'vhm', op: 'side', auto: 'on', holder: 'shrink', cool: 'emul', L: '', lc: '', way: '', ord: ['d', 'z'] },
+    drill: { d: '', vc: '', n: '', f: '', vf: '', Q: '', hm: '', sig: '', mat: 's235', tool: 'dvhm', thr: 'M8', auto: 'on', holder: 'er', cool: 'emul', depth: '', ord: ['d'] },
+    turn: { sk: 'Rz', d: '', r: '', vc: '', n: '', f: '', vf: '', Rz: '', Ra: '', ap: '', Q: '', hm: '', kr: '', mat: 's235', tool: 'tmed', auto: 'on', cool: 'emul', way: '', ord: ['d'] },
     ref: { proc: 'turn', mat: 's235', tool: 'tmed', d: '', z: '', sk: 'Rz', R: '', r: '' },
     mach: { nmax: '', vfmax: '', pmax: '', nmaxT: '', pmaxT: '' },
     sw: { d: '8' },
@@ -492,6 +492,23 @@
     return out;
   })();
   const saveA = () => store.set('apply', A);
+  // Schnittdaten leeren, wenn die App 20 Minuten nicht benutzt wurde (Werkstoff, Werkzeug, Anordnung bleiben)
+  const CUT_IDLE = 20 * 60 * 1000;
+  const cutTouch = () => store.set('cutSeen', Date.now());
+  function cutExpire() {
+    const t = store.get('cutSeen', 0);
+    const old = t && Date.now() - t > CUT_IDLE;
+    if (old) {
+      ['mill', 'drill', 'turn'].forEach(m => {
+        WK.SOLVE_VARS[m].concat(['L', 'lc', 'way', 'depth']).forEach(k => { if (k in A[m]) A[m][k] = ''; });
+        A[m].ord = [];
+      });
+      ['d', 'z', 'R', 'r'].forEach(k => { A.ref[k] = ''; });
+      saveA();
+    }
+    cutTouch();
+    return old;
+  }
   const getK = k => { const [a, b] = k.split('.'); return A[a][b]; };
   const setK = (k, v) => { const [a, b] = k.split('.'); A[a][b] = v; saveA(); };
   const numOf = s => T.parseNum(s);
@@ -1856,7 +1873,7 @@
     ae: { s: 'ae', mill: 'Eingriffsbreite', u: 'mm', dec: 2 },
     ap: { s: 'ap', mill: 'Schnitttiefe', turn: 'Schnitttiefe', u: 'mm', dec: 2 },
     Q: { s: 'Q', all: 'Zeitspanvolumen', u: 'cm³/min', dec: 1 },
-    hm: { s: 'hm', all: 'Spanungsdicke', mill: 'mittl. Spanungsdicke', u: 'mm', dec: 4 },
+    hm: { s: 'hm', all: 'Spanungsdicke', u: 'mm', dec: 4 },
     kr: { s: 'κr', turn: 'Einstellwinkel', u: '°', dec: 0 },
     sig: { s: 'σ', drill: 'Spitzenwinkel', u: '°', dec: 0 }
   };
@@ -1911,8 +1928,8 @@
     const field = (k, full) => `<div class="field sv-f${full ? ' full' : ''}" id="svf-${mode}-${k}"><label for="sv-${mode}-${k}"><b>${SV[k].s}</b><span>${esc(SV[k][mode] || SV[k].all)}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, `${mode}.${k}`, SV[k].u, '')}</div>`;
     const auxNum = (k, s, l, u, ph) => `<div class="field sv-f"><label for="sv-${mode}-${k}"><b>${s}</b><span>${l}</span></label><span class="rec" id="rec-${mode}-${k}"></span>${bindNum(`sv-${mode}-${k}`, mode + '.' + k, u, ph)}</div>`;
     const favs = myTools().filter(t => t.mode === mode);
-    const inputs = mode === 'mill' ? ['d', 'z'] : ['d'];
-    const tiles = mode === 'mill' ? ['vc', 'n', 'fz', 'f', 'vf', 'hm'] : ['vc', 'n', 'f', 'vf', 'hm'];
+    const inputs = mode === 'mill' ? ['d', 'z', 'ae', 'ap'] : mode === 'turn' ? ['d', 'ap'] : ['d'];
+    const tiles = mode === 'mill' ? ['vc', 'n', 'fz', 'hm', 'f', 'vf'] : ['vc', 'n', 'f', 'hm', 'vf'];
     // Ergebnis-Kachel: zeigt den Wert grün; antippen macht daraus ein Eingabefeld für einen eigenen Wert
     const tile = k => `<div class="rt" id="svf-${mode}-${k}">
         <button type="button" class="rt-face" data-act="rt-edit" data-m="${mode}" data-k="${k}"><span class="rt-l"><b>${SV[k].s}</b> ${esc(SV[k][mode] || SV[k].all)}</span><span class="rt-v"><b id="rtv-${mode}-${k}">?</b> <small>${SV[k].u}</small></span><span class="rt-tag" id="rtt-${mode}-${k}"></span></button>
@@ -1921,8 +1938,8 @@
     const sk = c.sk === 'Ra' ? 'Ra' : 'Rz';
     // Oberfläche sichtbar: Wunsch eingeben, Vorschub wird daraus gerechnet
     const surf = mode === 'drill' ? '' : `<div class="surf-box"><div class="surf-h"><span class="sv-h">Oberfläche</span>${segHTML(mode + '.sk', sk, [['Rz', 'Rz'], ['Ra', 'Ra']], 'mini')}</div><div class="fields">${field(sk)}${field('r')}</div><div class="chips">${(sk === 'Ra' ? ['0,4', '0,8', '1,6', '3,2', '6,3'] : ['2,5', '4', '6,3', '10', '16', '25']).map(v => `<button type="button" class="chip" data-act="sv-take" data-m="${mode}" data-k="${sk}" data-v="${v}">${sk} ${v}</button>`).join('')}</div><span class="hint-line" id="sv-${mode}-other"></span></div>`;
-    const load = fold(`f-${mode}-load`, mode === 'drill' ? 'Bohrtiefe, Leistung und Zeit' : mode === 'mill' ? 'Eingriff, Leistung und Zeit' : 'Schnitttiefe, Leistung und Zeit',
-      `<div class="fields">${mode === 'mill' ? field('ae') + field('ap') : mode === 'turn' ? field('ap') + field('kr') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30') + field('sig')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
+    const load = fold(`f-${mode}-load`, mode === 'drill' ? 'Bohrtiefe, Leistung und Zeit' : mode === 'mill' ? 'Leistung und Zeit' : 'Leistung, Zeit, Einstellwinkel',
+      `<div class="fields">${mode === 'mill' ? '' : mode === 'turn' ? field('kr') : auxNum('depth', 'T', 'Bohrtiefe', 'mm', 'z. B. 30') + field('sig')}${mode !== 'drill' ? auxNum('way', 'Weg', mode === 'mill' ? 'Vorschubweg' : 'Drehlänge', 'mm', 'für die Zeit') : ''}${field('Q', mode === 'mill')}</div><div id="load-${mode}"></div>`, `sum-${mode}-load`);
     const setup = fold(`f-${mode}-setup`, mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', `<div class="fields">
         ${mode === 'mill' ? auxNum('L', 'L', 'Auskraglänge', 'mm', 'ab Aufnahme') + auxNum('lc', 'lc', 'Schneidenlänge', 'mm', '') : ''}
         ${mode !== 'turn' ? `<div class="field"><label for="sv-${mode}-holder">Aufnahme</label>${selInp(`sv-${mode}-holder`, mode + '.holder', ZZ.HOLDERS.filter(h => h.modes.includes(mode)).map(h => [h.id, h.name]))}</div>` : ''}
@@ -1941,11 +1958,11 @@
     blk('tool', 'Werkzeug', `<div class="field"><label for="sv-${mode}-tool">Werkzeug</label>${selInp(`sv-${mode}-tool`, mode + '.tool', ZZ.TOOLS.filter(t => t.mode === mode).map(t => [t.id, t.name]))}</div>`);
     if (tool.thread && mode === 'drill') blk('thr', 'Gewinde', `<div class="field"><label for="sv-${mode}-thr">Gewinde</label>${textInp(`sv-${mode}-thr`, mode + '.thr', 'z. B. M8', true)}</div>`);
     if (tool.op) blk('op', 'Bearbeitung', segHTML(mode + '.op', c.op, ZZ.OPS.map(o => [o.id, o.name]), 'wrap'));
-    inputs.forEach(k => blk(k, k === 'd' ? 'Ø d' : 'Schneiden z', field(k), true));
+    inputs.forEach(k => blk(k, { d: 'Ø d', z: 'Schneiden z', ae: 'ae Eingriffsbreite', ap: 'ap Schnitttiefe' }[k], field(k), true));
     if (surf) blk('surf', 'Oberfläche', surf);
     blk('top', 'Ergebnis S und F', `<div id="top-${mode}" class="sv-top" aria-live="polite"></div>`);
     tiles.forEach(k => blk(k, { vc: 'vc Schnittgeschw.', n: 'n Drehzahl', fz: 'fz je Zahn', f: 'f je Umdrehung', vf: 'vf Vorschub F', hm: 'hm Spanungsdicke' }[k], tile(k), true));
-    blk('load', mode === 'drill' ? 'Bohrtiefe, Leistung, Zeit' : mode === 'mill' ? 'Eingriff, Leistung, Zeit' : 'Schnitttiefe, Leistung, Zeit', load);
+    blk('load', mode === 'drill' ? 'Bohrtiefe, Leistung, Zeit' : mode === 'mill' ? 'Leistung und Zeit' : 'Leistung, Zeit, κr', load);
     blk('setup', mode === 'turn' ? 'Kühlung' : 'Aufspannung und Kühlung', setup);
     blk('tips', 'Tipps', fold(`f-${mode}-tips`, 'Tipps', `<div id="tips-${mode}"></div>`, `sum-${mode}-tips`));
     blk('mach', 'Maschine', machine);
@@ -2064,7 +2081,7 @@
       if (mode === 'mill' && !known(['ae']) && r.val.d && (g.hm || rec.ae || c.op === 'slot')) {   // Eingriffsbreite für die Spanungsdicke hm
         soft.ae = c.op === 'slot' ? r.val.d : rec.ae ? Math.min(rec.ae[1], r.val.d) : r.val.d / 2;
         resolve();
-        if (g.hm) info.push(`Für fz aus hm braucht die App die Eingriffsbreite. Angenommen ist ae ${T.fmt(soft.ae, 0, 2)} mm, trag deinen Wert unter „Eingriff, Leistung und Zeit“ ein.`);
+        if (g.hm) info.push(`Für fz aus hm braucht die App die Eingriffsbreite. Angenommen ist ae ${T.fmt(soft.ae, 0, 2)} mm, trag deinen Wert bei ae ein.`);
       }
       if (!known(['vc', 'n']) && rec.vc) {
         if (rec.deff && rec.deff < r.val.d) soft.n = rec.vc[1] * 1000 / (Math.PI * rec.deff);   // Kugelfräser: Drehzahl für den wirksamen Ø
@@ -2719,6 +2736,7 @@
   }
 
   function onApplyChange(k) {
+    cutTouch();
     const [sk0, sk1] = k.split('.');
     if (sk0 === 'ref' && ['sk', 'proc', 'tool'].includes(sk1)) {   // Richtwerte: Oberfläche umrechnen, Werkzeug passend zum Verfahren
       const x = optOf(A.ref.R);
@@ -2971,5 +2989,12 @@
   }
 
   applyTheme(store.get('theme', 'auto'));
+  cutExpire();
   render();
+  // Zurück in die App: nach langer Pause sind die Schnittdaten leer
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { cutTouch(); return; }
+    if (cutExpire() && S.page !== 'home' && $('#sec-body') && ['mill', 'drill', 'turn', 'cutref'].includes(curSection().id)) { $('#sec-body').innerHTML = sectionHTML(); computeCurrent(); }
+  });
+  addEventListener('pagehide', cutTouch);
 })();
