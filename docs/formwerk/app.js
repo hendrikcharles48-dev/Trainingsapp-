@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.6.1';
+  const VERSION = '1.6.2';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -92,7 +92,9 @@
     const d = st.data; if (!d) return '';
     const lf = d.status && d.status.lastFetch;
     const cls = st.error || (d.status && d.status.error) ? 'err' : (Date.now() - (lf || 0) < 3 * 3600e3 ? 'fresh' : 'old');
-    return `<div class="stand ${cls}"><i></i><span class="ell">Stand ${lf ? clock(lf) : '–'}${lf && Date.now() - lf > 20 * 3600e3 ? ' (' + ago(lf) + ')' : ''} · Garmin</span></div>`;
+    // „Uhr bis …“ = bis wann Garmin den heutigen Tag von der Uhr kennt (letzte Synchronisierung der Uhr)
+    const up = d.vitals && d.vitals.syncedUntil && d.date === todayIso() ? d.vitals.syncedUntil : null;
+    return `<div class="stand ${cls}"><i></i><span class="ell">${up ? 'Uhr synchronisiert ' + up + ' · ' : ''}Stand ${lf ? clock(lf) : '–'}${lf && Date.now() - lf > 20 * 3600e3 ? ' (' + ago(lf) + ')' : ''}</span></div>`;
   }
   function header(title) {
     const dt = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
