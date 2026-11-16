@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.8.0';
+  const VERSION = '1.8.1';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -241,7 +241,7 @@
     const c = b.checkin; const ms = d.muscles || [];
     const bb = b.baseball || { today: {}, yesterday: {} };
     // Schalter zeigen den wirksamen Stand: feste Zeit = automatisch an (abwählbar), Uhr-Aktivität = fest
-    const bbLabel = (x, l) => l + (x.recorded ? ' (Uhr)' : x.planned ? ' ' + x.from : '');
+    const bbLabel = (x, l) => l + (x.recorded ? ' (Uhr)' : x.auto === true ? ' · am Puls erkannt' : x.auto === false ? ' · nicht erkannt' : x.planned ? ' ' + x.from : '');
     const tog = (k, x, l) => `<button class="ckchip ${x.on ? 'on' : ''}" ${x.recorded ? 'disabled' : `data-a="ckFlag" data-k="${k}" data-on="${x.on ? 1 : 0}"`} style="flex:1;min-height:44px"><b class="ell">${bbLabel(x, l)}</b><span>${x.on ? 'ja' : '–'}</span></button>`;
     const bbRow = `<div style="display:flex;gap:6px;margin-top:10px">${tog('bbToday', bb.today, 'Heute Baseball')}${tog('bb', bb.yesterday, 'Gestern Baseball')}</div>`;
     const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball${b.askBaseball.from ? ' ' + b.askBaseball.from : ''} – warst du da?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
@@ -438,6 +438,7 @@
       <p><b>Stresszeichen und leichtere Woche.</b> Steigen nachts Atemfrequenz und Ruhepuls deutlich über deinen Schnitt oder fällt die HRV stark ab, zeigt Formwerk „Stresszeichen“ und rät heute zu lockerer Bewegung. Liegen über eine Woche mindestens zwei Zeichen vor (HRV unter Basis, Ruhepuls erhöht, Erholung im Schnitt unter 50 %, oft starker Muskelkater oder Schmerz), wird eine leichtere Woche empfohlen – Satzwerk nimmt dazu seine Leistungsentwicklung.</p>
       <p><b>Satzwerk.</b> Satzwerk füllt mit Formwerk vor dem Training Energie und Schlaf vor, beim Wochen-Check-in fast alle Fragen, und übernimmt Baseball-Zeiten und gute Kraft-Tage. Du bestätigst immer selbst.</p>
       <p><b>Besondere Fälle.</b> Nacht ohne Messung → Erholung geschätzt (Tages-Ruhepuls zählt nicht). Nacht nur teilweise gemessen → zu kurzer Garmin-Schlaf zählt nicht. Krank (Morgen-Check) → Pause, der Tag zählt nicht zur Basis; einzelne Ausreißer werden ohnehin gekappt. Nach 10 Tagen ohne Kraft → „Wiedereinstieg“. Krafttraining nur auf der Uhr → zählt grob für die Muskeln. Fester Baseball-Termin ohne Uhr → am Morgen danach kurze Rückfrage. Garmin-Schlüssel abgelaufen oder Uhr lange nicht synchronisiert → Hinweis oben.</p>
+      <p><b>Baseball automatisch.</b> Bei festen Zeiten schaut Formwerk nach dem Termin auf deinen Tagespuls: deutlich erhöht im Zeitfenster → du warst da und es zählt, ruhig → zählt nicht. Uhr in der Zeit nicht getragen → es zählt der Termin und Formwerk fragt am Morgen nach. Antippen geht immer vor.</p>
       <p><b>Empfehlung.</b> Rot → Pause. Grün → Kraft voll, gelb → Kraft leicht (⅔ der Sätze, 3 Wdh. Reserve). Eine Stufe leichter bei wenig Schlaf oder deutlich mehr Wochenbelastung als gewohnt. An Baseball-Tagen höchstens leicht, am Tag davor keine schweren Beine/Überkopf. Letzte Kraft-Einheit unter 48 h und Muskeln noch müde → Kraft-Pause. Ziel: ${(st.data && st.data.settings && st.data.settings.strengthPerWeek) || 2} Einheiten pro Woche.</p>
       <p class="muted">Trainingshilfe, keine medizinische Aussage. Wenn du dich krank fühlst, zählt dein Gefühl.</p></div>
       <button class="btn block" data-a="closeSheet">Schließen</button></div>`);

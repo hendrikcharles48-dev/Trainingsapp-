@@ -412,7 +412,7 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const S2 = Object.assign({}, S, { sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
   let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions: allStrength, ratio, sleepPart, settings: S2, now }), pain, muscles);
   recommendation = applyLife(recommendation, { today, ck: ckBy[today], allStrength, watchStrength, rec });
-  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: bbY.planned && !bbY.recorded && ckT.bb == null && !(ckBy[addDays(today, -1)] && ckBy[addDays(today, -1)].bbToday != null) ? { date: addDays(today, -1), from: bbY.from } : false, sick: !!ckT.sick, watchStrength: watchStrength.filter(w => w.date >= addDays(today, -3)), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
+  const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: bbY.planned && !bbY.recorded && bbY.auto == null && ckT.bb == null && !(ckBy[addDays(today, -1)] && ckBy[addDays(today, -1)].bbToday != null) ? { date: addDays(today, -1), from: bbY.from } : false, sick: !!ckT.sick, watchStrength: watchStrength.filter(w => w.date >= addDays(today, -3)), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };
   const t = days[today] || {};
   const history = [];
   for (let k = histDays - 1; k >= 0; k--) {
@@ -535,8 +535,10 @@ export function planned(S, date) {
 export function baseballDay(ckBy, S, date, acts) {
   const recorded = (acts[date] || []).some(a => sportKind(a.type, a.name) === 'baseball' && !a.assumed);
   const c = ckBy[date] || {}, n = ckBy[addDays(date, 1)] || {}; const p = planned(S, date);
-  const on = recorded || (n.bb != null ? n.bb : c.bbToday != null ? c.bbToday : !!p);
-  return { recorded, planned: !!p, on, from: p ? p.from : '18:30', dur: p ? p.dur : 120 };
+  // Reihenfolge: Uhr-Aktivität > deine Antwort > Puls-Erkennung im festen Zeitfenster (S.autoBB) > fester Termin
+  const auto = p && S.autoBB && S.autoBB[date] != null ? S.autoBB[date] : null;
+  const on = recorded || (n.bb != null ? n.bb : c.bbToday != null ? c.bbToday : auto != null ? auto : !!p);
+  return { recorded, planned: !!p, auto, on, from: p ? p.from : '18:30', dur: p ? p.dur : 120 };
 }
 export function withCheckinBaseball(actsByDate, ckBy, hr, tzOff = 0, S = DEFAULT_SETTINGS, today = null, back = 100) {
   const out = Object.assign({}, actsByDate);
@@ -769,4 +771,27 @@ export function applyLife(r, { today, ck, allStrength, watchStrength, rec }) {
     x.notes.push(`Krafttraining auf der Uhr ${w.date === today ? 'heute' : 'am ' + w.date.slice(8, 10) + '.' + w.date.slice(5, 7) + '.'} ohne Satzwerk – Muskeln grob geschätzt. In Satzwerk nachtragen für genaue Werte.`);
   }
   return x;
+}
+
+/* =====================================================================
+   10) BASEBALL AM PULS ERKENNEN (feste Zeiten, Nutzerwunsch 16.11.)
+   ---------------------------------------------------------------------
+   Im festen Zeitfenster den Tagespuls der Uhr ansehen: getragen (≥ 40 % des Fensters mit Werten) und
+   ≥ 20 % der Werte über Ruhepuls + 30 ODER Schnitt ≥ Ruhepuls + 22 → warst da. Getragen, aber ruhig → warst nicht da.
+   Kaum Werte (Uhr nicht getragen) → unbekannt (dann zählt der Termin und Formwerk fragt am Morgen).
+   ===================================================================== */
+export function detectBaseball(hrJson, startTs, endTs, rest = 55) {
+  let vals = hrJson && (hrJson.heartRateValues || hrJson.values || (Array.isArray(hrJson) ? hrJson : null));
+  if (!Array.isArray(vals)) return { v: null, reason: 'keine Daten', complete: false };
+  vals = vals.map(x => (Array.isArray(x) ? [Number(x[0]), Number(x[1])] : [Number(x.timestamp || x.startGMT), Number(x.value || x.heartRate)])).filter(x => x[0] > 0);
+  const maxTs = vals.length ? Math.max(...vals.map(x => x[0])) : 0;
+  const complete = maxTs >= endTs - 5 * 60e3;
+  const ts = vals.map(x => x[0]).sort((a, b) => a - b); const gaps = [];
+  for (let i = 1; i < ts.length; i++) { const g = ts[i] - ts[i - 1]; if (g > 0 && g < 30 * 60e3) gaps.push(g); }
+  gaps.sort((a, b) => a - b); const step = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 120e3;
+  const win = vals.filter(x => x[0] >= startTs && x[0] <= endTs && x[1] > 0);
+  const coverage = Math.min(1, win.length * step / Math.max(1, endTs - startTs));
+  if (coverage < 0.4) return { v: null, reason: 'Uhr im Zeitfenster kaum getragen', coverage: round(coverage, 2), complete };
+  const m = mean(win.map(x => x[1])); const active = win.filter(x => x[1] >= rest + 30).length / win.length;
+  return { v: active >= 0.2 || m >= rest + 22, coverage: round(coverage, 2), active: round(active, 2), mean: Math.round(m), complete };
 }
