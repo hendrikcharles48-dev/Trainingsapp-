@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, prefillFor, recoveryCore } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -160,6 +160,43 @@ await t('Nacht ohne Messung: geschätzt statt Tages-Ruhepuls, eigene Schlafangab
   delete days[today].syncedUntil;
   s = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T06:00:00Z') });
   assert.equal(s.recovery.score, null); assert.ok(!s.recovery.estimated);
+});
+
+await t('Teilnacht: zu kurzer Schlaf mit Messlücke zählt nicht, eigene Angabe schon', () => {
+  const days = synthDays(40); days[today].sleep = Object.assign({}, days[today].sleep, { total: 3.5 * 3600 }); days[today].noMeasureMin = 240; days[today].syncedUntil = today + 'T09:00:00.0';
+  assert.equal(sleepView(days, today).reason, 'partial');
+  const full = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T09:00:00Z') });
+  assert.ok(full.recovery.partialNight); assert.ok(!full.recovery.parts.some(p => p.k === 'sleep' && !p.est));
+  const short = recoveryCore(days, today).score; assert.ok(full.recovery.score > short, 'ohne Strafe für Messlücke höher: ' + full.recovery.score + ' > ' + short);
+  const withEst = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T09:00:00Z'), checkins: [{ date: today, v: 5, sore: {}, pain: {}, sleepEst: { h: 8, q: 2 }, partial: true }] });
+  assert.ok(withEst.recovery.parts.some(p => p.est));
+});
+await t('Krank: Pause, Tag zählt nicht zur Basis', () => {
+  const days = synthDays(40); const sickDay = addDays(today, -3); days[sickDay].hrv = 45; days[sickDay].rhr = 55;
+  const s = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T08:00:00Z'), checkins: [{ date: sickDay, v: 5, sore: {}, pain: {}, sick: true }, { date: today, v: 5, sore: {}, pain: {}, sick: true }] });
+  assert.equal(s.recommendation.title, 'Krank – Pause'); assert.equal(s.prefill.tf.en, 0);
+  const marked = Object.assign({}, days, { [sickDay]: Object.assign({}, days[sickDay], { sick: true }) });
+  assert.ok(baselines(marked, today).rhr < baselines(days, today).rhr, 'kranker Tag hebt die Ruhepuls-Basis nicht mehr');
+});
+await t('Wiedereinstieg nach ≥ 10 Tagen ohne Kraft, Uhr-Krafttraining zählt', () => {
+  const old = [{ id: 'a', date: addDays(today, -14), end: Date.parse(addDays(today, -14) + 'T18:00:00Z'), exercises: [] }];
+  const r = applyLife({ level: 'full', title: 'Kraft voll', text: '', notes: [], good: [] }, { today, ck: null, allStrength: old, watchStrength: [], rec: {} });
+  assert.equal(r.title, 'Wiedereinstieg'); assert.equal(r.level, 'light');
+  const days = synthDays(40);
+  const s = buildSummary({ days, actsByDate: { [addDays(today, -1)]: [{ id: 7, type: 'strength_training', name: 'Krafttraining', dur: 3600, time: '18:00' }] }, sessions: old, settings: {}, today, now: Date.parse(today + 'T08:00:00Z') });
+  assert.notEqual(s.recommendation.title, 'Wiedereinstieg', 'Uhr-Kraft gestern beendet die Pause');
+  assert.ok(s.recommendation.notes.some(n => /ohne Satzwerk/.test(n)));
+  assert.notEqual(s.muscles.find(m => m.k === 'vorn').status, 'fresh');
+  // dieselbe Einheit auch in Satzwerk → nicht doppelt
+  const both = buildSummary({ days, actsByDate: { [addDays(today, -1)]: [{ id: 7, type: 'strength_training', dur: 3600, time: '18:00' }] }, sessions: old.concat([{ id: 'b', date: addDays(today, -1), end: Date.parse(addDays(today, -1) + 'T19:00:00Z'), exercises: [] }]), settings: {}, today, now: Date.parse(today + 'T08:00:00Z') });
+  assert.ok(!both.recommendation.notes.some(n => /ohne Satzwerk/.test(n)));
+});
+await t('Baseball: Rückfrage am Morgen nach festem Termin ohne Uhr', () => {
+  const S = { sportDays: [weekday(addDays(today, -1))], sportTimes: { [weekday(addDays(today, -1))]: { from: '18:00', dur: 120, since: '2026-01-01' } } };
+  const s = buildSummary({ days: synthDays(40), actsByDate: {}, sessions: [], settings: S, today, now: Date.parse(today + 'T08:00:00Z') });
+  assert.equal(s.body.askBaseball.from, '18:00');
+  const s2 = buildSummary({ days: synthDays(40), actsByDate: {}, sessions: [], settings: S, today, now: Date.parse(today + 'T08:00:00Z'), checkins: [{ date: today, v: 5, sore: {}, pain: {}, bb: false, partial: true }] });
+  assert.equal(s2.body.askBaseball, false);
 });
 
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */
