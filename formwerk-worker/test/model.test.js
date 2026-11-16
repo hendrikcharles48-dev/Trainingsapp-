@@ -202,8 +202,12 @@ await t('Baseball: Rückfrage am Morgen nach festem Termin ohne Uhr', () => {
 await t('Baseball am Puls erkennen', () => {
   const start = Date.parse('2026-11-10T17:00:00Z'), end = start + 2 * 3600e3;
   const mk = f => ({ heartRateValues: Array.from({ length: 24 * 30 }, (_, i) => { const ts = Date.parse('2026-11-10T00:00:00Z') + i * 120e3; return [ts, f(ts)]; }) });
-  assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? (ts % 600e3 < 240e3 ? 125 : 95) : 62)), start, end, 53).v, true);
+  assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? (ts % 600e3 < 240e3 ? 125 : 98) : 62)), start, end, 53).v, true);
   assert.equal(detectBaseball(mk(() => 64), start, end, 53).v, false);
+  // normaler Tag (echte Werte 16.11.: Schnitt +21…+29, ≤ 13 % über +40) darf nie „warst da“ sein
+  assert.notEqual(detectBaseball(mk(ts => (ts >= start && ts <= end ? (ts % 600e3 < 80e3 ? 93 : 76) : 62)), start, end, 51).v, true);
+  // gelernt: dein Baseball-Puls liegt bei Schnitt 88 → ähnlicher Abend wird erkannt
+  assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? 86 : 62)), start, end, 51, { minMean: 88 }).v, true);
   assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? null : 62)), start, end, 53).v, null, 'nicht getragen → unbekannt');
   // Erkennung schlägt den festen Termin, deine Antwort schlägt die Erkennung
   const S = { sportDays: [1], sportTimes: { 1: { from: '18:00', dur: 120, since: '2026-01-01' } }, autoBB: { '2026-11-10': false } };
