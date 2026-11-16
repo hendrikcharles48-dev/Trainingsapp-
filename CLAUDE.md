@@ -287,6 +287,8 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   aus Formwerk“), Wochen-Check-in vorausgefüllt (`FW.weekPrefill`, nur „diff“ bleibt offen), `deloadNeeded` = Leistung ODER Formwerk-Signale
   (2 Zeichen oder 1 + fallende Leistung), Baseball-Tage aus Formwerk (`sportDaysEff()`, `FW.plan().baseballToday`), gute Kraft-Tage in der
   Wochenleiste (`.wd.good`). Ohne Formwerk alles wie vorher.
+- Fehlende Nacht (16.11. geprüft: Synchronisierung lief, Uhr maß 0–7 Uhr nichts): `sleepView` liefert `reason` (`notWorn` = Garmin bis
+  nach 6 Uhr synchronisiert und ≥ 3 h ohne Messung laut `stress.uncategorizedDurationInMillis`, `noSleep`, `notSynced`); Formwerk erklärt das.
 - Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

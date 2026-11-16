@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -119,7 +119,7 @@
     const C = 2 * Math.PI * 100;
     const center = r.building
       ? `<div class="pending">Basis wird aufgebaut</div><div class="lbl">${r.baseNights || 0} von 5 Nächten</div>`
-      : score == null ? `<div class="pending">Noch keine Werte von heute Nacht</div>`
+      : score == null ? `<div class="pending">${d.sleep && d.sleep.reason === 'notWorn' ? 'Uhr nachts nicht getragen' : 'Noch keine Werte von heute Nacht'}</div>`
       : `<div class="big num">${score}<small>%</small></div><div class="lbl">Erholung</div>`;
     const hp = (r.parts || []).find(p => p.k === 'hrv');
     const hrvDelta = hp ? hp.deltaPct : null;
@@ -165,7 +165,12 @@
   function sleepTime(ts, local) { return ts ? new Date(ts).toLocaleTimeString('de-DE', Object.assign({ hour: '2-digit', minute: '2-digit' }, local ? { timeZone: 'UTC' } : {})) : null; }
   function sleepCard(d) {
     const s = d.sleep;
-    if (!s.has) return `<div class="card"><div class="ctitle"><h3>Schlaf</h3></div><p class="muted" style="margin:0">Für heute Nacht noch kein Schlaf von Garmin. Uhr synchronisieren und neu laden.</p></div>`;
+    if (!s.has) {
+      const msg = s.reason === 'notWorn' ? `Garmin hat für heute Nacht keinen Schlaf: Die Uhr hat ${s.noMeasureMin ? 'etwa ' + Math.round(s.noMeasureMin / 60) + ' Stunden ' : ''}nichts gemessen – sie war wohl nicht am Handgelenk oder saß zu locker. Synchronisiert ist alles bis ${s.syncedUntil} Uhr. Für Schlaf und HRV nachts tragen, laden lieber tagsüber.`
+        : s.reason === 'noSleep' ? `Garmin hat für heute Nacht keinen Schlaf erkannt, obwohl bis ${s.syncedUntil} Uhr synchronisiert ist. In Garmin Connect nachsehen, ob dort Schlaf steht.`
+        : 'Für heute Nacht noch kein Schlaf von Garmin. Garmin Connect kurz öffnen (synchronisiert), dann hier nach unten ziehen.';
+      return `<div class="card"><div class="ctitle"><h3>Schlaf</h3></div><p class="small ink2" style="margin:0">${esc(msg)}</p></div>`;
+    }
     const parts = [['deep', 'Tief', s.deep], ['light', 'Leicht', s.light], ['rem', 'REM', s.rem], ['awake', 'Wach', s.awake]];
     const tot = parts.reduce((t, p) => t + (p[2] || 0), 0);
     const from = sleepTime(s.start, s.local), to = sleepTime(s.end, s.local);

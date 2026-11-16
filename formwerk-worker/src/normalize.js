@@ -85,6 +85,9 @@ export function dailyFrom(o) {
   const stress = n(pick(o, 'stress.avgLevel', 'averageStressLevel', 'avgStressLevel', 'values.overallStressLevel'));
   return {
     rhr: n(pick(o, 'heartRate.restingValue', 'restingHeartRate', 'restingHeartRateInBeatsPerMinute', 'values.restingHR')),
+    // Wie weit Garmin den Tag schon kennt (letzte Synchronisierung) und wie lange die Uhr nichts messen konnte (nicht getragen)
+    syncedUntil: pick(o, 'wellnessChronology.endTimestampLocal') || null,
+    noMeasureMin: n(pick(o, 'stress.uncategorizedDurationInMillis')) != null ? Math.round(n(pick(o, 'stress.uncategorizedDurationInMillis')) / 60000) : null,
     steps: n(pick(o, 'movement.steps.value', 'totalSteps', 'steps', 'values.totalSteps')),
     stress: stress === null || stress < 0 ? null : stress,
     bbHigh: n(pick(o, 'bodyBattery.maxValue', 'bodyBatteryHighestValue', 'bodyBatteryHighValue')),
