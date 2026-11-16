@@ -175,7 +175,8 @@
   function isCut(profile, plan) { return ((profile && profile.answers) || {}).goal === 'recomp' || (plan && plan.goal === 'recomp'); }
   // Standard-Pause je Rolle (Sekunden): Grundübung 2,5 min, Ergänzung 2 min, Isolation 1,5 min
   function defaultRest(role, goal) {
-    return role === 'main' ? (goal === 'strength' ? 180 : goal === 'fit' ? 105 : 150) : role === 'sec' ? 120 : role === 'skill' ? 120 : role === 'cond' ? 20 : role === 'core' ? 60 : 90;
+    // 3.15 (Nutzerwunsch: 2 min war zu kurz, Kraftverlust): längere Pausen = mehr Wdh. in den Folgesätzen = mehr Reiz
+    return role === 'main' ? (goal === 'strength' ? 240 : goal === 'fit' ? 150 : 210) : role === 'sec' ? 165 : role === 'skill' ? 150 : role === 'cond' ? 20 : role === 'core' ? 90 : 120;
   }
   function goalRanges(goal) {
     goal = baseGoal(goal);
@@ -333,7 +334,8 @@
         slots.splice(worst, 1);
       }
       // Zeitbudget: erst Sätze kürzen, dann unwichtigste Übungen streichen (mindestens 5 Übungen)
-      if (dur <= 45) for (const sl of slots) sl.rest = Math.max(sl.r === 'main' ? 90 : 45, Math.round(sl.rest * 0.75 / 15) * 15);
+      // Wenig Zeit: Pausen nur bei Isolation/Rumpf kürzen – Grundübungen und Ergänzungen behalten ihre Pause (3.15)
+      if (dur <= 45) for (const sl of slots) if (sl.r === 'iso' || sl.r === 'core') sl.rest = Math.max(75, Math.round(sl.rest * 0.75 / 15) * 15);
       const prio = { main: 1, skill: 1.5, sec: 2, iso: 3, core: 3.5, cond: 4 };
       const est = () => 6 + slots.reduce((t, sl) => t + sl.sets * (0.75 + sl.rest / 60), 0);
       let guard = 0;
@@ -494,7 +496,7 @@
           .sort((a, b) => (KEEP[b.role] - KEEP[a.role]) || (a.sets - b.sets))[0];
         if (pick) { pick.boost = 1; out.boosted.push(pick); }
       }
-      const f = delta <= -2 ? { main: 0.85, sec: 0.75, iso: 0.65, core: 0.65 } : { main: 0.9, sec: 0.8, iso: 0.7, core: 0.7 };
+      const f = delta <= -2 ? { main: 1, sec: 0.9, iso: 0.7, core: 0.7 } : { main: 1, sec: 0.95, iso: 0.8, core: 0.8 }; // Grundübungen: Pause bleibt (3.15)
       for (const it of items) it.factor = f[it.role] || 0.8;
     } else if (delta > 0) {
       const focus = day.focus || 'full';
@@ -509,7 +511,7 @@
         const best = alternatives(S([pat], role), loc, profile, used)[0];
         if (!best || best.s <= -10) continue;
         have.add(pat); used.push(best.ex.id);
-        const it = { slot: null, ex: best.ex, role, sets: role === 'sec' ? 3 : isoSets, rest: role === 'sec' ? 90 : 75, boost: 0, factor: 1, spec: S([pat], role) };
+        const it = { slot: null, ex: best.ex, role, sets: role === 'sec' ? 3 : isoSets, rest: role === 'sec' ? 165 : role === 'core' ? 90 : 120, boost: 0, factor: 1, spec: S([pat], role) };
         items.push(it); out.added.push(it);
       }
       for (const it of items) if (it.role === 'main' || it.role === 'sec') it.factor = 1.15;
@@ -610,7 +612,7 @@
     if (ex.kind === 'load' && ex.role === 'c' && slot && slot.rr && !(ex.rr && ex.rr[0] > slot.rr[1])) rr = slot.rr;
     if (ex.kind === 'load' && ex.role === 'i' && slot && slot.rr) rr = [Math.max(slot.rr[0], ex.rr ? ex.rr[0] : 0), Math.max(slot.rr[1], ex.rr ? ex.rr[1] : 0)];
     if (slot && slot.custRR) rr = slot.custRR;
-    const rest = slot ? slot.rest : (role === 'iso' ? 75 : 120);
+    const rest = slot ? slot.rest : defaultRest(role, baseGoal((profile && profile.answers || {}).goal));
     return { sets, rr, rir: targetRIR(role, ex.kind, profile, wi), rest, role, deload: wi.deload };
   }
 
