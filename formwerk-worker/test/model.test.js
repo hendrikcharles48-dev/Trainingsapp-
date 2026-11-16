@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, prefillFor } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, prefillFor, recoveryCore } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -144,6 +144,22 @@ await t('Skala 1–5: alte Check-ins werden umgerechnet', async () => {
   const c = normCheckin({ date: '2026-11-01', sore: { vorn: 2, brust: 1 }, pain: { knie: 3 } });
   assert.deepEqual(c.sore, { vorn: 4, brust: 2 }); assert.deepEqual(c.pain, { knie: 4 }); assert.equal(c.v, 5);
   assert.deepEqual(normCheckin({ date: 'x', v: 5, sore: { vorn: 2 } }).sore, { vorn: 2 });
+});
+
+await t('Nacht ohne Messung: geschätzt statt Tages-Ruhepuls, eigene Schlafangabe zählt', () => {
+  const days = synthDays(40);
+  delete days[today].hrv; delete days[today].sleep; days[today].rhr = 60; days[today].syncedUntil = today + 'T12:15:00.0'; days[today].noMeasureMin = 420;
+  assert.equal(recoveryCore(days, today).score, null, 'Tages-Ruhepuls zählt nicht');
+  const prev = recoveryCore(days, addDays(today, -1)).score;
+  let s = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T12:00:00Z') });
+  assert.equal(s.recovery.estimated, true); assert.ok(Math.abs(s.recovery.score - prev) <= 12, s.recovery.score + ' vs ' + prev);
+  assert.equal(s.vitals.rhrDay, true); assert.ok(s.recommendation.notes.some(n => /geschätzt/.test(n)));
+  s = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T12:00:00Z'), checkins: [{ date: today, v: 5, sore: {}, pain: {}, sleepEst: { h: 5, q: 0 }, partial: true }] });
+  assert.ok(s.recovery.score < prev, 'kurze schlechte Nacht senkt die Schätzung'); assert.equal(s.prefill.tf.sl, 0);
+  // noch nicht synchronisiert → keine Schätzung, sondern „noch keine Werte“
+  delete days[today].syncedUntil;
+  s = buildSummary({ days, actsByDate: {}, sessions: [], settings: {}, today, now: Date.parse(today + 'T06:00:00Z') });
+  assert.equal(s.recovery.score, null); assert.ok(!s.recovery.estimated);
 });
 
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */

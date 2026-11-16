@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.6.2';
+  const VERSION = '1.7.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -113,7 +113,7 @@
   function todayView() {
     const d = st.data;
     if (!d) return header('Heute') + banners() + (st.loading ? '<div class="stack"><div class="skeleton" style="height:340px"></div><div class="skeleton"></div><div class="skeleton"></div></div>' : `<div class="card"><p class="ink2" style="margin:0">Noch keine Daten. Nach unten ziehen oder oben rechts aktualisieren.</p></div>`);
-    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${checkCard(d)}${signalCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
+    return header('Heute') + `<div class="stack">${banners()}${ringCard(d)}${nightCard(d)}${checkCard(d)}${signalCard(d)}${recCard(d)}${muscleCard(d)}${sleepCard(d)}${loadCard(d)}${weightCard(d)}${bbCard(d)}</div>`;
   }
   function ringCard(d) {
     const r = d.recovery, v = d.vitals;
@@ -122,7 +122,7 @@
     const center = r.building
       ? `<div class="pending">Basis wird aufgebaut</div><div class="lbl">${r.baseNights || 0} von 5 Nächten</div>`
       : score == null ? `<div class="pending">${d.sleep && d.sleep.reason === 'notWorn' ? 'Uhr nachts nicht getragen' : 'Noch keine Werte von heute Nacht'}</div>`
-      : `<div class="big num">${score}<small>%</small></div><div class="lbl">Erholung</div>`;
+      : `<div class="big num">${r.estimated ? '<small style="margin:0 2px 0 0">~</small>' : ''}${score}<small>%</small></div><div class="lbl">${r.estimated ? 'Erholung geschätzt' : 'Erholung'}</div>`;
     const hp = (r.parts || []).find(p => p.k === 'hrv');
     const hrvDelta = hp ? hp.deltaPct : null;
     const rp = (r.parts || []).find(p => p.k === 'rhr');
@@ -130,16 +130,29 @@
     const sl = d.sleep;
     return `<div class="card ringcard">
       <div class="ring"><svg viewBox="0 0 232 232"><circle class="trk" cx="116" cy="116" r="100" fill="none" stroke-width="16"/>
-        <circle class="val" id="ringVal" cx="116" cy="116" r="100" fill="none" stroke="${COL[col]}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" data-to="${C * (1 - (score || 0) / 100)}"/></svg>
+        <circle class="val" id="ringVal" cx="116" cy="116" r="100" fill="none" stroke="${COL[col]}" stroke-width="16" stroke-linecap="round" ${r.estimated ? 'opacity=".5"' : ''} stroke-dasharray="${C}" stroke-dashoffset="${C}" data-to="${C * (1 - (score || 0) / 100)}"/></svg>
         <div class="center">${center}</div></div>
-      ${score != null ? `<div class="chip ${'c-' + col}"><i class="${'bg-' + col}"></i>${COLTXT[col]}${r.provisional ? ' · vorläufig' : ''}</div>` : ''}
+      ${score != null ? `<div class="chip ${'c-' + col}"><i class="${'bg-' + col}"></i>${COLTXT[col]}${r.estimated ? ' · geschätzt' : r.provisional ? ' · vorläufig' : ''}</div>` : ''}
       <div class="vitals">
         <div><span>HRV</span><b class="num">${fmt(v.hrv)}<small>ms</small></b><em>${hrvDelta == null ? (v.hrvBase ? 'Ø ' + fmt(v.hrvBase) : '&nbsp;') : hrvDelta === 0 ? 'wie dein Ø' : (hrvDelta > 0 ? '+' : '−') + Math.abs(hrvDelta) + ' % zum Ø'}</em></div>
-        <div><span>Ruhepuls</span><b class="num">${fmt(v.rhr)}<small>bpm</small></b><em>${rhrDelta == null ? (v.rhrBase ? 'Ø ' + fmt(v.rhrBase, 0) : '&nbsp;') : Math.abs(rhrDelta) < 0.5 ? 'wie dein Ø' : (rhrDelta > 0 ? '+' : '−') + fmt(Math.abs(rhrDelta), 1) + ' zum Ø'}</em></div>
-        <div><span>Schlaf</span><b class="num">${sl.has ? hm(sl.total) : '–'}<small>h</small></b><em>${sl.has && sl.ofAvg ? sl.ofAvg + ' % vom Ø' : sl.avg ? 'Ø ' + hm(sl.avg) : '&nbsp;'}</em></div>
+        <div><span>Ruhepuls</span><b class="num">${fmt(v.rhr)}<small>bpm</small></b><em>${v.rhrDay ? 'Tageswert' : rhrDelta == null ? (v.rhrBase ? 'Ø ' + fmt(v.rhrBase, 0) : '&nbsp;') : Math.abs(rhrDelta) < 0.5 ? 'wie dein Ø' : (rhrDelta > 0 ? '+' : '−') + fmt(Math.abs(rhrDelta), 1) + ' zum Ø'}</em></div>
+        <div><span>Schlaf</span><b class="num">${sl.has ? hm(sl.total) : '–'}<small>h</small></b><em>${sl.has && sl.ofAvg ? sl.ofAvg + ' % vom Ø' : sl.reason === 'notWorn' ? 'fehlt' : sl.avg ? 'Ø ' + hm(sl.avg) : '&nbsp;'}</em></div>
       </div>
       <button class="why" data-a="why">${I.info} ${score == null ? 'So entsteht der Wert' : 'Warum heute ' + ({ green: 'grün', yellow: 'gelb', red: 'rot' }[col] || '') + '?'}</button>
     </div>`;
+  }
+  // Nacht ohne Messung: klar sagen und die eigene Schlafangabe abfragen (fließt in die geschätzte Erholung ein)
+  function nightCard(d) {
+    const r = d.recovery, s = d.sleep || {};
+    if (!r.estimated && s.reason !== 'notWorn') return '';
+    const se = (d.body && d.body.flags && d.body.flags.sleepEst) || {};
+    const hrs = [5, 6, 7, 8, 9], feel = ['schlecht', 'okay', 'gut'];
+    const pill = (attr, label, on) => `<button class="ckpill ${on ? 'on' : ''}" ${attr}>${label}</button>`;
+    return `<div class="card"><div class="ctitle"><h3>Nacht ohne Messung</h3><span class="aside">${s.noMeasureMin ? '~' + Math.round(s.noMeasureMin / 60) + ' h ohne Werte' : ''}</span></div>
+      <p class="small ink2" style="margin:0 0 10px">Die Uhr hat heute Nacht nichts gemessen. Die Erholung ist deshalb ${r.estimated && r.estBase != null ? 'aus deinen letzten Tagen geschätzt' : 'geschätzt'}; der Ruhepuls von heute ist ein Tageswert und zählt nicht. Wie hast du geschlafen?</p>
+      <div class="ckpills" style="flex-wrap:wrap">${hrs.map(h => pill(`data-a="nightSet" data-h="${h}"`, (h === 5 ? '≤ 5' : h === 9 ? '9+' : h) + ' h', se.h === h)).join('')}</div>
+      <div class="ckpills" style="margin-top:6px">${feel.map((l, q) => pill(`data-a="nightSet" data-q="${q}"`, l, se.h && se.q === q)).join('')}</div>
+      <div class="tiny muted" style="margin-top:8px">Für echte Werte: Uhr nachts tragen, laden lieber tagsüber.</div></div>`;
   }
   function animateRing() { const c = $('#ringVal'); if (c) c.style.strokeDashoffset = c.dataset.to; }
 
@@ -392,7 +405,7 @@
     const r = st.data.recovery; const col = r.color;
     const parts = r.parts.map(p => `<div class="part"><div class="score ${p.score >= 60 ? 'c-green' : p.score >= 34 ? 'c-yellow' : 'c-red'}">${p.score}<span>${p.weight} %</span></div><div class="grow" style="min-width:0"><b>${p.label}</b><div class="small ink2">${partText(p)}</div></div></div>`).join('');
     const head = r.score == null ? (r.building ? `Für eine faire Bewertung braucht Formwerk mindestens 5 Nächte mit HRV oder Ruhepuls. Bisher: ${r.baseNights}. Garmin-Daten der letzten Wochen werden automatisch nachgeladen.` : 'Für heute Nacht liegen noch keine Werte vor.')
-      : `Heute <b>${r.score} %</b> – ${COLTXT[col].toLowerCase()}. ${r.why && r.why[0] ? esc(r.why[0].text) : ''}`;
+      : `Heute <b>${r.estimated ? '~' : ''}${r.score} %</b> – ${COLTXT[col].toLowerCase()}${r.estimated ? ' (geschätzt)' : ''}. ${r.why && r.why[0] ? esc(r.why[0].text) : ''}`;
     openSheet(`<div class="stack"><div><div class="eyebrow">Erholung</div><h2>${r.score == null ? 'So entsteht der Wert' : 'Warum heute ' + ({ green: 'grün', yellow: 'gelb', red: 'rot' }[col]) + '?'}</h2></div>
       <p class="ink2" style="margin:0">${head}</p>
       ${parts ? `<div>${parts}</div>` : ''}
@@ -424,6 +437,9 @@
     refresh() { load(true); },
     why() { if (st.data) whySheet(); },
     weightSheet() { st.wIn = null; weightSheet(); },
+    nightSet(t) { const cur = (st.data && st.data.body && st.data.body.flags && st.data.body.flags.sleepEst) || {};
+      const se = { h: t.dataset.h ? +t.dataset.h : (cur.h || 7), q: t.dataset.q != null ? +t.dataset.q : (cur.q ?? 1) };
+      ckSend({ bbOnly: true, sleepEst: se }).then(() => toast('Schlaf eingetragen – Erholung neu geschätzt')); },
     ckOk() { ckSend({ sore: {}, pain: {} }).then(() => toast('Eingetragen')); },
     ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain) }; ckSheet(); },
     // Kachel antippen → Auswahl 0–5 unten im Fenster
