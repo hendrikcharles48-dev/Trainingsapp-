@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.14.9';
+  const APP_VERSION = '3.14.10';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1290,7 +1290,7 @@
       const lbl = isHold ? ['0 s', '3 s', '6 s', '9 s', '12 s', '15+ s'] : ['0', '1', '2', '3', '4', '5+'];
       const sub = isHold ? ['am Limit', '', '', '', '', 'locker'] : ['Versagen', 'sehr hart', 'hart', 'mittel', 'leicht', 'locker'];
       return `<div class="stack"><div><div class="eyebrow">${esc(ex.name)} · Satz ${S.done.length + 1}</div><h2>${isHold ? 'Wie lange hättest du noch halten können?' : 'Wie viele Wiederholungen wären noch gegangen?'}</h2></div>
-        ${isHold ? stepper('sec', 'Gehaltene Sekunden', 1) : `<div class="row" style="align-items:flex-end">${showW ? `<div class="grow">${stepper('w', ex.kind === 'bw' ? 'Zusatzgewicht kg' : 'Gewicht kg', wStep(ex))}</div>` : ''}<div class="grow">${stepper('reps', 'Wiederholungen', 1)}</div></div>`}
+        ${isHold ? stepper('sec', 'Gehaltene Sekunden', 1) : `<div class="stack" style="gap:12px">${showW ? stepper('w', ex.kind === 'bw' ? 'Zusatzgewicht kg' : 'Gewicht kg', wStep(ex)) : ''}${stepper('reps', 'Wiederholungen', 1)}</div>`}
         <div class="rirgrid">${opts.map((o, k) => `<button data-a="rirPick" data-r="${o}" class="${o === S.rec.rir ? 'suggest' : ''}"><b>${lbl[k]}</b><span>${settings().rpe && !isHold ? 'RPE ' + fmt(Math.max(5, 10 - o)) : sub[k]}</span></button>`).join('')}</div>
         <p class="tiny muted" style="margin:0">Ehrlich schätzen: Diese „Reserve“ ist die wichtigste Zahl für den Algorithmus. Umrandet = geplantes Ziel (${rirLabel(S.rec.rir, ex)}).</p></div>`;
     },

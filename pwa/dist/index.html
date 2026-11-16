@@ -661,9 +661,8 @@ button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:point
 .homebar,.topbar{padding-top:calc(env(safe-area-inset-top,0px) + 22px)}
 .overlay .inner{padding-top:calc(env(safe-area-inset-top,0px) + 22px)}
 .sheet{max-height:calc(100% - env(safe-area-inset-top,0px) - 28px)}
-/* 3.14.8: Tab-Leiste und Trainings-Panel: Abstand unten höchstens 34 px (kein Verschieben mehr – 3.14.7 schob die Leiste aus dem Bild) */
-.tabs{bottom:max(6px, calc(min(env(safe-area-inset-bottom,0px), 34px) - 16px))}
-.panel{bottom:calc(min(env(safe-area-inset-bottom,0px), 34px) + 10px)}
+/* 3.14.10: kurze Seiten (z. B. Übungen → Eigene) mindestens bildschirmhoch – iOS setzt die Tab-Leiste sonst höher */
+#app{min-height:100lvh;box-sizing:border-box}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
