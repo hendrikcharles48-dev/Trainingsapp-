@@ -265,6 +265,7 @@ export function recommend({ date, rec, muscles, sessions, ratio, sleepPart, sett
   } else {
     let lv = rec.color === 'green' ? 2 : rec.color === 'yellow' ? 1 : (sleepPart ? (sleepPart.ofNeed < 80 ? 1 : 2) : 1);
     if (!rec.hasData) notes.push('Noch keine Werte von heute Nacht – Uhr in Garmin Connect synchronisieren und neu laden.');
+    else if (sleepPart == null && rec.parts.every(p => p.k !== 'hrv')) notes.push('Ohne Schlaf und HRV von heute Nacht – Bewertung nur aus dem Ruhepuls, also grob.');
     if (sleepPart && sleepPart.ofNeed < 75 && lv > 1) { lv--; notes.push('Wenig Schlaf – lieber eine Stufe leichter.'); }
     if (ratio && ratio.ratio > 1.5 && lv > 1) { lv--; notes.push('Deutlich mehr Belastung als sonst diese Woche.'); }
     const recentHeavy = hoursSince != null && hoursSince < 48 && tired.length >= 2;
@@ -295,7 +296,13 @@ export function recommend({ date, rec, muscles, sessions, ratio, sleepPart, sett
    ===================================================================== */
 export function sleepView(days, date) {
   const d = days[date]; const b = baselines(days, date);
-  if (!d || !d.sleep) return { date, has: false, avg: b.sleep };
+  if (!d || !d.sleep) {
+    // Warum fehlt die Nacht? Garmin kennt den Tag schon (synchronisiert nach dem Aufwachen), hat aber keinen Schlaf
+    // → Uhr war nachts nicht am Handgelenk (lange ohne Messung) – kein Synchronisierungsproblem.
+    const synced = d && d.syncedUntil ? String(d.syncedUntil).slice(11, 16) : null;
+    const reason = !d || !synced || synced < '06:00' ? 'notSynced' : (d.noMeasureMin || 0) >= 180 ? 'notWorn' : 'noSleep';
+    return { date, has: false, avg: b.sleep, reason, syncedUntil: synced, noMeasureMin: d ? d.noMeasureMin ?? null : null };
+  }
   const s = d.sleep;
   const ofAvg = b.sleep ? s.total / b.sleep : null;
   return {
