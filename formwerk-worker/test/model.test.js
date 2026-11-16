@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines, detectBaseball } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -197,6 +197,18 @@ await t('Baseball: Rückfrage am Morgen nach festem Termin ohne Uhr', () => {
   assert.equal(s.body.askBaseball.from, '18:00');
   const s2 = buildSummary({ days: synthDays(40), actsByDate: {}, sessions: [], settings: S, today, now: Date.parse(today + 'T08:00:00Z'), checkins: [{ date: today, v: 5, sore: {}, pain: {}, bb: false, partial: true }] });
   assert.equal(s2.body.askBaseball, false);
+});
+
+await t('Baseball am Puls erkennen', () => {
+  const start = Date.parse('2026-11-10T17:00:00Z'), end = start + 2 * 3600e3;
+  const mk = f => ({ heartRateValues: Array.from({ length: 24 * 30 }, (_, i) => { const ts = Date.parse('2026-11-10T00:00:00Z') + i * 120e3; return [ts, f(ts)]; }) });
+  assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? (ts % 600e3 < 240e3 ? 125 : 95) : 62)), start, end, 53).v, true);
+  assert.equal(detectBaseball(mk(() => 64), start, end, 53).v, false);
+  assert.equal(detectBaseball(mk(ts => (ts >= start && ts <= end ? null : 62)), start, end, 53).v, null, 'nicht getragen → unbekannt');
+  // Erkennung schlägt den festen Termin, deine Antwort schlägt die Erkennung
+  const S = { sportDays: [1], sportTimes: { 1: { from: '18:00', dur: 120, since: '2026-01-01' } }, autoBB: { '2026-11-10': false } };
+  assert.equal(baseballDay({}, S, '2026-11-10', {}).on, false);
+  assert.equal(baseballDay({ '2026-11-11': { bb: true } }, S, '2026-11-10', {}).on, true);
 });
 
 /* ---------- Worker komplett mit nachgebauten Garmin-Antworten ---------- */

@@ -22,6 +22,7 @@ export const PATHS = {
   activities: (a, b, start = 0, limit = 100) => `/activitylist-service/activities/search/activities?start=${start}&limit=${limit}&startDate=${a}&endDate=${b}`,
   activity: id => `/activity-service/activity/${id}`,
   hrZones: () => '/biometric-service/heartRateZones/v2',
+  heartRateDay: d => `/wellness-service/wellness/dailyHeartRate?date=${d}`,
   weight: (a, b) => `/weight-service/weight/range/${a}/${b}?includeAll=true`
 };
 

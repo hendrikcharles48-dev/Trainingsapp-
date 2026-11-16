@@ -3,11 +3,11 @@
 // - Speicher: Durable Object „FormwerkStore“ (SQLite, Free-Plan). Schnittstelle: formwerk/SCHNITTSTELLE.md
 import { Garmin, PATHS, chunks, addDays } from './garmin.js';
 import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
-import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, normCheckin } from './model.js';
+import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, normCheckin, planned, sportKind, detectBaseball } from './model.js';
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.0.0';
+export const WORKER_VERSION = '2.1.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -228,6 +228,7 @@ export class FormwerkStore {
     const from = addDays(today, -(HISTORY_DAYS + 28));
     const [days, acts, sessions, settings, hrz, checkins] = await Promise.all([this.range('d:', from, today), this.range('a:', from, today), this.sessions(120), this.settings(), this.st.get('hr'), this.checkins(100)]);
     const now = Date.now();
+    settings.autoBB = await this.autoBaseball(today, settings, acts, checkins, now, hrz);
     const sum = buildSummary({ days, actsByDate: acts, sessions, settings, today, now, manualWeights: await this.weights(), checkins, hr: hrz ? { max: hrz.max, rest: hrz.rest || estimateHr(days, acts).rest } : null, tzOff: tzOffset(this.tz(), now), histDays: 90 });
     const status = { generated: now, lastFetch: meta.lastFetch || null, lastOk: meta.lastOk || null, errorKind: meta.error ? meta.errorKind || 'other' : null, error: meta.error || null, backfilled: !!meta.backfilled, firstDate: meta.firstDate || null, garminKey: !!this.env.GARMIN_API_KEY, worker: WORKER_VERSION };
     if (kind === 'today') {
@@ -315,6 +316,30 @@ export class FormwerkStore {
     return new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Backup-Time': String(meta.t) } });
   }
 
+  /* ----- Baseball am Puls erkennen (feste Zeiten, gestern und heute) ----- */
+  async autoBaseball(today, settings, acts, checkins, now, hrz) {
+    const cache = (await this.st.get('bbauto')) || {};
+    const ckBy = Object.fromEntries((checkins || []).map(c => [c.date, c]));
+    const tzOff = tzOffset(this.tz(), now); let g = null, changed = false;
+    for (const d of [addDays(today, -1), today]) {
+      const p = planned(settings, d); if (!p) continue;
+      if ((acts[d] || []).some(a => sportKind(a.type, a.name) === 'baseball')) continue;       // Uhr-Aktivität zählt ohnehin
+      if ((ckBy[addDays(d, 1)] || {}).bb != null || (ckBy[d] || {}).bbToday != null) continue;  // du hast schon geantwortet
+      const start = Date.parse(d + 'T' + p.from + ':00Z') - tzOff, end = start + p.dur * 60e3;
+      const c = cache[d];
+      if (c && c.complete) continue;
+      if (now < end + 20 * 60e3 || (c && now - c.checked < 30 * 60e3)) continue;               // erst nach dem Termin, höchstens alle 30 min
+      g = g || new Garmin(this.env.GARMIN_API_KEY, this.st);
+      const r = await g.safe(PATHS.heartRateDay(d));
+      if (!r.ok) continue;
+      const rest = (hrz && hrz.rest) || 55;
+      cache[d] = Object.assign(detectBaseball(r.data, start, end, rest), { checked: now }); changed = true;
+    }
+    for (const k of Object.keys(cache)) if (k < addDays(today, -120)) { delete cache[k]; changed = true; }
+    if (changed) await this.st.put('bbauto', cache);
+    return Object.fromEntries(Object.entries(cache).filter(([, v]) => v.v != null).map(([k, v]) => [k, v.v]));
+  }
+
   /* ----- Satzwerk-Einheiten ----- */
   async putSessions(body) {
     const inS = Array.isArray(body && body.sessions) ? body.sessions.slice(0, 200) : [];
@@ -345,7 +370,7 @@ export class FormwerkStore {
       'Schlaf Zeitraum': PATHS.sleepRange(from, today), 'Schlaf heute (Detail)': PATHS.sleepDay(today), 'Schlaf gestern (Detail)': PATHS.sleepDay(yest),
       'Body Battery': PATHS.bodyBattery(from, today), 'Tageszusammenfassungen': PATHS.dailySummaries(from, today),
       'Stress': PATHS.stress(from, today), 'Schritte': PATHS.steps(from, today),
-      'Aktivitäten': PATHS.activities(from, today, 0, 50), 'Herzfrequenz-Zonen': PATHS.hrZones(), 'Gewicht': PATHS.weight(from, today)
+      'Aktivitäten': PATHS.activities(from, today, 0, 50), 'Herzfrequenz-Zonen': PATHS.hrZones(), 'Puls gestern (Tag)': PATHS.heartRateDay(yest), 'Gewicht': PATHS.weight(from, today)
     };
     const out = { range: [from, today], worker: WORKER_VERSION, calls: {} };
     try { await g.token(false); } catch (e) { return { range: [from, today], error: e.message, status: e.status, body: e.body }; }
