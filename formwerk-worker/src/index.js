@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.1.1';
+export const WORKER_VERSION = '2.2.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -76,6 +76,11 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
+    // Der 8-Uhr-Abruf läuft zu zwei UTC-Zeiten (Sommer/Winter) – nur der mit lokal 8 Uhr wird ausgeführt
+    if (event.cron === '0 6,7 * * *') {
+      const h = +new Intl.DateTimeFormat('en-GB', { timeZone: env.TZ || 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(new Date(event.scheduledTime || Date.now()));
+      if (h !== 8) return;
+    }
     ctx.waitUntil(store(env).fetch('https://store/internal/refresh', { method: 'POST' }).catch(() => {}));
   }
 };
