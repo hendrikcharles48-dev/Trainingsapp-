@@ -306,6 +306,7 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   getragen; ja: Schnitt ≥ Ruhe+35 und ≥ 30 % über Ruhe+40, oder ≥ 20 % über Ruhe+50, oder gelernt aus bestätigten Tagen; nein: Schnitt
   < Ruhe+22; dazwischen unbekannt → Rückfrage; an echtem Alltag geprüft: max. Schnitt Ruhe+29), Ergebnis im Worker `bbauto`, in `S.autoBB`. Vorrang: Uhr-Aktivität >
   Antwort > Puls > Termin. Nicht getragen → Termin zählt + Rückfrage.
+- Abrufe (Worker 2.2): Cron `40 4,5 * * *` (≈ 5:40/6:40) und `0 6,7 * * *` (8:00 deutscher Zeit, nur der Lauf mit lokal 8 Uhr, Sommer/Winter) in `wrangler.jsonc`.
 - Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.

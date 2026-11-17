@@ -17,7 +17,8 @@
     "bindings": [{ "name": "STORE", "class_name": "FormwerkStore" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FormwerkStore"] }],
-  // Morgens vorab Garmin abfragen (UTC): 04:40 und 05:40 UTC = 05:40/06:40 Winterzeit, 06:40/07:40 Sommerzeit
-  "triggers": { "crons": ["40 4,5 * * *"] },
+  // Morgens vorab Garmin abfragen (UTC): 04:40 und 05:40 UTC = 05:40/06:40 Winterzeit, 06:40/07:40 Sommerzeit.
+  // Dazu 8:00 Uhr deutscher Zeit: 06:00 und 07:00 UTC – der Worker lässt nur den Lauf zu, der lokal wirklich 8 Uhr ist.
+  "triggers": { "crons": ["40 4,5 * * *", "0 6,7 * * *"] },
   "observability": { "enabled": true }
 }
