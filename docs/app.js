@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.21.0';
+  const APP_VERSION = '3.22.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -588,7 +588,7 @@
         ${(() => { const r = readyFor(di, loc); return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
         <div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${setsPlan}</b><span>Sätze</span></div><div><b>${estMinutes(day, loc)}</b><span>Minuten</span></div></div>
         <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button></div>`;
-    return `<div class="homebar"><div class="row"><div class="eyebrow grow ell">${dateTxt}</div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div>
+    return `<div class="homebar compact"><div class="row" style="align-items:center;gap:8px"><div class="grow" style="min-width:0"><div class="eyebrow ell">${dateTxt}</div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div></div>
     <div class="stack">
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
       ${st.active ? '' : cxReadyCard()}
