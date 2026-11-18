@@ -544,6 +544,8 @@ input.field,select.field,textarea.field,.search{border-radius:18px}
 .pl-row .num{flex:none;font-size:13px}
 .pl-row.tired{opacity:.45}
 .volwhy{margin:-2px 0 4px 0;line-height:1.35}
+#edgeBack{position:fixed;left:0;top:0;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;background:var(--surface2);color:var(--muted);border:1px solid var(--line);opacity:0;pointer-events:none;z-index:200;transition:opacity .15s,background .15s,color .15s}
+#edgeBack.on{opacity:1}#edgeBack.ready{background:var(--accent);color:#0B1220;border-color:var(--accent)}#edgeBack svg{width:22px;height:22px}
 .difflist{margin:0;padding-left:18px;font-size:14px;line-height:1.45}.difflist li{overflow-wrap:anywhere}
 .pl-row .tagx{margin-left:-2px}
 .readyhint{display:flex;flex-direction:column;gap:2px;border:1px solid var(--accent);border-radius:16px;padding:10px 12px;font-size:13px;line-height:1.35}

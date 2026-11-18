@@ -317,6 +317,14 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   kein Tag trainiert den Muskel → gleichmäßig). „Einheit ausbalancieren“ (`balanceDay`, Vorschau, ändert nur diese Einheit).
   Automatik je Einheit (`day.noAuto`); Wochenlauf gleicht nur Einheiten ohne `noAuto` an (Ziele minus Volumen der anderen).
   Plan-Tab erneut antippen, Plan- oder Ortswechsel → zurück zur Übersicht.
+- Volumen mit dem Wochenbericht (Satzwerk 3.21, Worker 2.6, Nutzerwunsch 18.11.): `weeklyLearn` läuft, wenn ein neuer Bericht da ist
+  (`FW.coach().id` ≠ `learn.rep`, Bericht < 4 Tage alt) → Ziele für die NÄCHSTE Woche (`learn.wk` = Woche, für die angepasst wurde);
+  ohne Bericht ab Dienstag als Ersatz. Änderungen im Bericht-Fenster („Volumen für nächste Woche“, `volReport`, Rückgängig/Warum?),
+  Karte auf Heute nur noch ohne Bericht. Auch über `FW.init onChange` angestoßen. Worker-Zusammenfassung enthält `vol`;
+  `tools/coach.js facts` → `volume` (gleiche Rechnung), Skill erklärt es im Text, keine eigenen `sets`-Vorschläge bei Automatik.
+  Untergrenze 6 nur beim Senken von oben; gesenkte Ziele steigen ohne Kraftdaten bei wenig Muskelkater + guter Erholung um 1 pro Woche.
+- Wischen vom linken Rand (≤ 28 px, > 80 px nach rechts) = `goBack()`: Fenster schließen → Training minimieren → Fragebogen zurück →
+  Einheit-Seite → Übersicht. Pfeil `#edgeBack` zeigt es an.
 - Training → Plan übernehmen (Satzwerk 3.17, Nutzerwunsch 18.11.): `planDiff(active)` vergleicht mit dem Plan-Tag (nur Plan-Trainings,
   nicht frei/angepasst): Getauscht, Neu (`tpx` = von „länger“ ergänzt, zählt nicht), Raus, Sätze, Reihenfolge. Fenster `finish` zeigt die Liste,
   „Speichern & Plan übernehmen“ (`finishAdopt`, vorher `Backup.snapshot('vor-plan-anpassen')`). Deload/Tagesform-Länge: keine Sätze/Raus.

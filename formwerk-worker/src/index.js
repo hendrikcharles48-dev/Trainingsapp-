@@ -7,7 +7,7 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.5.0';
+export const WORKER_VERSION = '2.6.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -251,7 +251,7 @@ export class FormwerkStore {
         vol: volumeSignals({ checkins, sessions, history: sum.history, today }),
         signals: sum.signals, prefill: sum.prefill, plan: { sportDays: settings.sportDays || [], baseballToday: !!sum.body.baseball.today.on, strengthDays: sum.body.insights.strengthDays.idx || [] } };
     }
-    return Object.assign(sum, { status, settings });
+    return Object.assign(sum, { status, settings, vol: volumeSignals({ checkins, sessions, history: sum.history, today }) });
   }
 
   /* ----- Morgen-Check: Muskelkater und Schmerz ----- */

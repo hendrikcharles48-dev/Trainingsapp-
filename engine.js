@@ -505,14 +505,18 @@
       let d = 0, txt;
       const tt = t == null ? '' : (t >= 0 ? 'Kraft +' : 'Kraft −') + Math.abs(Math.round(t * 10) / 10).toString().replace('.', ',') + ' %/Woche';
       const st = so == null ? '' : 'Muskelkater ' + String(so).replace('.', ',') + '/5';
-      if (t == null) { txt = 'Noch zu wenig Daten – Ziel bleibt'; }
+      if (t == null) {
+        if (so != null && so <= 1.5 && good && cur < def[m]) { d = 1; txt = 'Wenig Muskelkater, gut erholt → langsam zurück Richtung ' + def[m] + ' Sätze'; }
+        else txt = 'Noch zu wenig Daten – Ziel bleibt';
+      }
       else if (t <= -1 && (soreHigh || poor)) { d = -2; txt = 'Schwächer und ' + (soreHigh ? 'viel Muskelkater' : 'schlecht erholt') + ' → weniger Sätze'; }
       else if (t >= 1 && !soreHigh && !poor) { d = good ? 1 : 0; txt = good ? 'Wird stärker und erholt sich gut → 1 Satz mehr' : 'Wird stärker – Erholung nur mittel, Ziel bleibt'; }
       else if (t > -1 && t < 1 && soreHigh) { d = -1; txt = 'Stagniert mit viel Muskelkater → 1 Satz weniger'; }
       else if (t > -1 && t < 1 && soreLow && good) { d = 1; txt = 'Stagniert, aber gut erholt → 1 Satz mehr Reiz'; }
       else if (t <= -1) { txt = 'Schwächer trotz guter Erholung – eher Diät oder Schlaf, Ziel bleibt'; }
       else txt = 'Läuft – Ziel bleibt';
-      let nv = Math.max(lo, Math.min(hi, cur + d)); if (cur > hi && d >= 0) { nv = Math.max(hi, cur - 2); txt = 'Erholung dauerhaft niedrig → Obergrenze ' + hi; }
+      // Untergrenze 6 nur beim Senken von oben – ein wegen Muskelkater gesenktes Ziel springt nicht von selbst wieder hoch
+      let nv = Math.min(hi, cur + d); if (d < 0) nv = Math.max(nv, Math.min(cur, lo)); if (cur > hi && d >= 0) { nv = Math.max(hi, cur - 2); txt = 'Erholung dauerhaft niedrig → Obergrenze ' + hi; }
       // Regeneration zuerst: bei viel Muskelkater oder schlechter Erholung nicht über das hinaus, was du jetzt machst
       const now = Math.round(planned[m] || 0);
       if ((soreHigh || poor) && now > 0) { const cap = d < 0 ? Math.max(2, now + d) : now; if (nv > cap) { nv = cap; txt += ' · ' + (soreHigh ? 'viel Muskelkater' : 'Erholung knapp') + ': nicht mehr als ' + (d < 0 ? cap : 'jetzt (' + now + ')'); } }

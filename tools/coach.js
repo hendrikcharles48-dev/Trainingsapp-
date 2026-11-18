@@ -79,6 +79,14 @@ function facts(f, summaryF, checkF) {
     customWaiting: (p.custom || []).filter(c => !c.hidden && findBuiltin(c.name) && !(p.cxNo || {})[c.id]).map(c => c.name + ' → ' + findBuiltin(c.name).name)
   };
   if (summaryF && fs.existsSync(summaryF)) { const s = read(summaryF); out.formwerk = { recovery: s.recovery, recommendation: s.recommendation, sleep: s.sleep, load: s.load, signals: s.signals, muscles: s.muscles, vitals: s.vitals, pain: s.pain, weight: s.weight }; }
+  // Volumen für nächste Woche (rechnet die App beim neuen Bericht genauso: E.learnVolume je aktivem Plan)
+  { const fw = summaryF && fs.existsSync(summaryF) ? read(summaryF).vol || null : null; const ids = new Set([p.planId, ...Object.values(p.planBy || {})]);
+    out.volume = (p.plans || []).filter(x => ids.has(x.id) && x.learn && x.learn.auto !== false && (x.days || []).length).map(x => {
+      const r = E.learnVolume(x, p, { workouts: ws, fw }); const old = E.volTargets(p, x);
+      return { plan: x.name, place: x.place || 'beide', rir: r.rir, rirWas: r.rirWas, notes: r.notes,
+        changes: Object.keys(r.T).filter(m => r.T[m] !== old[m]).map(m => ({ muscle: D.MUSCLES[m], from: old[m], to: r.T[m], why: r.why[m] })),
+        keep: Object.keys(r.T).filter(m => r.T[m] === old[m] && !/zu wenig Daten/.test(r.why[m])).map(m => ({ muscle: D.MUSCLES[m], target: r.T[m], why: r.why[m] })) };
+    }); }
   if (checkF && fs.existsSync(checkF)) { const c = read(checkF); out.morning = (c.checkins || c).slice ? (c.checkins || c).slice(-10) : c; }
   return out;
 }

@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.20.0';
+  const APP_VERSION = '3.21.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1391,22 +1391,40 @@
     if (all.length) L.last = { wk, ch: all, undo, seen: false, plan: pl.name || pl.splitName };
     return all;
   }
+  /* 3.21: läuft mit dem Wochenbericht (sonntags) – neuer Bericht (FW.coach().id) → Ziele für die NÄCHSTE Woche.
+     Kommt keiner, ab Dienstag trotzdem einmal pro Woche (learn.wk = Woche, für die angepasst wurde). */
   function weeklyLearn() {
     const pr = P(); if (!pr || st.active || !(pr.plans || []).length) return;
-    const wk = E.todayISO(E.startOfWeek()); const ids = new Set([pr.planId, ...Object.values(pr.planBy || {})]);
+    const now = new Date(); const wk = E.todayISO(E.startOfWeek(now)); const ids = new Set([pr.planId, ...Object.values(pr.planBy || {})]);
+    const c = FW.coach(); const cT = c && c.created ? new Date(c.created) : null;
+    const fresh = c && c.id && cT && !isNaN(cT) && now - cT < 4 * 864e5;
+    const repWk = fresh ? E.todayISO(E.startOfWeek(new Date(cT.getTime() + 2 * 864e5))) : null;
     let snap = false, any = false;
     for (const pl of pr.plans) {
       if (!ids.has(pl.id) || !(pl.days || []).length) continue;
       const L = pl.learn = pl.learn || { auto: true };
-      if (L.auto === false || L.wk === wk) continue;
-      if (E.weekInfo(pl, pr).deload) { L.wk = wk; any = true; continue; }
+      if (L.auto === false) continue;
+      let forWk = null, rep = null;
+      if (fresh && L.rep !== c.id && L.wk !== repWk) { forWk = repWk; rep = c.id; }
+      else if (now.getDay() !== 1 && L.wk < wk || (now.getDay() !== 1 && !L.wk)) forWk = wk; // Ersatz ab Dienstag
+      if (!forWk) continue;
+      if (rep) L.rep = rep;
+      if (E.weekInfo(pl, pr).deload) { L.wk = forWk; any = true; continue; }
       if (!snap) { Backup.snapshot('vor-volumen'); snap = true; }
-      learnPlan(pl); any = true;
+      learnPlan(pl); L.wk = forWk; if (L.last) L.last.rep = rep; any = true;
     }
     if (any) { Store.saveProfile(true); render(); }
   }
+  // Volumen-Abschnitt im Wochenbericht
+  function volReport(repId) {
+    const pls = (P().plans || []).filter(x => x.learn && x.learn.last && x.learn.last.rep === repId); if (!pls.length) return '';
+    return `<div class="lbl">Volumen für nächste Woche</div>${pls.map(pl => { const l = pl.learn.last;
+      return `<div class="card flat stack" style="gap:6px"><b>${esc(l.plan)}</b><ul class="difflist">${l.ch.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        ${l.undone ? '<div class="small muted">Rückgängig gemacht</div>' : `<div class="row"><button class="btn grow" data-a="volWhy" data-id="${pl.id}">Warum?</button><button class="btn ghost grow" data-a="volUndo" data-id="${pl.id}">Rückgängig</button></div>`}</div>`; }).join('')}
+      <div class="small muted">Angepasst nach deiner Kraftentwicklung, deinem Muskelkater nach dem Training und deiner Erholung. Vorher wurde gesichert.</div>`;
+  }
   function volLastCard() {
-    const pr = P(); const pl = (pr.plans || []).find(x => x.learn && x.learn.last && !x.learn.last.seen); if (!pl) return '';
+    const pr = P(); const pl = (pr.plans || []).find(x => x.learn && x.learn.last && !x.learn.last.seen && !x.learn.last.rep); if (!pl) return '';
     const l = pl.learn.last;
     return `<div class="card stack" style="gap:10px"><b>Plan an deine Erholung angepasst</b><div class="small muted">${esc(l.plan)} · diese Woche</div><ul class="difflist">${l.ch.slice(0, 6).map(c => `<li>${esc(c)}</li>`).join('')}${l.ch.length > 6 ? `<li>… und ${l.ch.length - 6} weitere</li>` : ''}</ul>
       <div class="row"><button class="btn primary grow" data-a="volOk" data-id="${pl.id}">OK</button><button class="btn grow" data-a="volWhy" data-id="${pl.id}">Warum?</button><button class="btn ghost" data-a="volUndo" data-id="${pl.id}">Rückgängig</button></div></div>`;
@@ -1678,6 +1696,7 @@
       return `<div class="stack"><div><div class="eyebrow">Wochenbericht · ${esc(c.id)}</div><h2>${esc(c.title)}</h2></div>
         <div>${esc(c.summary)}</div>
         ${(c.points || []).length ? `<div class="list">${c.points.map(p => `<div class="li"><div class="grow"><b>${esc(p.t)}</b>${p.d ? `<div class="small muted">${esc(p.d)}</div>` : ''}</div></div>`).join('')}</div>` : ''}
+        ${volReport(c.id)}
         ${act ? `<div class="lbl">Vorschläge für den Plan</div>${act}<div class="small muted">Vor jeder Änderung legt die App eine Sicherung an.</div>` : ''}
         ${pendingCustom().length ? `<div class="lbl">Neue feste Übungen – bitte prüfen</div>${pendingCustom().map(x => `<button class="card flat row" style="width:100%;text-align:left;gap:10px" data-a="cxReady" data-id="${x.c.id}">${thumb(x.b)}<div class="grow" style="min-width:0"><b class="ell">${esc(x.b.name)}</b><div class="small muted ell">aus „${esc(x.c.name)}“</div></div><span class="chev">${I.chev}</span></button>`).join('')}` : (c.built || []).length ? `<div class="small muted">Neu eingebaut: ${c.built.map(esc).join(', ')}</div>` : ''}
         <button class="btn" data-a="coachClose">Gelesen</button></div>`;
@@ -2380,7 +2399,7 @@
   function coachCard() {
     const c = FW.coach(); if (!c || !P() || coachRec(c.id).closed) return '';
     const n = coachOpenN(c);
-    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen'}</div></div><span class="chev">${I.chev}</span></button>`;
+    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${[n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen', (P().plans || []).some(x => x.learn && x.learn.last && x.learn.last.rep === c.id && !x.learn.last.undone) ? 'Volumen angepasst' : ''].filter(Boolean).join(' · ')}</div></div><span class="chev">${I.chev}</span></button>`;
   }
   async function exportData(src) {
     const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };
@@ -2575,6 +2594,30 @@
   document.addEventListener('mouseup', lpEnd);
   document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('[data-drag]')) e.preventDefault(); });
 
+  // Wischen vom linken Rand zur Mitte = einen Schritt zurück (3.21, Nutzerwunsch 18.11., wie in Kochwerk)
+  function goBack() {
+    if (st.sheet) { closeSheet(); return true; }
+    if (st.ov) {
+      if (st.ov.type === 'workout') { A.wMin(); return true; }
+      if (st.ov.type === 'quiz') { A.qBack(); return true; }
+      if (st.ov.type === 'result') { A.resultBack(); return true; }
+      st.ov = null; render(); return true;
+    }
+    if (st.tab === 'plan' && st.planDay) { A.dayBack(); return true; }
+    return false;
+  }
+  let edge = null;
+  const edgeEl = () => { let el = $('#edgeBack'); if (!el) { el = document.createElement('div'); el.id = 'edgeBack'; el.innerHTML = I.back; document.body.appendChild(el); } return el; };
+  document.addEventListener('touchstart', e => { const t = e.touches[0]; edge = t.clientX <= 28 && !lp ? { x: t.clientX, y: t.clientY, dx: 0 } : null; }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!edge) return; const t = e.touches[0]; const dx = t.clientX - edge.x, dy = t.clientY - edge.y;
+    if (Math.abs(dy) > 40 && Math.abs(dy) > dx) { edge = null; edgeEl().className = ''; return; }
+    edge.dx = dx; const el = edgeEl(); el.style.transform = `translate(${Math.min(60, dx * 0.5) - 44}px, ${t.clientY - 22}px)`; el.className = dx > 80 ? 'on ready' : 'on';
+    if (dx > 10 && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  const edgeEnd = () => { if (!edge) return; const ok = edge.dx > 80; edge = null; edgeEl().className = ''; if (ok) goBack(); };
+  document.addEventListener('touchend', edgeEnd); document.addEventListener('touchcancel', () => { edge = null; edgeEl().className = ''; });
+
   // Fenster nach unten wischen zum Schließen
   let drag = null;
   document.addEventListener('touchstart', e => {
@@ -2655,7 +2698,7 @@
     }
     restoreTimers();
     render();
-    FW.init({ workouts: () => st.workouts, getEx, bwLog: () => (P() && P().bwLog) || [], onWeight: syncWeight, onChange(force) { if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
+    FW.init({ workouts: () => st.workouts, getEx, bwLog: () => (P() && P().bwLog) || [], onWeight: syncWeight, onChange(force) { try { if (st.profile && !st.active) weeklyLearn(); } catch (e) { } if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
     Cloud.auto(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Cloud.flush(); });
     // Daten beschädigt oder verschwunden? Sicherungen anbieten
     let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }
