@@ -169,6 +169,17 @@
     tfPrefill() { const d = this.today(); const p = d && d.prefill && d.prefill.tf; if (!p || (p.en == null && p.sl == null)) return {}; const o = { fw: p.why || 'Formwerk' }; if (p.en != null) o.en = p.en; if (p.sl != null) o.sl = p.sl; return o; },
     weekPrefill() { const d = this.today(); return (d && d.prefill && d.prefill.week) || null; },
     signals() { const d = this.today(); return (d && d.signals) || null; },
+    // Muskeln aus Formwerk für ein „Bereit-Training“: noch müde = auslassen, teilweise = eher meiden, Schmerz ab 2/5 = Stelle schonen
+    readiness() {
+      const d = this.today(); if (!d || !Array.isArray(d.muscles)) return null;
+      const muscles = new Set(), partial = new Set(), inj = new Set(), labels = [], pain = [];
+      for (const g of d.muscles) {
+        if (g.status === 'tired') { (g.m || []).forEach(m => muscles.add(m)); labels.push(g.label); }
+        else if (g.status === 'partial') (g.m || []).forEach(m => partial.add(m));
+      }
+      for (const p of d.pain || []) if (p.inj && p.lvl >= 2) { inj.add(p.inj); pain.push(p.label); }
+      return muscles.size || inj.size ? { muscles, partial, inj, labels, pain } : null;
+    },
     // Schmerz aus dem Formwerk-Morgen-Check: Hinweis bei Übungen, die diese Stelle belasten (ex.inj)
     painHint(ex) {
       const T = get(K.today, null); const d = T && T.data; if (!d || d.date !== iso(new Date()) || !ex || !ex.inj) return '';
