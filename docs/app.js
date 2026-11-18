@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.17.0';
+  const APP_VERSION = '3.18.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -261,15 +261,53 @@
   const autoPlan = p => p && !p.custom && !p.edited;
   function activatePlan(id) {
     const pr = P(); const np = (pr.plans || []).find(x => x.id === id); if (!np) return false;
-    pr.plan = np; pr.planId = id; st.homeDay = null; Store.saveProfile(true); return true;
+    pr.plan = np; pr.planId = id; st.homeDay = null;
+    const l = np.place || curLoc(); pr.planBy = Object.assign({}, pr.planBy, { [l]: id });
+    if (np.place && np.place !== curLoc()) { st.homeLoc = np.place; st.planLoc = np.place; const se = pr.settings = pr.settings || {}; se.homeLoc = np.place; }
+    Store.saveProfile(true); return true;
+  }
+  /* Pläne pro Ort (3.18, Nutzerwunsch 18.11.): plan.place = 'home' | 'gym' (ohne = alter Plan für beide Orte).
+     profile.planBy = {home, gym} merkt den aktiven Plan je Ort; profile.plan/planId bleibt der Plan des gewählten Orts. */
+  const curLoc = () => st.homeLoc || defLoc();
+  const placeMismatch = () => { const p = plan(); return !!(p && p.place && p.place !== curLoc()); };
+  function switchLoc(l) {
+    setHomeLoc(l); st.planLoc = l; st.homeDay = null;
+    if (st.active) return;
+    const pr = P(); const cur = plan(); const all = pr.plans || [];
+    let np = all.find(x => x.id === (pr.planBy || {})[l] && (!x.place || x.place === l));
+    if (!np && cur && (!cur.place || cur.place === l)) return;
+    if (!np) np = all.find(x => x.place === l) || all.find(x => !x.place);
+    if (np && np.id !== pr.planId) { pr.plan = np; pr.planId = np.id; Store.saveProfile(true); }
+  }
+  // Plan auf einen Ort beschränken (Übungen des anderen Orts fallen weg, Plätze ohne Übung auch)
+  function onlyLoc(pl, l) {
+    pl.locs = [l]; pl.place = l;
+    for (const d of pl.days || []) {
+      d.slots = (d.slots || []).filter(sl => sl.ex && sl.ex[l]).map(sl => Object.assign(sl, { ex: { [l]: sl.ex[l] }, why: { [l]: (sl.why || {})[l] || [] }, locked: { [l]: true } }));
+      for (const sl of d.slots) if (sl.ss && !d.slots.some(o => o !== sl && o.ss === sl.ss)) delete sl.ss;
+    }
+    return pl;
+  }
+  async function splitPlan(id) {
+    const pr = P(); const src = (pr.plans || []).find(x => x.id === id); if (!src || src.place) return;
+    await Backup.snapshot('vor-aufteilen');
+    const made = {};
+    for (const l of ['home', 'gym']) {
+      const np = onlyLoc(clone(src), l); np.id = 'p' + uid(); np.name = (src.name || src.splitName || 'Plan') + ' ' + LOCN[l]; np.created = new Date().toISOString();
+      if (!np.custom) np.edited = true; // aufgeteilte Pläne nicht mehr automatisch umbauen
+      pr.plans.push(np); made[l] = np.id;
+    }
+    pr.planBy = Object.assign({}, pr.planBy, made);
+    const l = curLoc(); pr.plan = pr.plans.find(x => x.id === made[l]); pr.planId = made[l]; st.homeDay = null;
+    pr.seen = Object.assign({}, pr.seen, { splitAsk: true }); Store.saveProfile(true);
   }
   function emptyPlan(name, nDays) {
     const a = P().answers || {};
     return { v: E.PLAN_VERSION, id: 'p' + uid(), name, custom: true, created: new Date().toISOString(), split: 'custom', splitName: 'Eigener Plan', goal: a.goal || 'muscle',
-      locs: locs(), days: Array.from({ length: nDays }, (_, i) => ({ id: 'd' + uid(), key: 'C', name: 'Tag ' + 'ABCDEF'[i], focus: 'full', slots: [] })), meso: { start: E.todayISO(), len: 5 }, next: 0, bal: true };
+      locs: locs().length > 1 ? [curLoc()] : locs(), place: locs().length > 1 ? curLoc() : undefined, days: Array.from({ length: nDays }, (_, i) => ({ id: 'd' + uid(), key: 'C', name: 'Tag ' + 'ABCDEF'[i], focus: 'full', slots: [] })), meso: { start: E.todayISO(), len: 5 }, next: 0, bal: true };
   }
   function lockAll(pl) { for (const d of pl.days) for (const sl of d.slots) { sl.locked = sl.locked || {}; for (const l of pl.locs || []) sl.locked[l] = true; } return pl; }
-  function addPlan(np, activate) { const pr = P(); pr.plans = pr.plans || []; pr.plans.push(np); if (activate) { pr.plan = np; pr.planId = np.id; st.homeDay = null; } Store.saveProfile(true); }
+  function addPlan(np, activate) { const pr = P(); pr.plans = pr.plans || []; pr.plans.push(np); if (activate) activatePlan(np.id); else Store.saveProfile(true); }
   // Tagesreihenfolge geändert: derselbe Tag bleibt „als Nächstes dran“
   function keepNext(fn) {
     const p = plan(); const nd = p.days[(p.next || 0) % p.days.length]; const nid = nd && nd.id; const old = p.next || 0;
@@ -538,7 +576,7 @@
     const rec = recovery();
     const week = DAYS.map((d, i) => { const dt = new Date(sow.getTime() + i * 864e5); const good = ((FW.plan() || {}).strengthDays || []).includes(i) && i >= todayIdx && !doneDays.has(i); const cls = [i === todayIdx ? 'today' : '', doneDays.has(i) ? 'done' : '', sport.has(i) ? 'sport' : '', good ? 'good' : ''].join(' ');
       return `<div class="wd ${cls}"><span>${d}</span><b>${dt.getDate()}</b><i>${doneDays.has(i) ? I.check : sport.has(i) ? '<em></em>' : ''}</i></div>`; }).join('');
-    const hero = st.active ? `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl clamp2">${esc(st.active.name)}</h2><div class="small ink2">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div></div><div class="figtile hero">${figSVG(getEx((st.active.exercises[st.active.cur || 0] || {}).exId), { anim: 2.8 })}</div></div>
+    const hero = !st.active && placeMismatch() ? noPlanCard() : st.active ? `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">Training läuft · ${durTxt((Date.now() - st.active.start) / 1000)}</div><h2 class="xl clamp2">${esc(st.active.name)}</h2><div class="small ink2">${st.active.exercises.reduce((t, e) => t + e.sets.filter(s => s.done).length, 0)} Sätze erledigt</div></div><div class="figtile hero">${figSVG(getEx((st.active.exercises[st.active.cur || 0] || {}).exId), { anim: 2.8 })}</div></div>
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
       : `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Nächste Einheit'} · Woche ${wi.w}/${wi.len}${wi.deload ? ' · Deload' : ''}</div><h2 class="xl clamp2">${esc(day.name)}</h2><div class="small ink2 ell">${esc(dayFocus(day, loc))}</div></div><div class="figtile hero">${figSVG(hx, { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg onlight">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
@@ -605,7 +643,8 @@
       <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div></details>`;
   }
   function planView() {
-    const p = plan(); const loc = st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
+    if (placeMismatch()) return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto">Pläne</button></div><div class="stack">${noPlanCard()}</div>`;
+    const p = plan(); const loc = p.place || st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
     const goalN = { muscle: 'Muskelaufbau', recomp: 'Fett weg & Muskeln', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
     const nd = nextDayIdx(); const openD = st.planOpen || {};
     const isOpen = di => openD[p.days[di].id] ?? (di === nd);
@@ -616,13 +655,15 @@
     return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto">Pläne${(P().plans || []).length > 1 ? ' (' + P().plans.length + ')' : ''}</button><button class="iconbtn" data-a="planTools" aria-label="Plan verwalten">${I.more}</button></div>
     <div class="stack">
       <div class="card navy stack" style="gap:12px">
-        <div style="min-width:0"><div class="eyebrow">Aktiver Plan</div><h2 class="ell" style="margin-top:2px">${esc(p.name || p.splitName)}</h2><div class="small ink2 ell">${esc(sub)}</div></div>
+        ${p.place ? locSeg() : ''}
+        <div style="min-width:0"><div class="eyebrow">Aktiver Plan${p.place ? ' · ' + LOCN[p.place] : ''}</div><h2 class="ell" style="margin-top:2px">${esc(p.name || p.splitName)}</h2><div class="small ink2 ell">${esc(sub)}</div></div>
         <button class="cychead" data-a="cycleSheet"><span class="grow ell">Woche ${wi.w} von ${wi.len} · ${wi.label}</span><span class="small" style="color:var(--accent)">Zyklus ›</span></button>
         <div class="cycbar">${Array.from({ length: wi.len }, (_, k) => `<div class="${k + 1 === wi.w ? 'cur' : k + 1 < wi.w ? 'past' : ''}"><i></i><span>${k + 1 === wi.len ? 'Deload' : 'W' + (k + 1)}</span></div>`).join('')}</div>
         ${lastCi ? `<div class="tiny ink2">Letzter Check-in: ${ciTxt[lastCi.result] || ''}</div>` : ''}
       </div>
       ${weekList(p)}
-      <div class="section"><div class="head"><h3>Einheiten</h3>${locs().length > 1 ? `<div class="seg mini-seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}</div>
+      ${splitCard()}
+      <div class="section"><div class="head"><h3>Einheiten</h3>${locs().length > 1 && !p.place ? `<div class="seg mini-seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}</div>
         ${p.days.map((d, di) => { const o = isOpen(di); const SLp = ssLabels(d.slots); return `<div class="daybox ${o ? 'open' : ''}"><div class="dayhead"><button class="grow dayt" data-a="dayToggle" data-d="${di}" aria-expanded="${o}"><div style="min-width:0"><b class="ell">${esc(d.name)}</b><span class="ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min${di === nd ? ' · als Nächstes' : ''}</span></div><span class="chev">${I.chev}</span></button><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten">${I.more}</button></div>
           ${o ? `${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => slotRow(d, di, sl, si, SLp)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>` : ''}</div>`; }).join('')}
         <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
@@ -1618,17 +1659,22 @@
         ${s.confirm ? '<button class="btn danger" data-a="staleDropYes">Wirklich verwerfen</button>' : '<button class="btn ghost" data-a="staleDrop">Verwerfen</button>'}</div>`;
     },
     plans() {
-      const pr = P(); const list = pr.plans || [plan()];
-      return `<div class="stack"><h2>Deine Pläne</h2><div class="small muted">Tippe auf einen Plan, um ihn zu aktivieren, umzubenennen, zu kopieren oder zu löschen. Verlauf und Rekorde gehören zu den Übungen und bleiben bei jedem Plan erhalten.</div>
-        <div class="list">${list.map(x => `<button class="li" data-a="planOpen" data-id="${x.id}" ${x.id === pr.planId ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}><div class="grow"><b>${esc(x.name || x.splitName)}</b><div class="small muted">${x.days.length} Tage · ${x.custom ? 'Eigener Plan' : 'Empfohlen' + (x.edited ? ', angepasst' : '')}${x.id === pr.planId ? ' · <b style="color:var(--lime)">aktiv</b>' : ''}</div></div><span class="chev">${I.chev}</span></button>`).join('')}</div>
-        <button class="btn primary" data-a="planNew">${I.plus} Neuer Plan</button></div>`;
+      const pr = P(); const list = pr.plans || [plan()]; const two = locs().length > 1; const by = pr.planBy || {};
+      const isAct = x => x.id === pr.planId || (two && x.place && by[x.place] === x.id);
+      const row = x => `<button class="li" data-a="planOpen" data-id="${x.id}" ${isAct(x) ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}><div class="grow"><b>${esc(x.name || x.splitName)}</b><div class="small muted">${x.days.length} ${x.days.length === 1 ? 'Tag' : 'Tage'} · ${x.custom ? 'Eigener Plan' : 'Empfohlen' + (x.edited ? ', angepasst' : '')}${isAct(x) ? ' · <b style="color:var(--lime)">aktiv</b>' : ''}</div></div><span class="chev">${I.chev}</span></button>`;
+      const head = `<h2>Deine Pläne</h2><div class="small muted">Tippe auf einen Plan, um ihn zu aktivieren, umzubenennen, zu kopieren oder zu löschen. Verlauf und Rekorde gehören zu den Übungen und bleiben bei jedem Plan erhalten.</div>`;
+      if (!two) return `<div class="stack">${head}<div class="list">${list.map(row).join('')}</div><button class="btn primary" data-a="planNew">${I.plus} Neuer Plan</button></div>`;
+      const grp = (l, n) => { const xs = list.filter(x => (x.place || 'both') === l); return xs.length || l !== 'both' ? `<div class="stack" style="gap:8px"><div class="eyebrow">${n}</div>${xs.length ? `<div class="list">${xs.map(row).join('')}</div>` : `<div class="small muted">Noch kein Plan.</div>`}${l !== 'both' ? `<button class="btn" data-a="planNewAt" data-l="${l}">${I.plus} Neuer Plan ${l === 'home' ? 'für Zuhause' : 'fürs Studio'}</button>` : ''}</div>` : ''; };
+      return `<div class="stack">${head}${grp('home', 'Zuhause')}${grp('gym', 'Studio')}${grp('both', 'Für beide Orte (alt)')}${list.some(x => !x.place) ? '<div class="tiny muted">Pläne für beide Orte kannst du im Plan-Menü in einen Zuhause- und einen Studio-Plan aufteilen.</div>' : ''}</div>`;
     },
     planMenu(s) {
       const pr = P(); const x = (pr.plans || []).find(p => p.id === s.id); if (!x) return '<div class="stack"><h2>Plan nicht gefunden</h2></div>';
-      const act = x.id === pr.planId;
+      const two = locs().length > 1; const act = x.id === pr.planId || (two && x.place && (pr.planBy || {})[x.place] === x.id);
       return `<div class="stack"><h2>${esc(x.name || x.splitName)}</h2>
         <div><label class="lbl" for="pl-name">Name</label><input class="field" id="pl-name" data-in="planName" data-id="${x.id}" value="${esc(x.name || '')}"></div>
         <div class="small muted">${x.days.map(d => esc(d.name)).join(' · ')}</div>
+        ${two ? `<div><div class="lbl">Gilt für</div><div class="seg">${[['home', 'Zuhause'], ['gym', 'Studio'], ['both', 'Beide']].map(([k, n]) => `<button data-a="planPlace" data-l="${k}" aria-pressed="${(x.place || 'both') === k}">${n}</button>`).join('')}</div></div>
+          ${!x.place ? `<button class="btn" data-a="planSplit" data-id="${x.id}">In Zuhause- und Studio-Plan aufteilen</button><div class="tiny muted">Macht zwei Pläne aus den Zuhause- und den Studio-Übungen. Dieser Plan bleibt in der Liste, vorher wird gesichert.</div>` : ''}` : ''}
         ${act ? '<div class="small" style="font-weight:800">Dieser Plan ist aktiv.</div>' : `<button class="btn primary big" data-a="planAct" data-id="${x.id}">Diesen Plan aktivieren</button>`}
         <button class="btn" data-a="planDup" data-id="${x.id}">Kopieren</button>
         ${(pr.plans || []).length > 1 ? (s.confirm ? `<button class="btn danger" data-a="planDelYes" data-id="${x.id}">Wirklich löschen</button>` : `<button class="btn ghost" data-a="planDel">Plan löschen</button>`) : ''}
@@ -1822,7 +1868,7 @@
     ciLater() { st.ciLater = true; render(); },
     homeFilter(t) { st.homeFilter = t.dataset.k; render(); },
     dayOpen(t) { openSheet({ type: 'day', i: +t.dataset.i }); },
-    dayLoc(t) { st.sheet.loc = t.dataset.l; setHomeLoc(t.dataset.l); renderSheet(); render(); },
+    dayLoc(t) { st.sheet.loc = t.dataset.l; switchLoc(t.dataset.l); renderSheet(); render(); },
     progGo(t) { st.tab = 'fortschritt'; st.progSeg = t.dataset.k; render(); window.scrollTo(0, 0); },
     libTab(t) { st.libTab = t.dataset.k; render(); },
     libMore() { st.libMax = (st.libMax || 40) + 60; const el = $('#libRes'); if (el) el.innerHTML = libResults(); },
@@ -1887,9 +1933,11 @@
       if (st.active && pr.planId === id) { toast('Erst das laufende Training beenden'); return; }
       await Backup.snapshot('vor-planloeschen');
       pr.plans = pr.plans.filter(x => x.id !== id);
-      if (pr.planId === id) { pr.plan = pr.plans[0]; pr.planId = pr.plan.id; st.homeDay = null; }
+      for (const k in pr.planBy || {}) if (pr.planBy[k] === id) delete pr.planBy[k];
+      if (pr.planId === id) { const l = curLoc(); pr.plan = pr.plans.find(x => x.place === l) || pr.plans.find(x => !x.place) || pr.plans[0]; pr.planId = pr.plan.id; st.homeDay = null; }
       Store.saveProfile(true); openSheet({ type: 'plans' }); render(); toast('Plan gelöscht');
     },
+    planNewAt(t) { switchLoc(t.dataset.l); render(); A.planNew(); },
     planNew() { openSheet({ type: 'planNew', n: 3, split: 'fb', name: 'Eigener Plan ' + (((P().plans || []).filter(x => x.custom).length) + 1) }); },
     pnN(t) { st.sheet.n = +t.dataset.n; renderSheet(); },
     pnSplit(t) { st.sheet.split = t.dataset.k; renderSheet(); },
@@ -1897,11 +1945,12 @@
       const s = st.sheet; const kind = t.dataset.k; const name = (s.name || '').trim() || 'Eigener Plan'; let np;
       if (kind === 'empty') np = emptyPlan(name, s.n);
       else if (kind === 'tpl') {
-        const prof = clone(P()); prof.answers = Object.assign({}, prof.answers, { split: s.split, days: String(s.n) });
+        const prof = clone(P()); prof.answers = Object.assign({}, prof.answers, { split: s.split, days: String(s.n) }, locs().length > 1 ? { location: curLoc() } : {});
         np = lockAll(E.buildPlan(prof)); np.id = 'p' + uid(); np.custom = true; np.name = name; np.next = 0; np.meso = { start: E.todayISO(), len: 5 };
       } else { np = lockAll(clone(plan())); np.id = 'p' + uid(); np.custom = true; np.edited = false; np.name = name; np.next = 0; np.created = new Date().toISOString(); }
+      if (locs().length > 1) onlyLoc(np, curLoc());
       if (st.active) { addPlan(np, false); toast('Plan angelegt – aktivieren kannst du ihn nach dem Training'); closeSheet(); render(); return; }
-      addPlan(np, true); closeSheet(); st.tab = 'plan'; render(); window.scrollTo(0, 0); toast('Plan angelegt und aktiv');
+      addPlan(np, true); closeSheet(); st.tab = 'plan'; render(); window.scrollTo(0, 0); toast('Plan angelegt und aktiv' + (np.place ? ' (' + LOCN[np.place] + ')' : ''));
     },
     dayEdit(t) { openSheet({ type: 'dayEdit', d: +t.dataset.d }); },
     dayAdd() {
@@ -1925,14 +1974,19 @@
       if (sl.rest === E.defaultRest(sl.r, goal)) sl.rest = E.defaultRest(r, goal);
       sl.r = r; sl.rr = (E.goalRanges(goal) || {})[r] || null; touchPlan(); Store.saveProfile(); renderSheet(); render();
     },
-    homeLoc(t) { setHomeLoc(t.dataset.l); render(); },
+    homeLoc(t) { switchLoc(t.dataset.l); render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
     pickDay(t) { const i = +t.dataset.i; st.homeDay = i === nextDayIdx() ? null : i; closeSheet(); render(); window.scrollTo(0, 0); },
     dayPick() { openSheet({ type: 'dayPick' }); },
     planTools() { openSheet({ type: 'planTools' }); },
     cycleSheet() { openSheet({ type: 'cycleSheet' }); },
     dayToggle(t) { const p = plan(); const di = +t.dataset.d; const d = p.days[di]; st.planOpen = st.planOpen || {}; const cur = st.planOpen[d.id] ?? (di === nextDayIdx()); st.planOpen[d.id] = !cur; render(); },
-    planLoc(t) { st.planLoc = t.dataset.l; render(); },
+    planLoc(t) { switchLoc(t.dataset.l); render(); },
+    planSplit(t) { if (st.active) { toast('Erst das laufende Training beenden'); return; } splitPlan(t.dataset.id || P().planId).then(() => { closeSheet(); render(); toast('Aufgeteilt: je ein Plan für Zuhause und Studio'); }); },
+    splitLater() { P().seen = Object.assign({}, P().seen, { splitAsk: true }); Store.saveProfile(); render(); },
+    planPlace(t) { const x = (P().plans || []).find(y => y.id === st.sheet.id); if (!x) return; const l = t.dataset.l;
+      if (l === 'both') { delete x.place; x.locs = locs(); } else { x.place = l; x.locs = [l]; }
+      Store.saveProfile(true); if (x.id === P().planId) switchLoc(curLoc()); renderSheet(); render(); },
     startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; }
       const d0 = plan().days[+t.dataset.d]; if (!d0 || !d0.slots.some(s => s.ex[t.dataset.l])) { st.tab = 'plan'; render(); toast('Füge diesem Tag zuerst Übungen hinzu'); return; }
       openSheet(Object.assign({ type: 'time', d: +t.dataset.d, l: t.dataset.l }, FW.tfPrefill())); },
@@ -2303,8 +2357,20 @@
     const alt = p.days.map((x, i) => ({ x, i })).find(o => o.i !== di && o.x.slots.some(s => s.ex[loc]) && !heavyDay(o.x, loc));
     return `<div class="card stack" style="gap:10px"><b>${when} ist Spiel-/Trainingstag</b><div class="small muted">„${esc(d.name)}“ hat schwere Bein- oder Überkopfübungen. Die stecken in den Beinen und Schultern, wenn du werfen und sprinten willst.</div>${alt ? `<button class="btn primary" data-a="homeDay" data-i="${alt.i}">„${esc(alt.x.name)}“ vorziehen</button>` : '<div class="small">Tipp: heute leichter (kürzere Einheit) oder einen Tag schieben.</div>'}</div>`;
   }
+  function splitCard() {
+    const pr = P(); const cur = plan();
+    if (locs().length < 2 || !cur || cur.place || (pr.seen || {}).splitAsk || (pr.plans || []).some(x => x.place)) return '';
+    return `<div class="card stack" style="gap:10px"><b>Eigene Pläne für Zuhause und Studio</b><div class="small muted">Teile „${esc(cur.name || cur.splitName)}“ in einen Zuhause- und einen Studio-Plan auf. Danach hat jeder Ort eigene Tage, Übungen und Sätze, und du kannst pro Ort mehrere Pläne anlegen. Verlauf und Rekorde bleiben, vorher wird gesichert.</div>
+      <div class="row"><button class="btn primary grow" data-a="planSplit">Aufteilen</button><button class="btn ghost" data-a="splitLater">Später</button></div></div>`;
+  }
+  function noPlanCard() {
+    const l = curLoc(); const old = (P().plans || []).find(x => !x.place);
+    return `<div class="card navy stack" style="gap:12px"><div class="eyebrow">${LOCN[l]}</div><h2 style="font-size:26px">Noch kein Plan ${l === 'home' ? 'für Zuhause' : 'fürs Studio'}</h2><div class="small ink2">Lege einen an – die Übungen passen zu deinen Geräten ${l === 'home' ? 'zu Hause' : 'im Studio'}.</div>
+      ${locSeg()}<button class="btn primary big" data-a="planNewAt" data-l="${l}">${I.plus} Neuer Plan</button>${old ? `<button class="btn" data-a="planSplit" data-id="${old.id}">„${esc(old.name || old.splitName)}“ aufteilen</button>` : ''}</div>`;
+  }
+  const locSeg = (cls) => locs().length > 1 ? `<div class="seg ${cls || 'onlight'}">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${curLoc() === l}">${LOCN[l]}</button>`).join('')}</div>` : '';
   function homeCards() {
-    const p = P(); let out = '';
+    const p = P(); let out = splitCard();
     const g = (p.answers || {}).goal;
     if (!(p.seen || {}).recomp && ['muscle', 'fit', 'health'].includes(g)) out += `<div class="card stack" style="gap:10px"><b>Neues Ziel: Fett weg & Muskeln aufbauen</b><div class="small muted">Für die Zeit, in der du Körperfett verlierst: gleiche Übungen, etwas weniger Zusatzvolumen, Fokus darauf, die Kraft zu halten. Dein Plan bleibt, wie er ist.</div><div class="row"><button class="btn primary grow" data-a="recompYes">Umstellen</button><button class="btn grow" data-a="recompNo">Nein danke</button></div></div>`;
     out += sportHint();
@@ -2454,7 +2520,7 @@
     // 3.6: neue Standardschrift (System) – alte Handschrift-Voreinstellung einmalig umstellen, wählbar bleibt sie
     if (st.profile && st.profile.settings && st.profile.settings.font === 'hand' && !(st.profile.seen || {}).sysfont) { delete st.profile.settings.font; st.profile.seen = Object.assign({}, st.profile.seen, { sysfont: true }); Store.saveProfile(); }
     normalizePlans();
-    { const hl = ((st.profile || {}).settings || {}).homeLoc; if (hl && locs().includes(hl)) st.homeLoc = hl; } // zuletzt gewählter Ort bleibt
+    { const hl = ((st.profile || {}).settings || {}).homeLoc; if (hl && locs().includes(hl)) st.homeLoc = hl; if (locs().length > 1 && !st.active) switchLoc(curLoc()); st.planLoc = curLoc(); } // zuletzt gewählter Ort bleibt, mit seinem Plan
     // Pausen bei Isolationsübungen 75 → 90 s (nur unveränderte empfohlene Pläne)
     // 3.15: Pausen, die noch auf altem Standard stehen, anheben (eigene Werte bleiben), vorher Sicherung
     if (((st.profile && st.profile.plans) || []).some(pl => (pl.restV || 1) < 3)) {
