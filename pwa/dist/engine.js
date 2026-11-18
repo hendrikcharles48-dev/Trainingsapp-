@@ -539,6 +539,60 @@
     return out;
   }
 
+  /* ================= Bereit-Training: müde Muskeln auslassen (Formwerk) =================
+     block = { muscles:Set (noch müde → nicht trainieren), partial:Set (teilweise erholt → eher meiden), inj:Set (Schmerz-Stellen) }.
+     Übungen, deren Hauptmuskel müde ist (oder die eine schmerzende Stelle belasten), fallen weg und werden durch
+     gleichwertige Übungen für bereite Muskeln ersetzt (gleiche Rolle und Sätze). Vorrang: Favoriten, dann Übungen
+     aus den eigenen Plänen, Muskeln mit wenig Sätzen diese Woche. Ergebnis ist ein Tag-Objekt, der Plan bleibt unverändert. */
+  const READY_PATS = { main: ['squat', 'hinge', 'vpull', 'hpull', 'hpush', 'vpush', 'dip', 'lunge', 'glute'], sec: ['hpull', 'vpull', 'hpush', 'vpush', 'dip', 'lunge', 'squat', 'hinge', 'glute', 'latiso'],
+    iso: ['side', 'rear', 'biceps', 'triceps', 'fly', 'latiso', 'calf', 'hamcurl', 'quadiso'], core: ['core'] };
+  const ROLE_ORD = { skill: 0, main: 1, sec: 2, iso: 3, core: 4, cond: 5 };
+  function readyDay(day, loc, profile, plan, block, plans) {
+    const exOf = id => DB.byId[id] || ((profile && profile.custom) || []).find(e => e.id === id);
+    const bm = block.muscles || new Set(), bp = block.partial || new Set(), bi = block.inj || new Set();
+    const hit = ex => ex.prim.some(m => bm.has(m)) || (ex.inj || []).some(t => bi.has(t));
+    const slots = day.slots.filter(sl => sl.ex[loc] && exOf(sl.ex[loc]));
+    const bad = slots.filter(sl => hit(exOf(sl.ex[loc])));
+    if (!bad.length) return null;
+    const keep = slots.filter(sl => !bad.includes(sl)).map(sl => Object.assign({}, sl));
+    for (const sl of keep) if (sl.ss && !keep.some(o => o !== sl && o.ss === sl.ss)) delete sl.ss;
+    const used = new Set(keep.map(sl => sl.ex[loc]));
+    const known = new Set(); for (const pl of plans || []) for (const d of pl.days || []) for (const sl of d.slots || []) for (const id of Object.values(sl.ex || {})) if (id) known.add(id);
+    const favs = new Set((profile && profile.favs) || []);
+    const cover = {}; const addCover = ex => { for (const m of ex.prim) cover[m] = (cover[m] || 0) + 1; };
+    keep.forEach(sl => addCover(exOf(sl.ex[loc])));
+    const ws = (WK && WK()) || [];
+    const week = weeklyMuscleSets(ws, todayISO(startOfWeek()));
+    const ctx = { profile, loc, eqSet: locEquip(profile, loc), used: new Set(), dayUsed: used, ab: abilities(profile.answers || {}), seed: 'ready' + todayISO() };
+    const goal = (plan && plan.goal) || (profile.answers || {}).goal || 'muscle';
+    const removed = [], added = [];
+    for (const sl of [...bad].sort((a, b) => (ROLE_ORD[a.r] ?? 9) - (ROLE_ORD[b.r] ?? 9))) {
+      removed.push(exOf(sl.ex[loc]));
+      const role = sl.r === 'skill' ? 'iso' : sl.r;
+      const pats = READY_PATS[role]; if (!pats) continue;
+      let best = null;
+      for (const ex of allExercises(profile)) {
+        if (used.has(ex.id) || hit(ex)) continue;
+        const r = scoreExercise(ex, S(pats, role), ctx); if (!r) continue;
+        let v = r.s;
+        if (favs.has(ex.id)) v += 8; // Favoriten klar vorn (Nutzerwunsch)
+        if (known.has(ex.id)) v += 3; // kennt er schon: Verlauf und Gewichte passen
+        v -= 3 * (ex.sec || []).filter(m => bm.has(m)).length;
+        v -= 2 * ex.prim.filter(m => bp.has(m)).length;
+        v -= 2.5 * ex.prim.reduce((t, m) => t + (cover[m] || 0), 0) / Math.max(1, ex.prim.length);
+        const m0 = ex.prim[0]; if (m0 != null) v += Math.max(0, Math.min(3, (10 - (week[m0] || 0)) / 3));
+        if (!best || v > best.v) best = { ex, v, why: r.reasons };
+      }
+      if (!best || best.v < -12) continue;
+      used.add(best.ex.id); addCover(best.ex); added.push(best.ex);
+      const why = favs.has(best.ex.id) ? ['★ Deine Lieblingsübung'] : known.has(best.ex.id) ? ['Aus deinen Plänen'] : best.why;
+      keep.push(S([best.ex.pat], role, { id: 'r' + Math.random().toString(36).slice(2, 8), sets: sl.sets, rest: sl.r === role ? sl.rest : defaultRest(role, goal),
+        rr: goalRanges(goal)[role] || null, ex: { [loc]: best.ex.id }, why: { [loc]: why }, ready: true }));
+    }
+    keep.sort((a, b) => (ROLE_ORD[a.r] ?? 9) - (ROLE_ORD[b.r] ?? 9));
+    return { day: Object.assign({}, day, { slots: keep }), removed, added, kept: slots.length - bad.length, total: slots.length };
+  }
+
   /* ================= Mesozyklus ================= */
   function todayISO(d) { d = d || new Date(); const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); }
   /* Zyklus nach TRAINIERTEN Wochen: Woche = 1 + Zahl der Kalenderwochen seit meso.start (ohne die laufende),
@@ -893,7 +947,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

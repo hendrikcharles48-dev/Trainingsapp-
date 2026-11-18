@@ -165,11 +165,11 @@ Wo die eigenen Übungen zu finden sind:
   (Artifact https://claude.ai/artifact/9rhKGs5pYvdeqRx7ymim9L).
 - Wenn nichts davon vorliegt: den Nutzer kurz fragen, ob er neue Übungen angelegt hat.
 
-Übungsbestand: 249 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
+Übungsbestand: 250 (Version 3.6 hat 75 ergänzt, Block „Erweiterung 3.6“ am Ende von `exercises.js`/`howto.js`/`map` in `figures.js`;
 neue Figuren nutzen vorhandene Vorlagen). Prüfen: jede Übung braucht Eintrag in allen drei Dateien.
 Bereits eingebaut: „Pistol Squat an Ringen“ (`ring-pistol`), „L-Sit an Ringen“ (`ring-lsit`), „Tuck L-Sit an Ringen“ (`ring-tuck-lsit`),
 „Hohes Rudern an der Maschine (brustgestützt)“ (`machine-high-row`, gym80 High Row; Block „Eigene Übungen des Nutzers“ am Ende von
-`exercises.js`/`howto.js`). Namen nie doppelt (vorher prüfen); den Namen des Nutzers als `alias`, sinnvollen Namen als `name`.
+`exercises.js`/`howto.js`), „Beinpresse einbeinig im sitzen“ (`leg-press-single`, gym80, Figur `legpress1`). Namen nie doppelt (vorher prüfen); den Namen des Nutzers als `alias`, sinnvollen Namen als `name`.
 Eigene Übungen lassen sich auch direkt beim Tauschen/Wählen anlegen („Eigene Übung anlegen“, `customFrom`).
 Reiter „Eigene“ in Übungen (`st.libTab = 'own'`): Bearbeiten (`cxEdit`, gleiche ID, Verlauf bleibt) und Löschen (`cxDelYes`):
 aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favoriten; mit Verlauf nur `hidden: true`
@@ -292,6 +292,11 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   aus Formwerk“), Wochen-Check-in vorausgefüllt (`FW.weekPrefill`, nur „diff“ bleibt offen), `deloadNeeded` = Leistung ODER Formwerk-Signale
   (2 Zeichen oder 1 + fallende Leistung), Baseball-Tage aus Formwerk (`sportDaysEff()`, `FW.plan().baseballToday`), gute Kraft-Tage in der
   Wochenleiste (`.wd.good`). Ohne Formwerk alles wie vorher.
+- Bereit-Training (Satzwerk 3.16, Worker 2.4, Nutzerwunsch 18.11.): `/v1/today` liefert `muscles` (Status je Gruppe + Muskel-Schlüssel `m`),
+  `FW.readiness()` → `{muscles (müde), partial, inj (Schmerz ≥ 2)}`. `E.readyDay(day, loc, profile, plan, block, plans)` ersetzt Übungen mit müdem
+  Hauptmuskel durch Übungen für bereite Muskeln (gleiche Rolle/Sätze; Favoriten +8, aus eigenen Plänen +3, wenig Wochensätze bevorzugt), Plan bleibt
+  unverändert. Heute-Karte zeigt Hinweis, Tagesform-Fenster Auswahl „Für heute empfohlen“/„Dein Plan“ (`s.mode`), „Andere Einheit“ zeigt „x von y bereit“.
+  Zählt nur als Plan-Tag, wenn ≥ Hälfte der Übungen bleibt (sonst `dayIdx: null`, Tag bleibt dran). Ort Zuhause/Studio bleibt gespeichert (`settings.homeLoc`).
 - Fehlende Nacht (16.11. geprüft: Synchronisierung lief, Uhr maß 0–7 Uhr nichts): `sleepView` liefert `reason` (`notWorn` = Garmin bis
   nach 6 Uhr synchronisiert und ≥ 3 h ohne Messung laut `stress.uncategorizedDurationInMillis`, `noSleep`, `notSynced`); Formwerk erklärt das.
 - Nacht ohne Messung (Nutzerwunsch 16.11.): Ruhepuls zählt nur mit Nachtdaten (`rhrValid`, sonst Tageswert – auch nicht für die Basis).

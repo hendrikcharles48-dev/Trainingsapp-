@@ -279,6 +279,7 @@
 
   /* ---------- Eigene Übungen des Nutzers, fest eingebaut ---------- */
   A('machine-high-row', ['Sitz so einstellen, dass die Brust oben am Polster liegt und die Griffe gestreckt schräg vor und über dir sind.', 'Brust fest ans Polster, Füße flach auf den Boden oder die Fußstütze.', 'Schultern zuerst nach unten-hinten ziehen, dann die Griffe schräg nach hinten unten Richtung untere Brust ziehen.', 'Ellbogen enden hinter dem Körper, kurz halten, langsam zurück in die volle Dehnung.'], ['Brust bleibt am Polster', 'Ellbogen nah am Körper vorbei nach hinten unten', 'Oben 1 s halten, Schulterblätter zusammen'], 'Mit den Schultern hochziehen und den Oberkörper vom Polster lösen – dann arbeitet der Nacken statt Rücken.');
+  A('leg-press-single', ['Sitz so einstellen, dass das Knie unten etwa 90° gebeugt ist und der Po fest im Sitz bleibt.', 'Einen Fuß mittig auf die Platte, Fuß ganz aufgesetzt, Knie zeigt in Richtung Fußspitze. Das andere Bein steht locker am Boden.', 'Griffe am Sitz festhalten, Platte kontrolliert wegdrücken, bis das Bein fast gestreckt ist.', 'Langsam zurück bis zur 90°-Beugung, dann alle Wiederholungen, danach das andere Bein.'], ['Po und unterer Rücken bleiben am Polster', 'Knie bleibt über dem Fuß, kippt nicht nach innen', 'Ganze Fußsohle drückt, auch die Ferse', 'Beide Beine gleich viele Wiederholungen'], 'Zu tief gehen, bis sich das Becken vom Sitz rollt – oder das Knie ganz durchdrücken.');
 
   window.HOWTO = H;
 })();

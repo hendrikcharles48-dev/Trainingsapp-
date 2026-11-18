@@ -337,6 +337,7 @@
 
   /* ---------- Eigene Übungen des Nutzers, fest eingebaut (Wochenbericht) ---------- */
   X('machine-high-row', 'Hohes Rudern an der Maschine (brustgestützt)', 'hpull', 'c', 'load', ['mach'], ['lats', 'upperback'], ['rdelt', 'biceps'], { lvl: 1, std: 0.6, rr: [8, 12], alias: ['Rudern beustgestützt von oben 45grad Winkel', 'Rudern beustgestützt 45*', 'Rudern brustgestützt von oben 45 Grad', 'High Row Maschine', 'gym80 High Row'], d: 'Brust ans Polster, Griffe schräg von oben (etwa 45°) nach hinten unten ziehen – zwischen Latzug und Rudern. Z. B. gym80 Pure Kraft High Row.', c: ['Brust bleibt am Polster', 'Ellbogen nach hinten unten, nah am Körper vorbei'] });
+  X('leg-press-single', 'Beinpresse sitzend, einbeinig', 'squat', 'c', 'load', ['mach'], ['quads', 'glutes'], ['hams'], { lvl: 2, std: 0.9, uni: true, rr: [8, 12], inj: ['knee'], alias: ['Beinpresse einbeinig im sitzen', 'Beinpresse einbeinig sitzend', 'Einbeinige Beinpresse', 'gym80 Beinpresse einbeinig'], d: 'An der sitzenden Beinpresse (z. B. gym80) ein Bein nach dem anderen gegen die Platte drücken. Gleicht Seitenunterschiede aus und schont den Rücken.', c: ['Gewicht pro Bein', 'Erst das schwächere Bein'] });
 
   window.EXDB = { list: L, byId: Object.fromEntries(L.map(e => [e.id, e])), MUSCLES, GROUPS, EQUIP, PATTERNS };
 })();

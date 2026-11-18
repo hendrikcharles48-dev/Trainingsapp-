@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.15.0';
+  const APP_VERSION = '3.16.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, coach: () => null, refreshCoach() { } };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, coach: () => null, refreshCoach() { } };
   // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
   function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
@@ -507,6 +507,15 @@
   }
 
   /* ================= Heute ================= */
+  // Formwerk meldet müde Muskeln → Vorschlag ohne sie (engine readyDay), Plan bleibt unverändert
+  function readyFor(di, loc) {
+    const b = FW.readiness(); const p = plan(); if (!b || !p || !p.days[di]) return null;
+    const r = E.readyDay(p.days[di], loc, P(), p, b, P().plans || [p]); if (!r) return null;
+    r.labels = b.labels; r.pain = b.pain; r.why = [b.labels.length ? b.labels.join(' & ') + ' noch nicht bereit' : '', b.pain.length ? b.pain.join(' & ') + ' schmerzt' : ''].filter(Boolean).join(' · ');
+    r.counts = r.kept >= Math.ceil(r.total / 2); // mehr als die Hälfte bleibt → zählt als dieser Tag
+    return r;
+  }
+  function setHomeLoc(l) { st.homeLoc = l; const se = P().settings = P().settings || {}; if (se.homeLoc !== l) { se.homeLoc = l; Store.saveProfile(); } }
   function nextDayIdx() { const p = plan(); return p ? (p.next || 0) % p.days.length : 0; }
   function homeView() {
     const p = plan(), a = P().answers || {};
@@ -533,6 +542,7 @@
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
       : `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Nächste Einheit'} · Woche ${wi.w}/${wi.len}${wi.deload ? ' · Deload' : ''}</div><h2 class="xl clamp2">${esc(day.name)}</h2><div class="small ink2 ell">${esc(dayFocus(day, loc))}</div></div><div class="figtile hero">${figSVG(hx, { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg onlight">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
+        ${(() => { const r = readyFor(di, loc); return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
         <div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${setsPlan}</b><span>Sätze</span></div><div><b>${estMinutes(day, loc)}</b><span>Minuten</span></div></div>
         <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button></div>`;
     return `<div class="homebar"><div class="row"><div class="eyebrow grow ell">${dateTxt}</div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div>
@@ -947,8 +957,8 @@
     const ra = ((P() && P().restAdj) || {})[exId]; if (ra && ra.s && presc.rest >= 60) presc.rest = Math.min(300, presc.rest + ra.s);
     return Object.assign({ key: uid(), exId, slotId: slot ? slot.id : null, presc, sets: [], extra: 0 }, slot && slot.ss ? { ss: slot.ss } : {});
   }
-  function startWorkout(di, loc, delta) {
-    const p = plan(); const day = p.days[di];
+  function startWorkout(di, loc, delta, rd) {
+    const p = plan(); const day = rd ? rd.day : p.days[di];
     let exercises, timeNote = null;
     if (delta) {
       const tp = E.timePlan(day, loc, delta, P(), p);
@@ -960,7 +970,8 @@
       });
       timeNote = { delta, minutes: tp.minutes, notes: tp.notes };
     } else exercises = day.slots.filter(s => s.ex[loc]).map(s => newEntry(s.ex[loc], s));
-    st.active = { id: uid(), planId: p.id, dayIdx: di, dayId: day.id, name: day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
+    const counts = !rd || rd.counts; // angepasst und weniger als die Hälfte übrig → Plan-Tag bleibt als Nächstes dran
+    st.active = { id: uid(), planId: p.id, dayIdx: counts ? di : null, dayId: counts ? day.id : null, name: rd ? day.name + ' · angepasst' : day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
@@ -1535,7 +1546,7 @@
     },
     dayPick() {
       const p = plan(); const loc = st.homeLoc || defLoc(); const nd = nextDayIdx(); const cur = st.homeDay ?? nd;
-      return `<div class="stack"><h2>Einheit wählen</h2><div class="list">${p.days.map((d, i) => `<button class="li" data-a="pickDay" data-i="${i}" ${i === cur ? 'style="background:var(--navy)"' : ''}>${thumb(heroEx(d, loc))}<div class="grow"><div class="ell" style="font-weight:700">${esc(d.name)}</div><div class="small muted ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ${estMinutes(d, loc)} min${i === nd ? ' · als Nächstes' : ''}</div></div>${i === cur ? `<span style="color:var(--accent)">${I.check.replace('<svg', '<svg width="20" height="20"')}</span>` : ''}</button>`).join('')}</div>
+      return `<div class="stack"><h2>Einheit wählen</h2><div class="list">${p.days.map((d, i) => `<button class="li" data-a="pickDay" data-i="${i}" ${i === cur ? 'style="background:var(--navy)"' : ''}>${thumb(heroEx(d, loc))}<div class="grow"><div class="ell" style="font-weight:700">${esc(d.name)}</div><div class="small muted ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ${estMinutes(d, loc)} min${i === nd ? ' · als Nächstes' : ''}</div>${(() => { const r = readyFor(i, loc); return r ? `<div class="tiny ell" style="color:var(--accent)">${r.kept} von ${r.total} Übungen bereit</div>` : ''; })()}</div>${i === cur ? `<span style="color:var(--accent)">${I.check.replace('<svg', '<svg width="20" height="20"')}</span>` : ''}</button>`).join('')}</div>
         <div class="tiny muted">Die Reihenfolge im Plan bleibt; nach dem Training ist der Tag danach dran.</div></div>`;
     },
     stale(s) {
@@ -1590,9 +1601,10 @@
         ${s.preview && ch.length ? '<div class="small" style="font-weight:800">Das würde sich ändern. Übernehmen?</div><button class="btn primary" data-a="balanceApply">Übernehmen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button>' : '<button class="btn primary" data-a="closeSheet">Alles klar</button>'}</div>`;
     },
     time(s) {
-      const p = plan(); const day = p.days[s.d];
+      const p = plan(); const rd = readyFor(s.d, s.l); const useR = rd && s.mode !== 'plan'; const day = useR ? rd.day : p.days[s.d];
       const en = s.en ?? 1, sl = s.sl ?? 1, ti = s.ti ?? 1;
       const delta = tfDelta(s);
+      const newIds = new Set(useR ? rd.added.map(x => x.id) : []); const tiredIds = new Set(rd && !useR ? rd.removed.map(x => x.id) : []);
       const tp = delta ? E.timePlan(day, s.l, delta, P(), p) : null;
       const items = tp ? tp.items.map(it => ({ ex: it.ex, sets: it.spec ? it.sets : E.prescription(it.slot, it.ex, P(), p).sets + (it.boost || 0) }))
         : day.slots.filter(x => x.ex[s.l]).map(x => { const ex = getEx(x.ex[s.l]); return { ex, sets: ex ? E.prescription(x, ex, P(), p).sets : 0 }; }).filter(x => x.ex);
@@ -1600,9 +1612,11 @@
       const grp = (k, label, opts, v) => `<div><div class="eyebrow" style="margin-bottom:8px">${label}</div><div class="tfrow">${opts.map((o, i) => `<button class="tf" data-a="tfPick" data-k="${k}" data-v="${i}" aria-pressed="${v === i}">${o}</button>`).join('')}</div></div>`;
       const label = { '-2': 'Deutlich kürzer', '-1': 'Etwas kürzer', '0': 'Wie geplant', '1': 'Etwas länger', '2': 'Deutlich länger' }[delta];
       return `<div class="stack"><div><div class="eyebrow">${esc(day.name)}</div><h2>Wie geht’s dir heute?</h2>${s.fw ? `<div class="small muted">Vorausgefüllt aus Formwerk (${esc(s.fw)}) – nur ändern, wenn es nicht passt.</div>` : ''}</div>
+        ${rd ? `<div class="card flat stack" style="gap:8px"><div class="small"><b>${esc(rd.why)}</b> (Formwerk)</div><div class="seg">${[['ready', 'Für heute empfohlen'], ['plan', 'Dein Plan']].map(([k, n]) => `<button data-a="tfMode" data-k="${k}" aria-pressed="${(s.mode || 'ready') === k}">${n}</button>`).join('')}</div></div>` : ''}
         ${grp('en', 'Energie', ['Niedrig', 'Normal', 'Hoch'], en)}${grp('sl', 'Schlaf', ['Schlecht', 'Okay', 'Gut'], sl)}${grp('ti', 'Zeit', ['Knapp', 'Normal', 'Viel'], ti)}
-        <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">Dein Plan heute</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
-          <div class="planlist">${items.map(it => `<div class="pl-row">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span><span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
+        <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">${useR ? 'Empfohlen heute' : 'Dein Plan heute'}</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
+          <div class="planlist">${items.map(it => `<div class="pl-row ${tiredIds.has(it.ex.id) ? 'tired' : ''}">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span>${newIds.has(it.ex.id) ? `<span class="tagx">${(P().favs || []).includes(it.ex.id) ? '★ neu' : 'neu'}</span>` : tiredIds.has(it.ex.id) ? '<span class="tagx">müde</span>' : ''}<span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
+          ${useR ? `<div class="tiny ink2">Ohne: ${esc(rd.removed.map(x => x.name).join(', '))}${rd.counts ? '' : ` · ${esc(p.days[s.d].name)} bleibt als Nächstes dran`}</div>` : ''}
           ${tp && tp.notes.length ? `<div class="tiny ink2">${esc(tp.notes.join(' · '))}</div>` : ''}</div>
         <button class="btn primary big" data-a="tfGo">Training starten</button>
         <div class="tiny muted">Energie und Schlaf ändern nur die Länge der Einheit: kürzer heißt, weniger wichtige Übungen entfallen. Gewichte und Wiederholungen bestimmt weiter deine Satzleistung.</div></div>`;
@@ -1745,7 +1759,7 @@
     ciLater() { st.ciLater = true; render(); },
     homeFilter(t) { st.homeFilter = t.dataset.k; render(); },
     dayOpen(t) { openSheet({ type: 'day', i: +t.dataset.i }); },
-    dayLoc(t) { st.sheet.loc = t.dataset.l; st.homeLoc = t.dataset.l; renderSheet(); render(); },
+    dayLoc(t) { st.sheet.loc = t.dataset.l; setHomeLoc(t.dataset.l); renderSheet(); render(); },
     progGo(t) { st.tab = 'fortschritt'; st.progSeg = t.dataset.k; render(); window.scrollTo(0, 0); },
     libTab(t) { st.libTab = t.dataset.k; render(); },
     libMore() { st.libMax = (st.libMax || 40) + 60; const el = $('#libRes'); if (el) el.innerHTML = libResults(); },
@@ -1848,7 +1862,7 @@
       if (sl.rest === E.defaultRest(sl.r, goal)) sl.rest = E.defaultRest(r, goal);
       sl.r = r; sl.rr = (E.goalRanges(goal) || {})[r] || null; touchPlan(); Store.saveProfile(); renderSheet(); render();
     },
-    homeLoc(t) { st.homeLoc = t.dataset.l; render(); },
+    homeLoc(t) { setHomeLoc(t.dataset.l); render(); },
     homeDay(t) { st.homeDay = +t.dataset.i; render(); },
     pickDay(t) { const i = +t.dataset.i; st.homeDay = i === nextDayIdx() ? null : i; closeSheet(); render(); window.scrollTo(0, 0); },
     dayPick() { openSheet({ type: 'dayPick' }); },
@@ -1862,7 +1876,8 @@
     rateW(t) { const w = st.summary; if (!w) return; w.rating = +t.dataset.r; Store.saveWorkout(w); renderSheet(); },
     chartPick(t) { st.chartEx = t.dataset.id; render(); },
     tfPick(t) { st.sheet[t.dataset.k] = +t.dataset.v; renderSheet(); },
-    tfGo() { const s = st.sheet; const d = tfDelta(s); closeSheet(); startWorkout(s.d, s.l, d); },
+    tfGo() { const s = st.sheet; const d = tfDelta(s); const rd = s.mode !== 'plan' ? readyFor(s.d, s.l) : null; closeSheet(); startWorkout(s.d, s.l, d, rd); },
+    tfMode(t) { st.sheet.mode = t.dataset.k; renderSheet(); },
     timePick(t) { const d = st.sheet.d, l = st.sheet.l; closeSheet(); startWorkout(d, l, +t.dataset.delta); },
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
@@ -2375,6 +2390,7 @@
     // 3.6: neue Standardschrift (System) – alte Handschrift-Voreinstellung einmalig umstellen, wählbar bleibt sie
     if (st.profile && st.profile.settings && st.profile.settings.font === 'hand' && !(st.profile.seen || {}).sysfont) { delete st.profile.settings.font; st.profile.seen = Object.assign({}, st.profile.seen, { sysfont: true }); Store.saveProfile(); }
     normalizePlans();
+    { const hl = ((st.profile || {}).settings || {}).homeLoc; if (hl && locs().includes(hl)) st.homeLoc = hl; } // zuletzt gewählter Ort bleibt
     // Pausen bei Isolationsübungen 75 → 90 s (nur unveränderte empfohlene Pläne)
     // 3.15: Pausen, die noch auf altem Standard stehen, anheben (eigene Werte bleiben), vorher Sicherung
     if (((st.profile && st.profile.plans) || []).some(pl => (pl.restV || 1) < 3)) {
