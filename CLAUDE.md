@@ -312,6 +312,11 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   `learn.last {ch, undo}` → Karte `volLastCard` (OK/Warum?/Rückgängig). Neuer Plan startet mit dem Durchschnitt (`avgLearn`).
   Plan-Ansicht unten: Karte „Volumen & Erholung“ (`volumeCard`: Ziel je Muskel + Begründung, Schalter, „Plan ausbalancieren“, „Neu berechnen“).
   Tipp auf einen Plan in „Pläne“ öffnet ihn (`planGo`); Umbenennen/Ort/Kopieren/Löschen über „⋯“ → „Diesen Plan bearbeiten“.
+- Einheit als eigene Seite (Satzwerk 3.20, Nutzerwunsch 18.11.): Planübersicht listet Einheiten (`dayOpen` → `st.planDay` = Tag-ID,
+  `dayView`: Zurück `dayBack`, Start, Übungen, unten `dayVolCard`). Ziel der Einheit = Wochenziel × Anteil ihrer Sätze (`dayTargets`;
+  kein Tag trainiert den Muskel → gleichmäßig). „Einheit ausbalancieren“ (`balanceDay`, Vorschau, ändert nur diese Einheit).
+  Automatik je Einheit (`day.noAuto`); Wochenlauf gleicht nur Einheiten ohne `noAuto` an (Ziele minus Volumen der anderen).
+  Plan-Tab erneut antippen, Plan- oder Ortswechsel → zurück zur Übersicht.
 - Training → Plan übernehmen (Satzwerk 3.17, Nutzerwunsch 18.11.): `planDiff(active)` vergleicht mit dem Plan-Tag (nur Plan-Trainings,
   nicht frei/angepasst): Getauscht, Neu (`tpx` = von „länger“ ergänzt, zählt nicht), Raus, Sätze, Reihenfolge. Fenster `finish` zeigt die Liste,
   „Speichern & Plan übernehmen“ (`finishAdopt`, vorher `Backup.snapshot('vor-plan-anpassen')`). Deload/Tagesform-Länge: keine Sätze/Raus.

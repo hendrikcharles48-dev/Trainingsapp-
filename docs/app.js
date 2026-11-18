@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.19.0';
+  const APP_VERSION = '3.20.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -261,7 +261,7 @@
   const autoPlan = p => p && !p.custom && !p.edited;
   function activatePlan(id) {
     const pr = P(); const np = (pr.plans || []).find(x => x.id === id); if (!np) return false;
-    pr.plan = np; pr.planId = id; st.homeDay = null;
+    pr.plan = np; pr.planId = id; st.homeDay = null; st.planDay = null;
     const l = np.place || curLoc(); pr.planBy = Object.assign({}, pr.planBy, { [l]: id });
     if (np.place && np.place !== curLoc()) { st.homeLoc = np.place; st.planLoc = np.place; const se = pr.settings = pr.settings || {}; se.homeLoc = np.place; }
     Store.saveProfile(true); return true;
@@ -271,7 +271,7 @@
   const curLoc = () => st.homeLoc || defLoc();
   const placeMismatch = () => { const p = plan(); return !!(p && p.place && p.place !== curLoc()); };
   function switchLoc(l) {
-    setHomeLoc(l); st.planLoc = l; st.homeDay = null;
+    setHomeLoc(l); st.planLoc = l; st.homeDay = null; st.planDay = null;
     if (st.active) return;
     const pr = P(); const cur = plan(); const all = pr.plans || [];
     let np = all.find(x => x.id === (pr.planBy || {})[l] && (!x.place || x.place === l));
@@ -652,9 +652,46 @@
       <label class="li" style="cursor:pointer"><div class="grow"><b>Jede Woche automatisch anpassen</b><div class="small muted">Montags: Ziele neu lernen, Plan schrittweise angleichen (höchstens ±2 Sätze je Muskel), vorher Sicherung</div></div><input type="checkbox" data-a="volAuto" ${auto ? 'checked' : ''} style="width:22px;height:22px"></label>
       <div class="row"><button class="btn primary grow" data-a="balanceNow">Plan ausbalancieren</button><button class="btn grow" data-a="volLearnNow">Neu berechnen</button></div></div>`;
   }
+  // Anteil der Einheit am Wochenziel: nach ihrem Anteil an den Sätzen des Plans (trainiert kein Tag den Muskel: gleichmäßig)
+  function dayTargets(p, di, loc) {
+    const v = E.planVolume(p, P(), loc); const T = v.targets; const n = Math.max(1, p.days.length); const out = {};
+    for (const m in T) { const tot = v.week[m], dv = v.perDay[di][m]; out[m] = Math.round((tot > 0 ? T[m] * dv / tot : T[m] / n) * 2) / 2; }
+    return { T, tU: out, dv: v.perDay[di] };
+  }
+  function dayVolCard(p, di, loc) {
+    const d = p.days[di]; const L = p.learn || {}; const { T, tU, dv } = dayTargets(p, di, loc);
+    const one = p.days.length === 1;
+    const rows = Object.keys(T).map(m => { const val = Math.round((dv[m] || 0) * 2) / 2, t = tU[m]; const st_ = val < t - 1 ? 'low' : val > t + 1.5 ? 'high' : 'ok';
+      const col = { low: 'var(--highlight)', ok: 'var(--lime)', high: 'var(--highlight)' }[st_];
+      return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${Math.min(100, t / 20 * 100)}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}<span class="muted">/${fmt(t)}</span></span></div>${L.why && L.why[m] ? `<div class="tiny muted volwhy">${esc(L.why[m])}${!one ? ' · Wochenziel ' + T[m] : ''}</div>` : ''}`; }).join('');
+    const auto = L.auto !== false && !d.noAuto;
+    return `<div class="card stack" id="volCard" style="gap:12px"><b style="font-size:18px">Volumen & Erholung</b>
+      <div class="small muted">${one ? 'Diese Einheit trägt das ganze Wochenziel des Plans.' : 'Diese Einheit trägt ihren Anteil am Wochenziel des Plans (nach ihren Sätzen).'} ${L.T ? 'Die Ziele lernt Satzwerk aus deiner Kraftentwicklung, deinem Muskelkater nach dem Training und deiner Erholung.' : 'Ab nächster Woche lernt Satzwerk dein persönliches Maß.'}</div>
+      ${(L.notes || []).length || L.rir ? `<div class="tiny ink2">${esc([].concat(L.notes || [], L.rir && !(L.notes || []).some(n => /Reserve/.test(n)) ? ['Reserve +1 Wdh. in diesem Plan'] : []).join(' · '))}</div>` : ''}
+      <div class="tiny muted">Balken = Sätze in dieser Einheit · Strich = Ziel für diese Einheit. Mittrainierte Muskeln zählen halb.</div>
+      <div class="stack" style="gap:6px">${rows}</div>
+      <label class="li" style="cursor:pointer"><div class="grow"><b>Jede Woche automatisch anpassen</b><div class="small muted">Montags schrittweise angleichen (höchstens ±2 Sätze je Muskel), vorher Sicherung</div></div><input type="checkbox" data-a="dayAuto" data-d="${di}" ${auto ? 'checked' : ''} style="width:22px;height:22px"></label>
+      <div class="row"><button class="btn primary grow" data-a="balanceDay" data-d="${di}">Einheit ausbalancieren</button><button class="btn grow" data-a="volLearnNow">Neu berechnen</button></div></div>`;
+  }
+  function dayView(p, di, loc) {
+    const d = p.days[di]; const SLp = ssLabels(d.slots); const nd = nextDayIdx();
+    const slots = d.slots.filter(s => s.ex[loc]);
+    const sets = slots.reduce((t, sl) => { const ex = getEx(sl.ex[loc]); return t + (ex ? E.prescription(sl, ex, P(), p).sets : 0); }, 0);
+    const slotRow = (sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p); const ro = { main: 'Grundübung', sec: 'Ergänzung', iso: 'Isolation', skill: 'Skill', core: 'Rumpf', cond: 'Kondition' }[sl.r] || '';
+      return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="ell" style="font-weight:700">${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</div><div class="small muted ell">${ro} · ${pr.sets} × ${pr.rr[0]}–${pr.rr[1]}${ex.uni ? ' pro Seite' : ''} · ${pr.rest} s</div></div><span class="chev">${I.chev}</span></button>`; };
+    return `<div class="topbar"><button class="iconbtn" data-a="dayBack" aria-label="Zurück">${I.back}</button><div class="grow" style="min-width:0"><div class="eyebrow ell">${esc(p.name || p.splitName)}${di === nd ? ' · als Nächstes' : ''}</div><h1 class="ell" style="font-size:32px">${esc(d.name)}</h1></div><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Einheit bearbeiten">${I.more}</button></div>
+    <div class="stack">
+      <div class="card navy stack" style="gap:12px"><div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${sets}</b><span>Sätze</span></div><div><b>${estMinutes(d, loc)}</b><span>Minuten</span></div></div>
+        ${st.active ? `<button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button>` : `<button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button>`}</div>
+      ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => slotRow(sl, si)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
+      <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
+      ${dayVolCard(p, di, loc)}
+    </div>`;
+  }
   function planView() {
     if (placeMismatch()) return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto">Pläne</button></div><div class="stack">${noPlanCard()}</div>`;
     const p = plan(); const loc = p.place || st.planLoc || defLoc(); const wi = E.weekInfo(p, P());
+    if (st.planDay) { const di = p.days.findIndex(d => d.id === st.planDay); if (di >= 0) return dayView(p, di, loc); st.planDay = null; }
     const goalN = { muscle: 'Muskelaufbau', recomp: 'Fett weg & Muskeln', strength: 'Maximalkraft', skills: 'Calisthenics-Skills', fit: 'Fitness & Fettabbau', health: 'Gesund & beweglich' }[p.goal] || '';
     const nd = nextDayIdx(); const openD = st.planOpen || {};
     const isOpen = di => openD[p.days[di].id] ?? (di === nd);
@@ -674,11 +711,10 @@
       ${weekList(p)}
       ${splitCard()}
       <div class="section"><div class="head"><h3>Einheiten</h3>${locs().length > 1 && !p.place ? `<div class="seg mini-seg">${['home', 'gym'].map(l => `<button data-a="planLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}</div>
-        ${p.days.map((d, di) => { const o = isOpen(di); const SLp = ssLabels(d.slots); return `<div class="daybox ${o ? 'open' : ''}"><div class="dayhead"><button class="grow dayt" data-a="dayToggle" data-d="${di}" aria-expanded="${o}"><div style="min-width:0"><b class="ell">${esc(d.name)}</b><span class="ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min${di === nd ? ' · als Nächstes' : ''}</span></div><span class="chev">${I.chev}</span></button><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten">${I.more}</button></div>
+        ${p.days.map((d, di) => { const o = false; const SLp = ssLabels(d.slots); return `<div class="daybox"><div class="dayhead"><button class="grow dayt" data-a="dayOpen" data-d="${di}"><div style="min-width:0"><b class="ell">${esc(d.name)}</b><span class="ell">${d.slots.filter(s => s.ex[loc]).length} Übungen · ≈ ${estMinutes(d, loc)} min${di === nd ? ' · als Nächstes' : ''}</span></div><span class="chev">${I.chev}</span></button><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Tag bearbeiten">${I.more}</button></div>
           ${o ? `${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => slotRow(d, di, sl, si, SLp)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>` : ''}</div>`; }).join('')}
         <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
         <button class="btn" data-a="dayAdd">${I.plus} Tag hinzufügen</button></div>
-      ${volumeCard(p, loc)}
       ${E.isCut(P(), p) ? `<details class="card fold"><summary>So klappt „Fett weg & Muskeln“</summary><ul class="small ink2" style="margin:10px 0 0;padding-left:18px">
         <li>Schwer trainieren bleibt das Signal für die Muskeln – Gewicht und Wdh. halten ist beim Abnehmen schon ein Erfolg.</li>
         <li>Viel Eiweiß: Richtwert 1,6–2,2 g pro kg Körpergewicht am Tag, über die Mahlzeiten verteilt.</li>
@@ -1343,7 +1379,12 @@
     else { // schrittweise: Ziel dieser Woche höchstens 2 Sätze vom jetzigen Plan entfernt
       const v = E.planVolume(pl, pr, pl.place || undefined).week; const Ts = {};
       for (const m in r.T) Ts[m] = Math.max(v[m] - 2, Math.min(v[m] + 2, r.T[m]));
-      ch = E.balancePlan(pl, pr, Ts, 1, { maxNew: 1 });
+      const autoDays = pl.days.filter(d => !d.noAuto);
+      if (!autoDays.length) ch = [];
+      else {
+        if (autoDays.length < pl.days.length) { const other = E.planVolume(Object.assign({}, pl, { days: pl.days.filter(d => d.noAuto) }), pr, pl.place || undefined).week; for (const m in Ts) Ts[m] = Math.max(0, Ts[m] - other[m]); }
+        ch = E.balancePlan(Object.assign({}, pl, { days: autoDays }), pr, Ts, 1, { maxNew: 1 });
+      }
     }
     const all = tCh.concat(r.rir !== r.rirWas ? [r.rir > r.rirWas ? 'Reserve +1 Wdh. – mehr Puffer zum Erholen' : 'Reserve wieder normal'] : [], ch);
     if (ch.length && !pl.custom) pl.edited = true;
@@ -1756,7 +1797,7 @@
     },
     balanceInfo(s) {
       const ch = s.ch || [];
-      return `<div class="stack"><div><div class="eyebrow">Effizienz</div><h2>${ch.length ? 'Plan ausbalanciert' : 'Plan passt schon'}</h2><div class="small muted">Ziel: jeder Muskel ~10 harte Sätze pro Woche (Schwerpunkte ~14), nicht über 15. Deine eigenen Übungen und die Reihenfolge bleiben, festgelegte Übungen werden nicht angefasst.</div></div>
+      return `<div class="stack"><div><div class="eyebrow">Effizienz</div><h2>${s.dayPreview ? (ch.length ? 'Einheit ausbalancieren' : 'Einheit passt schon') : ch.length ? 'Plan ausbalanciert' : 'Plan passt schon'}</h2><div class="small muted">Ziel: jeder Muskel ~10 harte Sätze pro Woche (Schwerpunkte ~14), nicht über 15. Deine eigenen Übungen und die Reihenfolge bleiben, festgelegte Übungen werden nicht angefasst.</div></div>
         ${ch.length ? `<div class="list">${ch.map(c => `<div class="li small">${esc(c)}</div>`).join('')}</div>` : '<div class="small">Alle Muskeln liegen schon im effizienten Bereich.</div>'}
         ${s.preview && ch.length ? '<div class="small" style="font-weight:800">Das würde sich ändern. Übernehmen?</div><button class="btn primary" data-a="balanceApply">Übernehmen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button>' : '<button class="btn primary" data-a="closeSheet">Alles klar</button>'}</div>`;
     },
@@ -1935,7 +1976,7 @@
     plates(t) { const e = st.active.exercises[+t.dataset.i]; const S = exState(e); openSheet({ type: 'plates', w: (e.draft && e.draft.w) ?? S.rec.w ?? 60, bar: 20 }); },
     plateStep(t) { st.sheet.w = Math.max(0, (st.sheet.w || 0) + +t.dataset.d); renderSheet(); },
     plateBar(t) { st.sheet.bar = +t.dataset.b; renderSheet(); },
-    tab(t) { st.tab = t.dataset.k; if (st.ov && st.ov.type === 'workout') st.ov = null; render(); window.scrollTo(0, 0); },
+    tab(t) { if (t.dataset.k === 'plan' && st.tab === 'plan') st.planDay = null; st.tab = t.dataset.k; if (st.ov && st.ov.type === 'workout') st.ov = null; render(); window.scrollTo(0, 0); },
     scrim(t, e) { if (e.target === t) closeSheet(); },
     closeSheet() { closeSheet(); },
     closeSheetRender() { closeSheet(); Store.saveActive(); render(); },
@@ -2034,6 +2075,13 @@
     dayPick() { openSheet({ type: 'dayPick' }); },
     planTools() { openSheet({ type: 'planTools' }); },
     cycleSheet() { openSheet({ type: 'cycleSheet' }); },
+    dayOpen(t) { const d = plan().days[+t.dataset.d]; if (!d) return; st.planDay = d.id; render(); window.scrollTo(0, 0); },
+    dayBack() { st.planDay = null; render(); window.scrollTo(0, 0); },
+    dayAuto(t) { const p = plan(); const d = p.days[+t.dataset.d]; if (!d) return; const L = p.learn = p.learn || {};
+      if (t.checked) { L.auto = true; delete d.noAuto; } else d.noAuto = true; Store.saveProfile(); render(); toast(t.checked ? 'Einheit passt sich jede Woche an' : 'Automatik für diese Einheit aus'); },
+    balanceDay(t) { const p = plan(); const di = +t.dataset.d; const d = p.days[di]; if (!d) return; const loc = p.place || st.planLoc || defLoc();
+      const { tU } = dayTargets(p, di, loc); const cp = clone(d); const tmp = Object.assign({}, p, { days: [cp] });
+      const ch = E.balancePlan(tmp, P(), tU, 1); openSheet({ type: 'balanceInfo', ch, preview: ch.length ? true : null, dayPreview: { id: d.id, slots: cp.slots } }); },
     dayToggle(t) { const p = plan(); const di = +t.dataset.d; const d = p.days[di]; st.planOpen = st.planOpen || {}; const cur = st.planOpen[d.id] ?? (di === nextDayIdx()); st.planOpen[d.id] = !cur; render(); },
     planLoc(t) { switchLoc(t.dataset.l); render(); },
     planSplit(t) { if (st.active) { toast('Erst das laufende Training beenden'); return; } splitPlan(t.dataset.id || P().planId).then(() => { closeSheet(); render(); toast('Aufgeteilt: je ein Plan für Zuhause und Studio'); }); },
@@ -2154,9 +2202,9 @@
     },
     cxUseBuiltin(t) { const r = st.sheet.ret; applyPick(r, t.dataset.id); },
     addToWorkout(t) { addToWorkout(t.dataset.id); },
-    balanceApply() { const cp = st.sheet.preview; if (!cp) return; plan().days = cp.days; Store.saveProfile(true); closeSheet(); render(); toast('Plan ausbalanciert'); },
+    balanceApply() { const dp = st.sheet.dayPreview; if (dp) { const d = plan().days.find(x => x.id === dp.id); if (d) { Backup.snapshot('vor-ausgleich'); d.slots = dp.slots; touchPlan(); Store.saveProfile(true); } closeSheet(); render(); toast('Einheit ausbalanciert'); return; } const cp = st.sheet.preview; if (!cp) return; plan().days = cp.days; Store.saveProfile(true); closeSheet(); render(); toast('Plan ausbalanciert'); },
     volOk(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) { pl.learn.last.seen = true; Store.saveProfile(); } render(); },
-    volWhy(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) pl.learn.last.seen = true; if (pl && pl.id !== P().planId) activatePlan(pl.id); Store.saveProfile(); st.tab = 'plan'; render(); setTimeout(() => { const c = $('#volCard'); if (c) c.scrollIntoView({ behavior: 'smooth' }); }, 60); },
+    volWhy(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) pl.learn.last.seen = true; if (pl && pl.id !== P().planId) activatePlan(pl.id); Store.saveProfile(); st.tab = 'plan'; st.planDay = (plan().days[nextDayIdx()] || plan().days[0] || {}).id || null; render(); setTimeout(() => { const c = $('#volCard'); if (c) c.scrollIntoView({ behavior: 'smooth' }); }, 60); },
     volUndo(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); const l = pl && pl.learn && pl.learn.last; if (!l || !l.undo) return;
       Backup.snapshot('vor-rueckgaengig'); pl.days = l.undo.days; pl.learn.T = l.undo.T || undefined; if (!l.undo.T) delete pl.learn.T; pl.learn.rir = l.undo.rir || 0; l.seen = true; l.undone = true; delete l.undo;
       Store.saveProfile(true); render(); toast('Rückgängig gemacht'); },
