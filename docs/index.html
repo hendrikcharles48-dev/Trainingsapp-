@@ -663,6 +663,16 @@ details.fold[open]>summary::after{transform:rotate(-135deg);margin-bottom:-4px}
 html.scrolled .homebar,html.scrolled .topbar{background:rgba(9,11,15,.72);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3)}
 /* 3.13: gute Kraft-Tage aus Formwerk in der Wochenleiste */
 .wd.good b{box-shadow:inset 0 -3px 0 var(--accent)}
+/* 3.22 (Nutzerwunsch 18.11.): Kopf und Wochenleiste auf „Heute“ etwa halb so hoch */
+.homebar.compact{padding-bottom:6px;gap:0}
+.homebar.compact h1{font-size:27px;line-height:1.1;margin-top:1px}
+.homebar.compact .eyebrow{font-size:11px}
+.homebar.compact .iconbtn{width:44px;height:44px;flex:none}
+.weekstrip{gap:5px}
+.wd{border-radius:12px;padding:5px 0 3px;gap:0}
+.wd span{font-size:10px}
+.wd b{font-size:15px;line-height:1.15}
+.wd i{height:11px}.wd i svg{width:11px;height:11px}.wd i em{width:5px;height:5px}
 .legend .lg-good{display:inline-block;width:12px;height:3px;border-radius:2px;background:var(--accent);vertical-align:3px;margin-right:6px}
 /* 3.14: Karten als Knopf (Wochenbericht, Sicherung) ohne Browser-Rahmen */
 button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:pointer}
