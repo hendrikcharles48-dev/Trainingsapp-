@@ -169,6 +169,8 @@
     tfPrefill() { const d = this.today(); const p = d && d.prefill && d.prefill.tf; if (!p || (p.en == null && p.sl == null)) return {}; const o = { fw: p.why || 'Formwerk' }; if (p.en != null) o.en = p.en; if (p.sl != null) o.sl = p.sl; return o; },
     weekPrefill() { const d = this.today(); return (d && d.prefill && d.prefill.week) || null; },
     signals() { const d = this.today(); return (d && d.signals) || null; },
+    // Volumen-Signale (Worker 2.5): Erholung 7/28 Tage, Muskelkater nach dem Training je Gruppe – auch vom Vortag noch gültig
+    volSignals() { const T = get(K.today, null); const d = T && T.data; return cfg() && d && d.vol && Date.now() - (T.t || 0) < 3 * 864e5 ? d.vol : null; },
     // Muskeln aus Formwerk für ein „Bereit-Training“: noch müde = auslassen, teilweise = eher meiden, Schmerz ab 2/5 = Stelle schonen
     readiness() {
       const d = this.today(); if (!d || !Array.isArray(d.muscles)) return null;

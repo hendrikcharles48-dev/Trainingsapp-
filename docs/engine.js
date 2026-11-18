@@ -365,9 +365,10 @@
   const VOL_T = { chest: 1, lats: 1, upperback: 1, sdelt: 1, rdelt: 1, biceps: 1, triceps: 1, quads: 1, hams: 1, glutes: 1, calves: 1, abs: 1 };
   const VOL_PAT = { chest: 'fly', lats: 'latiso', upperback: 'hpull', sdelt: 'side', rdelt: 'rear', biceps: 'biceps', triceps: 'triceps', quads: 'quadiso', hams: 'hamcurl', glutes: 'glute', calves: 'calf', abs: 'core' };
   const LOWER = ['quads', 'hams', 'glutes', 'calves'];
-  function volTargets(profile) {
+  function volTargets(profile, plan) {
     const pr = new Set(); for (const g of ((profile.answers || {}).priority || [])) for (const m of (DB.GROUPS[g] || [])) pr.add(m);
-    const t = {}; for (const m in VOL_T) t[m] = pr.has(m) ? (isCut(profile) ? 12 : 14) : 10; return t;
+    const L = plan && plan.learn && plan.learn.T;
+    const t = {}; for (const m in VOL_T) t[m] = L && L[m] != null ? L[m] : pr.has(m) ? (isCut(profile) ? 12 : 14) : 10; return t;
   }
   function mainLoc(plan, profile) { const l = plan.locs || ['home']; return l.includes('home') && (profile.answers || {}).location !== 'gym' ? 'home' : l[0]; }
   function planVolume(plan, profile, loc) {
@@ -379,10 +380,13 @@
       for (const sl of d.slots) { const ex = sl.ex && exOf(sl.ex[loc]); if (!ex || ex.role === 's' || ex.role === 'x') continue; for (const m of ex.prim) dv[m] += sl.sets; for (const m of (ex.sec || [])) dv[m] += sl.sets * 0.5; }
       for (const m in dv) week[m] += dv[m]; perDay.push(dv);
     }
-    return { week, perDay, targets: volTargets(profile) };
+    return { week, perDay, targets: volTargets(profile, plan) };
   }
-  function balancePlan(plan, profile) {
-    const loc = mainLoc(plan, profile); const changes = [];
+  // Tin: eigene Ziele (z. B. schrittweise beim automatischen Anpassen), tol: erlaubte Abweichung bevor etwas geändert wird
+  function balancePlan(plan, profile, Tin, tol, opts) {
+    opts = opts || {}; let added = 0;
+    const loc = plan.place || mainLoc(plan, profile); const changes = [];
+    const learned = !!(Tin || (plan.learn && plan.learn.T)); tol = tol != null ? tol : learned ? 1 : 2.5;
     const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
     const exAt = sl => sl.ex && exOf(sl.ex[loc]);
     const hit = (sl, m) => { const ex = exAt(sl); if (!ex || ex.role === 's' || ex.role === 'x') return 0; return ex.prim.includes(m) ? 1 : (ex.sec || []).includes(m) ? 0.5 : 0; };
@@ -394,15 +398,15 @@
       const keepD = new Set([ds[0], ds[Math.floor(ds.length / 2)]]);
       for (const di of ds) if (!keepD.has(di)) { const d = plan.days[di]; const rm = d.slots.filter(sl => sl.r === 'skill' && (sl.skill || 'x') === k && !(sl.locked && Object.values(sl.locked).some(Boolean))); d.slots = d.slots.filter(sl => !rm.includes(sl)); for (const sl of rm) { const ex = exAt(sl); changes.push((ex ? ex.name : 'Skill-Übung') + ' nur noch 2× pro Woche – aus ' + d.name + ' entfernt'); } }
     }
-    const T = volTargets(profile);
+    const T = Object.assign({}, Tin || volTargets(profile, plan));
     // 2) Zu viel: über 15 Sätze → Sätze bei Ergänzung/Isolation kürzen (mind. 2 Sätze)
     for (let guard = 0; guard < 40; guard++) {
       const { week } = planVolume(plan, profile, loc);
-      const over = Object.keys(T).filter(m => week[m] > 15.5).sort((a, b) => week[b] - week[a])[0];
+      const over = Object.keys(T).filter(m => week[m] > Math.min(15.5, learned ? T[m] + tol : 99)).sort((a, b) => (week[b] - T[b]) - (week[a] - T[a]))[0];
       if (!over) break;
       let best = null;
       for (const d of plan.days) for (const sl of d.slots) {
-        const h = hit(sl, over); if (!h || sl.sets <= 2 || sl.r === 'main' || sl.r === 'skill') continue;
+        const h = hit(sl, over); if (!h || sl.sets <= 2 || (sl.r === 'main' && sl.sets <= 3) || sl.r === 'skill') continue;
         const ex = exAt(sl); const hurts = ex.prim.concat(ex.sec || []).some(m => m !== over && T[m] && week[m] - 1 < T[m] - 1);
         const v = h * 2 + (sl.r === 'iso' ? 1 : 0) - (hurts ? 3 : 0) + sl.sets * 0.1;
         if (!best || v > best.v) best = { sl, v, d };
@@ -413,10 +417,11 @@
     // 3) Zu wenig: erst vorhandene Übungen +1 Satz, sonst neue Übung an einem passenden Tag
     for (let guard = 0; guard < 30; guard++) {
       const { week, perDay } = planVolume(plan, profile, loc);
-      const under = Object.keys(T).filter(m => week[m] < T[m] - 2.5).sort((a, b) => (week[a] - T[a]) - (week[b] - T[b]))[0];
+      const under = Object.keys(T).filter(m => week[m] < T[m] - tol).sort((a, b) => (week[a] - T[a]) - (week[b] - T[b]))[0];
       if (!under) break;
       const direct = [];
-      plan.days.forEach((d, di) => d.slots.forEach(sl => { if (hit(sl, under) === 1 && sl.sets < (sl.r === 'iso' || sl.r === 'core' ? 4 : 5) && sl.r !== 'skill' && perDay[di][under] < 8) direct.push({ sl, d }); }));
+      const full = m2 => m2 !== under && T[m2] != null && week[m2] + 1 > T[m2]; // anderer Hauptmuskel schon am Ziel (z. B. Muskelkater-Deckel)
+      plan.days.forEach((d, di) => d.slots.forEach(sl => { if (hit(sl, under) === 1 && sl.sets < (sl.r === 'iso' || sl.r === 'core' ? 4 : 5) && sl.r !== 'skill' && perDay[di][under] < 8 && !(learned && exAt(sl).prim.some(full))) direct.push({ sl, d }); }));
       direct.sort((a, b) => a.sl.sets - b.sl.sets);
       if (direct.length && week[under] >= T[under] - 6) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; }
       // neue Übung
@@ -436,6 +441,7 @@
         return best && best.y;
       };
       const cands = plan.days.map((d, di) => ({ d, di, sp: d.slots.length >= MAX_EX ? spare(d) : null })).filter(x => want.includes(x.d.focus) && (x.d.slots.length < MAX_EX || x.sp) && !x.d.slots.some(sl => sl.p && sl.p.includes(pat)) && perDay[x.di][under] < 6).sort((a, b) => (a.sp ? 1 : 0) - (b.sp ? 1 : 0) || a.d.slots.length - b.d.slots.length);
+      if (opts.maxNew != null && added >= opts.maxNew) { if (direct.length) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; } T[under] = 0; continue; }
       if (!cands.length) { if (direct.length) { direct[0].sl.sets += 1; changes.push('+1 Satz ' + exAt(direct[0].sl).name); continue; } T[under] = 0; continue; }
       const d = cands[0].d;
       if (cands[0].sp) { const y = cands[0].sp; d.slots = d.slots.filter(z => z !== y); changes.push('Ersetzt: ' + exAt(y).name); } const role = pat === 'core' ? 'core' : pat === 'hpull' ? 'sec' : 'iso';
@@ -443,15 +449,82 @@
       let ok = false;
       for (const l of (plan.locs || [loc])) {
         const used = new Set(); plan.days.forEach(x => x.slots.forEach(y => y.ex && y.ex[l] && used.add(y.ex[l])));
-        const best = rankFor(sl, { profile, loc: l, eqSet: locEquip(profile, l), used, dayUsed: new Set(d.slots.map(y => y.ex && y.ex[l]).filter(Boolean)), ab: abilities(profile.answers || {}), seed: d.id + sl.id }, 1)[0];
+        const best = rankFor(sl, { profile, loc: l, eqSet: locEquip(profile, l), used, dayUsed: new Set(d.slots.map(y => y.ex && y.ex[l]).filter(Boolean)), ab: abilities(profile.answers || {}), seed: d.id + sl.id }, 8).filter(x => !(learned && x.ex.prim.some(full)))[0];
         if (best) { sl.ex[l] = best.ex.id; sl.why[l] = ['Ergänzt dein Wochenvolumen für ' + DB.MUSCLES[under]].concat(best.reasons.slice(0, 1)); if (l === loc) ok = true; }
       }
       if (!ok) { T[under] = 0; continue; }
       const ci = d.slots.findIndex(y => y.r === 'core' || y.r === 'cond'); if (ci >= 0) d.slots.splice(ci, 0, sl); else d.slots.push(sl);
-      changes.push('Neu: ' + DB.byId[sl.ex[loc]].name + ' (' + d.name + ')');
+      added++; changes.push('Neu: ' + exOf(sl.ex[loc]).name + ' (' + d.name + ')');
     }
     plan.bal = 1;
     return changes;
+  }
+
+  /* ================= Volumen lernen (3.19, Nutzerwunsch 18.11.: Regeneration ist der Engpass) =================
+     Pro Muskel jede Woche: Leistungstrend (beste Satz-Leistung je Einheit, letzte 6 Wochen, %/Woche) + Muskelkater nach
+     dem Training (Formwerk) + Erholung (Formwerk rec7/rec28) + Wochen-Check-in → Wochenziel in Sätzen anpassen.
+       stärker, kaum Muskelkater, gut erholt → +1 · gleich, kaum Muskelkater, gut erholt → +1 (Reiz zu klein)
+       schwächer + viel Muskelkater oder schlecht erholt → −2 · gleich + viel Muskelkater → −1
+       schwächer trotz guter Erholung → halten (eher Diät/Schlaf) · zu wenig Daten → halten
+     Grenzen 6–15 (bei dauerhaft niedriger Erholung 12), höchstens ±2 pro Woche. Reserve (RIR) je Plan: +1, wenn die Erholung
+     schlecht ist oder mehrere Muskeln schwächer werden; zurück auf 0, wenn alles gut läuft. */
+  const FW_G = { brust: ['chest'], ruecken: ['lats', 'upperback'], schultern: ['sdelt', 'rdelt'], bizeps: ['biceps'], trizeps: ['triceps'], vorn: ['quads'], hinten: ['glutes', 'hams'], waden: ['calves'], rumpf: ['abs'] };
+  function learnVolume(plan, profile, ctx) {
+    ctx = ctx || {}; const fw = ctx.fw || null; const ws = ctx.workouts || (WK && WK()) || [];
+    const L = plan.learn || {}; const T0 = volTargets(profile, plan); const def = volTargets(profile);
+    const since = todayISO(new Date(Date.now() - 42 * 864e5));
+    const exOf = id => DB.byId[id] || ((profile.custom || []).find(e => e.id === id));
+    const recent = ws.filter(w => w.date >= since && (!plan.place || !w.loc || w.loc === plan.place)).sort((a, b) => (a.date < b.date ? -1 : 1));
+    // Leistungstrend je Übung → je Muskel (gewichtet nach Zahl der Einheiten)
+    const series = {};
+    for (const w of recent) for (const e of w.exercises || []) {
+      const ex = exOf(e.exId); if (!ex || ex.kind === 'int') continue;
+      const b = sessionBest(ex, e, w.bw); if (!(b > 0)) continue;
+      (series[e.exId] = series[e.exId] || []).push({ d: w.date, b });
+    }
+    const tr = {}, trN = {};
+    for (const id in series) {
+      const a = series[id]; if (a.length < 2) continue; const ex = exOf(id);
+      const days = (new Date(a[a.length - 1].d) - new Date(a[0].d)) / 864e5; if (days < 5) continue;
+      const h = Math.ceil(a.length / 2); const m1 = a.slice(0, h).reduce((t, x) => t + x.b, 0) / h, m2 = a.slice(-h).reduce((t, x) => t + x.b, 0) / h;
+      const pct = (m2 - m1) / m1 * 100 / Math.max(1, days * (a.length > 2 ? 0.5 : 1) / 7);
+      for (const m of ex.prim) if (VOL_T[m]) { tr[m] = (tr[m] || 0) + pct * a.length; trN[m] = (trN[m] || 0) + a.length; }
+    }
+    const ck = (profile.checkins || []).filter(c => c.week >= todayISO(new Date(Date.now() - 14 * 864e5))).slice(-1)[0] || null;
+    const rec7 = fw && fw.rec7 != null ? fw.rec7 : null, rec28 = fw && fw.rec28 != null ? fw.rec28 : null;
+    const poor = (rec7 != null && rec7 < 45) || !!(ck && ck.score >= 2.5);
+    const good = (rec7 == null || rec7 >= 60) && !(ck && ck.score >= 1.5);
+    const hi = rec28 != null && rec28 < 55 ? 12 : 15, lo = 6;
+    const soreOf = m => { if (!fw || !fw.sore) return null; for (const g in FW_G) if (FW_G[g].includes(m) && fw.sore[g] != null && (fw.soreN || {})[g] >= 1) return fw.sore[g]; return null; };
+    const planned = planVolume(plan, profile, plan.place || undefined).week;
+    const T = {}, why = {}; let downs = 0;
+    for (const m in VOL_T) {
+      const cur = T0[m]; const t = trN[m] >= 2 ? tr[m] / trN[m] : null; const so = soreOf(m);
+      const soreHigh = so != null && so >= 3, soreLow = so == null || so <= 1.5;
+      if (t != null && t <= -1) downs++;
+      let d = 0, txt;
+      const tt = t == null ? '' : (t >= 0 ? 'Kraft +' : 'Kraft −') + Math.abs(Math.round(t * 10) / 10).toString().replace('.', ',') + ' %/Woche';
+      const st = so == null ? '' : 'Muskelkater ' + String(so).replace('.', ',') + '/5';
+      if (t == null) { txt = 'Noch zu wenig Daten – Ziel bleibt'; }
+      else if (t <= -1 && (soreHigh || poor)) { d = -2; txt = 'Schwächer und ' + (soreHigh ? 'viel Muskelkater' : 'schlecht erholt') + ' → weniger Sätze'; }
+      else if (t >= 1 && !soreHigh && !poor) { d = good ? 1 : 0; txt = good ? 'Wird stärker und erholt sich gut → 1 Satz mehr' : 'Wird stärker – Erholung nur mittel, Ziel bleibt'; }
+      else if (t > -1 && t < 1 && soreHigh) { d = -1; txt = 'Stagniert mit viel Muskelkater → 1 Satz weniger'; }
+      else if (t > -1 && t < 1 && soreLow && good) { d = 1; txt = 'Stagniert, aber gut erholt → 1 Satz mehr Reiz'; }
+      else if (t <= -1) { txt = 'Schwächer trotz guter Erholung – eher Diät oder Schlaf, Ziel bleibt'; }
+      else txt = 'Läuft – Ziel bleibt';
+      let nv = Math.max(lo, Math.min(hi, cur + d)); if (cur > hi && d >= 0) { nv = Math.max(hi, cur - 2); txt = 'Erholung dauerhaft niedrig → Obergrenze ' + hi; }
+      // Regeneration zuerst: bei viel Muskelkater oder schlechter Erholung nicht über das hinaus, was du jetzt machst
+      const now = Math.round(planned[m] || 0);
+      if ((soreHigh || poor) && now > 0) { const cap = d < 0 ? Math.max(2, now + d) : now; if (nv > cap) { nv = cap; txt += ' · ' + (soreHigh ? 'viel Muskelkater' : 'Erholung knapp') + ': nicht mehr als ' + (d < 0 ? cap : 'jetzt (' + now + ')'); } }
+      T[m] = nv; why[m] = [tt, st, txt].filter(Boolean).join(' · ');
+    }
+    let rir = L.rir || 0; const rirWas = rir;
+    if (poor || downs >= 3) rir = Math.min(1, rir + 1); else if (good && downs === 0) rir = Math.max(0, rir - 1);
+    const notes = [];
+    if (rec7 != null) notes.push('Erholung 7 Tage ' + rec7 + ' %' + (rec28 != null ? ', 28 Tage ' + rec28 + ' %' : ''));
+    if (ck) notes.push('Wochen-Check-in: ' + (ck.score >= 2.5 ? 'erschöpft' : ck.score <= -2 ? 'fit' : 'normal'));
+    if (rir !== rirWas) notes.push(rir > rirWas ? 'Reserve +1 Wdh. (mehr Puffer zum Erholen)' : 'Reserve wieder normal');
+    return { T, why, rir, rirWas, notes, def, n: recent.length };
   }
 
   function fillDay(day, loc, profile, ab, used, di) {
@@ -667,7 +740,9 @@
     if (ex.kind === 'load' && ex.role === 'i' && slot && slot.rr) rr = [Math.max(slot.rr[0], ex.rr ? ex.rr[0] : 0), Math.max(slot.rr[1], ex.rr ? ex.rr[1] : 0)];
     if (slot && slot.custRR) rr = slot.custRR;
     const rest = slot ? slot.rest : defaultRest(role, baseGoal((profile && profile.answers || {}).goal));
-    return { sets, rr, rir: targetRIR(role, ex.kind, profile, wi), rest, role, deload: wi.deload };
+    let rir = targetRIR(role, ex.kind, profile, wi);
+    const lr = plan && plan.learn && plan.learn.rir; if (lr && !wi.deload) rir = Math.min(3, rir + lr); // gelernt: mehr Reserve, wenn die Erholung nicht reicht
+    return { sets, rr, rir, rest, role, deload: wi.deload };
   }
 
   /* ================= Der Algorithmus hinter jedem Satz ================= */
@@ -947,7 +1022,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, readyDay, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

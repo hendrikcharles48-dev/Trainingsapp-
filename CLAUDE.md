@@ -303,6 +303,15 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   Pläne-Fenster nach Ort gruppiert („Neuer Plan für …“ = `planNewAt`), Plan-Menü „Gilt für“ (`planPlace`) und Aufteilen (`splitPlan`:
   zwei Pläne „… Zuhause“/„… Studio“, alter bleibt, vorher Sicherung `vor-aufteilen`). Karte `splitCard` bis `seen.splitAsk`; kein Plan für den
   Ort → `noPlanCard`. Plan übernehmen/Bereit-Training wirken nur auf den Plan des Orts.
+- Volumen lernen (Satzwerk 3.19 / Worker 2.5, Nutzerwunsch 18.11.: Regeneration ist sein Engpass, trainiert zurzeit nur im Studio):
+  `/v1/today.vol` = `volumeSignals` (rec7/rec28, Muskelkater 1–2 Tage nach jeder Einheit je Gruppe `sore`/`soreN`, Schmerz 14 Tage), `FW.volSignals()`.
+  `E.learnVolume(plan, profile, {workouts, fw})` → Ziel je Muskel (`plan.learn.T`, Regeln im Kommentar dort; bei viel Muskelkater/knapper Erholung
+  nie über das jetzige Plan-Volumen) + Reserve je Plan (`plan.learn.rir` 0/1, in `prescription` addiert). `volTargets(profile, plan)` nimmt `learn.T`.
+  `weeklyLearn()` (4 s nach dem Start, einmal pro Woche `learn.wk`, aktive Pläne je Ort, nicht im Deload, `learn.auto !== false`):
+  `learnPlan` → `balancePlan(plan, profile, Ts, 1, {maxNew: 1})` mit Schritt-Zielen (±2 zum jetzigen Volumen), Sicherung `vor-volumen`,
+  `learn.last {ch, undo}` → Karte `volLastCard` (OK/Warum?/Rückgängig). Neuer Plan startet mit dem Durchschnitt (`avgLearn`).
+  Plan-Ansicht unten: Karte „Volumen & Erholung“ (`volumeCard`: Ziel je Muskel + Begründung, Schalter, „Plan ausbalancieren“, „Neu berechnen“).
+  Tipp auf einen Plan in „Pläne“ öffnet ihn (`planGo`); Umbenennen/Ort/Kopieren/Löschen über „⋯“ → „Diesen Plan bearbeiten“.
 - Training → Plan übernehmen (Satzwerk 3.17, Nutzerwunsch 18.11.): `planDiff(active)` vergleicht mit dem Plan-Tag (nur Plan-Trainings,
   nicht frei/angepasst): Getauscht, Neu (`tpx` = von „länger“ ergänzt, zählt nicht), Raus, Sätze, Reihenfolge. Fenster `finish` zeigt die Liste,
   „Speichern & Plan übernehmen“ (`finishAdopt`, vorher `Backup.snapshot('vor-plan-anpassen')`). Deload/Tagesform-Länge: keine Sätze/Raus.

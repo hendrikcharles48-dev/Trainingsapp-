@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.18.0';
+  const APP_VERSION = '3.19.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, coach: () => null, refreshCoach() { } };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, volSignals: () => null, coach: () => null, refreshCoach() { } };
   // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
   function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
@@ -307,7 +307,12 @@
       locs: locs().length > 1 ? [curLoc()] : locs(), place: locs().length > 1 ? curLoc() : undefined, days: Array.from({ length: nDays }, (_, i) => ({ id: 'd' + uid(), key: 'C', name: 'Tag ' + 'ABCDEF'[i], focus: 'full', slots: [] })), meso: { start: E.todayISO(), len: 5 }, next: 0, bal: true };
   }
   function lockAll(pl) { for (const d of pl.days) for (const sl of d.slots) { sl.locked = sl.locked || {}; for (const l of pl.locs || []) sl.locked[l] = true; } return pl; }
-  function addPlan(np, activate) { const pr = P(); pr.plans = pr.plans || []; pr.plans.push(np); if (activate) activatePlan(np.id); else Store.saveProfile(true); }
+  function avgLearn(except) {
+    const ls = (P().plans || []).filter(x => x !== except && x.learn && x.learn.T).map(x => x.learn); if (!ls.length) return null;
+    const T = {}; for (const m of Object.keys(ls[0].T)) { const v = ls.map(l => l.T[m]).filter(x => x != null); if (v.length) T[m] = Math.round(v.reduce((a, b) => a + b, 0) / v.length); }
+    return { T, rir: Math.round(ls.reduce((a, l) => a + (l.rir || 0), 0) / ls.length), auto: true, wk: E.todayISO(E.startOfWeek()), from: 'avg' };
+  }
+  function addPlan(np, activate) { const pr = P(); pr.plans = pr.plans || []; if (!np.learn) { const a = avgLearn(np); if (a) np.learn = a; } pr.plans.push(np); if (activate) activatePlan(np.id); else Store.saveProfile(true); }
   // Tagesreihenfolge geändert: derselbe Tag bleibt „als Nächstes dran“
   function keepNext(fn) {
     const p = plan(); const nd = p.days[(p.next || 0) % p.days.length]; const nid = nd && nd.id; const old = p.next || 0;
@@ -629,18 +634,23 @@
 
   /* ================= Plan ================= */
   function volumeCard(p, loc) {
-    const v = E.planVolume(p, P(), loc); const T = v.targets;
+    const v = E.planVolume(p, P(), loc); const T = v.targets; const L = p.learn || {};
     const freq = m => v.perDay.filter(dv => dv[m] >= 2).length;
     const once = Object.keys(T).filter(m => v.week[m] >= 4 && freq(m) === 1);
-    const rows = Object.keys(T).map(m => { const val = Math.round(v.week[m] * 2) / 2, t = T[m]; const st_ = val < t - 2.5 ? 'low' : val > 15.5 ? 'high' : 'ok';
+    const tol = L.T ? 1 : 2.5;
+    const rows = Object.keys(T).map(m => { const val = Math.round(v.week[m] * 2) / 2, t = T[m]; const st_ = val < t - tol ? 'low' : val > Math.min(15.5, t + (L.T ? tol : 99)) ? 'high' : 'ok';
       const col = { low: 'var(--highlight)', ok: 'var(--lime)', high: 'var(--highlight)' }[st_];
-      return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${t / 20 * 100}%"></b><b class="cap" style="left:${15 / 20 * 100}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}</span></div>`; }).join('');
-    const lowN = Object.keys(T).filter(m => v.week[m] < T[m] - 2.5).length, highN = Object.keys(T).filter(m => v.week[m] > 15.5).length;
-    return `<details class="card fold"><summary><span class="grow">Sätze pro Muskel & Woche</span><span class="tagx">${lowN || highN ? [lowN ? lowN + ' zu wenig' : '', highN ? highN + ' zu viel' : ''].filter(Boolean).join(' · ') : 'passt'}</span></summary><div class="stack" style="gap:10px;margin-top:12px"><div class="tiny muted">Strich = Ziel · ab 15 kaum Zusatznutzen</div>
-      <div class="tiny muted">Effizienz-Prinzip: ~10 harte Sätze pro Muskel (Schwerpunkte ~14), 2× pro Woche, über 15 bringt kaum noch mehr. Mittrainierte Muskeln zählen halb.</div>
+      return `<div class="volrow"><span class="small">${D.MUSCLES[m]}</span><div class="volbar"><i style="width:${Math.min(100, val / 20 * 100)}%;background:${col}"></i><b style="left:${t / 20 * 100}%"></b><b class="cap" style="left:${15 / 20 * 100}%"></b></div><span class="small num" style="color:${col}">${fmt(val)}<span class="muted">/${t}</span></span></div>${L.why && L.why[m] ? `<div class="tiny muted volwhy">${esc(L.why[m])}</div>` : ''}`; }).join('');
+    const lowN = Object.keys(T).filter(m => v.week[m] < T[m] - tol).length, highN = Object.keys(T).filter(m => v.week[m] > Math.min(15.5, T[m] + (L.T ? tol : 99))).length;
+    const auto = L.auto !== false;
+    return `<div class="card stack" id="volCard" style="gap:12px"><div class="row between"><b style="font-size:18px">Volumen & Erholung</b><span class="tagx">${lowN || highN ? [lowN ? lowN + ' zu wenig' : '', highN ? highN + ' zu viel' : ''].filter(Boolean).join(' · ') : 'passt'}</span></div>
+      <div class="small muted">${L.T ? `Persönliche Ziele für diesen Plan, gelernt aus deiner Kraftentwicklung, deinem Muskelkater nach dem Training und deiner Erholung${L.from === 'avg' && !L.why ? ' (Start: Durchschnitt deiner anderen Pläne)' : ''}.` : 'Ziel ~10 harte Sätze pro Muskel und Woche (Schwerpunkte mehr), höchstens 15. Ab nächster Woche lernt Satzwerk dein persönliches Maß.'}</div>
+      ${(L.notes || []).length || L.rir ? `<div class="tiny ink2">${esc([].concat(L.notes || [], L.rir && !(L.notes || []).some(n => /Reserve/.test(n)) ? ['Reserve +1 Wdh. in diesem Plan'] : []).join(' · '))}</div>` : ''}
+      <div class="tiny muted">Balken = Sätze im Plan · Strich = dein Ziel · ab 15 kaum Zusatznutzen. Mittrainierte Muskeln zählen halb.</div>
       <div class="stack" style="gap:6px">${rows}</div>
       ${once.length && p.days.length >= 3 ? `<div class="tiny" style="color:var(--highlight)">Nur an einem Tag trainiert: ${once.map(m => D.MUSCLES[m]).join(', ')} – besser auf zwei Tage verteilen.</div>` : ''}
-      <button class="btn sm" style="align-self:flex-start" data-a="balanceNow">Plan ausbalancieren</button></div></details>`;
+      <label class="li" style="cursor:pointer"><div class="grow"><b>Jede Woche automatisch anpassen</b><div class="small muted">Montags: Ziele neu lernen, Plan schrittweise angleichen (höchstens ±2 Sätze je Muskel), vorher Sicherung</div></div><input type="checkbox" data-a="volAuto" ${auto ? 'checked' : ''} style="width:22px;height:22px"></label>
+      <div class="row"><button class="btn primary grow" data-a="balanceNow">Plan ausbalancieren</button><button class="btn grow" data-a="volLearnNow">Neu berechnen</button></div></div>`;
   }
   function planView() {
     if (placeMismatch()) return `<div class="topbar"><h1>Plan</h1><button class="btn sm" data-a="plans" style="margin-left:auto">Pläne</button></div><div class="stack">${noPlanCard()}</div>`;
@@ -1318,6 +1328,48 @@
     });
     return ch.length ? { day, changes: ch, apply() { Backup.snapshot('vor-plan-anpassen'); ops.forEach(f => f()); touchPlan(); Store.saveProfile(); } } : null;
   }
+  /* Volumen lernen (3.19): einmal pro Woche für die aktiven Pläne (je Ort) – Ziele je Muskel + Reserve, dann schrittweise
+     ausgleichen (höchstens ±2 Sätze je Muskel). Vorher Sicherung, Karte auf Heute mit Rückgängig. Deload-Woche: nichts ändern. */
+  function learnPlan(pl, opts) {
+    opts = opts || {}; const pr = P(); const L = pl.learn = pl.learn || { auto: true };
+    const wk = E.todayISO(E.startOfWeek());
+    const undo = clone({ days: pl.days, T: L.T || null, rir: L.rir || 0 });
+    const oldT = E.volTargets(pr, pl);
+    const r = E.learnVolume(pl, pr, { workouts: st.workouts, fw: FW.volSignals() });
+    L.T = r.T; L.why = r.why; L.rir = r.rir; L.notes = r.notes; L.wk = wk; L.t = Date.now(); L.n = r.n;
+    const tCh = Object.keys(r.T).filter(m => r.T[m] !== oldT[m]).map(m => D.MUSCLES[m] + ': Ziel ' + oldT[m] + ' → ' + r.T[m] + ' Sätze' + (/Muskelkater:/.test(r.why[m]) ? ' (viel Muskelkater)' : /Erholung knapp/.test(r.why[m]) ? ' (Erholung knapp)' : /stärker/.test(r.why[m]) ? ' (wirst stärker)' : /Stagniert, aber/.test(r.why[m]) ? ' (mehr Reiz)' : ''));
+    let ch;
+    if (opts.full) ch = E.balancePlan(pl, pr);
+    else { // schrittweise: Ziel dieser Woche höchstens 2 Sätze vom jetzigen Plan entfernt
+      const v = E.planVolume(pl, pr, pl.place || undefined).week; const Ts = {};
+      for (const m in r.T) Ts[m] = Math.max(v[m] - 2, Math.min(v[m] + 2, r.T[m]));
+      ch = E.balancePlan(pl, pr, Ts, 1, { maxNew: 1 });
+    }
+    const all = tCh.concat(r.rir !== r.rirWas ? [r.rir > r.rirWas ? 'Reserve +1 Wdh. – mehr Puffer zum Erholen' : 'Reserve wieder normal'] : [], ch);
+    if (ch.length && !pl.custom) pl.edited = true;
+    if (all.length) L.last = { wk, ch: all, undo, seen: false, plan: pl.name || pl.splitName };
+    return all;
+  }
+  function weeklyLearn() {
+    const pr = P(); if (!pr || st.active || !(pr.plans || []).length) return;
+    const wk = E.todayISO(E.startOfWeek()); const ids = new Set([pr.planId, ...Object.values(pr.planBy || {})]);
+    let snap = false, any = false;
+    for (const pl of pr.plans) {
+      if (!ids.has(pl.id) || !(pl.days || []).length) continue;
+      const L = pl.learn = pl.learn || { auto: true };
+      if (L.auto === false || L.wk === wk) continue;
+      if (E.weekInfo(pl, pr).deload) { L.wk = wk; any = true; continue; }
+      if (!snap) { Backup.snapshot('vor-volumen'); snap = true; }
+      learnPlan(pl); any = true;
+    }
+    if (any) { Store.saveProfile(true); render(); }
+  }
+  function volLastCard() {
+    const pr = P(); const pl = (pr.plans || []).find(x => x.learn && x.learn.last && !x.learn.last.seen); if (!pl) return '';
+    const l = pl.learn.last;
+    return `<div class="card stack" style="gap:10px"><b>Plan an deine Erholung angepasst</b><div class="small muted">${esc(l.plan)} · diese Woche</div><ul class="difflist">${l.ch.slice(0, 6).map(c => `<li>${esc(c)}</li>`).join('')}${l.ch.length > 6 ? `<li>… und ${l.ch.length - 6} weitere</li>` : ''}</ul>
+      <div class="row"><button class="btn primary grow" data-a="volOk" data-id="${pl.id}">OK</button><button class="btn grow" data-a="volWhy" data-id="${pl.id}">Warum?</button><button class="btn ghost" data-a="volUndo" data-id="${pl.id}">Rückgängig</button></div></div>`;
+  }
   function finishWorkout(save, endTs) {
     const a = st.active; if (!a) return;
     if (save) {
@@ -1638,6 +1690,7 @@
       const p = plan();
       return `<div class="stack"><h2>Plan verwalten</h2>
         <div class="list">
+          <button class="li" data-a="planOpen"><div class="grow"><b>Diesen Plan bearbeiten</b><div class="small muted">Umbenennen, Ort, kopieren, löschen</div></div><span class="chev">${I.chev}</span></button>
           <button class="li" data-a="plans"><div class="grow"><b>Pläne</b><div class="small muted">Wechseln, kopieren, neu anlegen</div></div><span class="chev">${I.chev}</span></button>
           <button class="li" data-a="dayAdd"><div class="grow"><b>Tag hinzufügen</b><div class="small muted">Neue Einheit im aktiven Plan</div></div><span class="chev">${I.chev}</span></button>
           <button class="li" data-a="balanceNow"><div class="grow"><b>Plan ausbalancieren</b><div class="small muted">Sätze pro Muskel in den sinnvollen Bereich bringen</div></div><span class="chev">${I.chev}</span></button>
@@ -1661,7 +1714,7 @@
     plans() {
       const pr = P(); const list = pr.plans || [plan()]; const two = locs().length > 1; const by = pr.planBy || {};
       const isAct = x => x.id === pr.planId || (two && x.place && by[x.place] === x.id);
-      const row = x => `<button class="li" data-a="planOpen" data-id="${x.id}" ${isAct(x) ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}><div class="grow"><b>${esc(x.name || x.splitName)}</b><div class="small muted">${x.days.length} ${x.days.length === 1 ? 'Tag' : 'Tage'} · ${x.custom ? 'Eigener Plan' : 'Empfohlen' + (x.edited ? ', angepasst' : '')}${isAct(x) ? ' · <b style="color:var(--lime)">aktiv</b>' : ''}</div></div><span class="chev">${I.chev}</span></button>`;
+      const row = x => `<button class="li" data-a="planGo" data-id="${x.id}" ${isAct(x) ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}><div class="grow"><b>${esc(x.name || x.splitName)}</b><div class="small muted">${x.days.length} ${x.days.length === 1 ? 'Tag' : 'Tage'} · ${x.custom ? 'Eigener Plan' : 'Empfohlen' + (x.edited ? ', angepasst' : '')}${isAct(x) ? ' · <b style="color:var(--lime)">aktiv</b>' : ''}</div></div><span class="chev">${I.chev}</span></button>`;
       const head = `<h2>Deine Pläne</h2><div class="small muted">Tippe auf einen Plan, um ihn zu aktivieren, umzubenennen, zu kopieren oder zu löschen. Verlauf und Rekorde gehören zu den Übungen und bleiben bei jedem Plan erhalten.</div>`;
       if (!two) return `<div class="stack">${head}<div class="list">${list.map(row).join('')}</div><button class="btn primary" data-a="planNew">${I.plus} Neuer Plan</button></div>`;
       const grp = (l, n) => { const xs = list.filter(x => (x.place || 'both') === l); return xs.length || l !== 'both' ? `<div class="stack" style="gap:8px"><div class="eyebrow">${n}</div>${xs.length ? `<div class="list">${xs.map(row).join('')}</div>` : `<div class="small muted">Noch kein Plan.</div>`}${l !== 'both' ? `<button class="btn" data-a="planNewAt" data-l="${l}">${I.plus} Neuer Plan ${l === 'home' ? 'für Zuhause' : 'fürs Studio'}</button>` : ''}</div>` : ''; };
@@ -1921,7 +1974,8 @@
       Store.saveProfile(true); st.ov = null; st.tab = 'plan'; render(); toast('Leerer Plan angelegt: füge jedem Tag Übungen hinzu');
     },
     plans() { openSheet({ type: 'plans' }); },
-    planOpen(t) { openSheet({ type: 'planMenu', id: t.dataset.id }); },
+    planOpen(t) { openSheet({ type: 'planMenu', id: t.dataset.id || P().planId }); },
+    planGo(t) { if (st.active && t.dataset.id !== P().planId) { openSheet({ type: 'planMenu', id: t.dataset.id }); return; } activatePlan(t.dataset.id); closeSheet(); st.tab = 'plan'; render(); window.scrollTo(0, 0); },
     planAct(t) {
       if (st.active) { toast('Erst das laufende Training beenden'); return; }
       if (activatePlan(t.dataset.id)) { closeSheet(); render(); toast('Plan aktiv: ' + plan().name); }
@@ -2101,6 +2155,13 @@
     cxUseBuiltin(t) { const r = st.sheet.ret; applyPick(r, t.dataset.id); },
     addToWorkout(t) { addToWorkout(t.dataset.id); },
     balanceApply() { const cp = st.sheet.preview; if (!cp) return; plan().days = cp.days; Store.saveProfile(true); closeSheet(); render(); toast('Plan ausbalanciert'); },
+    volOk(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) { pl.learn.last.seen = true; Store.saveProfile(); } render(); },
+    volWhy(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) pl.learn.last.seen = true; if (pl && pl.id !== P().planId) activatePlan(pl.id); Store.saveProfile(); st.tab = 'plan'; render(); setTimeout(() => { const c = $('#volCard'); if (c) c.scrollIntoView({ behavior: 'smooth' }); }, 60); },
+    volUndo(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); const l = pl && pl.learn && pl.learn.last; if (!l || !l.undo) return;
+      Backup.snapshot('vor-rueckgaengig'); pl.days = l.undo.days; pl.learn.T = l.undo.T || undefined; if (!l.undo.T) delete pl.learn.T; pl.learn.rir = l.undo.rir || 0; l.seen = true; l.undone = true; delete l.undo;
+      Store.saveProfile(true); render(); toast('Rückgängig gemacht'); },
+    volAuto(t) { const L = plan().learn = plan().learn || {}; L.auto = !!t.checked; Store.saveProfile(); render(); toast(L.auto ? 'Passt sich jede Woche an' : 'Automatik aus – du gleichst selbst aus'); },
+    volLearnNow() { if (st.active) { toast('Erst das laufende Training beenden'); return; } Backup.snapshot('vor-volumen'); const ch = learnPlan(plan(), { full: false }); Store.saveProfile(true); render(); toast(ch.length ? ch.length + ' Änderungen – Details unten' : 'Ziele neu berechnet – passt'); },
     balanceNow() { if (!autoPlan(plan())) { const cp = clone(plan()); const ch = E.balancePlan(cp, P()); openSheet({ type: 'balanceInfo', ch, preview: cp }); return; } const ch = E.balancePlan(plan(), P()); Store.saveProfile(); render(); openSheet({ type: 'balanceInfo', ch }); },
     freeAdd(t) { addToWorkout(t.dataset.id); const e = st.active.exercises[st.active.exercises.length - 1]; if (e) { e.extraEx = true; Store.saveActive(); } toast('Hinzugefügt – viel Spaß!'); },
     addToPlanAsk(t) { openSheet({ type: 'addToPlan', id: t.dataset.id }); },
@@ -2370,7 +2431,7 @@
   }
   const locSeg = (cls) => locs().length > 1 ? `<div class="seg ${cls || 'onlight'}">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${curLoc() === l}">${LOCN[l]}</button>`).join('')}</div>` : '';
   function homeCards() {
-    const p = P(); let out = splitCard();
+    const p = P(); let out = volLastCard() + splitCard();
     const g = (p.answers || {}).goal;
     if (!(p.seen || {}).recomp && ['muscle', 'fit', 'health'].includes(g)) out += `<div class="card stack" style="gap:10px"><b>Neues Ziel: Fett weg & Muskeln aufbauen</b><div class="small muted">Für die Zeit, in der du Körperfett verlierst: gleiche Übungen, etwas weniger Zusatzvolumen, Fokus darauf, die Kraft zu halten. Dein Plan bleibt, wie er ist.</div><div class="row"><button class="btn primary grow" data-a="recompYes">Umstellen</button><button class="btn grow" data-a="recompNo">Nein danke</button></div></div>`;
     out += sportHint();
@@ -2557,5 +2618,6 @@
       else openSheet({ type: 'stale' });
     }
     if (balCh && balCh.length) setTimeout(() => openSheet({ type: 'balanceInfo', ch: balCh }), 700);
+    setTimeout(() => { try { weeklyLearn(); } catch (e) { console.warn('Volumen lernen', e); } }, 4000); // nach dem Formwerk-Abruf
   })();
 })();
