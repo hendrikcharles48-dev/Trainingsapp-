@@ -7,11 +7,12 @@ import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.2.0';
+export const WORKER_VERSION = '2.3.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
 const AUTO_REFRESH_MIN = 30;       // ohne Ziehen höchstens alle 30 min zu Garmin
+const NIGHT_RETRY_MIN = 3;
 const FORCE_REFRESH_SEC = 90;      // „Ziehen zum Aktualisieren“ höchstens alle 90 s
 const KEEP_SESSIONS_DAYS = 400;
 
@@ -146,7 +147,14 @@ export class FormwerkStore {
     const meta = await this.meta();
     const now = Date.now();
     const age = (now - (meta.lastFetch || 0)) / 1000;
-    if (mode === 'auto' && age < AUTO_REFRESH_MIN * 60) return meta;
+    // Morgens fehlt die Nacht oft noch kurz (Garmin rechnet den Schlaf erst nach HRV/Puls fertig):
+    // solange heute Schlaf oder HRV fehlen, schon nach 3 min erneut fragen statt erst nach 30.
+    let autoMin = AUTO_REFRESH_MIN;
+    if (mode === 'auto' && age < AUTO_REFRESH_MIN * 60 && age >= NIGHT_RETRY_MIN * 60) {
+      const d = await this.st.get('d:' + this.today());
+      if (!d || !d.sleep || !d.sleep.total || d.hrv == null) autoMin = NIGHT_RETRY_MIN;
+    }
+    if (mode === 'auto' && age < autoMin * 60) return meta;
     if (mode === 'force' && age < FORCE_REFRESH_SEC) return meta;
     if (mode === 'cron' && age < 20 * 60) return meta;
     const today = this.today();
