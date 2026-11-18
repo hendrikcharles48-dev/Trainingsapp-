@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.8.1';
+  const VERSION = '1.8.2';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -530,7 +530,9 @@
   })();
 
   // Beim Zurückkehren in die App auffrischen, wenn älter als 15 min
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.cfg && Date.now() - st.fetchedAt > 15 * 60e3) load(false); });
+  // Fehlt die Nacht noch (Garmin rechnet den Schlaf manchmal erst nach dem Sync fertig), schon nach 3 min neu fragen
+  const nightMissing = () => { const d = st.data; return !d || d.date !== todayIso() || !(d.sleep && d.sleep.has) || !(d.vitals && d.vitals.hrv != null); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.cfg && Date.now() - st.fetchedAt > (nightMissing() ? 3 : 15) * 60e3) load(false); });
 
   // iOS: nach dem Schließen der Tastatur bleibt die Seite sonst manchmal verschoben
   document.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) window.scrollTo(0, 0); }, 60));
