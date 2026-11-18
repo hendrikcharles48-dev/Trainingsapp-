@@ -3,11 +3,11 @@
 // - Speicher: Durable Object „FormwerkStore“ (SQLite, Free-Plan). Schnittstelle: formwerk/SCHNITTSTELLE.md
 import { Garmin, PATHS, chunks, addDays } from './garmin.js';
 import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
-import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, normCheckin, planned, sportKind, detectBaseball } from './model.js';
+import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, volumeSignals, normCheckin, planned, sportKind, detectBaseball } from './model.js';
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
 
-export const WORKER_VERSION = '2.4.0';
+export const WORKER_VERSION = '2.5.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -248,6 +248,7 @@ export class FormwerkStore {
       const r = sum.recovery, c = sum.recommendation;
       return { date: today, status, recovery: { score: r.score, color: r.color, building: r.building, provisional: r.provisional, estimated: !!r.estimated }, recommendation: { level: c.level, title: c.title, text: c.text, good: c.good, notes: c.notes.slice(0, 2), week: c.week }, sleep: { total: sum.sleep.total ?? null, short: !!sum.sleep.short }, weight: sum.weight.latest, weights: sum.weight.series.slice(-60), pain: sum.body.pain.map(p => ({ k: p.k, label: p.label, lvl: p.lvl, inj: p.inj, days: p.days })), checkin: !!sum.body.checkin, bbToday: !!(sum.body.flags && sum.body.flags.bbToday),
         muscles: sum.muscles.map(m => ({ k: m.k, label: m.label, status: m.status, pct: m.pct, sore: m.sore || 0, m: (GROUPS.find(g => g.k === m.k) || {}).m || [] })),
+        vol: volumeSignals({ checkins, sessions, history: sum.history, today }),
         signals: sum.signals, prefill: sum.prefill, plan: { sportDays: settings.sportDays || [], baseballToday: !!sum.body.baseball.today.on, strengthDays: sum.body.insights.strengthDays.idx || [] } };
     }
     return Object.assign(sum, { status, settings });

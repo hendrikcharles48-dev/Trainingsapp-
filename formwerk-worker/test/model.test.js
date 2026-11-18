@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines, detectBaseball } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines, detectBaseball, volumeSignals } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -311,6 +311,16 @@ await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, H
 });
 await t('Worker: Rohdaten-Test', async () => { const j = await (await call('/v1/raw?days=7')).json(); assert.ok(Object.keys(j.parsed).length >= 7); assert.ok(j.calls['HRV Zeitraum'].ok); });
 await t('Worker: Einstellungen', async () => { const j = await (await call('/v1/settings', { method: 'PUT', body: JSON.stringify({ sportDays: [1, 3, 9], strengthPerWeek: 3 }) })).json(); assert.deepEqual(j.sportDays, [1, 3]); assert.equal(j.strengthPerWeek, 3); });
+
+await t('Volumen-Signale: Muskelkater nach Einheiten, Erholung', () => {
+  const today = '2026-11-20';
+  const sessions = [{ date: '2026-11-17', exercises: [{ muscles: { primary: ['chest'] } }, { muscles: { primary: ['lats'] } }] }, { date: '2026-11-10', exercises: [{ muscles: { primary: ['chest'] } }] }];
+  const checkins = [{ date: '2026-11-18', sore: { brust: 2, ruecken: 3 }, pain: {} }, { date: '2026-11-19', sore: { brust: 4 }, pain: { schulter: 2 } }, { date: '2026-11-11', sore: {}, pain: {} }];
+  const history = [{ date: '2026-11-19', rec: 40 }, { date: '2026-11-18', rec: 60 }, { date: '2026-10-01', rec: 90 }];
+  const v = volumeSignals({ checkins, sessions, history, today });
+  assert.equal(v.sore.brust, 2, 'Brust: (4 + 0) / 2'); assert.equal(v.sore.ruecken, 3); assert.equal(v.soreN.brust, 2);
+  assert.equal(v.rec7, 50); assert.equal(v.pain.schulter, 2);
+});
 
 console.log(`\n${n - fails}/${n} Tests bestanden`);
 if (fails) process.exit(1);

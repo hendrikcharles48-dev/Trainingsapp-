@@ -801,3 +801,29 @@ export function detectBaseball(hrJson, startTs, endTs, rest = 55, learned = null
   const no = !yes && m < rest + 22 && a40 < 0.08;
   return { v: yes ? true : no ? false : null, reason: yes || no ? null : 'unsicher', coverage: round(coverage, 2), mean: Math.round(m), a40: round(a40, 2), a50: round(a50, 2), rest, complete };
 }
+
+/* =====================================================================
+   VOLUMEN-SIGNALE für Satzwerk (Worker 2.5, Nutzerwunsch 18.11.): wie gut steckt er sein Volumen weg?
+   - rec7/rec28: mittlere Erholung der letzten 7/28 Tage (nur Tage mit Wert)
+   - sore[g]: mittlerer Muskelkater 1–2 Tage nach jeder Kraft-Einheit der letzten 28 Tage (Spitze der beiden Tage,
+     nur Einheiten, nach denen ein Morgen-Check vorliegt; Skala 0–5), soreN[g] = Zahl der Einheiten
+   - pain[g]: höchster Schmerz der letzten 14 Tage
+   ===================================================================== */
+export function volumeSignals({ checkins = [], sessions = [], history = [], today }) {
+  const avg = a => a.length ? Math.round(a.reduce((t, x) => t + x, 0) / a.length) : null;
+  const back = n => { const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+  const recs = n => history.filter(h => h.date > back(n) && h.date <= today && h.rec != null).map(h => h.rec);
+  const ck = {}; for (const c of checkins) if (c && c.date && c.sore && !c.partial) ck[c.date] = c;
+  const nextDays = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const sum = {}, cnt = {};
+  const dates = [...new Set(sessions.filter(s => s.date > back(28) && s.date < today).map(s => s.date))];
+  for (const d of dates) {
+    const after = [ck[nextDays(d, 1)], ck[nextDays(d, 2)]].filter(Boolean); if (!after.length) continue;
+    const ses = sessions.filter(s => s.date === d);
+    const hitG = new Set(); for (const s of ses) for (const ex of s.exercises || []) for (const m of (ex.muscles && ex.muscles.primary) || []) { const g = GROUPS.find(G => G.m.includes(m)); if (g) hitG.add(g.k); }
+    for (const g of hitG) { const v = Math.max(...after.map(c => +(c.sore[g] || 0))); sum[g] = (sum[g] || 0) + v; cnt[g] = (cnt[g] || 0) + 1; }
+  }
+  const sore = {}; for (const g in sum) sore[g] = Math.round(sum[g] / cnt[g] * 10) / 10;
+  const pain = {}; for (const c of checkins) if (c && c.date > back(14) && c.pain) for (const [k, v] of Object.entries(c.pain)) pain[k] = Math.max(pain[k] || 0, +v || 0);
+  return { rec7: avg(recs(7)), rec28: avg(recs(28)), sore, soreN: cnt, pain, checkins: Object.keys(ck).filter(d => d > back(28)).length };
+}
