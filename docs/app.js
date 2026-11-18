@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.16.0';
+  const APP_VERSION = '3.17.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -964,7 +964,7 @@
       const tp = E.timePlan(day, loc, delta, P(), p);
       exercises = tp.items.map(it => {
         const e = newEntry(it.ex.id, it.slot);
-        if (it.spec) { e.presc.sets = it.sets; e.presc.rest = it.rest; e.extraEx = true; }
+        if (it.spec) { e.presc.sets = it.sets; e.presc.rest = it.rest; e.extraEx = true; e.tpx = true; }
         else { e.presc.sets += it.boost; e.presc.rest = Math.max(30, Math.round(e.presc.rest * it.factor / 5) * 5); }
         return e;
       });
@@ -1215,6 +1215,67 @@
       if (next !== cur) { p.restAdj = p.restAdj || {}; p.restAdj[e.exId] = { s: next, d: E.todayISO() }; out.push(ex.name + ' ' + mmss(base + next)); }
     }
     return out;
+  }
+  /* Training → Plan übernehmen (3.17, Nutzerwunsch 18.11.): Unterschiede zwischen trainiertem Training und Plan-Tag.
+     Nur für Trainings aus dem aktiven Plan (nicht frei, nicht angepasst). Ändert nur den gewählten Ort.
+     Deload oder Tagesform kürzer/länger: Satzzahlen und Weglassen werden nicht übernommen. */
+  function planDiff(a) {
+    const p = plan(); if (!a || !p || !a.dayId || (a.planId && a.planId !== p.id)) return null;
+    const day = p.days.find(d => d.id === a.dayId); if (!day) return null;
+    const loc = a.loc; const free = !!a.timeNote; const ch = []; const ops = [];
+    const nDone = e => e.sets.filter(x => x.done).length;
+    // Platz, den sich beide Orte teilen: für diesen Ort abtrennen, damit Sätze/Reihenfolge den anderen Ort nicht ändern
+    const idMap = {};
+    const own = sl => {
+      if (idMap[sl.id]) return day.slots.find(x => x.id === idMap[sl.id]) || sl;
+      if (!Object.entries(sl.ex || {}).some(([l, v]) => l !== loc && v)) return sl;
+      const n = JSON.parse(JSON.stringify(sl)); n.id = 's' + uid(); n.ex = { [loc]: sl.ex[loc] }; n.why = { [loc]: (sl.why || {})[loc] || [] }; n.locked = { [loc]: true }; delete n.ss;
+      sl.ex[loc] = null; day.slots.splice(day.slots.indexOf(sl) + 1, 0, n); idMap[sl.id] = n.id; return n;
+    };
+    const bySlot = new Map(); // slotId → Einträge
+    for (const e of a.exercises) if (e.slotId) { if (!bySlot.has(e.slotId)) bySlot.set(e.slotId, []); bySlot.get(e.slotId).push(e); }
+    for (const sl of day.slots) {
+      if (!sl.ex[loc]) continue;
+      const es = (bySlot.get(sl.id) || []); const done = es.filter(e => nDone(e) > 0);
+      const old = getEx(sl.ex[loc]);
+      if (!done.length) {
+        if (free && !es.length) continue; // durch „kürzer“ weggefallen
+        if (free || (es[0] && es[0].presc && es[0].presc.deload)) continue;
+        ch.push('Raus: ' + (old ? old.name : 'Übung')); ops.push(() => { sl.ex[loc] = null; }); continue;
+      }
+      const last = done[done.length - 1];
+      if (last.exId !== sl.ex[loc]) { const nx = getEx(last.exId); ch.push('Getauscht: ' + (old ? old.name : '?') + ' → ' + (nx ? nx.name : '?'));
+        ops.push(() => { sl.ex[loc] = last.exId; sl.why = sl.why || {}; sl.why[loc] = ['Von dir trainiert']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); }); }
+      const first = es[0]; const tot = done.reduce((t, e) => t + nDone(e), 0);
+      if (!free && first.presc && !first.presc.deload) { const d = tot - first.presc.sets;
+        if (d && sl.sets + d >= 1) { const nx = getEx(last.exId); ch.push((nx ? nx.name : 'Übung') + ': ' + (sl.sets + d) + ' statt ' + sl.sets + ' Sätze'); ops.push(() => { const t = own(sl); t.sets = t.sets + d; }); } }
+    }
+    for (const e of a.exercises) {
+      if (e.slotId && day.slots.some(sl => sl.id === e.slotId)) continue;
+      if (e.tpx || !nDone(e)) continue;
+      const ex = getEx(e.exId); if (!ex) continue;
+      if (day.slots.some(sl => sl.ex[loc] === e.exId)) continue;
+      const r = roleOfEx(ex); const n = nDone(e);
+      ch.push('Neu: ' + ex.name + ' (' + n + (n === 1 ? ' Satz' : ' Sätze') + ')');
+      ops.push(() => { const sl = { id: 's' + uid(), p: [ex.pat], r, sets: n, rest: E.defaultRest(r, p.goal), rr: (E.goalRanges(p.goal) || {})[r] || null, ex: { [loc]: e.exId }, why: { [loc]: ['Von dir trainiert'] }, locked: { [loc]: true } };
+        e.slotId = sl.id; day.slots.push(sl); });
+    }
+    // Reihenfolge: trainierte Übungen in der Trainings-Reihenfolge, der Rest bleibt an seinem Platz
+    const seq = []; for (const e of a.exercises) if (nDone(e) && e.slotId && !seq.includes(e.slotId)) seq.push(e.slotId);
+    const cur = day.slots.filter(sl => sl.ex[loc] && seq.includes(sl.id)).map(sl => sl.id);
+    if (cur.length > 1 && cur.join() !== seq.filter(id => cur.includes(id)).join()) {
+      ch.push('Neue Reihenfolge');
+    }
+    ops.push(() => { // nach allen anderen Änderungen (neue Plätze haben jetzt ihre slotId)
+      const order = []; for (const e of a.exercises) if (nDone(e) && e.slotId && !order.includes(e.slotId)) order.push(e.slotId);
+      if (!ch.includes('Neue Reihenfolge')) { day.slots = day.slots.filter(sl => Object.values(sl.ex || {}).some(Boolean)); return; }
+      for (let k = 0; k < order.length; k++) { const sl = day.slots.find(x => x.id === (idMap[order[k]] || order[k])); if (sl && sl.ex[loc]) order[k] = own(sl).id; else order[k] = idMap[order[k]] || order[k]; }
+      const pos = day.slots.map((sl, i) => order.includes(sl.id) ? i : -1).filter(i => i >= 0);
+      const inOrder = order.map(id => day.slots.find(sl => sl.id === id)).filter(Boolean);
+      pos.slice(0, inOrder.length).forEach((i, k) => { day.slots[i] = inOrder[k]; });
+      day.slots = day.slots.filter(sl => Object.values(sl.ex || {}).some(Boolean));
+    });
+    return ch.length ? { day, changes: ch, apply() { Backup.snapshot('vor-plan-anpassen'); ops.forEach(f => f()); touchPlan(); Store.saveProfile(); } } : null;
   }
   function finishWorkout(save, endTs) {
     const a = st.active; if (!a) return;
@@ -1656,7 +1717,9 @@
       const a = st.active; const done = a.exercises.reduce((t, e) => t + e.sets.filter(x => x.done).length, 0);
       const open = a.exercises.filter(e => !exState(e).finished).length;
       return `<div class="stack"><h2>Training beenden?</h2><div class="kpis"><div class="kpi"><b>${durTxt((Date.now() - a.start) / 1000)}</b><span>Dauer</span></div><div class="kpi"><b>${done}</b><span>Sätze</span></div><div class="kpi"><b>${open}</b><span>Übungen offen</span></div></div>
-        <button class="btn primary big" data-a="finishSave" ${done ? '' : 'disabled'}>Speichern</button>
+        ${(() => { const d = done ? planDiff(a) : null; return d ? `<div class="card flat stack" style="gap:6px"><b>Anders als im Plan</b><div class="small muted">${esc(d.day.name)} · ${LOCN[a.loc]}</div><ul class="difflist">${d.changes.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
+        <button class="btn primary big" data-a="finishAdopt">Speichern & Plan übernehmen</button><button class="btn" data-a="finishSave">Nur speichern</button>`
+          : `<button class="btn primary big" data-a="finishSave" ${done ? '' : 'disabled'}>Speichern</button>`; })()}
         ${s.confirm ? '<button class="btn danger" data-a="finishDiscardYes">Wirklich verwerfen</button>' : '<button class="btn danger" data-a="finishDiscard">Verwerfen</button>'}
         <button class="btn ghost" data-a="closeSheet">Weiter trainieren</button></div>`;
     },
@@ -1966,6 +2029,7 @@
     intStart(t) { const e = st.active.exercises[+t.dataset.i]; const S = exState(e); T.mode = 'interval'; T.iv = { work: S.presc.rr[0], rest: S.presc.rest || 20, rounds: S.planned - S.done.length }; T.ivRun = { start: Date.now() }; st.ov = null; st.tab = 'timer'; render(); toast('Intervall läuft. Danach im Training die Runden abhaken.'); },
     finishAsk() { openSheet({ type: 'finish' }); },
     finishSave() { finishWorkout(true); },
+    finishAdopt() { const d = planDiff(st.active); if (d) d.apply(); finishWorkout(true); if (d) toast('Plan angepasst: ' + d.day.name); },
     finishDiscard() { st.sheet.confirm = true; renderSheet(); },
     finishDiscardYes() { finishWorkout(false); },
     exInfo(t) { openSheet({ type: 'exInfo', id: t.dataset.id }); },

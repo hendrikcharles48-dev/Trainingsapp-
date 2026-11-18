@@ -297,6 +297,10 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   Hauptmuskel durch Übungen für bereite Muskeln (gleiche Rolle/Sätze; Favoriten +8, aus eigenen Plänen +3, wenig Wochensätze bevorzugt), Plan bleibt
   unverändert. Heute-Karte zeigt Hinweis, Tagesform-Fenster Auswahl „Für heute empfohlen“/„Dein Plan“ (`s.mode`), „Andere Einheit“ zeigt „x von y bereit“.
   Zählt nur als Plan-Tag, wenn ≥ Hälfte der Übungen bleibt (sonst `dayIdx: null`, Tag bleibt dran). Ort Zuhause/Studio bleibt gespeichert (`settings.homeLoc`).
+- Training → Plan übernehmen (Satzwerk 3.17, Nutzerwunsch 18.11.): `planDiff(active)` vergleicht mit dem Plan-Tag (nur Plan-Trainings,
+  nicht frei/angepasst): Getauscht, Neu (`tpx` = von „länger“ ergänzt, zählt nicht), Raus, Sätze, Reihenfolge. Fenster `finish` zeigt die Liste,
+  „Speichern & Plan übernehmen“ (`finishAdopt`, vorher `Backup.snapshot('vor-plan-anpassen')`). Deload/Tagesform-Länge: keine Sätze/Raus.
+  Nur der Ort des Trainings ändert sich: geteilte Plätze werden vor Satz-/Reihenfolge-Änderung abgetrennt (`own`).
 - Fehlende Nacht (16.11. geprüft: Synchronisierung lief, Uhr maß 0–7 Uhr nichts): `sleepView` liefert `reason` (`notWorn` = Garmin bis
   nach 6 Uhr synchronisiert und ≥ 3 h ohne Messung laut `stress.uncategorizedDurationInMillis`, `noSleep`, `notSynced`); Formwerk erklärt das.
 - Nacht ohne Messung (Nutzerwunsch 16.11.): Ruhepuls zählt nur mit Nachtdaten (`rhrValid`, sonst Tageswert – auch nicht für die Basis).
