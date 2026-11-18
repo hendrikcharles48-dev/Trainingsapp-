@@ -297,6 +297,12 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
   Hauptmuskel durch Übungen für bereite Muskeln (gleiche Rolle/Sätze; Favoriten +8, aus eigenen Plänen +3, wenig Wochensätze bevorzugt), Plan bleibt
   unverändert. Heute-Karte zeigt Hinweis, Tagesform-Fenster Auswahl „Für heute empfohlen“/„Dein Plan“ (`s.mode`), „Andere Einheit“ zeigt „x von y bereit“.
   Zählt nur als Plan-Tag, wenn ≥ Hälfte der Übungen bleibt (sonst `dayIdx: null`, Tag bleibt dran). Ort Zuhause/Studio bleibt gespeichert (`settings.homeLoc`).
+- Pläne pro Ort (Satzwerk 3.18, Nutzerwunsch 18.11.): `plan.place` `'home'|'gym'` (ohne = alter Plan für beide Orte, `locs` beide),
+  `profile.planBy = {home, gym}` = aktiver Plan je Ort; `profile.plan/planId` = Plan des gewählten Orts (`curLoc()`). Schalter Zuhause/Studio
+  (`switchLoc`) wechselt Ort UND Plan (Heute, Plan, „Andere Einheit“). Neue Pläne/Vorlagen/Kopien bekommen den aktuellen Ort (`onlyLoc`).
+  Pläne-Fenster nach Ort gruppiert („Neuer Plan für …“ = `planNewAt`), Plan-Menü „Gilt für“ (`planPlace`) und Aufteilen (`splitPlan`:
+  zwei Pläne „… Zuhause“/„… Studio“, alter bleibt, vorher Sicherung `vor-aufteilen`). Karte `splitCard` bis `seen.splitAsk`; kein Plan für den
+  Ort → `noPlanCard`. Plan übernehmen/Bereit-Training wirken nur auf den Plan des Orts.
 - Training → Plan übernehmen (Satzwerk 3.17, Nutzerwunsch 18.11.): `planDiff(active)` vergleicht mit dem Plan-Tag (nur Plan-Trainings,
   nicht frei/angepasst): Getauscht, Neu (`tpx` = von „länger“ ergänzt, zählt nicht), Raus, Sätze, Reihenfolge. Fenster `finish` zeigt die Liste,
   „Speichern & Plan übernehmen“ (`finishAdopt`, vorher `Backup.snapshot('vor-plan-anpassen')`). Deload/Tagesform-Länge: keine Sätze/Raus.
