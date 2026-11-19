@@ -181,6 +181,7 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   (Regeln im Kommentar dort: Schmerz/Muskelkater stark ersetzen oder streichen, leicht −1, mittel −1/−2 + Gewicht −10 % `presc.loadF`, gestern Baseball,
   Erholung rot −30 %/gelb ohne Steigerung `presc.noUp`). `dayAdjust` in app.js; Zeilen über der Übung (`.adjline`, `entry.adj`) auf Einheit-Seite,
   im Startfenster (`SHEETS.time`, nur noch „Zeit“) und im Training. `planDiff` wertet Tagesanpassungen nicht als Planänderung (`adjRemoved`, `adjEx`).
+  Auf Heute steht Formwerk nur noch als eine Zeile in der „Nächste Einheit“-Kachel (`fwBox`, Erholung · Titel · Änderungen/Gut heute, Tipp öffnet das Formwerk-Fenster) – keine eigene Karte oben mehr (3.24.2).
   Wochen-Check-in nur ohne Formwerk. Platz unten im Training = Höhe der Leiste (`--rbh`). Tests: `node tools/engine.test.js`.
 - Automatische Progression (3.24, Auftrag 19.11.): Doppelprogression mit festen Stufen (`progStep`: Langhantel +2,5 kg Oberkörper / +5 kg
   Unterkörper, sonst kleinste Stufe; Wdh. zurück ans untere Ende, `rec.up`). Sätze je Muskel (`learnVolume`): +1 bei 2 guten Wochen

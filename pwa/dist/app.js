@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.24.1';
+  const APP_VERSION = '3.24.2';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -564,6 +564,14 @@
     if (rd.yesterdayBaseball) parts.push('gestern Baseball');
     return { rd, adj: a, all, line: parts.join(' · '), day: Object.assign({}, d, { slots: a.slots }), counts: true };
   }
+  // 3.24.2 (Nutzerwunsch 19.11.): Formwerk steht nur noch in der „Nächste Einheit“-Kachel – eine Zeile: wie fit, was es für heute heißt
+  function fwBox(di, loc) {
+    const d = FW.today(); if (!d || !d.recovery) return '';
+    const r = d.recovery, c = d.recommendation || {}; const A = dayAdjust(di, loc, null); const n = A && A.adj.any ? A.adj.changes.length : 0;
+    const val = r.building ? 'Basis im Aufbau' : r.score == null ? 'noch keine Werte' : (r.estimated ? '~' : '') + r.score + ' %';
+    const sub = n ? n + (n === 1 ? ' Änderung' : ' Änderungen') + ' beim Start' : (c.good || []).length && c.level !== 'rest' && c.level !== 'done' ? 'Gut heute: ' + c.good.slice(0, 3).join(', ') : (c.text || '');
+    return `<button class="fwbox" data-a="formwerkSheet"><i class="fwdot ${esc(r.color || 'none')}"></i><span class="grow"><b class="ell">Erholung ${esc(val)} · ${esc(c.title || '')}</b><span class="ell">${esc(sub)}</span></span><span class="chev">${I.chev}</span></button>`;
+  }
   function readyFor(di, loc) {
     const b = FW.readiness(); const p = plan(); if (!b || !p || !p.days[di]) return null;
     const r = E.readyDay(p.days[di], loc, P(), p, b, P().plans || [p]); if (!r) return null;
@@ -598,8 +606,7 @@
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
       : `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Nächste Einheit'} · Woche ${wi.w}/${wi.len}${wi.deload ? ' · Deload' : ''}</div><h2 class="xl clamp2">${esc(day.name)}</h2><div class="small ink2 ell">${esc(dayFocus(day, loc))}</div></div><div class="figtile hero">${figSVG(hx, { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg onlight">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        ${(() => { const A = dayAdjust(di, loc, null); return A && A.adj.any ? `<div class="readyhint one"><b>Heute angepasst</b><span>${A.adj.changes.length} ${A.adj.changes.length === 1 ? 'Änderung' : 'Änderungen'} beim Start</span></div>` : ''; })()}
-        ${(() => { const r = false; return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
+        ${fwBox(di, loc)}
         <div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${setsPlan}</b><span>Sätze</span></div><div><b>${estMinutes(day, loc)}</b><span>Minuten</span></div></div>
         <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button></div>`;
     return `<div class="homebar compact"><div class="row" style="align-items:center;gap:8px"><div class="grow" style="min-width:0"><div class="eyebrow ell">${dateTxt}</div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div></div>
@@ -607,7 +614,6 @@
       <div class="weekstrip" aria-label="Diese Woche">${week}</div>
       ${st.active ? '' : cxReadyCard()}
       ${st.active ? '' : coachCard()}
-      ${st.active ? '' : FW.card()}
       ${sport.size || ((FW.plan() || {}).strengthDays || []).length ? `<div class="legend"><span><i class="lg-done">${I.check}</i>erledigt</span>${sport.size ? '<span><i class="lg-sport"></i>Baseball</span>' : ''}${((FW.plan() || {}).strengthDays || []).length ? '<span><i class="lg-good"></i>Kraft-Tag</span>' : ''}<span class="grow"></span><span>${weekW.length} von ${+a.days || p.days.length} Trainings</span></div>` : ''}
       ${hero}
       ${st.active ? '' : `<div class="row"><button class="btn grow" data-a="dayPick">Andere Einheit</button><button class="btn grow" data-a="freeWorkout">${I.plus} Freies Training</button></div>`}
