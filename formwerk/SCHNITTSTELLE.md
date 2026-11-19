@@ -108,3 +108,12 @@ Satzwerk zeigt das nur an und ändert nichts am Plan.
 - `prefill`: `{tf: {en 0–2, sl 0–2, why}, week: {ans: {exh, fit, sleep, sore, pain, sport}, src}}` – Werte wie in Satzwerks
   Tagesform (Energie/Schlaf: 0 niedrig/schlecht, 1 normal/okay, 2 hoch/gut) und `E.CHECKIN`.
 - `plan`: `{sportDays, baseballToday, strengthDays}` (0 = Mo … 6 = So).
+
+## GET /v1/readiness?date=YYYY-MM-DD (Worker 2.7)
+Kompakter Tageszustand für Satzwerk (ohne `date` = heute). Antwort:
+`{ date, recovery (0–100|null), color ('green'|'yellow'|'red'|'none'), estimated, building, checkin (Morgen-Check da?), sick,
+  sore: {gruppe: 1 leicht | 2 mittel | 3 stark}, pain: [{k, label, inj}], yesterdayBaseball, baseballSource ('uhr'|'eingetragen'|null),
+  synced, watchLast, advice, status }`
+Gruppen wie `GROUPS` (brust, ruecken, schultern, bizeps, trizeps, griff, rumpf, vorn, hinten, waden). Schmerzbereiche im Morgen-Check:
+schulter (inj shoulder), ellbogen (elbow), knie (knee), ruecken (lowback), sonstiges (ohne Zuordnung); ältere Bereiche bleiben gültig.
+Gespeichert wird weiter auf der Skala 1–5 (Muskelkater leicht 2 / mittel 3 / stark 5, Schmerz ja = 3).

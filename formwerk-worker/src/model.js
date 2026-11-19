@@ -236,7 +236,7 @@ export const SPORT = {
 };
 export function sportKind(type, name) {
   const t = (type || '') + ' ' + (name || '').toLowerCase();
-  if (/baseball|softball/.test(t)) return 'baseball';
+  if (/baseball|softball|team_?sport|teamsport/.test(t)) return 'baseball';
   if (/strength|kraft|weight|gym|hiit|functional/.test(t)) return 'strength';
   if (/cycl|bike|biking|rad|gravel|mountain/.test(t)) return 'cycling';
   if (/run|lauf|trail/.test(t)) return 'running';
@@ -497,7 +497,10 @@ export const PAIN_AREAS = [
   { k: 'oberschenkel', label: 'Oberschenkel hinten', groups: ['hinten'] },
   { k: 'knie', label: 'Knie', groups: ['vorn'], inj: 'knee' },
   { k: 'sprunggelenk', label: 'Sprunggelenk', groups: ['waden'] },
-  { k: 'achilles', label: 'Achillessehne / Wade', groups: ['waden'] }
+  { k: 'achilles', label: 'Achillessehne / Wade', groups: ['waden'] },
+  // Worker 2.7 (Nutzerwunsch 19.11.): Morgen-Check fragt nur noch 5 Bereiche ja/nein – Schulter, Ellbogen, Knie, Rücken, Sonstiges
+  { k: 'ruecken', label: 'Rücken', groups: ['ruecken', 'rumpf', 'hinten'], inj: 'lowback' },
+  { k: 'sonstiges', label: 'Sonstiges', groups: [] }
 ];
 const AREA = Object.fromEntries(PAIN_AREAS.map(a => [a.k, a]));
 const GLABEL = Object.fromEntries(GROUPS.map(g => [g.k, g.label]));
@@ -826,4 +829,22 @@ export function volumeSignals({ checkins = [], sessions = [], history = [], toda
   const sore = {}; for (const g in sum) sore[g] = Math.round(sum[g] / cnt[g] * 10) / 10;
   const pain = {}; for (const c of checkins) if (c && c.date > back(14) && c.pain) for (const [k, v] of Object.entries(c.pain)) pain[k] = Math.max(pain[k] || 0, +v || 0);
   return { rec7: avg(recs(7)), rec28: avg(recs(28)), sore, soreN: cnt, pain, checkins: Object.keys(ck).filter(d => d > back(28)).length };
+}
+
+/* =====================================================================
+   READINESS (Worker 2.7, Nutzerwunsch 19.11.): kompakter Tageszustand für Satzwerk (GET /v1/readiness?date=).
+   Muskelkater in 4 Stufen 0 keiner · 1 leicht (1–2) · 2 mittel (3) · 3 stark (4–5); Schmerz = Bereich ja (Stufe ≥ 1).
+   gesternBaseball: Uhr-Aktivität (Baseball/Teamsport) > Antwort/Schalter > fester Termin (baseballDay).
+   ===================================================================== */
+export const soreCat = v => (!v ? 0 : v <= 2 ? 1 : v === 3 ? 2 : 3);
+export function readinessFor({ days, ckBy, S = DEFAULT_SETTINGS, acts = {}, date, today, rec: recIn = null }) {
+  const ck = ckBy[date] && !ckBy[date].partial ? normCheckin(ckBy[date]) : null;
+  const rec = recIn || recovery(days, date, { ck: ckBy[date], settled: date < today });
+  const score = rec && rec.score != null ? Math.round(rec.score) : null;
+  const sore = {}; for (const [k, v] of Object.entries((ck && ck.sore) || {})) { const c = soreCat(+v); if (c) sore[k] = c; }
+  const pain = Object.entries((ck && ck.pain) || {}).filter(([, v]) => +v >= 1).map(([k]) => { const a = PAIN_AREAS.find(x => x.k === k) || { k, label: k }; return { k, label: a.label, inj: a.inj || null }; });
+  const y = baseballDay(ckBy, S, addDays(date, -1), acts);
+  return { date, recovery: score, color: color(score), building: !!(rec && rec.building), estimated: !!(rec && rec.estimated),
+    checkin: !!ck, sick: !!(ck && ck.sick), sore, pain, yesterdayBaseball: !!y.on, baseballSource: y.recorded ? 'uhr' : y.on ? 'eingetragen' : null,
+    synced: (days[date] && days[date].syncedUntil) || null };
 }

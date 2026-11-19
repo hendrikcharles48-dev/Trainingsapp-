@@ -6,7 +6,7 @@
    Speicher nur unter satzwerk.formwerk* (nie im Export, nie in Sicherungen). */
 (function () {
   'use strict';
-  const K = { cfg: 'satzwerk.formwerk', sync: 'satzwerk.formwerkSync', today: 'satzwerk.formwerkToday', coach: 'satzwerk.formwerkCoach' };
+  const K = { cfg: 'satzwerk.formwerk', sync: 'satzwerk.formwerkSync', today: 'satzwerk.formwerkToday', coach: 'satzwerk.formwerkCoach', ready: 'satzwerk.formwerkReady' };
   const WINDOW_DAYS = 45;
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev'; // Adresse des Formwerk-Workers (kein Geheimnis)
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
@@ -73,6 +73,14 @@
     busy = false;
   }
 
+  // Tageszustand (Worker 2.7, /v1/readiness): Grundlage für Satzwerks Tagesanpassung. Höchstens alle 5 min neu holen.
+  let readyBusy = null;
+  function fetchReadiness(force) {
+    if (!cfg() || readyBusy) return readyBusy;
+    const R = get(K.ready, null); if (!force && R && R.data && R.data.date === iso(new Date()) && Date.now() - R.t < 5 * 60e3) return Promise.resolve(R.data);
+    readyBusy = api('/v1/readiness').then(j => { if (j && j.date) set(K.ready, { t: Date.now(), data: j }); opt.onChange(true); return j; }).catch(() => null).finally(() => { readyBusy = null; });
+    return readyBusy;
+  }
   async function refreshToday(quiet) {
     if (!cfg()) return;
     try { const j = await api('/v1/today'); set(K.today, { t: Date.now(), data: j }); if (j && j.weight) try { opt.onWeight(j.weight, j.weights || []); } catch (e) { } }
@@ -153,10 +161,11 @@
       const T = get(K.today, null);
       if (!T || Date.now() - T.t > 20 * 60e3) setTimeout(() => refreshToday(true), 1200);
       setTimeout(() => refreshCoach(), 3000);
+      setTimeout(() => fetchReadiness(), 900);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible' || !cfg()) return;
         const t = get(K.today, null); if (!t || Date.now() - t.t > 20 * 60e3) refreshToday(true);
-        sync(); refreshCoach();
+        sync(); refreshCoach(); fetchReadiness();
       });
       addEventListener('online', () => sync());
     },
@@ -169,6 +178,8 @@
     tfPrefill() { const d = this.today(); const p = d && d.prefill && d.prefill.tf; if (!p || (p.en == null && p.sl == null)) return {}; const o = { fw: p.why || 'Formwerk' }; if (p.en != null) o.en = p.en; if (p.sl != null) o.sl = p.sl; return o; },
     weekPrefill() { const d = this.today(); return (d && d.prefill && d.prefill.week) || null; },
     signals() { const d = this.today(); return (d && d.signals) || null; },
+    fetchReadiness,
+    readyData() { const R = get(K.ready, null); return cfg() && R && R.data && R.data.date === iso(new Date()) ? R.data : null; },
     // Volumen-Signale (Worker 2.5): Erholung 7/28 Tage, Muskelkater nach dem Training je Gruppe – auch vom Vortag noch gültig
     volSignals() { const T = get(K.today, null); const d = T && T.data; return cfg() && d && d.vol && Date.now() - (T.t || 0) < 3 * 864e5 ? d.vol : null; },
     // Muskeln aus Formwerk für ein „Bereit-Training“: noch müde = auslassen, teilweise = eher meiden, Schmerz ab 2/5 = Stelle schonen

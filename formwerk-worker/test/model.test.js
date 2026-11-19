@@ -1,6 +1,6 @@
 // Tests: node test/model.test.js  (ohne Abhängigkeiten)
 import assert from 'node:assert/strict';
-import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines, detectBaseball, volumeSignals } from '../src/model.js';
+import { recovery, zToScore, dayLoad, muscleFatigue, recommend, buildSummary, addDays, effort, loadScore, calibrate, baseballDay, withCheckinBaseball, physio, weekday, prefillFor, recoveryCore, sleepView, applyLife, baselines, detectBaseball, volumeSignals, readinessFor, soreCat } from '../src/model.js';
 import { mergeDays, activityFrom } from '../src/normalize.js';
 import worker, { FormwerkStore } from '../src/index.js';
 import { FakeStorage, installFakeGarmin, counter } from './fakes.js';
@@ -320,6 +320,23 @@ await t('Volumen-Signale: Muskelkater nach Einheiten, Erholung', () => {
   const v = volumeSignals({ checkins, sessions, history, today });
   assert.equal(v.sore.brust, 2, 'Brust: (4 + 0) / 2'); assert.equal(v.sore.ruecken, 3); assert.equal(v.soreN.brust, 2);
   assert.equal(v.rec7, 50); assert.equal(v.pain.schulter, 2);
+});
+
+await t('Readiness: Stufen, Schmerz ja/nein, gestern Baseball', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(soreCat), [0, 1, 1, 2, 3, 3]);
+  const d = '2026-11-19', y = '2026-11-18';
+  const ckBy = { [d]: { date: d, v: 5, sore: { brust: 2, ruecken: 5, bizeps: 3 }, pain: { ellbogen: 3, sonstiges: 3 } } };
+  const r = readinessFor({ days: {}, ckBy, acts: { [y]: [{ type: 'baseball', name: 'Baseball', dur: 7200 }] }, date: d, today: d, rec: { score: 30 } });
+  assert.deepEqual(r.sore, { brust: 1, ruecken: 3, bizeps: 2 });
+  assert.deepEqual(r.pain.map(p => p.k + ':' + p.inj), ['ellbogen:elbow', 'sonstiges:null']);
+  assert.equal(r.color, 'red'); assert.equal(r.yesterdayBaseball, true); assert.equal(r.baseballSource, 'uhr');
+  const r2 = readinessFor({ days: {}, ckBy: {}, acts: {}, date: d, today: d, rec: { score: null } });
+  assert.equal(r2.checkin, false); assert.equal(r2.yesterdayBaseball, false); assert.equal(r2.color, 'none');
+  const r3 = readinessFor({ days: {}, ckBy: { [d]: { date: d, bb: true, sore: {}, pain: {} } }, acts: {}, date: d, today: d, rec: { score: 70 } });
+  assert.equal(r3.yesterdayBaseball, true, 'Schalter am Morgen'); assert.equal(r3.color, 'green');
+});
+await t('Worker: /v1/readiness', async () => {
+  const j = await (await call('/v1/readiness')).json(); assert.ok('recovery' in j && 'sore' in j && 'pain' in j && 'yesterdayBaseball' in j, JSON.stringify(j).slice(0, 200));
 });
 
 console.log(`\n${n - fails}/${n} Tests bestanden`);

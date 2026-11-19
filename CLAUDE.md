@@ -176,6 +176,12 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
 (`E.allExercises` blendet aus, `getEx` findet sie weiter), ohne Verlauf ganz entfernen. Vorher `Backup.snapshot`.
 
 ## Trainingslogik
+- Tagesanpassung aus Formwerk (3.23, Nutzerwunsch 19.11.: Körperzustand nur noch in Formwerk eingeben, Satzwerk fragt nicht mehr):
+  `FW.fetchReadiness()`/`FW.readyData()` (Worker `GET /v1/readiness`, Cache `satzwerk.formwerkReady`, 5 min) → `E.adjustDay(day, loc, profile, plan, rd, {only})`
+  (Regeln im Kommentar dort: Schmerz/Muskelkater stark ersetzen oder streichen, leicht −1, mittel −1/−2 + Gewicht −10 % `presc.loadF`, gestern Baseball,
+  Erholung rot −30 %/gelb ohne Steigerung `presc.noUp`). `dayAdjust` in app.js; Zeilen über der Übung (`.adjline`, `entry.adj`) auf Einheit-Seite,
+  im Startfenster (`SHEETS.time`, nur noch „Zeit“) und im Training. `planDiff` wertet Tagesanpassungen nicht als Planänderung (`adjRemoved`, `adjEx`).
+  Wochen-Check-in nur ohne Formwerk. Platz unten im Training = Höhe der Leiste (`--rbh`). Tests: `node tools/engine.test.js`.
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
   Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).
