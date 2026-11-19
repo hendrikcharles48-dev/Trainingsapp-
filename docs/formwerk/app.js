@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.9.0';
+  const VERSION = '1.10.0';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -166,16 +166,19 @@
   }
   function animateRing() { const c = $('#ringVal'); if (c) c.style.strokeDashoffset = c.dataset.to; }
 
+  // 1.10 (Nutzerwunsch 19.11.): eine kompakte Zusammenfassung – wie fit, was das fürs Training heißt, nichts doppelt
   function recCard(d) {
     const c = d.recommendation; const w = c.week || { done: 0, goal: 2 };
     const dots = Array.from({ length: Math.max(w.goal, w.done) }, (_, i) => `<i class="${i < w.done ? 'on' : ''}"></i>`).join('');
-    return `<div class="card navy rec"><div class="eyebrow">Empfehlung für heute</div>
-      <div class="title">${esc(c.title)}</div><p>${esc(c.text)}</p>
-      ${c.good && c.good.length ? `<div class="eyebrow" style="margin-top:14px">Gut heute</div><div class="pills">${c.good.map(g => `<span class="pill">${esc(g)}</span>`).join('')}</div>` : ''}
-      ${c.avoid && c.avoid.length && c.level !== 'rest' && c.level !== 'done' ? `<div class="eyebrow" style="margin-top:12px">Wegen Baseball schonen</div><div class="pills">${c.avoid.map(g => `<span class="pill dim">${esc(g)}</span>`).join('')}</div>` : ''}
-      ${c.notes && c.notes.length ? `<ul class="notes">${c.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
-      <div class="weekdots"><div class="dots">${dots}</div><span>Kraft diese Woche: ${w.done} von ${w.goal}</span></div>
-      ${d.body && d.body.insights && d.body.insights.strengthDays.days.length ? `<div class="tiny muted" style="margin-top:8px">Gute Kraft-Tage für dich: <b style="color:var(--ink2)">${d.body.insights.strengthDays.days.join(' · ')}</b></div>` : ''}</div>`;
+    const days = d.body && d.body.insights && d.body.insights.strengthDays.days.length ? d.body.insights.strengthDays.days.join(' · ') : '';
+    const good = c.good && c.good.length && c.level !== 'rest' && c.level !== 'done' ? c.good.slice(0, 4) : [];
+    const avoid = c.avoid && c.avoid.length && c.level !== 'rest' && c.level !== 'done' ? c.avoid : [];
+    const notes = (c.notes || []).slice(0, 2);
+    return `<div class="card navy rec compact"><div class="title">${esc(c.title)}</div><p>${esc(c.text)}</p>
+      ${good.length ? `<div class="pills"><span class="pl">Gut</span>${good.map(g => `<span class="pill">${esc(g)}</span>`).join('')}</div>` : ''}
+      ${avoid.length ? `<div class="pills"><span class="pl">Schonen</span>${avoid.map(g => `<span class="pill dim">${esc(g)}</span>`).join('')}</div>` : ''}
+      ${notes.length ? `<ul class="notes">${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+      <div class="weekdots"><div class="dots">${dots}</div><span>${w.done} von ${w.goal} diese Woche${days ? ' · gute Tage ' + esc(days) : ''}</span></div></div>`;
   }
 
   function muscleCard(d) {

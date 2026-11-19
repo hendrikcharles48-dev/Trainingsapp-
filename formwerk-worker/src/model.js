@@ -298,7 +298,9 @@ export const DEFAULT_SETTINGS = { sportDays: [], sportTimes: {}, strengthPerWeek
 export function recommend({ date, rec, muscles, sessions, ratio, sleepPart, settings, now }) {
   const S = Object.assign({}, DEFAULT_SETTINGS, settings || {});
   const wd = weekday(date);
-  const sportToday = S.sportDays.includes(wd), sportTomorrow = S.sportDays.includes((wd + 1) % 7);
+  // Worker 2.9 (Nutzerwunsch 19.11.): Baseball wirkt auf die Empfehlung nur, wenn Schmerz/Muskelkater dazu eingetragen ist (bbRelevant; ohne Angabe gilt wie früher)
+  const bbOn = S.bbRelevant !== false;
+  const sportToday = bbOn && S.sportDays.includes(wd), sportTomorrow = bbOn && S.sportDays.includes((wd + 1) % 7);
   const mondayIso = addDays(date, -wd);
   const weekS = (sessions || []).filter(s => s.date >= mondayIso && s.date <= date);
   const todayS = weekS.filter(s => s.date === date);
@@ -409,7 +411,12 @@ export function buildSummary({ days, actsByDate, sessions, settings, today, now,
   const sleepPart = rec.parts.find(p => p.k === 'sleep');
   const ckT = ckBy[today] || {};
   const bbT = baseballDay(ckBy, S, today, actsByDate), bbY = baseballDay(ckBy, S, addDays(today, -1), actsByDate);
-  const S2 = Object.assign({}, S, { sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
+  // Baseball (gestern/heute/morgen) zählt nur mit eingetragenem Schmerz oder Muskelkater an Schulter, Armen oder Beinen
+  const ckFull = ckBy[today] && !ckBy[today].partial ? ckBy[today] : null;
+  const bbTomorrow = S.sportDays.includes((weekday(today) + 1) % 7);
+  const bbHurt = !!ckFull && (Object.keys(ckFull.pain || {}).length > 0 || ['schultern', 'bizeps', 'trizeps', 'griff', 'vorn', 'hinten'].some(g => (ckFull.sore || {})[g] > 0));
+  const bbRelevant = (bbT.on || bbY.on || bbTomorrow) && bbHurt;
+  const S2 = Object.assign({}, S, { bbRelevant, sportDays: bbT.on ? [...new Set(S.sportDays.concat(weekday(today)))] : S.sportDays.filter(x => x !== weekday(today)) });
   let recommendation = applyPain(recommend({ date: today, rec, muscles, sessions: allStrength, ratio, sleepPart, settings: S2, now }), pain, muscles);
   recommendation = applyLife(recommendation, { today, ck: ckBy[today], allStrength, watchStrength, rec });
   const body = { flags: { bb: ckT.bb ?? null, bbToday: ckT.bbToday ?? null, sleepEst: ckT.sleepEst || null }, baseball: { today: bbT, yesterday: bbY }, checkin: ckBy[today] && !ckBy[today].partial ? ckBy[today] : null, askBaseball: bbY.planned && !bbY.recorded && bbY.auto == null && ckT.bb == null && !(ckBy[addDays(today, -1)] && ckBy[addDays(today, -1)].bbToday != null) ? { date: addDays(today, -1), from: bbY.from } : false, sick: !!ckT.sick, watchStrength: watchStrength.filter(w => w.date >= addDays(today, -3)), pain, calib, insights: insights({ ckBy, allActs, today, calib, settings: S }) };

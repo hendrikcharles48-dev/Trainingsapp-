@@ -245,3 +245,14 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
 
 .banner { overflow-wrap: anywhere; min-width: 0; }
 .banner > div { min-width: 0; }
+
+/* 1.10: kompakte Empfehlungskarte */
+.rec.compact { padding: 14px 16px; }
+.rec.compact .title { font-size: 24px; margin: 0 0 3px; }
+.rec.compact p { font-size: 15px; line-height: 1.35; }
+.rec.compact .pills { align-items: center; gap: 5px; margin-top: 8px; }
+.rec.compact .pill { padding: 4px 10px; font-size: 13px; }
+.rec.compact .pl { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.rec.compact .notes { margin-top: 8px; gap: 4px; }
+.rec.compact .notes li { font-size: 13px; }
+.rec.compact .weekdots { margin-top: 10px; padding-top: 9px; font-size: 13px; }
