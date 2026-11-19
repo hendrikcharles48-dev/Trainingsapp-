@@ -320,6 +320,7 @@ await t('Volumen-Signale: Muskelkater nach Einheiten, Erholung', () => {
   const v = volumeSignals({ checkins, sessions, history, today });
   assert.equal(v.sore.brust, 2, 'Brust: (4 + 0) / 2'); assert.equal(v.sore.ruecken, 3); assert.equal(v.soreN.brust, 2);
   assert.equal(v.rec7, 50); assert.equal(v.pain.schulter, 2);
+  assert.equal(v.weeks.length, 2); assert.equal(v.weeks[0].bad, 2); assert.equal(v.weeks[0].good, false);
 });
 
 await t('Readiness: Stufen, Schmerz ja/nein, gestern Baseball', () => {

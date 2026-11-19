@@ -828,7 +828,10 @@ export function volumeSignals({ checkins = [], sessions = [], history = [], toda
   }
   const sore = {}; for (const g in sum) sore[g] = Math.round(sum[g] / cnt[g] * 10) / 10;
   const pain = {}; for (const c of checkins) if (c && c.date > back(14) && c.pain) for (const [k, v] of Object.entries(c.pain)) pain[k] = Math.max(pain[k] || 0, +v || 0);
-  return { rec7: avg(recs(7)), rec28: avg(recs(28)), sore, soreN: cnt, pain, checkins: Object.keys(ck).filter(d => d > back(28)).length };
+  // Worker 2.8: die letzten zwei Wochen (je 7 Tage) für Satzwerks Satz-Steuerung: good = gut erholt (≥ 3 Messtage, Schnitt ≥ 60, höchstens 2 gelb/rot), bad = Tage gelb/rot
+  const wk = k => { const h = history.filter(x => x.date > back(7 * (k + 1)) && x.date <= back(7 * k) && x.rec != null);
+    const bad = h.filter(x => x.rec < REC.green).length; const a = avg(h.map(x => x.rec)); return { n: h.length, avg: a, bad, good: h.length >= 3 && a >= 60 && bad <= 2 }; };
+  return { rec7: avg(recs(7)), rec28: avg(recs(28)), sore, soreN: cnt, pain, checkins: Object.keys(ck).filter(d => d > back(28)).length, weeks: [wk(0), wk(1)] };
 }
 
 /* =====================================================================

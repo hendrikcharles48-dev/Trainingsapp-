@@ -446,8 +446,8 @@ Jeder Punkt ist ein **Eigener Vorschlag** und einzeln umsetzbar. Sagt der Nutzer
   `GET /v1/readiness` – erledigt 19.11.2026, Formwerk 1.9 / Worker 2.7
 - [x] **Etappe A1 – Satzwerk** – Tagesanpassung beim Öffnen/Start (`adjustDay`), Zeilen über den Übungen, keine Befindensfragen mehr,
   Leiste verdeckt nichts – erledigt 19.11.2026, Version 3.23.0
-- [ ] **Etappe A2 – Satzwerk** – Doppelprogression mit festen Stufen, Sätze je Muskel nach Erholung (10–20), Deload −40 %
-  (3× Stillstand oder alle 6 Wochen), Schalter „Anpassungen bestätigen“/„Vollautomatisch“
+- [x] **Etappe A2 – Satzwerk** – Doppelprogression mit festen Stufen, Sätze je Muskel nach Erholung (10–20), Deload −40 %
+  (3× Stillstand oder alle 6 Wochen), Schalter „Anpassungen bestätigen“/„Vollautomatisch“ – erledigt 19.11.2026, Version 3.24.0 / Worker 2.8
 
 ## Später (nicht geplant, nur merken)
 

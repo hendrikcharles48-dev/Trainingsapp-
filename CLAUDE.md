@@ -182,6 +182,13 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   Erholung rot −30 %/gelb ohne Steigerung `presc.noUp`). `dayAdjust` in app.js; Zeilen über der Übung (`.adjline`, `entry.adj`) auf Einheit-Seite,
   im Startfenster (`SHEETS.time`, nur noch „Zeit“) und im Training. `planDiff` wertet Tagesanpassungen nicht als Planänderung (`adjRemoved`, `adjEx`).
   Wochen-Check-in nur ohne Formwerk. Platz unten im Training = Höhe der Leiste (`--rbh`). Tests: `node tools/engine.test.js`.
+- Automatische Progression (3.24, Auftrag 19.11.): Doppelprogression mit festen Stufen (`progStep`: Langhantel +2,5 kg Oberkörper / +5 kg
+  Unterkörper, sonst kleinste Stufe; Wdh. zurück ans untere Ende, `rec.up`). Sätze je Muskel (`learnVolume`): +1 bei 2 guten Wochen
+  (`fw.weeks`, Worker 2.8) und steigender Leistung, −1 bei oft gelb/rot (≥ 4 Tage), Grenzen 10–20. Leichtere Woche −40 % Sätze (`prescription`),
+  ausgelöst durch Stillstand (`E.stalled`: 3 Einheiten ohne Bestwert) in `deloadNeeded` oder spätestens alle 6 Wochen (`meso.len` einmalig
+  auf 6, alter Wert `meso.lenOld`, `mesoV 2`); `plan.deloadFrom` = späterer Start. Schalter Einstellungen → Anpassungen: `settings.adjMode`
+  `'confirm'` (Standard: Tagesanpassung mit Haken im Startfenster `acc`, Steigerung per Knopf `upOk`, Wochen-Volumen `learn.pending` →
+  `volAccept`/`volReject`, Deload-Karte) / `'auto'` (alles ohne Nachfrage, Deload automatisch beim Start).
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
   Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).
