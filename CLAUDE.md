@@ -190,6 +190,11 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   auf 6, alter Wert `meso.lenOld`, `mesoV 2`); `plan.deloadFrom` = späterer Start. Schalter Einstellungen → Anpassungen: `settings.adjMode`
   `'confirm'` (Standard: Tagesanpassung mit Haken im Startfenster `acc`, Steigerung per Knopf `upOk`, Wochen-Volumen `learn.pending` →
   `volAccept`/`volReject`, Deload-Karte) / `'auto'` (alles ohne Nachfrage, Deload automatisch beim Start).
+- Mitteilung im Training (3.25 / Worker 2.10, Nutzerwunsch 19.11.: Sperrbildschirm, echte Live-Aktivität geht für Web-Apps nicht): Web-Push ohne Nutzlast.
+  Worker erzeugt das VAPID-Paar selbst (`vapid` im Durable Object, `push.js`), `/v1/push/key|subscribe|off`, `POST /v1/live {title, body, restEnd, endTitle, endBody}`
+  (sofort Push + Alarm zum Pausenende), `GET /v1/live/state?t=<Token>` ohne Passwort (Token `push:token`). `pwa/sw.js`: `push` holt den Text, `showNotification`
+  mit `tag: 'satzwerk-live'` (ersetzt die vorige), Zugang im Cache `live-cfg`. App: `liveSend()` bei Pausenstart/-Stopp/-Änderung, Trainingsstart, Ende;
+  `FW.liveEnable()` nur auf Tipp (Schalter `settings.live` unter Einstellungen → Signale, nur mit Formwerk). Tests: `node tools/sw-push.test.js`, Worker-Test „Mitteilung im Training“.
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
   Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).

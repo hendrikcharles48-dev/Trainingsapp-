@@ -6,6 +6,8 @@ export class FakeStorage {
   constructor() { this.m = new Map(); }
   async get(k) { if (Array.isArray(k)) { assert.ok(k.length <= 128, 'get > 128 Schlüssel'); return new Map(k.filter(x => this.m.has(x)).map(x => [x, structuredClone(this.m.get(x))])); } return structuredClone(this.m.get(k)); }
   async put(k, v) { if (typeof k === 'object') { assert.ok(Object.keys(k).length <= 128, 'put > 128'); for (const [a, b] of Object.entries(k)) this.m.set(a, structuredClone(b)); } else this.m.set(k, structuredClone(v)); }
+  async setAlarm(t) { this.alarm = t; }
+  async deleteAlarm() { this.alarm = null; }
   async delete(k) { for (const x of [].concat(k)) this.m.delete(x); }
   async list({ prefix = '', start, end } = {}) { return new Map([...this.m.entries()].filter(([k]) => k.startsWith(prefix) && (!start || k >= start) && (!end || k < end)).sort(([a], [b]) => (a < b ? -1 : 1))); }
 }

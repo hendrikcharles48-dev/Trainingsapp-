@@ -350,5 +350,36 @@ await t('Empfehlung: Baseball nur mit eingetragenem Schmerz/Muskelkater', () => 
   assert.ok(on.avoid.includes('Schultern')); assert.ok(on.notes.some(x => /Baseball/.test(x)));
 });
 
+await t('Mitteilung im Training: Abo, Push mit gültiger VAPID-Signatur, „Pause vorbei“ per Alarm, Text nur mit Token', async () => {
+  const sent = []; const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, o = {}) => { if (String(u).startsWith('https://push.example')) { sent.push({ u: String(u), h: o.headers }); return new Response(null, { status: 201 }); } return realFetch(u, o); };
+  try {
+    const key = (await (await call('/v1/push/key')).json()).key; assert.ok(key && key.length > 80);
+    const r0 = await (await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'x' }) })).json(); assert.equal(r0.ok, false, 'ohne Abo kein Push');
+    const sub = await (await call('/v1/push/subscribe', { method: 'POST', body: JSON.stringify({ sub: { endpoint: 'https://push.example/abc' } }) })).json(); assert.ok(sub.ok && sub.token);
+    const end = Date.now() + 120000;
+    const r1 = await (await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'Pause bis 12:00', body: 'Bankdrücken · Satz 2/4 · 60 kg × 8 Wdh.', restEnd: end, endTitle: 'Los: Bankdrücken', endBody: 'Satz 2/4' }) })).json();
+    assert.equal(r1.ok, true); assert.equal(sent.length, 1);
+    // Signatur prüfen: Header „vapid t=<jwt>, k=<öffentlicher Schlüssel>“
+    const m = /^vapid t=([^,]+), k=(.+)$/.exec(sent[0].h.Authorization); assert.ok(m, sent[0].h.Authorization);
+    const [h, c, sg] = m[1].split('.'); assert.equal(m[2], key);
+    const u8 = x => Uint8Array.from(atob(x.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+    const pub = await crypto.subtle.importKey('raw', u8(key), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    assert.ok(await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, u8(sg), new TextEncoder().encode(h + '.' + c)), 'Signatur gültig');
+    assert.equal(JSON.parse(atob(c.replace(/-/g, '+').replace(/_/g, '/'))).aud, 'https://push.example');
+    // Text: nur mit Token, ohne Passwort
+    const open = t => worker.fetch(new Request('https://w.example/v1/live/state?t=' + t), env);
+    assert.equal((await open('falsch')).status, 401);
+    const st1 = await (await open(sub.token)).json(); assert.equal(st1.title, 'Pause bis 12:00');
+    // Alarm → Pause vorbei
+    await doObj.alarm();
+    assert.equal(sent.length, 2); const st2 = await (await open(sub.token)).json(); assert.equal(st2.title, 'Los: Bankdrücken');
+    // abgemeldetes Abo (410) wird gelöscht
+    globalThis.fetch = async (u, o = {}) => (String(u).startsWith('https://push.example') ? new Response(null, { status: 410 }) : realFetch(u, o));
+    await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'y' }) });
+    const r3 = await (await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'z' }) })).json(); assert.equal(r3.ok, false);
+  } finally { globalThis.fetch = realFetch; }
+});
+
 console.log(`\n${n - fails}/${n} Tests bestanden`);
 if (fails) process.exit(1);
