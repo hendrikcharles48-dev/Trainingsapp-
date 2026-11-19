@@ -29,6 +29,8 @@ Aktivitäten waren im Test leer – Baseball/Rad nur in der Belastung, wenn sie 
 ## Noch zu prüfen (Stand 19.11.)
 - [ ] Neuer Morgen-Check (Formwerk 1.9): Muskelkater 4 Stufen per Tipp, Schmerz ja/nein – am iPhone einmal durchtippen
 - [ ] Satzwerk 3.23: Einheit mit Muskelkater/Schmerz starten → Zeilen über den Übungen stimmen? (Worker 2.7 muss gebaut sein: /v1/readiness)
+- [ ] Satzwerk 3.24: im Modus „Bestätigen“ testen; wenn alles passt, in Einstellungen → Anpassungen auf „Vollautomatisch“ stellen
+- [ ] Nach 2–3 Wochen prüfen: Sätze je Muskel (10–20) und leichtere Woche sinnvoll? Zyklus wurde einmalig auf 6 Wochen gestellt
 - [ ] Streifen unten / Tab-Leiste nach iOS-Höhenausgleich (Satzwerk 3.10.3, Formwerk 1.0.5) auf dem iPhone bestätigt? Sonst Zeile „Anzeige …“ unter Mehr erfragen
 - [ ] Satzwerk verbunden (Schritt 9) → Muskelgruppen in Formwerk + Karte auf Satzwerk-„Heute“
 - [x] Cron-Vorabruf morgens aktiv (04:40 + 05:40 UTC, im Dashboard bestätigt 15.11.)

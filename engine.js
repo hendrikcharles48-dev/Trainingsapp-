@@ -497,30 +497,22 @@
     const hi = rec28 != null && rec28 < 55 ? 12 : 15, lo = 6;
     const soreOf = m => { if (!fw || !fw.sore) return null; for (const g in FW_G) if (FW_G[g].includes(m) && fw.sore[g] != null && (fw.soreN || {})[g] >= 1) return fw.sore[g]; return null; };
     const planned = planVolume(plan, profile, plan.place || undefined).week;
-    const T = {}, why = {}; let downs = 0;
+    // 3.24 (Auftrag 19.11.): +1, wenn 2 Wochen in Folge gute Erholung UND Leistung steigt · −1, wenn Erholung oft gelb/rot · Grenzen 10–20
+    const wk = (fw && fw.weeks) || null; const goodBoth = !!(wk && wk.length >= 2 && wk[0].good && wk[1].good); const oftenBad = !!(wk && wk[0] && wk[0].bad >= 4);
+    const T = {}, why = {}; let downs = 0; const lo10 = 10, hi20 = 20;
     for (const m in VOL_T) {
-      const cur = T0[m]; const t = trN[m] >= 2 ? tr[m] / trN[m] : null; const so = soreOf(m);
-      const soreHigh = so != null && so >= 3, soreLow = so == null || so <= 1.5;
+      const cur = T0[m]; const t = trN[m] >= 2 ? tr[m] / trN[m] : null;
       if (t != null && t <= -1) downs++;
-      let d = 0, txt;
       const tt = t == null ? '' : (t >= 0 ? 'Kraft +' : 'Kraft −') + Math.abs(Math.round(t * 10) / 10).toString().replace('.', ',') + ' %/Woche';
-      const st = so == null ? '' : 'Muskelkater ' + String(so).replace('.', ',') + '/5';
-      if (t == null) {
-        if (so != null && so <= 1.5 && good && cur < def[m]) { d = 1; txt = 'Wenig Muskelkater, gut erholt → langsam zurück Richtung ' + def[m] + ' Sätze'; }
-        else txt = 'Noch zu wenig Daten – Ziel bleibt';
-      }
-      else if (t <= -1 && (soreHigh || poor)) { d = -2; txt = 'Schwächer und ' + (soreHigh ? 'viel Muskelkater' : 'schlecht erholt') + ' → weniger Sätze'; }
-      else if (t >= 1 && !soreHigh && !poor) { d = good ? 1 : 0; txt = good ? 'Wird stärker und erholt sich gut → 1 Satz mehr' : 'Wird stärker – Erholung nur mittel, Ziel bleibt'; }
-      else if (t > -1 && t < 1 && soreHigh) { d = -1; txt = 'Stagniert mit viel Muskelkater → 1 Satz weniger'; }
-      else if (t > -1 && t < 1 && soreLow && good) { d = 1; txt = 'Stagniert, aber gut erholt → 1 Satz mehr Reiz'; }
-      else if (t <= -1) { txt = 'Schwächer trotz guter Erholung – eher Diät oder Schlaf, Ziel bleibt'; }
-      else txt = 'Läuft – Ziel bleibt';
-      // Untergrenze 6 nur beim Senken von oben – ein wegen Muskelkater gesenktes Ziel springt nicht von selbst wieder hoch
-      let nv = Math.min(hi, cur + d); if (d < 0) nv = Math.max(nv, Math.min(cur, lo)); if (cur > hi && d >= 0) { nv = Math.max(hi, cur - 2); txt = 'Erholung dauerhaft niedrig → Obergrenze ' + hi; }
-      // Regeneration zuerst: bei viel Muskelkater oder schlechter Erholung nicht über das hinaus, was du jetzt machst
-      const now = Math.round(planned[m] || 0);
-      if ((soreHigh || poor) && now > 0) { const cap = d < 0 ? Math.max(2, now + d) : now; if (nv > cap) { nv = cap; txt += ' · ' + (soreHigh ? 'viel Muskelkater' : 'Erholung knapp') + ': nicht mehr als ' + (d < 0 ? cap : 'jetzt (' + now + ')'); } }
-      T[m] = nv; why[m] = [tt, st, txt].filter(Boolean).join(' · ');
+      let d = 0, txt;
+      if (oftenBad) { d = -1; txt = 'Erholung oft gelb/rot → 1 Satz weniger'; }
+      else if (goodBoth && t != null && t >= 1) { d = 1; txt = '2 Wochen gut erholt und stärker → 1 Satz mehr'; }
+      else if (t == null) txt = 'Noch zu wenig Daten – Ziel bleibt';
+      else if (!goodBoth) txt = 'Erholung noch nicht 2 Wochen gut – Ziel bleibt';
+      else txt = 'Leistung steigt noch nicht – Ziel bleibt';
+      let nv = Math.max(lo10, Math.min(hi20, cur + d));
+      if (cur < lo10) txt += ' · Untergrenze ' + lo10 + ' Sätze';
+      T[m] = nv; why[m] = [tt, txt].filter(Boolean).join(' · ');
     }
     let rir = L.rir || 0; const rirWas = rir;
     if (poor || downs >= 3) rir = Math.min(1, rir + 1); else if (good && downs === 0) rir = Math.max(0, rir - 1);
@@ -735,8 +727,8 @@
           const d = sv === 2 && o.sets >= 4 ? 2 : 1; const n = Math.max(1, o.sets - d);
           if (n < o.sets) add(o, id, 'sets', '−' + (o.sets - n) + (o.sets - n > 1 ? ' Sätze' : ' Satz') + ': Muskelkater ' + SORE_T[sv] + ' (' + ADJ_GL[sg] + ')');
           o.sets = n;
-          if (sv === 2 && ex.kind === 'load') { o._loadF = 0.9; add(o, id + ':w', 'load', 'Gewicht −10 %: Muskelkater mittel'); }
         }
+        if (sv === 2 && ex.kind === 'load' && ok(id + ':w')) { o._loadF = 0.9; add(o, id + ':w', 'load', 'Gewicht −10 %: Muskelkater mittel'); }
       }
       // gestern Baseball
       if (rd.yesterdayBaseball) {
@@ -797,7 +789,7 @@
   // Phase 0–3 (Einstieg, Aufbau, Aufbau, Peak) für beliebige Zykluslänge
   function phaseOf(w, len) { return Math.max(0, Math.min(3, Math.round((w - 1) / Math.max(1, len - 2) * 3))); }
   function weekInfo(plan, profile) {
-    const autoDl = plan && plan.deloadUntil && todayISO() < plan.deloadUntil;
+    const autoDl = plan && plan.deloadUntil && todayISO() < plan.deloadUntil && (!plan.deloadFrom || todayISO() >= plan.deloadFrom);
     const len = (plan && plan.meso && plan.meso.len) || 5;
     const w = plan && (plan.forceDeload || autoDl) ? len : mesoWeek(plan);
     const deload = w === len;
@@ -832,7 +824,7 @@
     const exp = (profile.answers || {}).exp;
     // Zusatzsatz für Grundübungen in den harten Wochen – nicht im Defizit (Ziel „Fett weg & Muskeln“)
     if (!wi.deload && (wi.phase ?? wi.w - 1) >= 2 && role === 'main' && exp !== 'new' && !isCut(profile, plan)) sets += 1;
-    if (wi.deload) sets = Math.max(1, Math.ceil(sets / 2));
+    if (wi.deload) sets = Math.max(1, Math.round(sets * 0.6)); // 3.24: leichtere Woche = −40 % Volumen
     const ad = adaptNow(profile);
     if (ad && !wi.deload) { if (ad.sets < 0 && (role === 'sec' || role === 'iso' || role === 'core')) sets = Math.max(2, sets + ad.sets); if (ad.sets > 0 && (role === 'main' || role === 'sec')) sets += ad.sets; }
     let rr = ex.rr || [8, 12];
@@ -1013,8 +1005,9 @@
         const allTop = lastSets.every(s => (+s.reps || 0) >= hi && (+s.rir || 0) <= lastRIRT + 1);
         let w = anchor, reps;
         if (allTop) {
-          const up = opts[ai + 1];
-          if (up != null && (baseLoad + up) > 0) { w = up; reps = fit(Math.max(lo, capR(up))); notes.push('Obergrenze geschafft: mehr Gewicht, Wdh. beginnen wieder unten'); }
+          // 3.24: Langhantel +2,5 kg (Oberkörper) / +5 kg (Unterkörper), Kurzhantel/Maschine/Kabel kleinste Stufe; Wdh. zurück ans untere Ende
+          const step = progStep(ex); const up = opts.find(o => o > anchor + 1e-9 && o >= anchor + step - 1e-9);
+          if (up != null && (baseLoad + up) > 0) { w = up; reps = lo; out.up = { from: anchor, to: up, reps0: hi }; notes.push('Alle Sätze oben geschafft: +' + String(Math.round((up - anchor) * 10) / 10).replace('.', ',') + ' kg, Wdh. zurück auf ' + lo); }
           else { reps = hi; notes.push('Schwerstes Gewicht: langsamer ablassen (3 s) macht es härter'); }
         } else if (r0 < lo - 1) {
           const dn = ai > 0 ? opts[ai - 1] : anchor; w = dn; reps = fit(capR(dn));
@@ -1060,6 +1053,14 @@
     if (!done.length && ex.kind === 'load' && presc.role === 'main' && bestO >= 20) out.warmup = warmups(bestO, opts);
     if (calib && !done.length) notes.unshift('Erste Einheit mit dieser Übung: Gewicht ist geschätzt, dein erster Satz kalibriert alles Weitere');
     return out;
+  }
+  const LOWER_M = ['quads', 'hams', 'glutes'];
+  function progStep(ex) { return ex.eq && ex.eq.includes('bb') ? (ex.prim.some(m => LOWER_M.includes(m)) ? 5 : 2.5) : 0; }
+  // 3.24: Stillstand = in den letzten 3 Einheiten kein neuer Bestwert (mind. 4 Einheiten Verlauf, beste Satz-Leistung)
+  function stalled(ex, hist, bw) {
+    if (!ex || ex.kind === 'hold' || ex.kind === 'int' || hist.length < 4) return false;
+    const b = hist.map(h => sessionBest(ex, h.entry, h.bw || bw)); const last3 = b.slice(-3), before = b.slice(0, -3);
+    return Math.max(...last3) <= Math.max(...before) * 1.005;
   }
   function clampReps(r, hi) { return Math.max(1, Math.min(Math.floor(r + 0.35), hi + 6)); }
   function pct(x) { return (x > 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + ' %'; }
@@ -1136,7 +1137,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, readyDay, adjustDay, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, adjustDay, stalled, progStep, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

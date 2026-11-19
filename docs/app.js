@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.23.0';
+  const APP_VERSION = '3.24.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -552,7 +552,7 @@
   /* ================= Heute ================= */
   // Formwerk meldet müde Muskeln → Vorschlag ohne sie (engine readyDay), Plan bleibt unverändert
   /* 3.23: Tagesanpassung aus Formwerk (/v1/readiness). acc = Set angenommener Änderungen (nur im Modus „bestätigen“). */
-  function adjMode() { return (settings().adjMode) || 'auto'; }
+  function adjMode() { return (settings().adjMode) || 'confirm'; } // 3.24: „Anpassungen bestätigen“ (Standard) oder „Vollautomatisch“
   function dayAdjust(di, loc, acc) {
     const rd = FW.readyData(); const p = plan(); const d = p && p.days[di]; if (!rd || !d) return null;
     const a = E.adjustDay(d, loc, P(), p, rd, { plans: P().plans, only: acc || undefined });
@@ -1104,7 +1104,9 @@
     const ex = getEx(entry.exId); const presc = entry.presc;
     const done = entry.sets.filter(s => s.done);
     const hist = histOf(entry.exId);
-    const rec = E.recommend(ex, presc, done, hist, { profile: P(), loc: st.active.loc, band: entry.band || null });
+    let rec = E.recommend(ex, presc, done, hist, { profile: P(), loc: st.active.loc, band: entry.band || null });
+    // Modus „bestätigen“: Gewichtssteigerung erst nach Tipp (bis dahin gleiches Gewicht wie zuletzt, Wdh. oben)
+    if (rec.up && adjMode() === 'confirm' && !entry.upOk && !done.length) rec = Object.assign({}, rec, { w: rec.up.from, reps: rec.up.reps0, upPending: rec.up, notes: rec.notes.filter(n => !/oben geschafft/.test(n)) });
     let planned = Math.max(1, rec.setsRec + (entry.extra || 0));
     if (rec.stop && !entry.ignoreStop) planned = Math.max(done.length, 1);
     if (entry.closed && done.length) planned = done.length;
@@ -1234,6 +1236,7 @@
         ${recordLine(ex, S, nextW, nextR)}
         <div class="note">Ziel ${rrText(presc.rr, ex)}${unitNote}${prevSets[done.length] ? ' · Letztes Mal: ' + shortSet(ex, prevSets[done.length]) : ''}</div>
         ${rec.warmup && rec.warmup.length ? `<div class="note">Aufwärmen: ${rec.warmup.map(w => fmt(w.w) + ' kg × ' + w.reps).join(' · ')}</div>` : ''}
+        ${rec.upPending ? `<button class="btn sm upbtn" data-a="upOk" data-i="${idx}">Alle Sätze oben geschafft – auf ${fmt(rec.upPending.to)} kg steigern?</button>` : ''}
         ${rec.notes.map(t => `<div class="note">${esc(t)}</div>`).join('')}
         ${rec.stop && !entry.ignoreStop ? `<div class="row"><button class="btn sm" data-a="ignoreStop" data-i="${idx}">Trotzdem weiter</button></div>` : ''}
         ${(() => { const nb = levelNeighbors(entry); if (!nb.easier && !nb.harder) return ''; const rc = levelRec(entry, S, nb); return `<div class="row"><button class="btn sm" data-a="levelOpen" data-i="${idx}">${I.swap} Leichter / Schwerer${rc !== 'cur' ? `<span class="recdot">${rc === 'harder' ? '▲' : '▼'} Tipp</span>` : ''}</button></div>`; })()}
@@ -1441,12 +1444,25 @@
       if (rep) L.rep = rep;
       if (E.weekInfo(pl, pr).deload) { L.wk = forWk; any = true; continue; }
       if (!snap) { Backup.snapshot('vor-volumen'); snap = true; }
-      learnPlan(pl); L.wk = forWk; if (L.last) L.last.rep = rep; any = true;
+      if (adjMode() === 'confirm') stagePlan(pl, rep, forWk); else { learnPlan(pl); if (L.last) L.last.rep = rep; } L.wk = forWk; any = true;
     }
     if (any) { Store.saveProfile(true); render(); }
   }
   // Volumen-Abschnitt im Wochenbericht
+  // Modus „bestätigen“: Änderungen an einer Kopie rechnen und vormerken – erst ein Tipp übernimmt sie
+  function stagePlan(pl, rep, wk) {
+    const cp = clone(pl); const ch = learnPlan(cp); const L = pl.learn;
+    if (!ch.length) { Object.assign(L, { T: cp.learn.T, why: cp.learn.why, rir: cp.learn.rir, notes: cp.learn.notes, t: Date.now(), n: cp.learn.n }); delete L.pending; return; }
+    L.pending = { rep: rep || null, wk, ch, days: cp.days, T: cp.learn.T, why: cp.learn.why, rir: cp.learn.rir, notes: cp.learn.notes, plan: pl.name || pl.splitName };
+  }
+  function volPendingHTML(pl) {
+    const pd = pl.learn.pending;
+    return `<div class="card flat stack" style="gap:6px"><b>${esc(pd.plan)}</b><ul class="difflist">${pd.ch.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      ${pd.no ? '<div class="small muted">Abgelehnt – Plan bleibt</div>' : `<div class="row"><button class="btn primary grow" data-a="volAccept" data-id="${pl.id}">Übernehmen</button><button class="btn grow" data-a="volReject" data-id="${pl.id}">Nein</button></div>`}</div>`;
+  }
   function volReport(repId) {
+    const pend = (P().plans || []).filter(x => x.learn && x.learn.pending && x.learn.pending.rep === repId);
+    if (pend.length) return `<div class="lbl">Volumen für nächste Woche – bitte bestätigen</div>${pend.map(volPendingHTML).join('')}<div class="small muted">Gelernt aus deiner Kraftentwicklung und deiner Erholung (Formwerk). Vor dem Übernehmen wird gesichert.</div>`;
     const pls = (P().plans || []).filter(x => x.learn && x.learn.last && x.learn.last.rep === repId); if (!pls.length) return '';
     return `<div class="lbl">Volumen für nächste Woche</div>${pls.map(pl => { const l = pl.learn.last;
       return `<div class="card flat stack" style="gap:6px"><b>${esc(l.plan)}</b><ul class="difflist">${l.ch.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
@@ -1454,6 +1470,8 @@
       <div class="small muted">Angepasst nach deiner Kraftentwicklung, deinem Muskelkater nach dem Training und deiner Erholung. Vorher wurde gesichert.</div>`;
   }
   function volLastCard() {
+    const pp = (P().plans || []).find(x => x.learn && x.learn.pending && !x.learn.pending.rep && !x.learn.pending.no);
+    if (pp) return `<div class="card stack" style="gap:10px"><b>Volumen für diese Woche – bestätigen?</b>${volPendingHTML(pp)}</div>`;
     const pr = P(); const pl = (pr.plans || []).find(x => x.learn && x.learn.last && !x.learn.last.seen && !x.learn.last.rep); if (!pl) return '';
     const l = pl.learn.last;
     return `<div class="card stack" style="gap:10px"><b>Plan an deine Erholung angepasst</b><div class="small muted">${esc(l.plan)} · diese Woche</div><ul class="difflist">${l.ch.slice(0, 6).map(c => `<li>${esc(c)}</li>`).join('')}${l.ch.length > 6 ? `<li>… und ${l.ch.length - 6} weitere</li>` : ''}</ul>
@@ -1942,6 +1960,8 @@
       const tog = (k, l, sub) => `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">${l}</div>${sub ? `<div class="small muted">${sub}</div>` : ''}</div><input type="checkbox" data-a="setToggle" data-k="${k}" ${se[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
       const head = t => `<div class="eyebrow sethead">${t}</div>`;
       return `<div class="stack"><h2>Einstellungen</h2>
+        ${head('Anpassungen')}<div class="seg">${[['confirm', 'Bestätigen'], ['auto', 'Vollautomatisch']].map(([k, n]) => `<button data-a="adjModeSet" data-k="${k}" aria-pressed="${adjMode() === k}">${n}</button>`).join('')}</div>
+        <div class="tiny muted">${adjMode() === 'auto' ? 'Tagesanpassung aus Formwerk, Gewichtssteigerung, Sätze je Muskel und leichtere Woche passieren ohne Nachfrage – mit Hinweis.' : 'Jede Änderung (Tagesanpassung, Gewichtssteigerung, Sätze je Muskel, leichtere Woche) übernimmst du mit einem Tipp.'}</div>
         ${head('Training')}<div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
         ${head('Signale')}<div class="list">${tog('sound', 'Töne', 'Auf dem iPhone nur ohne Stumm-Schalter')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}</div>
         <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden; im Training bleibt der Bildschirm an.</div>
@@ -2257,6 +2277,13 @@
     balanceApply() { const dp = st.sheet.dayPreview; if (dp) { const d = plan().days.find(x => x.id === dp.id); if (d) { Backup.snapshot('vor-ausgleich'); d.slots = dp.slots; touchPlan(); Store.saveProfile(true); } closeSheet(); render(); toast('Einheit ausbalanciert'); return; } const cp = st.sheet.preview; if (!cp) return; plan().days = cp.days; Store.saveProfile(true); closeSheet(); render(); toast('Plan ausbalanciert'); },
     volOk(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) { pl.learn.last.seen = true; Store.saveProfile(); } render(); },
     volWhy(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); if (pl && pl.learn && pl.learn.last) pl.learn.last.seen = true; if (pl && pl.id !== P().planId) activatePlan(pl.id); Store.saveProfile(); st.tab = 'plan'; st.planDay = (plan().days[nextDayIdx()] || plan().days[0] || {}).id || null; render(); setTimeout(() => { const c = $('#volCard'); if (c) c.scrollIntoView({ behavior: 'smooth' }); }, 60); },
+    volAccept(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); const L = pl && pl.learn; const pd = L && L.pending; if (!pd || pd.no) return;
+      Backup.snapshot('vor-volumen'); L.last = { wk: pd.wk, ch: pd.ch, undo: clone({ days: pl.days, T: L.T || null, rir: L.rir || 0 }), seen: true, rep: pd.rep, plan: pd.plan };
+      pl.days = pd.days; Object.assign(L, { T: pd.T, why: pd.why, rir: pd.rir, notes: pd.notes, t: Date.now() }); delete L.pending; if (!pl.custom) pl.edited = true;
+      Store.saveProfile(true); if (st.sheet) renderSheet(); render(); toast('Übernommen'); },
+    volReject(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); const pd = pl && pl.learn && pl.learn.pending; if (!pd) return; pd.no = true; delete pd.days; Store.saveProfile(); if (st.sheet) renderSheet(); render(); toast('Plan bleibt wie er ist'); },
+    adjModeSet(t) { P().settings = Object.assign(settings(), { adjMode: t.dataset.k }); Store.saveProfile(); renderSheet(); toast(t.dataset.k === 'auto' ? 'Vollautomatisch: Anpassungen ohne Nachfrage' : 'Jede Anpassung mit einem Tipp bestätigen'); },
+    upOk(t) { const e = st.active.exercises[+t.dataset.i]; if (!e) return; e.upOk = true; e.draft = null; Store.saveActive(); renderOverlay(); },
     volUndo(t) { const pl = (P().plans || []).find(x => x.id === t.dataset.id); const l = pl && pl.learn && pl.learn.last; if (!l || !l.undo) return;
       Backup.snapshot('vor-rueckgaengig'); pl.days = l.undo.days; pl.learn.T = l.undo.T || undefined; if (!l.undo.T) delete pl.learn.T; pl.learn.rir = l.undo.rir || 0; l.seen = true; l.undone = true; delete l.undo;
       Store.saveProfile(true); render(); toast('Rückgängig gemacht'); },
@@ -2432,7 +2459,7 @@
   function coachCard() {
     const c = FW.coach(); if (!c || !P() || coachRec(c.id).closed) return '';
     const n = coachOpenN(c);
-    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${[n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen', (P().plans || []).some(x => x.learn && x.learn.last && x.learn.last.rep === c.id && !x.learn.last.undone) ? 'Volumen angepasst' : ''].filter(Boolean).join(' · ')}</div></div><span class="chev">${I.chev}</span></button>`;
+    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${[n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen', (P().plans || []).some(x => x.learn && x.learn.pending && x.learn.pending.rep === c.id && !x.learn.pending.no) ? 'Volumen bestätigen' : (P().plans || []).some(x => x.learn && x.learn.last && x.learn.last.rep === c.id && !x.learn.last.undone) ? 'Volumen angepasst' : ''].filter(Boolean).join(' · ')}</div></div><span class="chev">${I.chev}</span></button>`;
   }
   async function exportData(src) {
     const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };
@@ -2504,7 +2531,10 @@
     }
     // Formwerk-Signale (HRV, Ruhepuls, Erholung, Muskelkater/Schmerz) zählen mit: 2 Formwerk-Zeichen oder 1 + fallende Leistung
     const fs = FW.signals(); const fc = fs && fs.deload ? fs.deload.count : 0;
-    return falling >= 2 || fc >= 2 || (falling >= 1 && fc >= 1);
+    // 3.24: eine Übung 3 Einheiten ohne neuen Bestwert → leichtere Woche (−40 %)
+    const st3 = [...ids].map(getEx).filter(ex => ex && E.stalled(ex, histOf(ex.id), E.bodyweight(P())));
+    st.dlWhy = st3.length ? 'Kein neuer Bestwert seit 3 Einheiten: ' + st3.slice(0, 3).map(x => x.name).join(', ') + '.' : null;
+    return st3.length > 0 || falling >= 2 || fc >= 2 || (falling >= 1 && fc >= 1);
   }
   // Baseball & Co.: vor/an Spieltagen keine schweren Bein- oder Überkopf-Grundübungen
   function heavyDay(d, loc) { return d.slots.some(sl => sl.r === 'main' && (getEx(sl.ex[loc]) || {}).pat && ['squat', 'hinge', 'lunge', 'vpush'].includes(getEx(sl.ex[loc]).pat)); }
@@ -2535,7 +2565,7 @@
     const g = (p.answers || {}).goal;
     if (!(p.seen || {}).recomp && ['muscle', 'fit', 'health'].includes(g)) out += `<div class="card stack" style="gap:10px"><b>Neues Ziel: Fett weg & Muskeln aufbauen</b><div class="small muted">Für die Zeit, in der du Körperfett verlierst: gleiche Übungen, etwas weniger Zusatzvolumen, Fokus darauf, die Kraft zu halten. Dein Plan bleibt, wie er ist.</div><div class="row"><button class="btn primary grow" data-a="recompYes">Umstellen</button><button class="btn grow" data-a="recompNo">Nein danke</button></div></div>`;
     out += sportHint();
-    if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Deload-Woche empfohlen</b><div class="small muted">${(() => { const fs = FW.signals(); const r = fs && fs.deload ? fs.deload.reasons : []; return (r.length ? 'Formwerk: ' + esc(r.join(' · ')) + '. ' : 'Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. ') + 'Eine leichtere Woche (halbe Sätze, mehr Reserve) bringt dich meist stärker zurück.'; })()}</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
+    if (deloadNeeded()) out += `<div class="card stack" style="gap:10px"><b>Deload-Woche empfohlen</b><div class="small muted">${(() => { const fs = FW.signals(); const r = fs && fs.deload ? fs.deload.reasons : []; return (st.dlWhy ? esc(st.dlWhy) + ' ' : r.length ? 'Formwerk: ' + esc(r.join(' · ')) + '. ' : 'Bei mehreren Grundübungen ist deine Leistung zweimal hintereinander gesunken. ') + 'Eine leichtere Woche (−40 % Sätze, mehr Reserve) bringt dich meist stärker zurück.'; })()}</div><div class="row"><button class="btn primary grow" data-a="dlYes">Deload starten</button><button class="btn grow" data-a="dlNo">Nein</button></div></div>`;
     const since = p.lastExport || ''; const nNew = st.workouts.filter(w => w.date > since).length;
     const days = since ? (Date.now() - new Date(since + 'T12:00:00').getTime()) / 864e5 : 999;
     const cs = Cloud.state(), cOn = !!Cloud.cfg();
@@ -2742,6 +2772,9 @@
       else openSheet({ type: 'stale' });
     }
     if (balCh && balCh.length) setTimeout(() => openSheet({ type: 'balanceInfo', ch: balCh }), 700);
+    // 3.24: leichtere Woche spätestens alle 6 Wochen – Zykluslänge einmalig auf 6 (alter Wert bleibt in meso.lenOld), vorher Sicherung
+    if (((st.profile && st.profile.plans) || []).some(pl => pl.meso && !pl.mesoV)) { Backup.snapshot('vor-zyklus'); for (const pl of st.profile.plans) if (pl.meso && !pl.mesoV) { if (pl.meso.len !== 6) { pl.meso.lenOld = pl.meso.len; pl.meso.len = 6; } pl.mesoV = 2; } Store.saveProfile(true); }
+    setTimeout(() => { try { if (adjMode() === 'auto' && !st.active && P() && deloadNeeded()) { A.dlYes(); toast('Leichtere Woche gestartet (−40 % Sätze)' + (st.dlWhy ? ': ' + st.dlWhy : ''), 5000); } } catch (e) { } }, 4500);
     setTimeout(() => { try { weeklyLearn(); } catch (e) { console.warn('Volumen lernen', e); } }, 4000); // nach dem Formwerk-Abruf
   })();
 })();
