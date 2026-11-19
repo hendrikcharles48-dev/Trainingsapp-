@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.24.0';
+  const APP_VERSION = '3.24.1';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -598,7 +598,7 @@
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
       : `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Nächste Einheit'} · Woche ${wi.w}/${wi.len}${wi.deload ? ' · Deload' : ''}</div><h2 class="xl clamp2">${esc(day.name)}</h2><div class="small ink2 ell">${esc(dayFocus(day, loc))}</div></div><div class="figtile hero">${figSVG(hx, { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg onlight">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        ${(() => { const A = dayAdjust(di, loc, null); return A && A.adj.any ? `<div class="readyhint"><b>Heute angepasst</b><span>${esc(A.line)} · ${A.adj.changes.length} ${A.adj.changes.length === 1 ? 'Änderung' : 'Änderungen'} – beim Start</span></div>` : ''; })()}
+        ${(() => { const A = dayAdjust(di, loc, null); return A && A.adj.any ? `<div class="readyhint one"><b>Heute angepasst</b><span>${A.adj.changes.length} ${A.adj.changes.length === 1 ? 'Änderung' : 'Änderungen'} beim Start</span></div>` : ''; })()}
         ${(() => { const r = false; return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
         <div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${setsPlan}</b><span>Sätze</span></div><div><b>${estMinutes(day, loc)}</b><span>Minuten</span></div></div>
         <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button></div>`;
@@ -700,7 +700,6 @@
     <div class="stack">
       <div class="card navy stack" style="gap:12px"><div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${sets}</b><span>Sätze</span></div><div><b>${estMinutes(d, loc)}</b><span>Minuten</span></div></div>
         ${st.active ? `<button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button>` : `<button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button>`}</div>
-      ${AJ && AJ.adj.any ? `<div class="readyhint"><b>Heute angepasst (Formwerk)</b><span>${esc(AJ.line)}${AJ.adj.noUp ? ' · keine Gewichtssteigerung' : ''}</span></div>` : ''}
       ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => adjLines(sl) + slotRow(sl, si)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
       <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
       ${dayVolCard(p, di, loc)}

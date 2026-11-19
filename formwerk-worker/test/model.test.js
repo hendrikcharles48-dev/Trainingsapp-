@@ -301,7 +301,7 @@ await t('Körpergefühl: Muskelkater/Schmerz heute, Pause bei starkem Schmerz, H
   const t2 = await (await call('/v1/today')).json(); assert.equal(t2.pain[0].inj, 'shoulder'); assert.equal(t2.checkin, true);
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, pain: { knie: 5 } }) });
   j = await (await call('/v1/summary')).json(); assert.equal(j.recommendation.level, j.recommendation.level === 'done' ? 'done' : 'rest');
-  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d }) });
+  await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, sore: { schultern: 2 } }) }); // Baseball wirkt nur mit eingetragenem Muskelkater/Schmerz
   const y = addDays(d, 5); // Baseball-Frage allein zählt nicht als Check
   await call('/v1/checkin', { method: 'POST', body: JSON.stringify({ date: d, bbOnly: true, bbToday: true }) });
   let jj = await (await call('/v1/summary')).json(); assert.ok(jj.recommendation.sportToday, 'Heute Baseball wirkt'); assert.ok(jj.recommendation.level !== 'full');
@@ -338,6 +338,16 @@ await t('Readiness: Stufen, Schmerz ja/nein, gestern Baseball', () => {
 });
 await t('Worker: /v1/readiness', async () => {
   const j = await (await call('/v1/readiness')).json(); assert.ok('recovery' in j && 'sore' in j && 'pain' in j && 'yesterdayBaseball' in j, JSON.stringify(j).slice(0, 200));
+});
+
+await t('Empfehlung: Baseball nur mit eingetragenem Schmerz/Muskelkater', () => {
+  const muscles = [{ k: 'schultern', label: 'Schultern', status: 'fresh', pct: 5 }, { k: 'trizeps', label: 'Trizeps', status: 'fresh', pct: 5 }];
+  const base = { date: '2026-11-19', rec: { color: 'green', hasData: true, parts: [] }, muscles, sessions: [], ratio: null, sleepPart: null, now: Date.parse('2026-11-19T12:00:00Z') };
+  const S = { sportDays: [weekday('2026-11-19'), (weekday('2026-11-19') + 1) % 7] };
+  const off = recommend(Object.assign({}, base, { settings: Object.assign({ bbRelevant: false }, S) }));
+  assert.deepEqual(off.avoid, []); assert.ok(!off.notes.some(x => /Baseball/.test(x))); assert.equal(off.level, 'full');
+  const on = recommend(Object.assign({}, base, { settings: Object.assign({ bbRelevant: true }, S) }));
+  assert.ok(on.avoid.includes('Schultern')); assert.ok(on.notes.some(x => /Baseball/.test(x)));
 });
 
 console.log(`\n${n - fails}/${n} Tests bestanden`);
