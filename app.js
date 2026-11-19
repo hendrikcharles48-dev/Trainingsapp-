@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.22.0';
+  const APP_VERSION = '3.23.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, volSignals: () => null, coach: () => null, refreshCoach() { } };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, volSignals: () => null, readyData: () => null, fetchReadiness() { }, coach: () => null, refreshCoach() { } };
   // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
   function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
@@ -551,6 +551,19 @@
 
   /* ================= Heute ================= */
   // Formwerk meldet müde Muskeln → Vorschlag ohne sie (engine readyDay), Plan bleibt unverändert
+  /* 3.23: Tagesanpassung aus Formwerk (/v1/readiness). acc = Set angenommener Änderungen (nur im Modus „bestätigen“). */
+  function adjMode() { return (settings().adjMode) || 'auto'; }
+  function dayAdjust(di, loc, acc) {
+    const rd = FW.readyData(); const p = plan(); const d = p && p.days[di]; if (!rd || !d) return null;
+    const a = E.adjustDay(d, loc, P(), p, rd, { plans: P().plans, only: acc || undefined });
+    const all = acc ? E.adjustDay(d, loc, P(), p, rd, { plans: P().plans }) : a;
+    const g = { brust: 'Brust', ruecken: 'Rücken', schultern: 'Schultern', bizeps: 'Bizeps', trizeps: 'Trizeps', griff: 'Unterarme', rumpf: 'Rumpf', vorn: 'Beine vorn', hinten: 'Po & Beinbeuger', waden: 'Waden' };
+    const parts = []; if (rd.recovery != null) parts.push('Erholung ' + rd.recovery + ' %');
+    const so = Object.entries(rd.sore || {}).map(([k, v]) => (g[k] || k) + ' ' + ['', 'leicht', 'mittel', 'stark'][v]); if (so.length) parts.push('Muskelkater ' + so.join(', '));
+    if ((rd.pain || []).length) parts.push('Schmerz ' + rd.pain.map(x => x.label).join(', '));
+    if (rd.yesterdayBaseball) parts.push('gestern Baseball');
+    return { rd, adj: a, all, line: parts.join(' · '), day: Object.assign({}, d, { slots: a.slots }), counts: true };
+  }
   function readyFor(di, loc) {
     const b = FW.readiness(); const p = plan(); if (!b || !p || !p.days[di]) return null;
     const r = E.readyDay(p.days[di], loc, P(), p, b, P().plans || [p]); if (!r) return null;
@@ -585,7 +598,8 @@
         <button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button></div>`
       : `<div class="card navy nextcard"><div class="nexttop"><div class="grow stack" style="gap:6px;min-width:0"><div class="eyebrow">${st.homeDay != null ? 'Ausgewählt' : 'Nächste Einheit'} · Woche ${wi.w}/${wi.len}${wi.deload ? ' · Deload' : ''}</div><h2 class="xl clamp2">${esc(day.name)}</h2><div class="small ink2 ell">${esc(dayFocus(day, loc))}</div></div><div class="figtile hero">${figSVG(hx, { anim: 2.8 })}</div></div>
         ${locs().length > 1 ? `<div class="seg onlight">${['home', 'gym'].map(l => `<button data-a="homeLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-        ${(() => { const r = readyFor(di, loc); return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
+        ${(() => { const A = dayAdjust(di, loc, null); return A && A.adj.any ? `<div class="readyhint"><b>Heute angepasst</b><span>${esc(A.line)} · ${A.adj.changes.length} ${A.adj.changes.length === 1 ? 'Änderung' : 'Änderungen'} – beim Start</span></div>` : ''; })()}
+        ${(() => { const r = false; return r ? `<div class="readyhint"><b>${esc(r.why)}</b><span>Beim Start: Vorschlag ohne ${r.removed.length === 1 ? 'diese Übung' : 'diese ' + r.removed.length + ' Übungen'}${r.added.length ? ', dafür ' + r.added.length + ' für bereite Muskeln' : ''}</span></div>` : ''; })()}
         <div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${setsPlan}</b><span>Sätze</span></div><div><b>${estMinutes(day, loc)}</b><span>Minuten</span></div></div>
         <button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button></div>`;
     return `<div class="homebar compact"><div class="row" style="align-items:center;gap:8px"><div class="grow" style="min-width:0"><div class="eyebrow ell">${dateTxt}</div><h1 class="ell">Moin${name ? ', ' + esc(name) : ''}</h1></div><button class="iconbtn" data-a="tab" data-k="timer" aria-label="Timer">${I.timer}</button><button class="iconbtn" data-a="settings" aria-label="Einstellungen">${I.gear}</button></div></div>
@@ -619,7 +633,7 @@
     return `<div class="card row"><div class="grow"><b>Körpergewicht aktuell?</b><div class="small muted">Klimmzüge, Dips & Co. werden damit berechnet. Aktuell: ${fmt(E.bodyweight(P()), 1)} kg</div></div><button class="btn sm" data-a="bwSheet">Eintragen</button></div>`;
   }
   function checkinDue() {
-    if (!plan() || st.ciLater) return false;
+    if (!plan() || st.ciLater || FW.configured()) return false; // Körperzustand kommt nur noch aus Formwerk (3.23)
     const sow = E.todayISO(E.startOfWeek());
     if ((P().checkins || []).some(c => c.week === sow)) return false;
     return st.workouts.some(w => w.date < sow);
@@ -677,13 +691,17 @@
     const d = p.days[di]; const SLp = ssLabels(d.slots); const nd = nextDayIdx();
     const slots = d.slots.filter(s => s.ex[loc]);
     const sets = slots.reduce((t, sl) => { const ex = getEx(sl.ex[loc]); return t + (ex ? E.prescription(sl, ex, P(), p).sets : 0); }, 0);
+    const AJ = dayAdjust(di, loc, null); const adjBy = {}, dropBy = {};
+    if (AJ && AJ.adj.any) { for (const x of AJ.adj.slots) adjBy[x.id] = x; for (const r of AJ.adj.removed) dropBy[r.slotId] = r; }
+    const adjLines = sl => dropBy[sl.id] ? `<div class="adjline">Heute gestrichen: ${esc(dropBy[sl.id].why)}</div>` : adjBy[sl.id] && adjBy[sl.id]._adj.length ? adjBy[sl.id]._adj.map(l => `<div class="adjline">${esc(l)}${adjBy[sl.id]._from && /^Ersetzt/.test(l) ? ' → ' + esc((getEx(adjBy[sl.id].ex[loc]) || {}).name || '') : ''}</div>`).join('') : '';
     const slotRow = (sl, si) => { const ex = getEx(sl.ex[loc]); if (!ex) return `<div class="li"><div class="thumb"></div><div class="grow muted small">Keine passende Übung ${loc === 'home' ? 'zu Hause' : 'im Studio'}</div></div>`; const pr = E.prescription(sl, ex, P(), p); const ro = { main: 'Grundübung', sec: 'Ergänzung', iso: 'Isolation', skill: 'Skill', core: 'Rumpf', cond: 'Kondition' }[sl.r] || '';
       return `<button class="li ${SLp[si] ? 'ss' : ''}" data-a="slotSheet" data-drag="1" data-d="${di}" data-s="${si}">${thumb(ex)}<div class="grow"><div class="ell" style="font-weight:700">${SLp[si] ? `<span class="sstag">${SLp[si]}</span>` : ''}${favMark(ex.id)}${esc(ex.name)}</div><div class="small muted ell">${ro} · ${pr.sets} × ${pr.rr[0]}–${pr.rr[1]}${ex.uni ? ' pro Seite' : ''} · ${pr.rest} s</div></div><span class="chev">${I.chev}</span></button>`; };
     return `<div class="topbar"><button class="iconbtn" data-a="dayBack" aria-label="Zurück">${I.back}</button><div class="grow" style="min-width:0"><div class="eyebrow ell">${esc(p.name || p.splitName)}${di === nd ? ' · als Nächstes' : ''}</div><h1 class="ell" style="font-size:32px">${esc(d.name)}</h1></div><button class="iconbtn" data-a="dayEdit" data-d="${di}" aria-label="Einheit bearbeiten">${I.more}</button></div>
     <div class="stack">
       <div class="card navy stack" style="gap:12px"><div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${sets}</b><span>Sätze</span></div><div><b>${estMinutes(d, loc)}</b><span>Minuten</span></div></div>
         ${st.active ? `<button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button>` : `<button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button>`}</div>
-      ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => slotRow(sl, si)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
+      ${AJ && AJ.adj.any ? `<div class="readyhint"><b>Heute angepasst (Formwerk)</b><span>${esc(AJ.line)}${AJ.adj.noUp ? ' · keine Gewichtssteigerung' : ''}</span></div>` : ''}
+      ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => adjLines(sl) + slotRow(sl, si)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
       <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
       ${dayVolCard(p, di, loc)}
     </div>`;
@@ -999,7 +1017,13 @@
     if (a.hold && !st.hold) st.hold = Object.assign({}, a.hold);
   }
   function toFocus() { const o = document.getElementById('ov'); if (o) o.scrollTop = 0; }
+  // 3.23: Platz unten im Training = echte Höhe der Leiste (Pause-Ring ist höher als das normale Panel) – nichts wird verdeckt
   function renderRest() {
+    renderRestCore();
+    const pn = document.querySelector('#rb .panel'); const h = pn ? Math.ceil(pn.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--rbh', h + 'px');
+  }
+  function renderRestCore() {
     const el = layerEl('rb');
     syncTimers();
     if (!st.ov || st.ov.type !== 'workout' || !st.active) { el.innerHTML = st.hold ? holdPanel() : ''; return; }
@@ -1057,8 +1081,12 @@
       });
       timeNote = { delta, minutes: tp.minutes, notes: tp.notes };
     } else exercises = day.slots.filter(s => s.ex[loc]).map(s => newEntry(s.ex[loc], s));
+    if (rd && rd.adj) { // Tagesanpassung (3.23): Zeile über der Übung, Gewicht −10 %, keine Steigerung
+      const by = {}; for (const sl of day.slots) by[sl.id] = sl;
+      for (const e of exercises) { const sl = by[e.slotId]; if (!sl) continue; if ((sl._adj || []).length) e.adj = sl._adj.slice(); if (sl._loadF) e.presc.loadF = sl._loadF; if (rd.adj.noUp) e.presc.noUp = rd.rd.color === 'red' ? 'red' : 'yellow'; if (sl._from) { e.adjFrom = sl._from; e.adjEx = e.exId; } }
+    }
     const counts = !rd || rd.counts; // angepasst und weniger als die Hälfte übrig → Plan-Tag bleibt als Nächstes dran
-    st.active = { id: uid(), planId: p.id, dayIdx: counts ? di : null, dayId: counts ? day.id : null, name: rd ? day.name + ' · angepasst' : day.name, loc, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
+    st.active = { id: uid(), planId: p.id, dayIdx: counts ? di : null, dayId: counts ? day.id : null, name: rd && !rd.adj ? day.name + ' · angepasst' : day.name, loc, adjRemoved: rd && rd.adj ? rd.adj.removed.map(r => r.slotId).filter(Boolean) : undefined, adjLine: rd && rd.adj ? rd.line : undefined, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
@@ -1098,7 +1126,7 @@
         ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>${freeCard()}`}
         <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
           <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten zum Verschieben.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
-          ${(() => { const SL = ssLabels(a.exercises); return a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''} ${SL[i] ? 'ss' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow"><b>${SL[i] ? `<span class="sstag">${SL[i]}</span>` : ''}${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join(''); })()}
+          ${(() => { const SL = ssLabels(a.exercises); return a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''} ${SL[i] ? 'ss' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow">${(e.adj || []).length ? `<div class="adjline in">${esc(e.adj.join(' · '))}</div>` : ''}<b>${SL[i] ? `<span class="sstag">${SL[i]}</span>` : ''}${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join(''); })()}
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
       </div>`;
   }
@@ -1220,7 +1248,7 @@
       else rows += `<tr><td class="setno">${i + 1}</td>${pv}${isHold ? `<td class="muted num">${fmt(rec.sec)}</td>` : `${showW ? `<td class="muted num">${fmt(rec.w)}</td>` : ''}<td class="muted num">${fmt(rec.reps)}</td>`}<td class="muted small">${rirLabel(rec.rir, ex)}</td><td></td></tr>`;
     }
     const isBB = ex.eq.includes('bb') && ex.kind === 'load';
-    return `<div class="stage"><div class="over"><div class="eyebrow ell">${ROLE[presc.role] ? ROLE[presc.role][1] : ''} · ${ex.prim.map(m => D.MUSCLES[m]).join(', ')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" aria-label="Satz ${done.length} von ${planned}">${pills}<b>${done.length}/${planned}</b></div></div>
+    return `${(entry.adj || []).map(l => `<div class="adjline">${esc(l)}</div>`).join('')}<div class="stage"><div class="over"><div class="eyebrow ell">${ROLE[presc.role] ? ROLE[presc.role][1] : ''} · ${ex.prim.map(m => D.MUSCLES[m]).join(', ')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" aria-label="Satz ${done.length} von ${planned}">${pills}<b>${done.length}/${planned}</b></div></div>
       ${target}
       ${(() => { const L = ssLabels(st.active.exercises)[idx]; if (!L) return ''; const partners = st.active.exercises.filter((x, k) => k !== idx && x.ss === entry.ss).map(x => getEx(x.exId).name); return `<div class="sschip">⇄ Supersatz ${L} · mit ${esc(partners.join(', '))}<span class="tiny muted"> – nach jedem Satz direkt weiter</span></div>`; })()}
       ${bandRow(entry, idx, ex)}
@@ -1306,6 +1334,7 @@
   /* Training → Plan übernehmen (3.17, Nutzerwunsch 18.11.): Unterschiede zwischen trainiertem Training und Plan-Tag.
      Nur für Trainings aus dem aktiven Plan (nicht frei, nicht angepasst). Ändert nur den gewählten Ort.
      Deload oder Tagesform kürzer/länger: Satzzahlen und Weglassen werden nicht übernommen. */
+  const first0 = es => es[0] || {};
   function planDiff(a) {
     const p = plan(); if (!a || !p || !a.dayId || (a.planId && a.planId !== p.id)) return null;
     const day = p.days.find(d => d.id === a.dayId); if (!day) return null;
@@ -1327,11 +1356,12 @@
       const old = getEx(sl.ex[loc]);
       if (!done.length) {
         if (free && !es.length) continue; // durch „kürzer“ weggefallen
+        if ((a.adjRemoved || []).includes(sl.id) && !es.length) continue; // heute wegen Formwerk gestrichen
         if (free || (es[0] && es[0].presc && es[0].presc.deload)) continue;
         ch.push('Raus: ' + (old ? old.name : 'Übung')); ops.push(() => { sl.ex[loc] = null; }); continue;
       }
       const last = done[done.length - 1];
-      if (last.exId !== sl.ex[loc]) { const nx = getEx(last.exId); ch.push('Getauscht: ' + (old ? old.name : '?') + ' → ' + (nx ? nx.name : '?'));
+      if (last.exId !== sl.ex[loc] && !(first0(es).adjEx && last.exId === first0(es).adjEx)) { const nx = getEx(last.exId); ch.push('Getauscht: ' + (old ? old.name : '?') + ' → ' + (nx ? nx.name : '?'));
         ops.push(() => { sl.ex[loc] = last.exId; sl.why = sl.why || {}; sl.why[loc] = ['Von dir trainiert']; sl.locked = Object.assign({}, sl.locked, { [loc]: true }); }); }
       const first = es[0]; const tot = done.reduce((t, e) => t + nDone(e), 0);
       if (!free && first.presc && !first.presc.deload) { const d = tot - first.presc.sets;
@@ -1821,25 +1851,26 @@
         ${s.preview && ch.length ? '<div class="small" style="font-weight:800">Das würde sich ändern. Übernehmen?</div><button class="btn primary" data-a="balanceApply">Übernehmen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button>' : '<button class="btn primary" data-a="closeSheet">Alles klar</button>'}</div>`;
     },
     time(s) {
-      const p = plan(); const rd = readyFor(s.d, s.l); const useR = rd && s.mode !== 'plan'; const day = useR ? rd.day : p.days[s.d];
-      const en = s.en ?? 1, sl = s.sl ?? 1, ti = s.ti ?? 1;
-      const delta = tfDelta(s);
-      const newIds = new Set(useR ? rd.added.map(x => x.id) : []); const tiredIds = new Set(rd && !useR ? rd.removed.map(x => x.id) : []);
+      const p = plan(); const base = p.days[s.d]; const A = dayAdjust(s.d, s.l, s.acc || null);
+      const day = A ? A.day : base; const ti = s.ti ?? 1; const delta = tfDelta({ ti });
       const tp = delta ? E.timePlan(day, s.l, delta, P(), p) : null;
-      const items = tp ? tp.items.map(it => ({ ex: it.ex, sets: it.spec ? it.sets : E.prescription(it.slot, it.ex, P(), p).sets + (it.boost || 0) }))
-        : day.slots.filter(x => x.ex[s.l]).map(x => { const ex = getEx(x.ex[s.l]); return { ex, sets: ex ? E.prescription(x, ex, P(), p).sets : 0 }; }).filter(x => x.ex);
+      const lines = {}; for (const sl of day.slots) lines[sl.id] = sl._adj || [];
+      const items = tp ? tp.items.map(it => ({ ex: it.ex, sets: it.spec ? it.sets : E.prescription(it.slot, it.ex, P(), p).sets + (it.boost || 0), adj: it.slot ? lines[it.slot.id] || [] : [] }))
+        : day.slots.filter(x => x.ex[s.l]).map(x => { const ex = getEx(x.ex[s.l]); return { ex, sets: ex ? E.prescription(x, ex, P(), p).sets : 0, adj: x._adj || [] }; }).filter(x => x.ex);
       const min = tp ? tp.minutes : estMinutes(day, s.l);
-      const grp = (k, label, opts, v) => `<div><div class="eyebrow" style="margin-bottom:8px">${label}</div><div class="tfrow">${opts.map((o, i) => `<button class="tf" data-a="tfPick" data-k="${k}" data-v="${i}" aria-pressed="${v === i}">${o}</button>`).join('')}</div></div>`;
-      const label = { '-2': 'Deutlich kürzer', '-1': 'Etwas kürzer', '0': 'Wie geplant', '1': 'Etwas länger', '2': 'Deutlich länger' }[delta];
-      return `<div class="stack"><div><div class="eyebrow">${esc(day.name)}</div><h2>Wie geht’s dir heute?</h2>${s.fw ? `<div class="small muted">Vorausgefüllt aus Formwerk (${esc(s.fw)}) – nur ändern, wenn es nicht passt.</div>` : ''}</div>
-        ${rd ? `<div class="card flat stack" style="gap:8px"><div class="small"><b>${esc(rd.why)}</b> (Formwerk)</div><div class="seg">${[['ready', 'Für heute empfohlen'], ['plan', 'Dein Plan']].map(([k, n]) => `<button data-a="tfMode" data-k="${k}" aria-pressed="${(s.mode || 'ready') === k}">${n}</button>`).join('')}</div></div>` : ''}
-        ${grp('en', 'Energie', ['Niedrig', 'Normal', 'Hoch'], en)}${grp('sl', 'Schlaf', ['Schlecht', 'Okay', 'Gut'], sl)}${grp('ti', 'Zeit', ['Knapp', 'Normal', 'Viel'], ti)}
-        <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">${useR ? 'Empfohlen heute' : 'Dein Plan heute'}</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
-          <div class="planlist">${items.map(it => `<div class="pl-row ${tiredIds.has(it.ex.id) ? 'tired' : ''}">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span>${newIds.has(it.ex.id) ? `<span class="tagx">${(P().favs || []).includes(it.ex.id) ? '★ neu' : 'neu'}</span>` : tiredIds.has(it.ex.id) ? '<span class="tagx">müde</span>' : ''}<span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
-          ${useR ? `<div class="tiny ink2">Ohne: ${esc(rd.removed.map(x => x.name).join(', '))}${rd.counts ? '' : ` · ${esc(p.days[s.d].name)} bleibt als Nächstes dran`}</div>` : ''}
+      const label = { '-1': 'Etwas kürzer', '0': 'Wie geplant', '1': 'Etwas länger' }[delta] || '';
+      const conf = s.acc && A && A.all.changes.length;
+      return `<div class="stack"><div><div class="eyebrow">${esc(base.name)}</div><h2>Bereit</h2>
+          <div class="small muted">${A ? (A.line ? 'Formwerk heute: ' + esc(A.line) + '.' : 'Formwerk: keine Auffälligkeiten.') + (A.adj.any ? ' Plan für heute angepasst.' : '') : FW.configured() ? 'Noch keine Formwerk-Daten für heute – normaler Plan.' : 'Normaler Plan.'}</div></div>
+        ${A && A.adj.banner.length ? `<div class="card flat small" style="border:1px solid var(--highlight)">${A.adj.banner.map(esc).join('<br>')}</div>` : ''}
+        ${conf ? `<div class="stack" style="gap:6px"><div class="row between"><div class="eyebrow">Anpassungen – antippen zum Bestätigen</div><button class="btn ghost sm" data-a="accAll">Alle</button></div>${A.all.changes.map(c => `<button class="li accrow" data-a="accTog" data-id="${esc(c.id)}" aria-pressed="${s.acc.has(c.id)}"><span class="accbox">${s.acc.has(c.id) ? I.check : ''}</span><div class="grow small">${esc(c.text)}</div></button>`).join('')}</div>` : ''}
+        <div><div class="eyebrow" style="margin-bottom:8px">Zeit</div><div class="tfrow">${['Knapp', 'Normal', 'Viel'].map((o, k) => `<button class="tf" data-a="tfPick" data-k="ti" data-v="${k}" aria-pressed="${ti === k}">${o}</button>`).join('')}</div></div>
+        <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">Heute</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
+          <div class="planlist">${items.map(it => `${it.adj.map(l => `<div class="adjline">${esc(l)}</div>`).join('')}<div class="pl-row">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span><span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
+          ${A && A.adj.removed.length ? `<div class="tiny ink2">Gestrichen: ${esc(A.adj.removed.map(r => r.ex.name + ' (' + r.why + ')').join(', '))}</div>` : ''}
+          ${A && A.adj.noUp ? '<div class="tiny ink2">Heute keine Gewichtssteigerung.</div>' : ''}
           ${tp && tp.notes.length ? `<div class="tiny ink2">${esc(tp.notes.join(' · '))}</div>` : ''}</div>
-        <button class="btn primary big" data-a="tfGo">Training starten</button>
-        <div class="tiny muted">Energie und Schlaf ändern nur die Länge der Einheit: kürzer heißt, weniger wichtige Übungen entfallen. Gewichte und Wiederholungen bestimmt weiter deine Satzleistung.</div></div>`;
+        <button class="btn primary big" data-a="tfGo">Training starten</button></div>`;
     },
     level(s) {
       const entry = st.active.exercises[s.i]; const S = exState(entry); const ex = S.ex; const nb = levelNeighbors(entry); const rc = levelRec(entry, S, nb);
@@ -2094,7 +2125,7 @@
     dayPick() { openSheet({ type: 'dayPick' }); },
     planTools() { openSheet({ type: 'planTools' }); },
     cycleSheet() { openSheet({ type: 'cycleSheet' }); },
-    dayOpen(t) { const d = plan().days[+t.dataset.d]; if (!d) return; st.planDay = d.id; render(); window.scrollTo(0, 0); },
+    dayOpen(t) { const d = plan().days[+t.dataset.d]; if (!d) return; st.planDay = d.id; FW.fetchReadiness(); render(); window.scrollTo(0, 0); },
     dayBack() { st.planDay = null; render(); window.scrollTo(0, 0); },
     dayAuto(t) { const p = plan(); const d = p.days[+t.dataset.d]; if (!d) return; const L = p.learn = p.learn || {};
       if (t.checked) { L.auto = true; delete d.noAuto; } else d.noAuto = true; Store.saveProfile(); render(); toast(t.checked ? 'Einheit passt sich jede Woche an' : 'Automatik für diese Einheit aus'); },
@@ -2110,11 +2141,13 @@
       Store.saveProfile(true); if (x.id === P().planId) switchLoc(curLoc()); renderSheet(); render(); },
     startWorkout(t) { st.sheet = null; renderSheet(); if (st.active) { openWorkout(); return; }
       const d0 = plan().days[+t.dataset.d]; if (!d0 || !d0.slots.some(s => s.ex[t.dataset.l])) { st.tab = 'plan'; render(); toast('Füge diesem Tag zuerst Übungen hinzu'); return; }
-      openSheet(Object.assign({ type: 'time', d: +t.dataset.d, l: t.dataset.l }, FW.tfPrefill())); },
+      FW.fetchReadiness(); openSheet({ type: 'time', d: +t.dataset.d, l: t.dataset.l, acc: adjMode() === 'confirm' ? new Set() : null }); },
     rateW(t) { const w = st.summary; if (!w) return; w.rating = +t.dataset.r; Store.saveWorkout(w); renderSheet(); },
     chartPick(t) { st.chartEx = t.dataset.id; render(); },
     tfPick(t) { st.sheet[t.dataset.k] = +t.dataset.v; renderSheet(); },
-    tfGo() { const s = st.sheet; const d = tfDelta(s); const rd = s.mode !== 'plan' ? readyFor(s.d, s.l) : null; closeSheet(); startWorkout(s.d, s.l, d, rd); },
+    tfGo() { const s = st.sheet; const d = tfDelta({ ti: s.ti ?? 1 }); const A = dayAdjust(s.d, s.l, s.acc || null); closeSheet(); startWorkout(s.d, s.l, d, A && A.adj.any ? A : null); },
+    accTog(t) { const a = st.sheet.acc; if (!a) return; const id = t.dataset.id; if (a.has(id)) a.delete(id); else a.add(id); renderSheet(); },
+    accAll() { const s = st.sheet; const A = dayAdjust(s.d, s.l, null); if (A) s.acc = new Set(A.adj.changes.map(c => c.id)); renderSheet(); },
     tfMode(t) { st.sheet.mode = t.dataset.k; renderSheet(); },
     timePick(t) { const d = st.sheet.d, l = st.sheet.l; closeSheet(); startWorkout(d, l, +t.dataset.delta); },
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
@@ -2698,7 +2731,7 @@
     }
     restoreTimers();
     render();
-    FW.init({ workouts: () => st.workouts, getEx, bwLog: () => (P() && P().bwLog) || [], onWeight: syncWeight, onChange(force) { try { if (st.profile && !st.active) weeklyLearn(); } catch (e) { } if (st.sheet && st.sheet.type === 'formwerk') { if (force) renderSheet(); } else if (!st.ov && !st.sheet && st.tab === 'heute') render(); } });
+    FW.init({ workouts: () => st.workouts, getEx, bwLog: () => (P() && P().bwLog) || [], onWeight: syncWeight, onChange(force) { try { if (st.profile && !st.active) weeklyLearn(); } catch (e) { } if (st.sheet && (st.sheet.type === 'formwerk' || st.sheet.type === 'time')) { if (force || st.sheet.type === 'time') renderSheet(); } else if (!st.ov && !st.sheet && (st.tab === 'heute' || st.tab === 'plan')) render(); } });
     Cloud.auto(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Cloud.flush(); });
     // Daten beschädigt oder verschwunden? Sicherungen anbieten
     let missing = false; try { missing = !st.profile && localStorage.getItem('satzwerk.profile') === null; } catch (e) { }

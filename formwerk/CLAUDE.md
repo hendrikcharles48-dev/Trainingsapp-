@@ -93,3 +93,6 @@ Empfehlung (Baseball-Zeiten einstellbar, 2× Kraft/Woche). Keine medizinischen A
 - Fenster in Formwerk: `openSheet` sperrt die Seite (`html.sheet-open`), nur das Fenster scrollt (`max-height: calc(100% - 40px)`, nicht vh).
 - App: Vanilla JS, Speicher nur `formwerk_…`. Deploy: `formwerk/*` (ohne `SCHNITTSTELLE.md`, `OFFEN.md`) nach `docs/formwerk/` kopieren,
   `CACHE` in `formwerk/sw.js` und `VERSION` in `formwerk/app.js` hochzählen. Ansicht bei 390/375 px prüfen.
+- Readiness (Worker 2.7 / Formwerk 1.9, Nutzerwunsch 19.11.): Morgen-Check Muskelkater 4 Stufen (Tipp schaltet weiter, gespeichert 2/3/5),
+  Schmerz ja/nein für Schulter, Ellenbogen, Knie, Rücken, Sonstiges (gespeichert 3; `PAIN_AREAS` um `ruecken`/`sonstiges` ergänzt).
+  `GET /v1/readiness?date=` (`readinessFor` in model.js) = einzige Quelle für Satzwerks Tagesanpassung. Teamsport zählt wie Baseball.

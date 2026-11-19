@@ -670,6 +670,102 @@
     return { day: Object.assign({}, day, { slots: keep }), removed, added, kept: slots.length - bad.length, total: slots.length };
   }
 
+  /* ================= Tagesanpassung aus Formwerk (3.23, Nutzerwunsch 19.11.) =================
+     rd = GET /v1/readiness: {color, recovery, sore: {gruppe: 1 leicht|2 mittel|3 stark}, pain: [{k, label, inj}], yesterdayBaseball, sick}.
+     Regeln (Reihenfolge): Schmerz → betroffene Übungen durch schmerzfreie Variante ersetzen, sonst streichen (nie in den Bereich trainieren) ·
+     Muskelkater stark → Übung ersetzen (andere Muskelgruppe) oder streichen · leicht −1 Satz · mittel −1 (ab 4 Sätzen −2) und Gewicht −10 % ·
+     gestern Baseball → Schulter, Brust/Drücken, Unterarm/Ellenbogen, Rumpf −1 (ab 4 Sätzen −2), keine schweren Überkopf-Übungen ·
+     Erholung rot → Gesamtvolumen −30 %, keine Steigerung · gelb → keine Steigerung · keine Daten → Plan bleibt.
+     opts.only (Set von Änderungs-IDs): nur diese anwenden (Modus „Anpassungen bestätigen“). Der Plan selbst bleibt unverändert. */
+  const ADJ_G = { brust: ['chest'], ruecken: ['lats', 'upperback'], schultern: ['fdelt', 'sdelt', 'rdelt'], bizeps: ['biceps'], trizeps: ['triceps'], griff: ['forearms'], rumpf: ['abs', 'obliques', 'lowback'], vorn: ['quads'], hinten: ['glutes', 'hams'], waden: ['calves'] };
+  const ADJ_GL = { brust: 'Brust', ruecken: 'Rücken', schultern: 'Schultern', bizeps: 'Bizeps', trizeps: 'Trizeps', griff: 'Unterarme', rumpf: 'Rumpf', vorn: 'Beine vorn', hinten: 'Po & Beinbeuger', waden: 'Waden' };
+  const SORE_T = ['', 'leicht', 'mittel', 'stark'];
+  const BB_G = new Set(['schultern', 'brust', 'griff', 'rumpf']);
+  function groupsOfEx(ex) { return Object.keys(ADJ_G).filter(g => ex.prim.some(m => ADJ_G[g].includes(m))); }
+  function adjustDay(day, loc, profile, plan, rd, opts) {
+    opts = opts || {};
+    const exOf = id => DB.byId[id] || ((profile && profile.custom) || []).find(e => e.id === id);
+    const out = { slots: [], removed: [], changes: [], banner: [], any: false, noUp: false };
+    const base = day.slots.filter(sl => sl.ex[loc] && exOf(sl.ex[loc]));
+    if (!rd || (!rd.checkin && (!rd.color || rd.color === 'none') && !rd.yesterdayBaseball)) { out.slots = base.map(sl => Object.assign({}, sl, { _adj: [] })); return out; }
+    const ok = id => !opts.only || opts.only.has(id);
+    const sore = rd.sore || {}; const inj = new Set((rd.pain || []).map(p => p.inj).filter(Boolean));
+    const painLbl = t => ((rd.pain || []).find(p => p.inj === t) || {}).label || t;
+    const strongM = new Set(); for (const g in sore) if (sore[g] >= 3) (ADJ_G[g] || []).forEach(m => strongM.add(m));
+    const bad = ex => (ex.inj || []).some(t => inj.has(t)) || ex.prim.some(m => strongM.has(m));
+    const used = new Set(base.map(sl => sl.ex[loc]));
+    const favs = new Set((profile && profile.favs) || []);
+    const known = new Set(); for (const pl of opts.plans || [plan]) for (const d of (pl && pl.days) || []) for (const sl of d.slots || []) for (const id of Object.values(sl.ex || {})) if (id) known.add(id);
+    const ctx = { profile, loc, eqSet: locEquip(profile, loc), used: new Set(), dayUsed: used, ab: abilities(profile.answers || {}), seed: 'adj' + todayISO() };
+    const pick = (sl, sameFirst) => {
+      // 1) gleiche Bewegung, schmerzfrei/anderer Muskel (z. B. Fliegende statt Bankdrücken bei Ellenbogen), 2) beliebige Übung gleicher Rolle für bereite Muskeln
+      if (sameFirst) { const alt = alternatives(sl, loc, profile, [...used]).find(x => !bad(x.ex)); if (alt) return alt.ex; }
+      const role = sl.r === 'skill' ? 'iso' : sl.r; const pats = READY_PATS[role]; if (!pats) return null;
+      let best = null;
+      for (const ex of allExercises(profile)) {
+        if (used.has(ex.id) || bad(ex)) continue;
+        const r = scoreExercise(ex, S(pats, role), ctx); if (!r) continue;
+        let v = r.s + (favs.has(ex.id) ? 8 : 0) + (known.has(ex.id) ? 3 : 0);
+        v -= 2 * groupsOfEx(ex).filter(g => sore[g] >= 2).length;
+        if (rd.yesterdayBaseball && groupsOfEx(ex).some(g => BB_G.has(g))) v -= 2;
+        if (!best || v > best.v) best = { ex, v };
+      }
+      return best && best.v > -12 ? best.ex : null;
+    };
+    const add = (o, id, kind, text) => { o._adj.push(text); out.changes.push({ id, kind, slotId: o.id, text }); out.any = true; };
+    for (const sl0 of base) {
+      const o = Object.assign({}, sl0, { ex: Object.assign({}, sl0.ex), _adj: [] }); let ex = exOf(o.ex[loc]);
+      // Schmerz / starker Muskelkater → ersetzen oder streichen
+      const painT = (ex.inj || []).filter(t => inj.has(t));
+      const strongG = groupsOfEx(ex).filter(g => sore[g] >= 3);
+      if (painT.length || strongG.length) {
+        const why = painT.length ? 'Schmerz ' + painLbl(painT[0]) : 'Muskelkater ' + ADJ_GL[strongG[0]] + ' stark';
+        const id = 'swap:' + o.id;
+        if (ok(id)) {
+          const nx = pick(o, !!painT.length);
+          if (nx) { used.add(nx.id); out.changes.push({ id, kind: 'swap', slotId: o.id, text: ex.name + ' → ' + nx.name + ': ' + why }); out.any = true; o._adj.push('Ersetzt ' + ex.name + ': ' + why); o._from = ex.id; o.ex[loc] = nx.id; ex = nx; }
+          else { out.removed.push({ ex, why, slotId: o.id }); out.changes.push({ id, kind: 'drop', slotId: o.id, text: 'Gestrichen: ' + ex.name + ' (' + why + ')' }); out.any = true; continue; }
+        }
+      }
+      // Muskelkater leicht/mittel → Sätze, mittel auch Gewicht
+      const gs = groupsOfEx(ex); const sv = Math.max(0, ...gs.map(g => sore[g] || 0)); const sg = gs.find(g => (sore[g] || 0) === sv);
+      if (sv === 1 || sv === 2) {
+        const id = 'sore:' + o.id;
+        if (ok(id)) {
+          const d = sv === 2 && o.sets >= 4 ? 2 : 1; const n = Math.max(1, o.sets - d);
+          if (n < o.sets) add(o, id, 'sets', '−' + (o.sets - n) + (o.sets - n > 1 ? ' Sätze' : ' Satz') + ': Muskelkater ' + SORE_T[sv] + ' (' + ADJ_GL[sg] + ')');
+          o.sets = n;
+          if (sv === 2 && ex.kind === 'load') { o._loadF = 0.9; add(o, id + ':w', 'load', 'Gewicht −10 %: Muskelkater mittel'); }
+        }
+      }
+      // gestern Baseball
+      if (rd.yesterdayBaseball) {
+        const press = ['hpush', 'vpush', 'dip'].includes(ex.pat); const elbow = (ex.inj || []).includes('elbow') || (ex.inj || []).includes('shoulder');
+        const hit = press || elbow || gs.some(g => BB_G.has(g));
+        const overhead = ex.pat === 'vpush' && (ex.kind === 'load' || o.r === 'main');
+        if (overhead && ok('bbo:' + o.id)) {
+          const nx = pick(Object.assign({}, o, { p: ['side', 'rear'], r: 'iso' }), false);
+          if (nx) { used.add(nx.id); out.changes.push({ id: 'bbo:' + o.id, kind: 'swap', slotId: o.id, text: ex.name + ' → ' + nx.name + ': gestern Baseball' }); out.any = true; o._adj.push('Ersetzt ' + ex.name + ': keine schweren Überkopf-Übungen nach Baseball'); o._from = o._from || ex.id; o.ex[loc] = nx.id; ex = nx; }
+          else { out.removed.push({ ex, why: 'gestern Baseball', slotId: o.id }); out.changes.push({ id: 'bbo:' + o.id, kind: 'drop', slotId: o.id, text: 'Gestrichen: ' + ex.name + ' (gestern Baseball, Überkopf)' }); out.any = true; continue; }
+        } else if (hit && ok('bb:' + o.id) && o.sets > 1) {
+          const d = o.sets >= 4 ? 2 : 1; add(o, 'bb:' + o.id, 'sets', '−' + d + (d > 1 ? ' Sätze' : ' Satz') + ': gestern Baseball'); o.sets = Math.max(1, o.sets - d);
+        }
+      }
+      out.slots.push(o);
+    }
+    // Erholung rot: Gesamtvolumen −30 % (erst Isolation/Ergänzung kürzen), keine Steigerung · gelb: keine Steigerung
+    if (rd.color === 'red' && ok('red')) {
+      const tot = out.slots.reduce((t, s) => t + s.sets, 0); let cut = tot - Math.round(tot * 0.7);
+      const order = [...out.slots].sort((a, b) => (KEEP[a.r] ?? 2) - (KEEP[b.r] ?? 2) || b.sets - a.sets);
+      for (let k = 0; cut > 0 && k < 20; k++) { const s = order.filter(x => x.sets > 1).sort((a, b) => b.sets - a.sets || (KEEP[a.r] ?? 2) - (KEEP[b.r] ?? 2))[0]; if (!s) break; s.sets--; s._red = (s._red || 0) + 1; cut--; }
+      for (const s of out.slots) if (s._red) s._adj.push('−' + s._red + (s._red > 1 ? ' Sätze' : ' Satz') + ': Erholung rot');
+      out.changes.push({ id: 'red', kind: 'volume', text: 'Erholung rot (' + rd.recovery + ' %): Volumen −30 %, keine Gewichtssteigerung' }); out.any = true; out.noUp = true;
+    } else if (rd.color === 'yellow' && ok('yellow')) { out.changes.push({ id: 'yellow', kind: 'noup', text: 'Erholung gelb (' + rd.recovery + ' %): heute keine Gewichtssteigerung' }); out.any = true; out.noUp = true; }
+    if (rd.sick) out.banner.push('Krank eingetragen – heute lieber Pause.');
+    if ((rd.pain || []).some(p => !p.inj)) out.banner.push('Schmerz „' + rd.pain.filter(p => !p.inj).map(p => p.label).join(', ') + '“: nichts machen, was dort wehtut.');
+    return out;
+  }
+
   /* ================= Mesozyklus ================= */
   function todayISO(d) { d = d || new Date(); const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); }
   /* Zyklus nach TRAINIERTEN Wochen: Woche = 1 + Zahl der Kalenderwochen seit meso.start (ohne die laufende),
@@ -805,7 +901,21 @@
 
   /* Hauptfunktion: nächste Satzempfehlung.
      doneSets = bereits abgeschlossene Sätze dieser Übung heute. */
+  // 3.23: Tagesanpassung aus Formwerk – presc.loadF (z. B. 0,9 bei Muskelkater mittel), presc.noUp (Erholung gelb/rot: keine Steigerung)
   function recommend(ex, presc, doneSets, hist, ctx) {
+    const out = recommendCore(ex, presc, doneSets, hist, ctx);
+    if (doneSets.some(s => s.done) || !(out.w > 0) || ex.kind !== 'load') return out;
+    const opts = loadOptions(ex, ctx.loc, ctx.profile);
+    const floorTo = v => { if (!opts || !opts.length) return Math.max(0, Math.floor(v * 2) / 2); const lo = opts.filter(o => o <= v + 1e-9); return lo.length ? lo[lo.length - 1] : opts[0]; };
+    if (presc.noUp) {
+      const lastH = hist.length ? hist[hist.length - 1] : null;
+      const lastW = lastH ? Math.max(0, ...(lastH.entry.sets || []).filter(s => s.done !== false).map(s => +s.w || 0)) : 0;
+      if (lastW > 0 && out.w > lastW) { out.w = floorTo(lastW); out.reps = presc.rr[1]; out.notes = out.notes.filter(n => !/Gewicht, Wdh\.|Progression/.test(n)); out.notes.push('Heute keine Gewichtssteigerung: Erholung ' + (presc.noUp === 'red' ? 'rot' : 'gelb')); }
+    }
+    if (presc.loadF && presc.loadF < 1) { const w = floorTo(out.w * presc.loadF); if (w < out.w) { out.w = w; out.notes.push('Gewicht −' + Math.round((1 - presc.loadF) * 100) + ' %: Muskelkater'); } }
+    return out;
+  }
+  function recommendCore(ex, presc, doneSets, hist, ctx) {
     const { profile, loc } = ctx; const bw = bodyweight(profile);
     const [lo, hi] = presc.rr; const rirT = presc.rir;
     const done = doneSets.filter(s => s.done);
@@ -1026,7 +1136,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, readyDay, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, adjustDay, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();

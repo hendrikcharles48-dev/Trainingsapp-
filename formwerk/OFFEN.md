@@ -26,7 +26,9 @@ Schritt erinnern und erledigte Punkte abhaken. Ausführliche Anleitung: `formwer
 Hinweis: Vivoactive 5 liefert HRV, Schlaf (Phasen, Schlafwert), Ruhepuls, Stress, Schritte, Body Battery, HF-Zonen (Worker 1.1.0 liest alles).
 Aktivitäten waren im Test leer – Baseball/Rad nur in der Belastung, wenn sie auf der Uhr als Aktivität aufgezeichnet werden.
 
-## Noch zu prüfen (Stand 15.11.)
+## Noch zu prüfen (Stand 19.11.)
+- [ ] Neuer Morgen-Check (Formwerk 1.9): Muskelkater 4 Stufen per Tipp, Schmerz ja/nein – am iPhone einmal durchtippen
+- [ ] Satzwerk 3.23: Einheit mit Muskelkater/Schmerz starten → Zeilen über den Übungen stimmen? (Worker 2.7 muss gebaut sein: /v1/readiness)
 - [ ] Streifen unten / Tab-Leiste nach iOS-Höhenausgleich (Satzwerk 3.10.3, Formwerk 1.0.5) auf dem iPhone bestätigt? Sonst Zeile „Anzeige …“ unter Mehr erfragen
 - [ ] Satzwerk verbunden (Schritt 9) → Muskelgruppen in Formwerk + Karte auf Satzwerk-„Heute“
 - [x] Cron-Vorabruf morgens aktiv (04:40 + 05:40 UTC, im Dashboard bestätigt 15.11.)
