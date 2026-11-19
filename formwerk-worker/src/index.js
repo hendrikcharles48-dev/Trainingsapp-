@@ -6,8 +6,9 @@ import { mergeDays, list, activityFrom, hrFrom } from './normalize.js';
 import { buildSummary, DEFAULT_SETTINGS, MODEL_VERSION, estimateHr, GROUPS, PAIN_AREAS, volumeSignals, normCheckin, planned, sportKind, detectBaseball, readinessFor } from './model.js';
 const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS.map(a => a.k));
 import { PAGE } from './page.js';
+import { vapidKeys, sendPush, b64u } from './push.js';
 
-export const WORKER_VERSION = '2.9.0';
+export const WORKER_VERSION = '2.10.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -66,7 +67,7 @@ export default {
     if (url.pathname === '/' || url.pathname === '/index.html') return new Response(PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' } });
     if (!url.pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, ch);
     if (!env.APP_PASSWORD) return json({ error: 'setup', message: 'Secret APP_PASSWORD fehlt im Worker.' }, 503, ch);
-    if (!(await authorized(req, env))) { await new Promise(r => setTimeout(r, 800)); return json({ error: 'auth', message: 'Passwort falsch.' }, 401, ch); }
+    if (url.pathname !== '/v1/live/state' && !(await authorized(req, env))) { await new Promise(r => setTimeout(r, 800)); return json({ error: 'auth', message: 'Passwort falsch.' }, 401, ch); }
     try {
       const res = await store(env).fetch(new Request('https://store' + url.pathname + url.search, { method: req.method, headers: { 'Content-Type': 'application/json' }, body: req.method === 'GET' ? undefined : await req.text() }));
       const out = new Response(res.body, res);
@@ -98,6 +99,11 @@ export class FormwerkStore {
       if (p === '/v1/raw') return json(await this.raw(Math.min(14, Math.max(1, +url.searchParams.get('days') || 7))));
       if (p === '/v1/summary') return json(await this.summary(url.searchParams.get('force') === '1', 'full'));
       if (p === '/v1/today') return json(await this.summary(url.searchParams.get('force') === '1', 'today'));
+      if (p === '/v1/push/key') return json({ key: (await vapidKeys(this.st)).pub });
+      if (p === '/v1/push/subscribe' && req.method === 'POST') return json(await this.pushSubscribe(await req.json()));
+      if (p === '/v1/push/off' && req.method === 'POST') { await this.st.delete(['push:sub', 'live']); await this.st.deleteAlarm(); return json({ ok: true }); }
+      if (p === '/v1/live' && req.method === 'POST') return json(await this.putLive(await req.json()));
+      if (p === '/v1/live/state') return this.liveState(url.searchParams.get('t'));
       if (p === '/v1/readiness') return json(await this.readiness(url.searchParams.get('date')));
       if (p === '/v1/sessions' && req.method === 'POST') return json(await this.putSessions(await req.json()));
       if (p === '/v1/sessions') return json({ sessions: await this.sessions(+url.searchParams.get('days') || 60) });
@@ -253,6 +259,42 @@ export class FormwerkStore {
         signals: sum.signals, prefill: sum.prefill, plan: { sportDays: settings.sportDays || [], baseballToday: !!sum.body.baseball.today.on, strengthDays: sum.body.insights.strengthDays.idx || [] } };
     }
     return Object.assign(sum, { status, settings, vol: volumeSignals({ checkins, sessions, history: sum.history, today }) });
+  }
+
+  /* ----- Mitteilung im Training (Worker 2.10): ersetzt sich bei jedem Satz, „Pause vorbei“ kommt per Alarm ----- */
+  async pushSubscribe(b) {
+    const s = b && b.sub; if (!s || typeof s.endpoint !== 'string' || !/^https:\/\//.test(s.endpoint) || s.endpoint.length > 600) return { ok: false, error: 'Abo ungültig' };
+    await this.st.put('push:sub', { endpoint: s.endpoint, t: Date.now() });
+    let token = await this.st.get('push:token');
+    if (!token) { token = b64u(crypto.getRandomValues(new Uint8Array(24))); await this.st.put('push:token', token); }
+    return { ok: true, token };
+  }
+  async pushNow() {
+    const sub = await this.st.get('push:sub'); if (!sub) return { ok: false, error: 'kein Abo' };
+    try { const r = await sendPush(this.st, sub, 'https://formwerk.workers.dev'); if (r.gone) await this.st.delete('push:sub'); return r; }
+    catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+  async putLive(b) {
+    if (!(await this.st.get('push:sub'))) return { ok: false, error: 'kein Abo' };
+    const now = Date.now(); const cut = (x, n) => String(x == null ? '' : x).slice(0, n);
+    const live = { title: cut(b.title, 80), body: cut(b.body, 160), t: now };
+    const restEnd = +b.restEnd > now && +b.restEnd - now < 20 * 60e3 ? +b.restEnd : 0;
+    if (restEnd) Object.assign(live, { restEnd, endTitle: cut(b.endTitle, 80), endBody: cut(b.endBody, 160) });
+    await this.st.put('live', live);
+    if (restEnd) await this.st.setAlarm(restEnd); else await this.st.deleteAlarm();
+    const r = await this.pushNow();
+    return { ok: !!r.ok, status: r.status || null, error: r.error || null };
+  }
+  async liveState(t) {
+    const token = await this.st.get('push:token');
+    if (!token || !t || t !== token) return json({ error: 'auth' }, 401);
+    const live = await this.st.get('live');
+    return json(live ? { title: live.title, body: live.body } : { title: 'Satzwerk', body: '' });
+  }
+  async alarm() {
+    const live = await this.st.get('live'); if (!live || !live.restEnd) return;
+    await this.st.put('live', { title: live.endTitle || 'Pause vorbei', body: live.endBody || '', t: Date.now() });
+    await this.pushNow();
   }
 
   /* ----- Tageszustand für Satzwerk (Erholung, Ampel, Muskelkater, Schmerz, gestern Baseball) ----- */

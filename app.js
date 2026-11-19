@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.24.2';
+  const APP_VERSION = '3.25.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -175,7 +175,7 @@
     }
   };
   // Formwerk-Anbindung (eigenes Modul formwerk-link.js, Schnittstelle formwerk/SCHNITTSTELLE.md) – fehlt es, passiert nichts
-  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, volSignals: () => null, readyData: () => null, fetchReadiness() { }, coach: () => null, refreshCoach() { } };
+  const FW = window.FormwerkLink || { init() { }, changed() { }, card: () => '', sheet: () => '', configured: () => false, statusLine: () => '', painHint: () => '', today: () => null, plan: () => null, tfPrefill: () => ({}), weekPrefill: () => null, signals: () => null, readiness: () => null, volSignals: () => null, readyData: () => null, fetchReadiness() { }, liveEnable: async () => ({ ok: false }), liveDisable() { }, live() { }, coach: () => null, refreshCoach() { } };
   // Baseball-Tage: mit Formwerk aus Formwerks festen Zeiten (eine Quelle), sonst Satzwerks eigene Einstellung
   function sportDaysEff() { const fp = FW.plan(); return fp && Array.isArray(fp.sportDays) ? fp.sportDays : (P() && P().sportDays) || []; }
   const Store = {
@@ -1005,7 +1005,27 @@
   }
 
   /* ================= Pausentimer im Training ================= */
-  function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, len: sec, label: label || '' }; renderRest(); }
+  /* 3.25: Mitteilung im Training (Sperrbildschirm). Nach jedem Satz „Pause bis hh:mm · als Nächstes …“, am Pausenende „Los: …“ (Alarm im Worker),
+     beim Beenden eine letzte. Gleiche Mitteilung wird ersetzt. Nur mit Schalter (settings.live) und Formwerk-Verbindung. */
+  let liveT = null;
+  function liveNext() {
+    const a = st.active; if (!a) return null; const ci = curIndex(); if (ci < 0) return { done: true };
+    const S = exState(a.exercises[ci]); if (!S.ex) return null; const hold = S.ex.kind === 'hold' || S.ex.kind === 'int';
+    const tgt = hold ? fmt(S.rec.sec) + ' s' : (S.rec.w ? fmt(S.rec.w) + ' kg × ' : '') + fmt(S.rec.reps) + ' Wdh.';
+    return { name: S.ex.name, line: 'Satz ' + Math.min(S.done.length + 1, S.planned) + '/' + S.planned + ' · ' + tgt };
+  }
+  function liveSend() {
+    if (!settings().live || !FW.configured()) return;
+    clearTimeout(liveT);
+    liveT = setTimeout(() => {
+      if (!st.active) return; const nx = liveNext(); if (!nx) return;
+      if (nx.done) { FW.live({ title: 'Alles erledigt', body: 'Training speichern?' }); return; }
+      const left = st.rest ? (st.rest.end - Date.now()) / 1000 : 0;
+      if (left > 3) { const hm = new Date(st.rest.end).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); FW.live({ title: 'Pause bis ' + hm, body: nx.name + ' · ' + nx.line, restEnd: st.rest.end, endTitle: 'Los: ' + nx.name, endBody: nx.line }); }
+      else FW.live({ title: nx.name, body: nx.line });
+    }, 150);
+  }
+  function startRest(sec, label) { if (!settings().autoRest) return; st.rest = { end: Date.now() + sec * 1000, total: sec, len: sec, label: label || '' }; renderRest(); liveSend(); }
   // Pause und Halte-Timer im laufenden Training mitspeichern (übersteht Neuladen durch iOS)
   function syncTimers() {
     const a = st.active; if (!a) return;
@@ -1095,7 +1115,7 @@
     st.homeDay = null;
     Store.saveActive(true); openWorkout();
   }
-  function openWorkout() { st.ov = { type: 'workout' }; restoreTimers(); keepAwake(true); render(); }
+  function openWorkout() { st.ov = { type: 'workout' }; restoreTimers(); keepAwake(true); render(); liveSend(); }
   function flashPanel() { const p = document.querySelector('#rb .panel'); if (!p) return; p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }
   // exState wird pro Neuaufbau mehrfach gebraucht: Ergebnis merken, bis sich etwas ändert (jede Eingabe zählt st.ev hoch)
   const exCache = new Map();
@@ -1484,6 +1504,7 @@
   }
   function finishWorkout(save, endTs) {
     const a = st.active; if (!a) return;
+    if (settings().live && FW.configured()) { clearTimeout(liveT); const n = a.exercises.reduce((t, e) => t + e.sets.filter(x => x.done).length, 0); FW.live({ title: save ? 'Training gespeichert' : 'Training beendet', body: save ? n + (n === 1 ? ' Satz · ' : ' Sätze · ') + durTxt((Date.now() - a.start) / 1000) : '' }); }
     if (save) {
       const restNote = learnRest(a);
       if (restNote.length) setTimeout(() => toast('Pause angepasst: ' + restNote.join(', '), 5000), 900);
@@ -1968,7 +1989,7 @@
         ${head('Anpassungen')}<div class="seg">${[['confirm', 'Bestätigen'], ['auto', 'Vollautomatisch']].map(([k, n]) => `<button data-a="adjModeSet" data-k="${k}" aria-pressed="${adjMode() === k}">${n}</button>`).join('')}</div>
         <div class="tiny muted">${adjMode() === 'auto' ? 'Tagesanpassung aus Formwerk, Gewichtssteigerung, Sätze je Muskel und leichtere Woche passieren ohne Nachfrage – mit Hinweis.' : 'Jede Änderung (Tagesanpassung, Gewichtssteigerung, Sätze je Muskel, leichtere Woche) übernimmst du mit einem Tipp.'}</div>
         ${head('Training')}<div class="list">${tog('autoRest', 'Pausentimer automatisch', 'Startet nach jedem Satz')}${tog('quick', 'Schnell abhaken', '„Satz fertig“ speichert sofort mit der Ziel-Reserve')}${tog('rpe', 'RPE statt Reserve anzeigen', 'RPE 8 = 2 Wdh. Reserve')}</div>
-        ${head('Signale')}<div class="list">${tog('sound', 'Töne', 'Auf dem iPhone nur ohne Stumm-Schalter')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}</div>
+        ${head('Signale')}<div class="list">${FW.configured() ? `<label class="li" style="cursor:pointer"><div class="grow"><div style="font-weight:600">Mitteilung im Training</div><div class="small muted">Aktuelle Übung, Gewicht und Wdh. auf dem Sperrbildschirm</div></div><input type="checkbox" data-a="liveToggle" ${se.live ? 'checked' : ''} style="width:22px;height:22px"></label>` : ''}${tog('sound', 'Töne', 'Auf dem iPhone nur ohne Stumm-Schalter')}${tog('vib', 'Vibration', 'Geht auf dem iPhone in Web-Apps nicht – dafür blinkt das Pausenfeld')}</div>
         <div class="tiny muted" style="margin-top:-6px">Bei gesperrtem Bildschirm kann eine Web-App nichts melden; im Training bleibt der Bildschirm an.</div>
         ${head('Baseball-Tage')}${FW.plan() ? `<div class="card flat small">Kommen aus Formwerk (Mehr → Feste Baseball-Zeiten): <b>${sportDaysEff().length ? sportDaysEff().map(k => DAYS[k]).join(', ') : 'keine festen Tage'}</b>. Einmal-Termine und Absagen trägst du in Formwerk auf „Heute“ ein.</div>` : `<div class="seg">${DAYS.map((d, k) => `<button data-a="sportDay" data-k="${k}" aria-pressed="${(P().sportDays || []).includes(k)}">${d}</button>`).join('')}</div>`}
         <div class="tiny muted" style="margin-top:-6px">An diesen Tagen und am Tag davor warnt die App vor schweren Bein- und Überkopfübungen.</div>
@@ -2363,6 +2384,13 @@
     },
     delCustom(t) { P().custom = (P().custom || []).filter(x => x.id !== t.dataset.id); Store.saveProfile(); closeSheet(); render(); },
     setFont(t) { P().settings = Object.assign(settings(), { font: t.dataset.k }); Store.saveProfile(); render(); },
+    async liveToggle(t) {
+      if (!t.checked) { P().settings = Object.assign(settings(), { live: false }); Store.saveProfile(); FW.liveDisable(); toast('Mitteilung aus'); return; }
+      toast('Erlaubnis wird angefragt …', 4000);
+      const r = await FW.liveEnable();
+      if (r.ok) { P().settings = Object.assign(settings(), { live: true }); Store.saveProfile(); toast('Mitteilung im Training ist an', 4000); }
+      else { t.checked = false; toast(r.error || 'Hat nicht geklappt', 6000); }
+    },
     setToggle(t) { P().settings = Object.assign(settings(), { [t.dataset.k]: t.checked }); Store.saveProfile(); render(); },
     cxReady(t) { openSheet({ type: 'cxReady', id: t.dataset.id }); },
     cxReadyYes(t) { const x = pendingCustom().find(y => y.c.id === t.dataset.id); if (!x) { closeSheet(); return; } upgradeOne(x.c, x.b); const next = pendingCustom()[0]; render(); if (next) openSheet({ type: 'cxReady', id: next.c.id }); else closeSheet(); toast('Jetzt feste Übung: ' + x.b.name); },
@@ -2401,8 +2429,8 @@
     swToggle() { const sw = T.sw; if (sw.start) { sw.acc += Date.now() - sw.start; sw.start = null; } else sw.start = Date.now(); render(); },
     swLap() { const sw = T.sw; sw.laps.unshift(sw.acc + (Date.now() - sw.start)); render(); },
     swReset() { T.sw = { start: null, acc: 0, laps: [] }; render(); },
-    restAdj(t) { if (!st.rest) return; st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
-    restSkip() { st.rest = null; renderRest(); toFocus(); }
+    restAdj(t) { if (!st.rest) return; liveSend(); st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
+    restSkip() { st.rest = null; renderRest(); toFocus(); liveSend(); }
   };
   function applyPick(s, id) {
       const ex = getEx(id);

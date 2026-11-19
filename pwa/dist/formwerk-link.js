@@ -81,6 +81,27 @@
     readyBusy = api('/v1/readiness').then(j => { if (j && j.date) set(K.ready, { t: Date.now(), data: j }); opt.onChange(true); return j; }).catch(() => null).finally(() => { readyBusy = null; });
     return readyBusy;
   }
+  /* Mitteilung im Training (3.25): Abo anlegen (nur auf Tipp – iOS fragt dann nach Erlaubnis), Text-Schlüssel an den Service Worker geben */
+  const keyBytes = b64 => { const p = b64.replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(p + '='.repeat((4 - p.length % 4) % 4)), ch => ch.charCodeAt(0)); };
+  async function swSend(msg) { const reg = await navigator.serviceWorker.ready; const t = reg.active || navigator.serviceWorker.controller; if (t) t.postMessage(msg); }
+  async function liveEnable() {
+    if (!cfg()) return { ok: false, error: 'Erst Formwerk verbinden.' };
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return { ok: false, error: 'Mitteilungen gehen nur, wenn Satzwerk auf dem Home-Bildschirm liegt (iOS 16.4 oder neuer).' };
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return { ok: false, error: 'Mitteilungen sind nicht erlaubt. iPhone: Einstellungen → Mitteilungen → Satzwerk.' };
+      const reg = await navigator.serviceWorker.ready; const { key } = await api('/v1/push/key');
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+      const r = await api('/v1/push/subscribe', { method: 'POST', body: { sub: sub.toJSON() } });
+      if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Anmelden fehlgeschlagen.' };
+      await swSend({ type: 'live-cfg', cfg: { url: cfg().url, token: r.token } });
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e.message || String(e) }; }
+  }
+  async function liveDisable() { try { await api('/v1/push/off', { method: 'POST', body: {} }); await swSend({ type: 'live-cfg', cfg: null }); const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) { } }
+  // Nachricht schicken (Fehler egal – die Mitteilung ist nur ein Zusatz)
+  function live(m) { if (!cfg()) return; api('/v1/live', { method: 'POST', body: m, timeout: 8000 }).catch(() => { }); }
   async function refreshToday(quiet) {
     if (!cfg()) return;
     try { const j = await api('/v1/today'); set(K.today, { t: Date.now(), data: j }); if (j && j.weight) try { opt.onWeight(j.weight, j.weights || []); } catch (e) { } }
@@ -178,7 +199,7 @@
     tfPrefill() { const d = this.today(); const p = d && d.prefill && d.prefill.tf; if (!p || (p.en == null && p.sl == null)) return {}; const o = { fw: p.why || 'Formwerk' }; if (p.en != null) o.en = p.en; if (p.sl != null) o.sl = p.sl; return o; },
     weekPrefill() { const d = this.today(); return (d && d.prefill && d.prefill.week) || null; },
     signals() { const d = this.today(); return (d && d.signals) || null; },
-    fetchReadiness,
+    fetchReadiness, liveEnable, liveDisable, live,
     readyData() { const R = get(K.ready, null); return cfg() && R && R.data && R.data.date === iso(new Date()) ? R.data : null; },
     // Volumen-Signale (Worker 2.5): Erholung 7/28 Tage, Muskelkater nach dem Training je Gruppe – auch vom Vortag noch gültig
     volSignals() { const T = get(K.today, null); const d = T && T.data; return cfg() && d && d.vol && Date.now() - (T.t || 0) < 3 * 864e5 ? d.vol : null; },

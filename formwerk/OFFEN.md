@@ -27,6 +27,7 @@ Hinweis: Vivoactive 5 liefert HRV, Schlaf (Phasen, Schlafwert), Ruhepuls, Stress
 Aktivitäten waren im Test leer – Baseball/Rad nur in der Belastung, wenn sie auf der Uhr als Aktivität aufgezeichnet werden.
 
 ## Noch zu prüfen (Stand 19.11.)
+- [ ] Satzwerk 3.25 (Mitteilung im Training): Einstellungen → Signale → „Mitteilung im Training“ einschalten (iPhone fragt nach Erlaubnis), Training starten, Handy sperren, Satz abhaken → kommt „Pause bis …“, danach „Los: …“? Wenn nichts kommt: Einstellungen → Mitteilungen → Satzwerk prüfen, Schalter aus/an
 - [ ] Neuer Morgen-Check (Formwerk 1.9): Muskelkater 4 Stufen per Tipp, Schmerz ja/nein – am iPhone einmal durchtippen
 - [ ] Satzwerk 3.23: Einheit mit Muskelkater/Schmerz starten → Zeilen über den Übungen stimmen? (Worker 2.7 muss gebaut sein: /v1/readiness)
 - [ ] Satzwerk 3.24: im Modus „Bestätigen“ testen; wenn alles passt, in Einstellungen → Anpassungen auf „Vollautomatisch“ stellen
