@@ -2,7 +2,7 @@
    die App zeigt an. Speicher nur mit Präfix „formwerk_“ (geteilte Adresse mit Satzwerk, Kochwerk …). */
 (function () {
   'use strict';
-  const VERSION = '1.10.0';
+  const VERSION = '1.10.1';
   // Vorbelegung der Worker-Adresse (keine Geheimnisse – das Passwort gibt der Nutzer einmal ein)
   const DEFAULT_URL = 'https://formwerk.hendrikcharles48.workers.dev';
 
@@ -183,7 +183,7 @@
 
   function muscleCard(d) {
     const ms = d.muscles || []; const last = d.strength && d.strength.last;
-    const txt = m => m.pain >= 2 ? 'Schmerz · schonen' : m.sore ? 'Muskelkater ' + SORE4[soreCat(m.sore)] : m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
+    const txt = m => m.pain >= 2 ? 'Schmerz · schonen' : m.sore ? 'Muskelkater ' + SORE_L[m.sore] : m.status === 'fresh' ? 'erholt' : (m.status === 'tired' ? 'ermüdet' : 'teilweise') + (m.readyIn ? ' · ~' + (m.readyIn >= 36 ? Math.round(m.readyIn / 24) + ' T' : m.readyIn + ' h') : '');
     const lastTxt = last ? `${esc(last.name || 'Kraft')} · ${last.date === todayIso() ? 'heute' : dShort(last.date)}` : 'Noch keine Einheit von Satzwerk';
     return `<div class="card"><div class="ctitle"><h3>Muskelgruppen</h3><span class="aside ell">${lastTxt}</span></div>
       <div class="muscles">${ms.map(m => `<div class="mus ${m.status}"><div class="top"><b class="ell">${esc(m.label)}</b><span>${txt(m)}</span></div><div class="bar"><i style="width:${Math.max(3, m.pct)}%"></i></div></div>`).join('')}</div>
@@ -237,10 +237,9 @@
   const SORE_L = ['', 'sehr leicht', 'leicht', 'mittel', 'stark', 'sehr stark'];
   const PAIN_L = ['', 'kaum', 'spürbar', 'störend', 'stark', 'sehr stark'];
   // 1.9 (Nutzerwunsch 19.11.): Muskelkater 4 Stufen, Schmerz ja/nein – ein Tipp schaltet weiter. Alte 1–5-Werte bleiben lesbar.
-  const SORE4 = ['keiner', 'leicht', 'mittel', 'stark'], SORE4V = [0, 2, 3, 5];
   const soreCat = v => (!v ? 0 : v <= 2 ? 1 : v === 3 ? 2 : 3);
-  const lvTxt = (kind, v) => v ? (kind === 'sore' ? SORE4[soreCat(v)] : 'ja') : (kind === 'sore' ? 'keiner' : 'nein');
-  const lvCls = (kind, v) => !v ? '' : kind === 'pain' ? ' on lv4' : ' on lv' + [0, 2, 3, 5][soreCat(v)];
+  const lvTxt = (kind, v) => v ? (kind === 'sore' ? SORE_L[v] : 'ja') : (kind === 'sore' ? 'keiner' : 'nein');
+  const lvCls = (kind, v) => !v ? '' : kind === 'pain' ? ' on lv4' : ' on lv' + v;
   const PAIN_AREAS = [['nacken', 'Nacken'], ['schulter', 'Schulter'], ['ellbogen', 'Ellbogen'], ['handgelenk', 'Handgelenk'], ['oberer_ruecken', 'Oberer Rücken'], ['unterer_ruecken', 'Unterer Rücken'], ['huefte', 'Hüfte'], ['leiste', 'Leiste'], ['oberschenkel', 'Oberschenkel hinten'], ['knie', 'Knie'], ['sprunggelenk', 'Sprunggelenk'], ['achilles', 'Achilles / Wade']];
   const painLabel = k => (PAIN_AREAS.concat([['ruecken', 'Rücken'], ['sonstiges', 'Sonstiges']]).find(a => a[0] === k) || [k, k])[1];
   const PAIN5 = [['schulter', 'Schulter'], ['ellbogen', 'Ellenbogen'], ['knie', 'Knie'], ['ruecken', 'Rücken'], ['sonstiges', 'Sonstiges']];
@@ -255,7 +254,7 @@
     const bbQ = b.askBaseball ? `<div class="row" style="display:flex;align-items:center;gap:8px;margin-top:12px"><span class="small ink2" style="flex:1">Gestern Baseball${b.askBaseball.from ? ' ' + b.askBaseball.from : ''} – warst du da?</span><button class="btn" data-a="ckBB" data-v="1" style="min-height:44px">Ja</button><button class="btn" data-a="ckBB" data-v="0" style="min-height:44px">Nein</button></div>` : '';
     if (!c) return `<div class="card"><div class="ctitle"><h3>Wie fühlt sich dein Körper an?</h3><span class="aside">10 Sekunden</span></div>
       <div style="display:flex;gap:8px"><button class="btn" data-a="ckOk" style="flex:1">Alles gut</button><button class="btn primary" data-a="ckOpen" style="flex:1;min-height:52px;font-size:16px">Muskelkater / Schmerz</button></div>${bbQ || bbRow}</div>`;
-    const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE4[soreCat(v)]})`);
+    const sore = Object.entries(c.sore || {}).map(([k, v]) => `${(ms.find(m => m.k === k) || { label: k }).label} (${SORE_L[v]})`);
     const pain = Object.entries(c.pain || {}).map(([k]) => painLabel(k));
     const txt = c.sick ? 'Krank' + (sore.length || pain.length ? ' · ' : '.') + [sore.join(', '), pain.join(', ')].filter(Boolean).join(' · ') : !sore.length && !pain.length ? 'Alles gut.' : [sore.length ? 'Muskelkater: ' + sore.join(', ') : '', pain.length ? 'Schmerz: ' + pain.join(', ') : ''].filter(Boolean).join(' · ');
     // fertig: kompakte Zeile – nur noch kurz, was eingetragen ist, plus die beiden Baseball-Schalter als kleine Pillen
@@ -265,15 +264,15 @@
   }
   function ckSheet() {
     const ms = (st.data && st.data.muscles) || []; const c = st.ck;
-    const chip = (kind, k, label, v) => `<button class="ckchip${lvCls(kind, v)}" data-a="ckTap" data-kind="${kind}" data-k="${k}" id="ck-${kind}-${k}"><b class="ell">${esc(label)}</b><span>${lvTxt(kind, v)}</span></button>`;
+    const chip = (kind, k, label, v) => `<button class="ckchip${lvCls(kind, v)}" data-a="ckTap" data-kind="${kind}" data-k="${k}" data-label="${esc(label)}" id="ck-${kind}-${k}"><b class="ell">${esc(label)}</b><span>${lvTxt(kind, v)}</span></button>`;
     const areas = PAIN5.concat(Object.keys(c.pain).filter(k => !PAIN5.some(a => a[0] === k)).map(k => [k, painLabel(k)]));
-    openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Antippen schaltet weiter: Muskelkater keiner → leicht → mittel → stark, Schmerz nein → ja. Nichts antippen = alles gut.</div></div>
+    openSheet(`<div class="stack"><div><div class="eyebrow">Morgen-Check</div><h2>Muskelkater & Schmerz</h2><div class="small muted">Muskel antippen und die Stufe 1–5 wählen. Schmerz: einmal antippen = ja. Nichts antippen = alles gut.</div></div>
       <button class="ckchip ${c.sick ? 'on lv5' : ''}" data-a="ckSick" id="ck-sick" style="width:100%"><b>Krank / angeschlagen</b><span>${c.sick ? 'ja – heute Pause' : '–'}</span></button>
       <div><div class="lblf">Muskelkater</div><div class="ckgrid">${ms.map(m => chip('sore', m.k, m.label, c.sore[m.k] || 0)).join('')}</div></div>
       <div><div class="lblf">Schmerz – kein Muskelkater (Gelenke, Sehnen, stechend)</div><div class="ckgrid">${areas.map(([k, l]) => chip('pain', k, l, c.pain[k] || 0)).join('')}</div></div>
       <div class="tiny muted">Formwerk stellt keine Diagnose. Hält Schmerz an oder wird stärker: Arzt oder Physio.</div>
       <button class="btn primary block" data-a="ckSave">Speichern</button><button class="btn ghost block" data-a="closeSheet">Abbrechen</button>
-      </div>`);
+      <div class="ckpick" id="ckPick" hidden></div></div>`);
   }
   async function ckSend(body) {
     try { await api('/v1/checkin', { method: 'POST', body: Object.assign({ date: todayIso() }, body) }); closeSheet(); load(true); }
@@ -466,10 +465,15 @@
     ckSick() { st.ck.sick = !st.ck.sick; const b = $('#ck-sick'); if (b) { b.className = 'ckchip' + (st.ck.sick ? ' on lv5' : ''); b.querySelector('span').textContent = st.ck.sick ? 'ja – heute Pause' : '–'; } },
     ckOpen() { const c = (st.data && st.data.body && st.data.body.checkin) || {}; st.ck = { sore: Object.assign({}, c.sore), pain: Object.assign({}, c.pain), sick: !!c.sick }; ckSheet(); },
     // Kachel antippen → Auswahl 0–5 unten im Fenster
+    // Muskelkater: antippen → Stufen 0–5 unten im Fenster · Schmerz: ein Tipp schaltet ja/nein
     ckTap(t) { const kind = t.dataset.kind, k = t.dataset.k; const cur = st.ck[kind][k] || 0;
-      const v = kind === 'pain' ? (cur ? 0 : 3) : SORE4V[(soreCat(cur) + 1) % 4];
-      if (v) st.ck[kind][k] = v; else delete st.ck[kind][k];
-      t.className = 'ckchip' + lvCls(kind, v); t.querySelector('span').textContent = lvTxt(kind, v); },
+      if (kind === 'pain') { const v = cur ? 0 : 3; if (v) st.ck.pain[k] = v; else delete st.ck.pain[k]; t.className = 'ckchip' + lvCls('pain', v); t.querySelector('span').textContent = lvTxt('pain', v); return; }
+      const box = $('#ckPick'); box.hidden = false;
+      box.innerHTML = `<div class="ckpick-h"><b>${esc(t.dataset.label)}</b><span class="tiny muted">Muskelkater</span></div><div class="ckpick-row">${[0, 1, 2, 3, 4, 5].map(v => `<button class="ckl ${v === cur ? 'on' : ''} ${v ? 'lv' + v : ''}" data-a="ckSet" data-kind="sore" data-k="${k}" data-v="${v}"><b>${v || '–'}</b><span>${v ? SORE_L[v] : 'keiner'}</span></button>`).join('')}</div>`;
+      document.querySelectorAll('.ckchip.sel').forEach(x => x.classList.remove('sel')); t.classList.add('sel'); },
+    ckSet(t) { const k = t.dataset.k, v = +t.dataset.v; if (v) st.ck.sore[k] = v; else delete st.ck.sore[k];
+      const chip = $('#ck-sore-' + k); if (chip) { chip.className = 'ckchip' + lvCls('sore', v); chip.querySelector('span').textContent = lvTxt('sore', v); }
+      const box = $('#ckPick'); box.hidden = true; box.innerHTML = ''; },
     ckSave() { ckSend({ sore: st.ck.sore, pain: st.ck.pain, sick: !!st.ck.sick }); },
     ckFlag(t) { ckSend({ bbOnly: true, [t.dataset.k]: t.dataset.on !== '1' }).then(() => toast(t.dataset.on !== '1' ? (t.dataset.k === 'bb' ? 'Gestern Baseball eingetragen' : 'Heute Baseball – Empfehlung angepasst') : 'Entfernt')); },
     ckBB(t) { const c = (st.data && st.data.body && st.data.body.checkin); ckSend({ bbOnly: true, bb: t.dataset.v === '1' }); },
