@@ -162,6 +162,37 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--label-2) 50%
 .xstand b.neg{color:var(--orange)}
 .grid2 .btn{padding:15px 6px;white-space:nowrap}
 .xstand b small{font-size:18px;font-weight:600;color:var(--label-2)}
+/* Planer */
+.phead{display:flex;flex-direction:column;gap:12px}
+.pnum{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pnum b{font:800 30px/1 var(--round);font-variant-numeric:tabular-nums}
+.pnum span{color:var(--label-2);font-size:15px}
+.pnum .pill{margin-left:auto;font-style:normal}
+.pill.ok{background:var(--green-soft);color:var(--green)}
+.pill.warn{background:rgba(255,179,64,.16);color:var(--orange)}
+.pbar{position:relative;display:flex;height:12px;border-radius:99px;background:var(--fill);overflow:hidden}
+.pbar i{display:block;height:100%}
+.pbar i.e,.plegend i.e{background:var(--green)}
+.pbar i.p,.plegend i.p{background:repeating-linear-gradient(135deg,var(--green) 0 4px,var(--green-soft) 4px 8px)}
+.pbar em{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--label)}
+.plegend{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.plegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.note{background:rgba(255,179,64,.12);border-radius:14px;padding:12px 14px;font-size:14px}
+.btn.sm{padding:11px 8px;font-size:15px}
+.weeks{display:flex;flex-direction:column;gap:14px}
+.wk{display:flex;flex-direction:column;gap:6px}
+.wkhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:2px 4px;text-align:left}
+.wkhead>span:first-child{font-weight:700;font-size:15px;white-space:nowrap}
+.wkhead small{font-weight:500;color:var(--label-2);font-size:13px;margin-left:4px}
+.wsum{font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums;text-align:right}
+.wsum b{color:var(--label)}
+.wfree{color:var(--label-3)}
+.day.plan{background:var(--green-soft);color:var(--green)}
+.day.done{background:var(--green);color:var(--on-green)}
+.day.done span{color:var(--on-green)}
+.row.more{display:block;text-align:center;color:var(--green);font-weight:600;padding:14px}
+.cal button small{font-size:9px;letter-spacing:-.02em}
+.monthnav #cset{font-size:17px;color:var(--label-2)}
 /* Kalender */
 .cal{display:grid;gap:4px;text-align:center}
 .cal .wd{font-size:12px;font-weight:600;color:var(--label-2);padding-bottom:2px}
@@ -238,7 +269,7 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
 const WT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
 // ---------- Daten ----------
-let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, tpl:[], offen:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
+let st = {entries:[], S:{...DEF}, plan:[{anz:2, per:'w', von:'14:00', bis:'22:30'}], extra:{anz:1, per:'w', von:'14:00'}, cal:{}, free:{}, skip:{}, tpl:[], offen:[], calStart:'14:00', calMode:'voll', pmode:'kal'};
 function load(){ try{ const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if(d) st = {...st, ...d, S:{...DEF, ...(d.S||{})}}; }catch(_){} }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){ toast('Speichern nicht möglich'); } }
 const S = () => st.S;
@@ -279,7 +310,8 @@ function shift(von, bis, pauseIn, pauseVon){
   const spaet = Math.max(0, inWin(s, e) - (pS != null && !pauseBad ? inWin(pS, pS + pause) : 0));
   return {gross, pause, paid, spaet: Math.min(paid, spaet), pauseVon: pS != null ? hhmm(pS) : null, pauseBis: pS != null ? hhmm(pS + pause) : null, pauseBad, pauseSpaet: pS != null && !pauseBad && inWin(pS, pS + pause) > 0};
 }
-const money = (paid, spaet) => { const base = paid/60*S().lohn, zul = spaet/60*S().lohn*S().proz/100; return {base, zul, sum: base+zul, zaehlt: base + (S().zaehlt ? zul : 0)}; };
+// e = gespeicherte Schicht: rechnet mit dem Lohn von damals, damit spätere Änderungen sie nicht verändern
+const money = (paid, spaet, e) => { const l = (e && e.lohn) || S().lohn, pr = e && e.proz != null ? e.proz : S().proz; const base = paid/60*l, zul = spaet/60*l*pr/100; return {base, zul, sum: base+zul, zaehlt: base + (S().zaehlt ? zul : 0)}; };
 function maxShift(von, budget){
   let best = null;
   for(let g = 1; g <= MAXG; g++){ const r = shift(von, hhmm(toMin(von)+g), null); if(money(r.paid, r.spaet).zaehlt <= budget + .005 && (!best || r.paid > best.paid)) best = {...r, bis: hhmm(toMin(von)+g)}; }
@@ -287,7 +319,7 @@ function maxShift(von, budget){
 }
 function sumOf(list){
   let paid = 0, spaet = 0, base = 0, zul = 0;
-  for(const e of list){ const m = money(e.minuten||0, e.spaetMin||0); paid += e.minuten||0; spaet += e.spaetMin||0; base += m.base; zul += m.zul; }
+  for(const e of list){ const m = money(e.minuten||0, e.spaetMin||0, e); paid += e.minuten||0; spaet += e.spaetMin||0; base += m.base; zul += m.zul; }
   return {paid, spaet, base, zul, zaehlt: base + (S().zaehlt ? zul : 0), n: list.length};
 }
 const monthEntries = ym => st.entries.filter(e => (e.datum||'').startsWith(ym)).sort((a,b) => b.datum.localeCompare(a.datum) || (b.von||'').localeCompare(a.von||''));
@@ -333,15 +365,17 @@ function viewMonat(){
       </div>
       ${restHtml}
     </section>
+    ${isCur ? (() => { const P = calPlan(ym), up = P.L.res.filter(x => x.s); return up.length ? `<p class="group-title">Noch geplant · ${eur(P.L.used)}</p><section class="list" id="plist">${up.slice(0,3).map(planRow).join('')}${up.length > 3 ? `<button type="button" class="row more" id="pmore">Alle ${up.length} im Planer</button>` : ''}</section>` : ''; })() : ''}
     <p class="group-title">${t.n} ${t.n===1?'Schicht':'Schichten'}</p>
     <section class="list" id="list"></section>
   </div>`;
+  if($('#plist')){ const P = calPlan(ym); $('#plist').querySelectorAll('[data-day]').forEach(b => b.onclick = () => dayMenu(b.dataset.day, P.rec[b.dataset.day].s)); if($('#pmore')) $('#pmore').onclick = () => { calYm = ym; go('planer'); }; }
   $('#prev').onclick = () => { ym = iso(new Date(y, m-2, 1)).slice(0,7); render(); };
   $('#next').onclick = () => { if(!isCur){ ym = iso(new Date(y, m, 1)).slice(0,7); render(); } };
   const box = $('#list');
   if(!list.length) box.innerHTML = `<div class="empty"><b>Noch keine Schichten</b>Tipp auf + und trag deine erste Schicht ein.</div>`;
   for(const e of list){
-    const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0);
+    const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0, e);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
     b.innerHTML = `<div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
       <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : 'Ohne Uhrzeit'}</span><span class="s">${esc([fmt(e.minuten||0), e.spaetMin ? `${fmt(e.spaetMin)} spät` : '', e.notiz].filter(Boolean).join(' · '))}</span></div>
@@ -434,6 +468,7 @@ function openSheet(entry, pre){
     const r = read(); if(r.err) return;
     const obj = {...(edit ? entry : {id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), erstellt:Date.now()}), ...r, datum:$('#fDatum').value || today(), notiz:$('#fNotiz').value.trim()};
     delete obj.warn; if(!obj.pause) delete obj.pauseVon;
+    if(obj.lohn == null){ obj.lohn = S().lohn; obj.proz = S().proz; }
     if(!obj.von){ delete obj.von; delete obj.bis; delete obj.pause; delete obj.pauseVon; }
     st.entries = edit ? st.entries.map(x => x.id === obj.id ? obj : x) : [...st.entries, obj];
     save(); ym = ymOf(obj.datum); closeSheet(); render();
@@ -458,60 +493,17 @@ $('#nudgeB').onclick = async () => { hideNudge(); await exportData(); };
 $('#nudgeX').onclick = hideNudge;
 let tt; function toast(t){ const x = $('#toast'); x.textContent = t; x.hidden = false; clearTimeout(tt); tt = setTimeout(() => x.hidden = true, 2000); }
 
-// ---------- Planer ----------
-const PSEG = () => `<div class="seg" role="group" aria-label="Planer"><button type="button" data-pm="kal" aria-pressed="${st.pmode==='kal'}">Kalender</button><button type="button" data-pm="muster" aria-pressed="${st.pmode!=='kal'}">Wochenmuster</button></div>`;
-function bindPseg(){ document.querySelectorAll('[data-pm]').forEach(b => b.onclick = () => { st.pmode = b.dataset.pm; save(); viewPlaner(); }); }
-function viewPlaner(){ if(st.pmode === 'kal') viewKalender(); else viewMuster(); }
-function viewMuster(){
-  const v = $('#view');
-  v.innerHTML = `<div class="page">
-    <div class="top"><div><div class="eyebrow">Was passt in ${eur(S().grenze)}?</div><h1>Planer</h1></div></div>
-    ${PSEG()}
-    <p class="group-title">So möchte ich arbeiten</p>
-    <section class="list" id="prows"></section>
-    <button type="button" class="btn plain" id="padd">Schicht hinzufügen</button>
-    <section class="card verdict" id="pout"></section>
-    <p class="group-title">Zusätzliche Tage</p>
-    <section class="list"><div class="prow" style="grid-template-columns:auto minmax(0,1fr)">
-      <div class="stepper"><button type="button" id="xm" aria-label="Weniger">−</button><b>${st.extra.anz}×<small>${st.extra.per==='w'?'pro Woche':'pro Monat'}</small></b><button type="button" id="xp" aria-label="Mehr">+</button></div>
-      <div class="grid2"><select id="xper" aria-label="Zeitraum"><option value="w">pro Woche</option><option value="m">pro Monat</option></select><input id="xvon" type="time" value="${st.extra.von}" aria-label="Beginn Zusatztag"></div>
-    </div></section>
-    <section class="card verdict" id="xout"></section>
-    <p class="hint">Gerechnet mit ${String(S().wochen).replace('.',',')} Wochen pro Monat wie dein Arbeitgeber, Pause wird automatisch abgezogen (über 6 Std 30 Min, über 9 Std 45 Min).</p>
-  </div>`;
-  const rows = $('#prows');
-  st.plan.forEach((r, i) => {
-    const d = document.createElement('div'); d.className = 'prow pl';
-    d.innerHTML = `<div class="stepper"><button type="button" aria-label="Weniger">−</button><b>${r.anz}×<small>${r.per==='w'?'Woche':'Monat'}</small></b><button type="button" aria-label="Mehr">+</button></div>
-      <input type="time" value="${r.von}" aria-label="Beginn"><input type="time" value="${r.bis}" aria-label="Ende">
-      <button type="button" class="x" aria-label="Entfernen">✕</button>`;
-    const [mi, pl] = d.querySelectorAll('.stepper button'), [iv, ib] = d.querySelectorAll('input');
-    mi.onclick = () => { r.anz = Math.max(0, r.anz-1); save(); viewPlaner(); };
-    pl.onclick = () => { r.anz++; save(); viewPlaner(); };
-    d.querySelector('.stepper b').onclick = () => { r.per = r.per==='w' ? 'm' : 'w'; save(); viewPlaner(); };
-    iv.onchange = () => { r.von = iv.value; save(); planOut(); };
-    ib.onchange = () => { r.bis = ib.value; save(); planOut(); };
-    d.querySelector('.x').onclick = () => { st.plan.splice(i,1); save(); viewPlaner(); };
-    rows.append(d);
-  });
-  if(!st.plan.length) rows.innerHTML = `<div class="empty">Füg eine Schicht hinzu, z. B. 14:00–21:30.</div>`;
-  bindPseg();
-  $('#padd').onclick = () => { st.plan.push({anz:1, per:'w', von:'14:00', bis:'21:30'}); save(); viewPlaner(); };
-  $('#xper').value = st.extra.per;
-  $('#xm').onclick = () => { st.extra.anz = Math.max(0, st.extra.anz-1); save(); viewPlaner(); };
-  $('#xp').onclick = () => { st.extra.anz = Math.min(7, st.extra.anz+1); save(); viewPlaner(); };
-  $('#xper').onchange = () => { st.extra.per = $('#xper').value; save(); viewPlaner(); };
-  $('#xvon').onchange = () => { st.extra.von = $('#xvon').value; save(); planOut(); };
-  planOut();
-}
-
-// ---------- Kalender-Planer ----------
-// st.cal[datum] = {von, max (bezahlte Min., null = automatisch), bis (nur bei fester Zeit)}
-// st.free[montag] = true: ganze Woche frei; st.tpl = [Wochentage 0–6] der normalen Woche
-const NOPAUSE = 360, MAXPAID = 600; // bis 6 Std ohne Pause, höchstens 10 Std Arbeit
+// ---------- Planer (Kalender) ----------
+// st.cal[datum] = {von?, max?, bis?, src?}: ohne von gilt „Beginn meistens“, bis = feste Zeit, src 'tpl' = aus der normalen Woche.
+// st.skip[datum] = true: Tag bewusst rausgenommen, die normale Woche trägt ihn nicht wieder ein. st.free[montag] = ganze Woche frei.
+// Geplante Tage werden bei jeder Anzeige neu gerechnet (Lohn, Ziel, Beginn …); gearbeitete Schichten behalten ihre Werte.
+const NOPAUSE = 360, MAXPAID = 480; // bis 6 Std ohne Pause, mit Pause höchstens 8 Std
 const ziel = () => Math.min(S().grenze, S().ziel || S().grenze);
 const monday = d => { const x = new Date(d+'T12:00'); x.setDate(x.getDate() - (x.getDay()+6)%7); return iso(x); };
 const kw = d => { const x = new Date(d+'T12:00'); x.setDate(x.getDate() + 3 - (x.getDay()+6)%7); const j = new Date(x.getFullYear(), 0, 4); return 1 + Math.round(((x - j)/864e5 - 3 + (j.getDay()+6)%7) / 7); };
+const startOf = c => (c && c.von) || st.calStart;
+const shortT = t => t.endsWith(':00') ? String(+t.slice(0,2)) : `${+t.slice(0,2)}:${t.slice(3)}`;
+const dmy = d => `${+d.slice(8)}.${+d.slice(5,7)}.`;
 function shiftPaid(von, paid){
   let gross = paid; if(paid > 360){ gross = paid + 30; if(gross > 540) gross = paid + 45; }
   const bis = hhmm(toMin(von) + gross), r = shift(von, bis, null);
@@ -535,17 +527,7 @@ function distribute(days, R, mode){
   const out = res.map(x => ({...x, s: x.p ? shiftPaid(x.von, x.p) : null}));
   return {res: out, used: out.reduce((a,x) => a + (x.s ? x.s.cost : 0), 0)};
 }
-function recRows(list){
-  return list.map(x => {
-    const d = new Date(x.d+'T12:00'), s = x.s;
-    const tag = (x.fix ? 'fest · ' : '') + (s && s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause');
-    return `<button type="button" class="row" data-day="${x.d}"><div class="day"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
-      <div class="mid">${s ? `<span class="t">${s.von}–${s.bis}${x.fix ? ' <span class="pill" style="font-size:11px">fest</span>' : ''}</span><span class="s">${fmt(s.paid)} · ${tag}${s.spaet ? ` · <span class="spaet">${fmt(s.spaet)} spät</span>` : ''}</span>`
-        : `<span class="t" style="color:var(--label-2)">Frei</span><span class="s">Für dein Ziel nicht nötig</span>`}</div>
-      <div class="right">${s ? `<b>${eur(s.cost)}</b>` : ''}</div></button>`;
-  }).join('');
-}
-// Plan für einen Monat berechnen
+// Plan für einen Monat: gearbeitet + Verteilung des Rests auf die geplanten Tage
 function calPlan(ymX){
   const t0 = today(), byDay = {};
   for(const e of st.entries) if((e.datum||'').startsWith(ymX)) (byDay[e.datum] = byDay[e.datum] || []).push(e);
@@ -553,183 +535,207 @@ function calPlan(ymX){
   const all = Object.keys(st.cal).filter(d => d.startsWith(ymX) && d >= t0 && !byDay[d] && !st.free[monday(d)]).sort();
   const fixed = [], flex = [];
   for(const d of all){
-    const c = st.cal[d], von = c.von || st.calStart;
+    const c = st.cal[d], von = startOf(c);
     if(c.bis){ const r = shift(von, c.bis, null); fixed.push({d, von, fix:true, s: r ? {...r, von, bis:c.bis, cost: money(r.paid, r.spaet).zaehlt} : null}); }
     else flex.push({d, von, max: c.max || null});
   }
   const fixCost = fixed.reduce((a,x) => a + (x.s ? x.s.cost : 0), 0), R2 = Math.max(0, R - fixCost);
   const A = distribute(flex.map(x => ({...x, cap: x.max || NOPAUSE})), R2, st.calMode);
-  const short = flex.length && R2 - A.used >= S().lohn/2 && flex.some(x => !x.max);
+  const short = flex.length > 0 && R2 - A.used >= S().lohn/2 && flex.some(x => !x.max);
   const B = short ? distribute(flex.map(x => ({...x, cap: x.max || MAXPAID})), R2, 'gleich') : null;
   const sortD = l => l.sort((a,b) => a.d.localeCompare(b.d));
-  return {byDay, earned, T, R, fixCost, over: fixCost - R, n: all.length, short,
-    A: {res: sortD([...fixed, ...A.res]), used: fixCost + A.used}, B: B && {res: sortD([...fixed, ...B.res]), used: fixCost + B.used}};
+  const L = short ? {res: sortD([...fixed, ...B.res]), used: fixCost + B.used} : {res: sortD([...fixed, ...A.res]), used: fixCost + A.used};
+  const rec = {}; for(const x of L.res) rec[x.d] = x;
+  return {byDay, earned, T, R, fixCost, over: fixCost - R, n: all.length, short, freeA: R2 - A.used, L, rec,
+    planMin: L.res.reduce((a,x) => a + (x.s ? x.s.paid : 0), 0)};
 }
-function viewKalender(){
-  const [y,m] = calYm.split('-').map(Number), first = new Date(y, m-1, 1), dim = new Date(y, m, 0).getDate();
-  const t0 = today(), isCur = calYm === curYM(), P = calPlan(calYm), byDay = P.byDay, rec = {};
-  for(const x of (P.short ? P.B : P.A).res) rec[x.d] = x;
-  // Raster: Wochen als Zeilen, vorne die Kalenderwoche
-  let cells = '<div class="wd">KW</div>' + ['Mo','Di','Mi','Do','Fr','Sa','So'].map(w => `<div class="wd">${w}</div>`).join('');
-  let d0 = new Date(y, m-1, 1 - (first.getDay()+6)%7, 12);
-  while(true){
-    const mon = iso(d0); if(mon > `${calYm}-${String(dim).padStart(2,'0')}`) break;
-    const free = !!st.free[mon];
+function planRow(x){
+  const d = new Date(x.d+'T12:00'), s = x.s;
+  const tag = (x.fix ? 'feste Zeit · ' : '') + (s && s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause');
+  return `<button type="button" class="row" data-day="${x.d}"><div class="day plan"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
+    <div class="mid">${s ? `<span class="t">${s.von}–${s.bis}</span><span class="s">${fmt(s.paid)} · ${tag}${s.spaet ? ` · <span class="spaet">${fmt(s.spaet)} spät</span>` : ''}</span>`
+      : `<span class="t" style="color:var(--label-2)">Nicht nötig</span><span class="s">Für dein Ziel reicht es ohne diesen Tag</span>`}</div>
+    <div class="right">${s ? `<b>${eur(s.cost)}</b><span>geplant</span>` : ''}</div></button>`;
+}
+function doneRow(e){
+  const d = new Date(e.datum+'T12:00'), mo = money(e.minuten||0, e.spaetMin||0, e);
+  return `<button type="button" class="row" data-e="${e.id}"><div class="day done"><b>${d.getDate()}</b><span>${WT[d.getDay()]}</span></div>
+    <div class="mid"><span class="t">${e.von ? `${e.von}–${e.bis}` : fmt(e.minuten||0)}</span><span class="s">${fmt(e.minuten||0)} · gearbeitet</span></div>
+    <div class="right"><b>${eur(mo.sum)}</b><span>✓</span></div></button>`;
+}
+// Kopf: Gearbeitet + Geplant gegen Ziel und Grenze
+function planHead(P){
+  const G = S().grenze, total = P.earned.zaehlt + P.L.used, gap = P.T - total;
+  const st0 = total > G + .005 ? ['bad', `${eur(total - G)} über der Grenze`] : gap <= S().lohn/2 ? ['ok', 'passt'] : ['warn', `fehlt ${eur(gap)}`];
+  const pE = Math.min(100, P.earned.zaehlt / G * 100), pP = Math.min(100 - pE, P.L.used / G * 100), pZ = P.T / G * 100;
+  return `<section class="card phead">
+    <div class="pnum"><b>${eur(total)}</b><span>von ${eur(P.T)}${P.T < G ? ' Ziel' : ''}</span><i class="pill ${st0[0]}">${st0[1]}</i></div>
+    <div class="pbar"><i class="e" style="width:${pE}%"></i><i class="p" style="width:${pP}%"></i>${P.T < G ? `<em style="left:${pZ}%"></em>` : ''}</div>
+    <div class="plegend"><span><i class="e"></i>Gearbeitet ${eur(P.earned.zaehlt)} · ${fmtS(P.earned.paid)} Std</span><span><i class="p"></i>Geplant ${eur(P.L.used)} · ${fmtS(P.planMin)} Std</span></div>
+  </section>`;
+}
+function planNotes(P){
+  const out = [];
+  if(P.R <= 0) out.push(`Diesen Monat ist dein Ziel schon erreicht.`);
+  else if(!P.n) out.push(`Tipp im Kalender die Tage an, an denen du arbeiten kannst, oder trag deine normale Woche ein (⚙). Die App verteilt dann die fehlenden ${eur(P.R)}, möglichst ohne Pause.`);
+  if(P.over > .005) out.push(`Deine festen Zeiten ergeben ${eur(P.over)} mehr als dein Ziel. Kürz eine feste Schicht.`);
+  if(P.short){ const need = Math.ceil(P.freeA / shiftPaid(st.calStart, NOPAUSE).cost - 1e-9); out.push(`Ohne Pause reichen deine Tage nicht. Tipp noch <b>${need} ${need===1?'Tag':'Tage'}</b> an, bis dahin plant die App mit Pause.`); }
+  const tiny = P.L.res.filter(x => x.s && !x.fix && x.s.paid < 120);
+  if(tiny.length && st.calMode === 'voll'){ const x = tiny[tiny.length-1]; out.push(`Am ${dmy(x.d)} wären es nur ${fmt(x.s.paid)}. Lass den Tag weg oder stell auf „Gleichmäßig“ (⚙).`); }
+  return out.map(t => `<div class="note">${t}</div>`).join('');
+}
+function viewPlaner(){
+  const [y,m] = calYm.split('-').map(Number), first = new Date(y, m-1, 1), dim = new Date(y, m, 0).getDate(), last = `${calYm}-${String(dim).padStart(2,'0')}`;
+  const t0 = today(), isCur = calYm === curYM(), P = calPlan(calYm), byDay = P.byDay, rec = P.rec;
+  let cells = '<div class="wd">KW</div>' + ['Mo','Di','Mi','Do','Fr','Sa','So'].map(w => `<div class="wd">${w}</div>`).join(''), weeks = '';
+  for(let d0 = new Date(y, m-1, 1 - (first.getDay()+6)%7, 12); iso(d0) <= last; d0.setDate(d0.getDate() + 7)){
+    const mon = iso(d0), free = !!st.free[mon];
     cells += `<button type="button" class="kw${free ? ' free' : ''}" data-w="${mon}" aria-label="Woche ${kw(mon)}${free?', frei':''}">${kw(mon)}</button>`;
+    const rows = []; let wMin = 0, wEur = 0, wDays = 0, from = null, to = null;
     for(let i = 0; i < 7; i++){
       const d = iso(new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i, 12));
       if(!d.startsWith(calYm)){ cells += '<div></div>'; continue; }
-      const cls = [], c = st.cal[d], r = rec[d];
-      if(byDay[d]) cls.push('done');
+      from = from || d; to = d;
+      const cls = [], c = st.cal[d], r = rec[d]; let sub = '';
+      if(byDay[d]){ cls.push('done'); sub = fmtS(byDay[d].reduce((a,e) => a + (e.minuten||0), 0));
+        for(const e of byDay[d]){ rows.push(doneRow(e)); wMin += e.minuten||0; wEur += money(e.minuten||0, e.spaetMin||0, e).sum; } wDays++; }
       else if(free) cls.push('off');
-      else if(c && d >= t0) cls.push(r && r.s ? (c.bis ? 'plan fix' : 'plan') : 'unused');
+      else if(c && d >= t0){
+        cls.push(r && r.s ? (c.bis ? 'plan fix' : 'plan') : 'unused');
+        if(r && r.s){ const a = shortT(r.s.von), b = shortT(r.s.bis); sub = (a + '–' + b).length <= 6 ? a + '–' + b : a; wMin += r.s.paid; wEur += r.s.cost; wDays++; }
+        if(r) rows.push(planRow(r));
+      }
       if(d < t0 && !byDay[d]) cls.push('past'); if(d === t0) cls.push('today');
-      const sub = byDay[d] ? fmtS(byDay[d].reduce((a,e) => a + (e.minuten||0), 0)) : r && r.s ? fmtS(r.s.paid) : c && c.max && !free && d >= t0 ? '≤'+fmtS(c.max) : '';
       cells += `<button type="button" class="${cls.join(' ')}" data-d="${d}" aria-label="${+d.slice(8)}. ${MONATE[m-1]}">${+d.slice(8)}<small>${sub}</small></button>`;
     }
-    d0.setDate(d0.getDate() + 7);
-  }
-  const zielTxt = S().ziel && S().ziel < S().grenze ? `dein Ziel ${eur(ziel())}` : `die Grenze ${eur(S().grenze)}`;
-  let out;
-  if(P.R <= 0) out = `<section class="card"><div class="answer">Diesen Monat hast du ${zielTxt} schon erreicht.</div></section>`;
-  else if(!P.n) out = `<section class="card"><div class="answer">Tipp die Tage an, an denen du arbeiten kannst, oder trag unten deine normale Woche ein. Die App verteilt dann die fehlenden <b>${eur(P.R)}</b> bis ${zielTxt}, möglichst ohne Pause.</div></section>`;
-  else {
-    const L = P.short ? P.B : P.A;
-    if(P.over > 0.005) out = `<section class="card"><div class="answer" style="background:var(--red-soft)">Deine festen Zeiten ergeben schon <b>${eur(P.over)}</b> mehr als ${zielTxt}. Kürz eine feste Schicht.</div></section>`;
-    else out = '';
-    if(P.short){
-      const need = Math.ceil((P.R - P.A.used) / shiftPaid(st.calStart, NOPAUSE).cost - 1e-9);
-      out += `<section class="card"><div class="answer" style="background:var(--red-soft)">Ohne Pause reichen deine Tage nicht ganz, <b>${eur(P.R - P.A.used)}</b> blieben übrig. Tipp noch <b>${need} ${need===1?'Tag':'Tage'}</b> an, dann geht alles ohne Pause. Bis dahin gilt dieser Vorschlag mit Pause:</div></section>`;
-    }
-    const tiny = L.res.filter(x => x.s && !x.fix && x.s.paid < 120);
-    if(tiny.length && st.calMode === 'voll'){ const x = tiny[tiny.length-1], dd = new Date(x.d+'T12:00');
-      out += `<section class="card"><div class="answer">Am ${dd.getDate()}. wären es nur <b>${fmt(x.s.paid)}</b>. Lohnt sich kaum: Lass den Tag weg (dann ${eur(P.earned.zaehlt + L.used - x.s.cost)} im Monat) oder stell auf <b>Gleichmäßig</b>.</div></section>`; }
-    out += `<p class="group-title">Empfehlung</p><section class="list">${recRows(L.res)}</section>
-      <p class="hint">Damit kommst du auf <b>${eur(P.earned.zaehlt + L.used)}</b>${P.earned.n ? ` (${eur(P.earned.zaehlt)} schon gearbeitet)` : ''}. Ziel: ${eur(P.T)}, Grenze: ${eur(S().grenze)}. Tipp auf einen Tag für feste Zeiten oder eine Höchstdauer.</p>`;
+    const sum = free ? '<span class="wfree">frei</span>' : wDays ? `${wDays} ${wDays===1?'Tag':'Tage'} · ${fmtS(wMin)} Std · <b>${eur(wEur)}</b>` : '<span class="wfree">nichts geplant</span>';
+    weeks += `<div class="wk"><button type="button" class="wkhead" data-w="${mon}"><span>KW ${kw(mon)} <small>${dmy(from)}–${dmy(to)}</small></span><span class="wsum">${sum}</span></button>${rows.length && !free ? `<section class="list">${rows.join('')}</section>` : ''}</div>`;
   }
   $('#view').innerHTML = `<div class="page">
-    <div class="top"><div><div class="eyebrow">Noch ${eur(P.R)} bis ${S().ziel && S().ziel < S().grenze ? 'Ziel' : 'Grenze'}</div><h1>Planer</h1></div></div>
-    ${PSEG()}
+    <div class="top"><div><div class="eyebrow">${isCur ? 'Dieser Monat' : y}</div><h1>${MONATE[m-1]}</h1></div>
+      <div class="monthnav"><button type="button" id="cset" aria-label="Einstellungen zum Planen">⚙</button><button type="button" id="cprev" aria-label="Vorheriger Monat" ${isCur?'disabled':''}>‹</button><button type="button" id="cnext" aria-label="Nächster Monat">›</button></div></div>
+    ${planHead(P)}
+    ${planNotes(P)}
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="top" style="align-items:center"><b style="font-size:19px">${MONATE[m-1]} ${y}</b>
-        <div class="monthnav"><button type="button" id="cprev" aria-label="Vorheriger Monat" ${isCur?'disabled':''}>‹</button><button type="button" id="cnext" aria-label="Nächster Monat">›</button></div></div>
       <div class="cal">${cells}</div>
-      <div class="legend"><span><i class="lg done"></i>gearbeitet</span><span><i class="lg plan"></i>geplant</span><span><i class="lg fix"></i>feste Zeit</span><span><i class="lg off"></i>Woche frei</span></div>
+      <div class="legend"><span><i class="lg done"></i>gearbeitet</span><span><i class="lg plan"></i>geplant</span><span><i class="lg fix"></i>feste Zeit</span><span><i class="lg off"></i>frei</span></div>
+      <div class="grid2"><button type="button" class="btn plain sm" id="tApply" ${st.tpl.length ? '' : 'disabled'}>Normale Woche eintragen</button><button type="button" class="btn plain sm" id="cClear">Monat leeren</button></div>
     </section>
-    <section class="set">
-      <div class="it"><label for="cZiel">Ziel im Monat (€)</label><input id="cZiel" inputmode="decimal" placeholder="${String(S().grenze).replace('.',',')}" value="${S().ziel ? String(S().ziel).replace('.',',') : ''}"></div>
-      <div class="it"><label for="cStart">Beginn meistens</label><input id="cStart" type="time" value="${st.calStart}"></div>
-      <div class="it" style="grid-template-columns:auto minmax(0,1fr)"><label>Verteilen</label><div class="seg"><button type="button" data-cm="voll" aria-pressed="${st.calMode==='voll'}">Volle Tage</button><button type="button" data-cm="gleich" aria-pressed="${st.calMode==='gleich'}">Gleichmäßig</button></div></div>
-    </section>
-    <p class="group-title">Meine normale Woche</p>
-    <section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="days7">${[1,2,3,4,5,6,0].map(i => `<button type="button" data-t="${i}" aria-pressed="${st.tpl.includes(i)}">${WT[i]}</button>`).join('')}</div>
-      <button type="button" class="btn plain" id="tApply" ${st.tpl.length ? '' : 'disabled'}>In alle offenen Wochen eintragen</button>
-      <p class="hint">Freie Wochen (KW antippen) und Tage, die schon gearbeitet sind, werden übersprungen.</p>
-    </section>
-    ${out}
+    <div class="weeks">${weeks}</div>
+    <p class="hint">Leeren Tag antippen = einplanen. Geplanten Tag antippen = Beginn, Höchstdauer oder feste Zeit. KW antippen = Woche frei oder Tage wählen. Gearbeitete Schichten ändern sich nicht, wenn du hier etwas umstellst.</p>
   </div>`;
-  bindPseg();
-  $('#cprev').onclick = () => { if(!isCur){ calYm = iso(new Date(y, m-2, 1)).slice(0,7); viewKalender(); } };
-  $('#cnext').onclick = () => { calYm = iso(new Date(y, m, 1)).slice(0,7); viewKalender(); };
-  $('#cZiel').onchange = () => { const v = num($('#cZiel').value); st.S.ziel = v && v > 0 ? Math.min(v, S().grenze) : null; save(); setTimeout(viewKalender); if(v > S().grenze) toast('Höher als die Grenze geht nicht'); };
-  $('#cStart').onchange = () => { const v = $('#cStart').value; if(!v) return; for(const d in st.cal) if(st.cal[d].von === st.calStart) st.cal[d].von = v; st.calStart = v; save(); setTimeout(viewKalender); };
-  document.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { st.calMode = b.dataset.cm; save(); viewKalender(); });
-  document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const i = +b.dataset.t; st.tpl = st.tpl.includes(i) ? st.tpl.filter(x => x !== i) : [...st.tpl, i]; save(); viewKalender(); });
-  $('#tApply').onclick = () => { const n = applyTpl(calYm); save(); viewKalender(); toast(n ? `${n} Tage eingetragen` : 'Nichts Neues einzutragen'); };
+  $('#cset').onclick = planSettings;
+  $('#cprev').onclick = () => { if(!isCur){ calYm = iso(new Date(y, m-2, 1)).slice(0,7); render(); } };
+  $('#cnext').onclick = () => { calYm = iso(new Date(y, m, 1)).slice(0,7); render(); };
+  $('#tApply').onclick = () => { for(const d in st.skip) if(d.startsWith(calYm)) delete st.skip[d]; const n = applyTpl(calYm); save(); render(); toast(n ? `${n} Tage eingetragen` : 'Nichts Neues einzutragen'); };
+  $('#cClear').onclick = ev => {
+    const b = ev.currentTarget; if(!b.dataset.sure){ b.dataset.sure = 1; b.textContent = 'Wirklich leeren?'; return; }
+    let n = 0; for(const d of Object.keys(st.cal)) if(d.startsWith(calYm) && d >= t0){ delete st.cal[d]; st.skip[d] = true; n++; }
+    save(); render(); toast(n ? `${n} geplante Tage entfernt` : 'Nichts geplant');
+  };
   document.querySelectorAll('.cal [data-d]').forEach(b => b.onclick = () => {
     const d = b.dataset.d;
     if(byDay[d]) return openSheet(byDay[d][0]);
     if(d < t0) return toast('Vergangene Tage über „Monat“ eintragen');
     if(st.free[monday(d)]) return toast('Diese Woche ist frei. KW antippen zum Ändern.');
-    if(st.cal[d]) dayMenu(d, rec[d] && rec[d].s); else { st.cal[d] = {von: st.calStart}; save(); viewKalender(); }
+    if(st.cal[d]) dayMenu(d, rec[d] && rec[d].s); else { st.cal[d] = {}; delete st.skip[d]; save(); render(); }
   });
   document.querySelectorAll('[data-w]').forEach(b => b.onclick = () => weekMenu(b.dataset.w));
   document.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { const d = b.dataset.day; dayMenu(d, rec[d] && rec[d].s); });
+  document.querySelectorAll('[data-e]').forEach(b => b.onclick = () => openSheet(st.entries.find(e => e.id === b.dataset.e)));
+}
+// Einstellungen zum Planen; jede Änderung rechnet die geplanten Tage sofort neu
+function planSettings(){
+  const w = $('#sheet');
+  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="psT">
+    <div class="grab"></div>
+    <div class="sheet-head"><span style="width:60px"></span><h2 id="psT">Planen</h2><button type="button" id="psX">Fertig</button></div>
+    <section class="set">
+      <div class="it"><label for="cZiel">Ziel im Monat (€)</label><input id="cZiel" inputmode="decimal" placeholder="${String(S().grenze).replace('.',',')}" value="${S().ziel ? String(S().ziel).replace('.',',') : ''}"></div>
+      <div class="it"><label for="cStart">Beginn meistens</label><input id="cStart" type="time" value="${st.calStart}"></div>
+    </section>
+    <div class="field"><span class="lbl">Stunden verteilen</span><div class="seg"><button type="button" data-cm="voll" aria-pressed="${st.calMode==='voll'}">Volle Tage (6 Std)</button><button type="button" data-cm="gleich" aria-pressed="${st.calMode==='gleich'}">Gleichmäßig</button></div></div>
+    <div class="field"><span class="lbl">Meine normale Woche</span><div class="days7">${[1,2,3,4,5,6,0].map(i => `<button type="button" data-t="${i}" aria-pressed="${st.tpl.includes(i)}">${WT[i]}</button>`).join('')}</div></div>
+    <p class="hint">Änderungen gelten sofort für alle geplanten Tage ab heute. Gearbeitete Schichten bleiben, wie sie sind.</p>
+  </div>`;
+  w.hidden = false; document.body.style.overflow = 'hidden';
+  const close = () => { closeSheet(); render(); };
+  $('#psX').onclick = close; w.onclick = ev => { if(ev.target === w) close(); };
+  $('#cZiel').onchange = () => { const v = num($('#cZiel').value); st.S.ziel = v && v > 0 ? Math.min(v, S().grenze) : null; save(); render(); toast(v > S().grenze ? 'Höher als die Grenze geht nicht' : 'Ziel gespeichert'); };
+  $('#cStart').onchange = () => { const v = $('#cStart').value; if(!v) return; for(const d in st.cal) if(st.cal[d].von === st.calStart) delete st.cal[d].von; st.calStart = v; save(); render(); toast('Beginn gespeichert'); };
+  w.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { st.calMode = b.dataset.cm; w.querySelectorAll('[data-cm]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); save(); render(); });
+  w.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.t; st.tpl = st.tpl.includes(i) ? st.tpl.filter(x => x !== i) : [...st.tpl, i];
+    b.setAttribute('aria-pressed', String(st.tpl.includes(i))); syncTpl(); save(); render();
+  });
+}
+// Normale Woche geändert: Vorlagen-Tage ab heute anpassen (eigene Tage, feste Zeiten und gearbeitete Tage bleiben)
+function syncTpl(){
+  const t0 = today();
+  for(const d of Object.keys(st.cal)) if(d >= t0 && st.cal[d].src === 'tpl' && !st.tpl.includes(new Date(d+'T12:00').getDay())) delete st.cal[d];
+  const months = new Set([curYM(), calYm, ...Object.keys(st.cal).filter(d => d >= t0).map(d => d.slice(0,7))]);
+  for(const mo of months) if(mo >= curYM()) applyTpl(mo);
 }
 function applyTpl(ymX, onlyMon){
   const t0 = today(), [y,m] = ymX.split('-').map(Number), dim = new Date(y, m, 0).getDate(); let n = 0;
   for(let i = 1; i <= dim; i++){
     const d = `${ymX}-${String(i).padStart(2,'0')}`, wd = new Date(d+'T12:00').getDay();
-    if(d < t0 || !st.tpl.includes(wd) || st.cal[d] || st.free[monday(d)] || (onlyMon && monday(d) !== onlyMon)) continue;
+    if(d < t0 || !st.tpl.includes(wd) || st.cal[d] || st.skip[d] || st.free[monday(d)] || (onlyMon && monday(d) !== onlyMon)) continue;
     if(st.entries.some(e => e.datum === d)) continue;
-    st.cal[d] = {von: st.calStart}; n++;
+    st.cal[d] = {src:'tpl'}; n++;
   }
   return n;
 }
 function weekMenu(mon){
   const w = $('#sheet'), free = !!st.free[mon], end = new Date(mon+'T12:00'); end.setDate(end.getDate()+6);
   const days = [...Array(7)].map((_,i) => { const x = new Date(mon+'T12:00'); x.setDate(x.getDate()+i); return iso(x); });
-  const fmtD = d => `${+d.slice(8)}.${+d.slice(5,7)}.`;
   w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wmT">
     <div class="grab"></div>
-    <div class="sheet-head"><button type="button" id="wmX">Fertig</button><h2 id="wmT">KW ${kw(mon)}</h2><span style="width:60px"></span></div>
-    <p class="hint" style="text-align:center;margin-top:-8px">${fmtD(mon)} bis ${fmtD(iso(end))}</p>
+    <div class="sheet-head"><span style="width:60px"></span><h2 id="wmT">KW ${kw(mon)}</h2><button type="button" id="wmX">Fertig</button></div>
+    <p class="hint" style="text-align:center;margin-top:-8px">${dmy(mon)} bis ${dmy(iso(end))}</p>
     ${free ? '' : `<div class="lbl">An diesen Tagen arbeiten</div>
     <div class="days7">${days.map(d => { const wd = new Date(d+'T12:00').getDay(), dis = d < today() || st.entries.some(e => e.datum === d); return `<button type="button" data-wd="${d}" aria-pressed="${!!st.cal[d]}" ${dis?'disabled':''}>${WT[wd]}<small>${+d.slice(8)}</small></button>`; }).join('')}</div>
     ${st.tpl.length ? '<button type="button" class="btn plain" id="wmTpl">Normale Woche eintragen</button>' : ''}`}
     <button type="button" class="btn ${free ? '' : 'plain'}" id="wmFree">${free ? 'Woche wieder planen' : 'Ganze Woche frei (nicht arbeiten)'}</button>
   </div>`;
   w.hidden = false; document.body.style.overflow = 'hidden';
-  const done = () => { save(); closeSheet(); viewKalender(); };
+  const done = () => { save(); closeSheet(); render(); };
   $('#wmX').onclick = done; w.onclick = ev => { if(ev.target === w) done(); };
-  w.querySelectorAll('[data-wd]').forEach(b => b.onclick = () => { const d = b.dataset.wd; if(st.cal[d]) delete st.cal[d]; else st.cal[d] = {von: st.calStart}; b.setAttribute('aria-pressed', String(!!st.cal[d])); save(); });
-  if($('#wmTpl')) $('#wmTpl').onclick = () => { for(const mo of new Set(days.map(d => d.slice(0,7)))) applyTpl(mo, mon); done(); };
+  w.querySelectorAll('[data-wd]').forEach(b => b.onclick = () => { const d = b.dataset.wd; if(st.cal[d]){ delete st.cal[d]; st.skip[d] = true; } else { st.cal[d] = {}; delete st.skip[d]; } b.setAttribute('aria-pressed', String(!!st.cal[d])); save(); });
+  if($('#wmTpl')) $('#wmTpl').onclick = () => { for(const d of days) delete st.skip[d]; for(const mo of new Set(days.map(d => d.slice(0,7)))) applyTpl(mo, mon); done(); };
   $('#wmFree').onclick = () => { if(free) delete st.free[mon]; else st.free[mon] = true; done(); };
 }
 function dayMenu(d, s){
-  const dt = new Date(d+'T12:00'), w = $('#sheet'), c = st.cal[d] || {von: st.calStart};
+  const dt = new Date(d+'T12:00'), w = $('#sheet'), c = st.cal[d] || {};
   let art = c.bis ? 'fest' : 'flex';
   const maxOpts = [[0,'Automatisch (bis 6 Std, ohne Pause)'],[120,'höchstens 2 Std'],[180,'höchstens 3 Std'],[240,'höchstens 4 Std'],[300,'höchstens 5 Std'],[360,'höchstens 6 Std'],[420,'höchstens 7 Std'],[480,'höchstens 8 Std']];
   w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dmT">
     <div class="grab"></div>
-    <div class="sheet-head"><button type="button" id="dmX">Fertig</button><h2 id="dmT">${WT[dt.getDay()]}, ${dt.getDate()}. ${MONATE[dt.getMonth()]}</h2><span style="width:60px"></span></div>
-    ${s ? `<div class="calc"><div><b>${s.von}–${s.bis}</b><span>${c.bis ? 'feste Zeit' : 'Empfehlung'}</span></div><div><b>${fmtS(s.paid)}</b><span>${s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause'}</span></div><div><b>${eur(s.cost)}</b><span>verdient</span></div></div>` : '<p class="hint">An diesem Tag wird gerade keine Schicht gebraucht.</p>'}
+    <div class="sheet-head"><button type="button" id="dmX">Abbrechen</button><h2 id="dmT">${WT[dt.getDay()]}, ${dt.getDate()}. ${MONATE[dt.getMonth()]}</h2><span style="width:80px"></span></div>
+    ${s ? `<div class="calc"><div><b>${s.von}–${s.bis}</b><span>${c.bis ? 'feste Zeit' : 'Vorschlag'}</span></div><div><b>${fmtS(s.paid)}</b><span>${s.pause ? `Pause ${s.pauseVon}–${s.pauseBis}` : 'ohne Pause'}</span></div><div><b>${eur(s.cost)}</b><span>verdient</span></div></div>` : '<p class="hint">An diesem Tag wird gerade keine Schicht gebraucht.</p>'}
+    ${s ? '<button type="button" class="btn" id="dmAdd">Gearbeitet – eintragen</button>' : ''}
     <div class="seg" role="group" aria-label="Art"><button type="button" data-a="flex">App schlägt vor</button><button type="button" data-a="fest">Feste Zeit</button></div>
-    <div class="grid2"><div class="field"><label for="dmVon">Beginn</label><input id="dmVon" type="time" value="${c.von || st.calStart}"></div>
+    <div class="grid2"><div class="field"><label for="dmVon">Beginn</label><input id="dmVon" type="time" value="${startOf(c)}"></div>
       <div class="field" id="dmBisF"><label for="dmBis">Ende</label><input id="dmBis" type="time" value="${c.bis || (s ? s.bis : '18:00')}"></div>
-      <div class="field" id="dmMaxF" style="grid-column:2"><label for="dmMax">Dauer</label><select id="dmMax">${maxOpts.map(([v,t]) => `<option value="${v}">${t}</option>`).join('')}</select></div></div>
-    <button type="button" class="btn" id="dmSave">Übernehmen</button>
-    ${s ? '<button type="button" class="btn plain" id="dmAdd">Als gearbeitet eintragen</button>' : ''}
+      <div class="field" id="dmMaxF"><label for="dmMax">Dauer</label><select id="dmMax">${maxOpts.map(([v,t]) => `<option value="${v}">${t}</option>`).join('')}</select></div></div>
+    <button type="button" class="btn plain" id="dmSave">Übernehmen</button>
     <button type="button" class="btn danger" id="dmDel">An diesem Tag nicht arbeiten</button>
   </div>`;
   w.hidden = false; document.body.style.overflow = 'hidden';
   $('#dmMax').value = String(c.max || 0);
   const setArt = a => { art = a; w.querySelectorAll('[data-a]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.a === a))); $('#dmBisF').hidden = a !== 'fest'; $('#dmMaxF').hidden = a === 'fest'; };
   w.querySelectorAll('[data-a]').forEach(b => b.onclick = () => setArt(b.dataset.a)); setArt(art);
-  const done = () => { save(); closeSheet(); viewKalender(); };
+  const done = () => { save(); closeSheet(); render(); };
   $('#dmX').onclick = () => closeSheet(); w.onclick = ev => { if(ev.target === w) closeSheet(); };
   $('#dmSave').onclick = () => {
-    const von = $('#dmVon').value || st.calStart;
-    if(art === 'fest'){ const r = shift(von, $('#dmBis').value, null); if(!r || r.paid <= 0) return toast('Bitte ein gültiges Ende wählen'); st.cal[d] = {von, bis: $('#dmBis').value}; }
-    else st.cal[d] = {von, max: +$('#dmMax').value || null};
-    done();
+    const v = $('#dmVon').value, von = v && v !== st.calStart ? v : null, o = {};
+    if(von) o.von = von;
+    if(art === 'fest'){ const r = shift(von || st.calStart, $('#dmBis').value, null); if(!r || r.paid <= 0) return toast('Bitte ein gültiges Ende wählen'); o.bis = $('#dmBis').value; }
+    else if(+$('#dmMax').value) o.max = +$('#dmMax').value;
+    st.cal[d] = o; done();
   };
-  $('#dmDel').onclick = () => { delete st.cal[d]; done(); };
+  $('#dmDel').onclick = () => { delete st.cal[d]; st.skip[d] = true; done(); };
   if(s) $('#dmAdd').onclick = () => { delete st.cal[d]; save(); closeSheet(); openSheet(null, {datum: d, von: s.von, bis: s.bis, pauseVon: s.pauseVon}); };
-}
-function planOut(){
-  let total = 0, mins = 0;
-  for(const r of st.plan){ const s = shift(r.von, r.bis, null); if(!s || !r.anz) continue; const k = r.anz*(r.per==='w'?S().wochen:1); total += money(s.paid, s.spaet).zaehlt*k; mins += s.paid*k; }
-  const rest = S().grenze - total, ok = rest >= 0;
-  let h = `<div><span class="lbl">Im Monat</span><div class="big">${eur(total)} <span class="pill ${ok?'':'bad'}">${ok?'passt':'zu viel'}</span></div><span class="hint">${fmt(mins)} Arbeit</span></div>`;
-  if(!ok){
-    h += `<div class="answer">Das sind <b>${eur(-rest)}</b> mehr als erlaubt.`;
-    const r0 = st.plan.find(r => r.anz && shift(r.von, r.bis, null));
-    if(r0){ const s = shift(r0.von, r0.bis, null), c = money(s.paid, s.spaet).zaehlt, n = Math.floor(S().grenze/c), left = S().grenze - n*c;
-      h += ` Mit ${r0.von}–${r0.bis} gehen höchstens<span class="k">${n} Schichten im Monat</span>danach bleiben ${eur(left)} = ${fmt(Math.floor(left/S().lohn*60))} Arbeit vor ${S().ab} Uhr.`; }
-    h += `</div>`;
-  } else h += `<div class="answer">Bis zur Grenze fehlen noch<span class="k">${eur(rest)}</span>= ${fmt(Math.floor(rest/S().lohn*60))} Arbeit vor ${S().ab} Uhr pro Monat.</div>`;
-  $('#pout').innerHTML = h;
-  // Zusatztage
-  const x = st.extra, xo = $('#xout');
-  if(!ok){ xo.innerHTML = `<p class="hint" style="margin:0">Erst wenn der Plan oben passt, ist Platz für Zusatztage.</p>`; return; }
-  if(!x.anz){ xo.innerHTML = `<p class="hint" style="margin:0">Stell oben ein, wie viele Tage du zusätzlich arbeiten willst.</p>`; return; }
-  const k = x.anz*(x.per==='w'?S().wochen:1), s = maxShift(x.von, rest/k);
-  const wer = x.anz===1 ? 'Am zusätzlichen Tag' : `An jedem der ${x.anz} Zusatztage`;
-  if(!s || s.paid <= 0) xo.innerHTML = `<div class="answer">${wer}: dafür reicht der Rest nicht.</div>`;
-  else if(s.gross >= MAXG) xo.innerHTML = `<div class="answer">${wer} wären mehr als 10 Std nötig. Das ist gesetzlich zu viel, plan lieber mehr Tage ein.</div>`;
-  else xo.innerHTML = `<div class="answer">${wer} (${x.per==='w'?'pro Woche':'pro Monat'}) arbeitest du<span class="k">${x.von}–${s.bis}</span>= ${fmt(s.paid)}${s.pause?` nach ${s.pause} Min Pause`:''}${s.spaet?`, davon <span class="spaet">${fmt(s.spaet)} nach ${S().ab}</span>`:''} · ${eur(money(s.paid,s.spaet).zaehlt)} pro Tag</div>`;
 }
 
 // ---------- Übersicht & Einstellungen ----------
@@ -895,9 +901,12 @@ load(); applyTheme();
 // iPhone bitten, die gespeicherten Daten nicht von selbst zu löschen
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(_){}
 // Spätminuten gespeicherter Schichten neu rechnen (alte Version zählte bei Frühschichten 0–6 Uhr fälschlich mit)
-let fixed = 0;
-for(const e of st.entries){ if(!e.von || !e.bis) continue; const r = shift(e.von, e.bis, e.pause ?? null, e.pauseVon || null); if(r && r.spaet !== e.spaetMin){ e.spaetMin = r.spaet; fixed++; } }
-if(fixed) save();
+if(!st.mig1){ for(const e of st.entries){ if(!e.von || !e.bis) continue; const r = shift(e.von, e.bis, e.pause ?? null, e.pauseVon || null); if(r) e.spaetMin = r.spaet; } st.mig1 = 1; save(); }
+// Gearbeitete Schichten bekommen ihren Lohn fest gespeichert (vorher Sicherung des alten Stands)
+if(!st.mig2){ try{ localStorage.setItem(KEY + '.vor-planer2', localStorage.getItem(KEY) || ''); }catch(_){}
+  for(const e of st.entries){ if(e.lohn == null) e.lohn = S().lohn; if(e.proz == null) e.proz = S().proz; }
+  for(const d in st.cal) if(st.cal[d].von === st.calStart) delete st.cal[d].von;
+  st.mig2 = 1; save(); }
 go('monat');
 if('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 </script>
