@@ -106,5 +106,25 @@ t('Sätze je Muskel: +1 bei 2 guten Wochen und steigender Leistung, −1 bei oft
   const none = E.learnVolume(p, profile(), { workouts: ws, fw: null }); assert.equal(none.T.chest, 12);
 });
 
+// ---------- 3.27: Steigerungstempo je Übung ----------
+const HS = (exId, list) => list.map(([w, reps, k]) => H(exId, w, reps, k));
+t('Tempo schnell: Steigerungen klappen, schnell wieder oben → doppelter Sprung', () => {
+  const hist = HS('bench', [[50, 10, 40], [52.5, 8, 33], [52.5, 10, 26], [55, 8, 19], [55, 10, 12], [57.5, 8, 8], [57.5, 10, 3]]);
+  const pg = E.progProfile(D.byId['bench'], hist, [6, 10], 80); assert.equal(pg.speed, 'fast', JSON.stringify(pg)); assert.equal(pg.ok, 3);
+  const r = E.recommend(D.byId['bench'], { sets: 3, rr: [6, 10], rir: 2, role: 'main' }, [], hist, { profile: profile(), loc: 'gym' });
+  assert.equal(r.w, 62.5, '+5 statt +2,5'); assert.equal(r.reps, 6); assert.match(r.notes.join(' '), /schnell/);
+});
+t('Tempo langsam: Steigerungen scheitern → erst 2× oben, dann mehr', () => {
+  const hist = HS('bench', [[60, 10, 40], [62.5, 5, 33], [60, 9, 26], [60, 10, 19], [62.5, 5, 12], [60, 10, 3]]);
+  const pg = E.progProfile(D.byId['bench'], hist, [6, 10], 80); assert.equal(pg.speed, 'slow', JSON.stringify(pg)); assert.equal(pg.fail, 2);
+  const r = E.recommend(D.byId['bench'], { sets: 3, rr: [6, 10], rir: 2, role: 'main' }, [], hist, { profile: profile(), loc: 'gym' });
+  assert.equal(r.w, 60, 'noch nicht steigern'); assert.equal(r.reps, 10); assert.match(r.notes.join(' '), /langsamer/);
+  const r2 = E.recommend(D.byId['bench'], { sets: 3, rr: [6, 10], rir: 2, role: 'main' }, [], hist.concat(HS('bench', [[60, 10, 1]])), { profile: profile(), loc: 'gym' });
+  assert.equal(r2.w, 62.5, 'zweimal oben → kleinste Stufe');
+});
+t('Tempo: zu wenig Verlauf = normal', () => {
+  assert.equal(E.progProfile(D.byId['bench'], HS('bench', [[60, 8, 10], [60, 9, 3]]), [6, 10], 80).speed, 'normal');
+});
+
 console.log(`\n${n - fails}/${n} Tests bestanden`);
 if (fails) process.exit(1);

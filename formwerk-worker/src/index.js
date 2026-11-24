@@ -8,7 +8,7 @@ const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS
 import { PAGE } from './page.js';
 import { vapidKeys, sendPush, b64u } from './push.js';
 
-export const WORKER_VERSION = '2.10.0';
+export const WORKER_VERSION = '2.11.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -365,7 +365,13 @@ export class FormwerkStore {
     if (!j || j.v !== 1 || typeof j.id !== 'string' || typeof j.title !== 'string') return { ok: false, error: 'Kein Wochenbericht (v 1, id, title)' };
     const old = await this.st.get('coach'); if (old && old.id !== j.id) await this.st.put('coachPrev', old);
     j.stored = Date.now(); await this.st.put('coach', j);
-    return { ok: true, id: j.id, stored: j.stored };
+    // Worker 2.11: Mitteilung „Wochenbericht ist da“ – nur bei neuem Bericht, mit Abo und wenn gerade kein Training läuft
+    let pushed = false;
+    if ((!old || old.id !== j.id) && await this.st.get('push:sub')) {
+      const live = await this.st.get('live'); const training = live && Date.now() - live.t < 3 * 3600e3 && !/gespeichert|beendet|Wochenbericht/.test(live.title || '');
+      if (!training) { await this.st.put('live', { title: 'Dein Wochenbericht ist da', body: String(j.title).slice(0, 160), t: Date.now() }); await this.st.deleteAlarm(); pushed = !!(await this.pushNow()).ok; }
+    }
+    return { ok: true, id: j.id, stored: j.stored, pushed };
   }
   async putBackup(app, text) {
     if (!text || text.length > 12e6) return { ok: false, error: 'Sicherung leer oder zu groß' };

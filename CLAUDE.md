@@ -199,6 +199,12 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   diese Woche + heute + offene Plan-Tage gegen `volTargets`; ≥ 2 darunter → +1 Satz, ≥ 3 darüber → −1, höchstens 4, antippen = übernehmen, im Modus „auto“ vorgewählt)
   → eigene Satz-Änderungen (−/+ je Übung, `s.dm`) → Zeit kürzer/länger. Dauer = `trainTime` (Satzzeit `setWorkSec` + Pausen + Aufwärmen), gleiche Rechnung in `estMinutes`
   (Heute-Kachel, Einheit-Seite). Änderungen gelten nur für heute; `tfGo` übergibt den gerechneten Tag an `startWorkout`.
+- Steigerungstempo je Übung (3.27, Nutzerwunsch 24.11.): `E.progProfile(ex, hist, rr, bw)` → `speed` fast/normal/slow (Rate %/Woche der besten Satzleistung,
+  geklappte/gescheiterte Gewichtssteigerungen, Einheiten bis wieder oben; < 3 Einheiten = normal). In `recommendCore` (Doppelprogression): schnell = doppelte Stufe
+  (max. +10 %) bzw. +2 Wdh., langsam = erst nach 2× Obergrenze steigern. Anzeige in der Übungsinfo („Dein Tempo“), Stand je Übung in `profile.prog[exId]` (nach jedem Training).
+- Wochenbericht auffälliger (3.27 / Worker 2.11): ungelesen = Navy-Karte mit „Neu“; neuer Bericht per `PUT /v1/coach` → Mitteilung „Dein Wochenbericht ist da“
+  (gleiches Abo wie die Training-Mitteilung, nicht während eines laufenden Trainings, nur einmal je Bericht).
+- Im Training sind erledigte Übungen antippbar (`a.pin`, bleibt offen bis zum nächsten Satz; Panel-Knopf „Nächste Übung“ = `nextOpen`) (3.26.1).
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
   Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).

@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.26.1';
+  const APP_VERSION = '3.27.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1578,6 +1578,7 @@
       const w = { id: a.id, planId: a.planId || undefined, ts: Date.now(), date: E.todayISO(new Date(a.start)), name: a.name, dayId: a.dayId || null, loc: a.loc, dur: Math.round(((endTs || Date.now()) - a.start) / 1000), bw, exercises: exs, prs, vol: Math.round(vol) };
       if (exs.length) {
         st.workouts.push(w); Store.saveWorkout(w); Backup.snapshot('training');
+        try { const pr = P(); pr.prog = pr.prog || {}; const bw0 = E.bodyweight(pr); for (const e of w.exercises) { const ex = getEx(e.exId); if (!ex) continue; const pg = E.progProfile(ex, E.historyFor(e.exId, st.workouts), e.rr || ex.rr, bw0); pr.prog[e.exId] = { speed: pg.speed, rate: pg.rate, ok: pg.ok, fail: pg.fail, n: pg.n, d: w.date }; } Store.saveProfile(); } catch (err) { }
         try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }); } catch (e) { }
         if (a.dayIdx != null && plan() && (!a.planId || a.planId === plan().id)) { const di = a.dayId ? plan().days.findIndex(d => d.id === a.dayId) : a.dayIdx; plan().next = ((di >= 0 ? di : a.dayIdx) + 1) % plan().days.length; Store.saveProfile(); }
         st.summary = w;
@@ -1694,6 +1695,8 @@
       return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div><button class="favbtn ${isFav(ex.id) ? 'on' : ''}" data-a="favToggle" data-id="${ex.id}" aria-label="${isFav(ex.id) ? 'Favorit entfernen' : 'Als Favorit markieren'}" aria-pressed="${isFav(ex.id)}">★</button>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
         <div class="row wrap" style="gap:6px">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
         ${noteChip(ex.id)}
+        ${(() => { const pg = E.progProfile(ex, h, ex.rr, bw); if (pg.n < 3) return ''; const sp = { fast: 'Du steigerst dich hier schnell – größere Sprünge', slow: 'Hier geht es langsamer – erst 2× oben, dann kleinste Stufe', normal: 'Normales Tempo' }[pg.speed];
+          return `<div class="card flat small"><b>Dein Tempo</b><div class="muted">${sp}${pg.rate != null ? ' · ≈ ' + (pg.rate > 0 ? '+' : '') + String(pg.rate).replace('.', ',') + ' % pro Woche' : ''}${pg.ok + pg.fail ? ' · Steigerungen ' + pg.ok + ' von ' + (pg.ok + pg.fail) + ' geklappt' : ''}</div></div>`; })()}
         ${ex.kind === 'load' || (ex.kind === 'bw' && ex.addw) ? `<button class="btn sm" style="align-self:flex-start" data-a="wOpen" data-id="${ex.id}">⚖ Verfügbare Gewichte${ownW(ex, st.active ? st.active.loc : defLoc()) ? ': ' + ownW(ex, st.active ? st.active.loc : defLoc()).map(x => fmt(x)).join(', ') + ' kg' : ' festlegen'}</button>` : ''}
         <div class="card stack" style="gap:12px"><b>Anleitung</b>${howtoHTML(ex)}
         <div class="small muted">${ex.eq.map(e => D.EQUIP[e]).join(' + ')} · ${ex.kind === 'load' ? 'mit Gewicht' : ex.kind === 'bw' ? 'Körpergewicht' + (ex.addw ? ' (+ Zusatzgewicht möglich)' : '') : ex.kind === 'hold' ? 'Haltezeit' : 'Intervall'} · Ziel ${rrText(ex.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div></div>
@@ -2553,7 +2556,8 @@
   function coachCard() {
     const c = FW.coach(); if (!c || !P() || coachRec(c.id).closed) return '';
     const n = coachOpenN(c);
-    return `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${[n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen', (P().plans || []).some(x => x.learn && x.learn.pending && x.learn.pending.rep === c.id && !x.learn.pending.no) ? 'Volumen bestätigen' : (P().plans || []).some(x => x.learn && x.learn.last && x.learn.last.rep === c.id && !x.learn.last.undone) ? 'Volumen angepasst' : ''].filter(Boolean).join(' · ')}</div></div><span class="chev">${I.chev}</span></button>`;
+    const isNew = !coachRec(c.id).seen; // 3.27: ungelesen = auffällig (Navy, „Neu“)
+    return `<button class="card row ${isNew ? 'navy coachnew' : ''}" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht${isNew ? ' <span class="tagx">Neu</span>' : ''}</div><b class="clamp2">${esc(c.title)}</b><div class="small muted">${[n ? n + (n === 1 ? ' Vorschlag' : ' Vorschläge') + ' zum Annehmen' : 'Zum Lesen', (P().plans || []).some(x => x.learn && x.learn.pending && x.learn.pending.rep === c.id && !x.learn.pending.no) ? 'Volumen bestätigen' : (P().plans || []).some(x => x.learn && x.learn.last && x.learn.last.rep === c.id && !x.learn.last.undone) ? 'Volumen angepasst' : ''].filter(Boolean).join(' · ')}</div></div><span class="chev">${I.chev}</span></button>`;
   }
   async function exportData(src) {
     const d = src || { profile: st.profile, workouts: st.workouts, active: st.active };
