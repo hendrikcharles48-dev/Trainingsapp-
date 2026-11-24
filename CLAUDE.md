@@ -202,7 +202,7 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
 - Steigerungstempo je Übung (3.27, Nutzerwunsch 24.11.): `E.progProfile(ex, hist, rr, bw)` → `speed` fast/normal/slow (Rate %/Woche der besten Satzleistung,
   geklappte/gescheiterte Gewichtssteigerungen, Einheiten bis wieder oben; < 3 Einheiten = normal). In `recommendCore` (Doppelprogression): schnell = doppelte Stufe
   (max. +10 %) bzw. +2 Wdh., langsam = erst nach 2× Obergrenze steigern. Anzeige in der Übungsinfo („Dein Tempo“), Stand je Übung in `profile.prog[exId]` (nach jedem Training).
-- Wochenbericht auffälliger (3.27 / Worker 2.11): ungelesen = Navy-Karte mit „Neu“; neuer Bericht per `PUT /v1/coach` → Mitteilung „Dein Wochenbericht ist da“
+- Wochenbericht auffälliger (3.27 / Worker 2.11): ungelesen = Navy-Karte mit „Neu“ ganz oben auf Heute (`coachUnseen`, bis geöffnet; 3.27.1); im Training springt die Seite beim Antippen einer Übung nicht mehr nach oben; neuer Bericht per `PUT /v1/coach` → Mitteilung „Dein Wochenbericht ist da“
   (gleiches Abo wie die Training-Mitteilung, nicht während eines laufenden Trainings, nur einmal je Bericht).
 - Im Training sind erledigte Übungen antippbar (`a.pin`, bleibt offen bis zum nächsten Satz; Panel-Knopf „Nächste Übung“ = `nextOpen`) (3.26.1).
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
