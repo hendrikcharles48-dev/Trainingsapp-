@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.1';
+  const APP_VERSION = '3.27.2';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -508,9 +508,11 @@
     if (!st.ov) { el.className = ''; el.innerHTML = ''; document.body.style.overflow = ''; return; }
     const html = { workout: workoutView, quiz: quizView, result: resultView }[st.ov.type]();
     const keep = el.scrollTop;
-    // Die Fokus-Übung steht oben: wechselt sie, springt die Ansicht nach oben
-    const fk = st.ov.type === 'workout' && st.active ? (st.active.exercises[curIndex()] || {}).key : st.ov.type + (st.ov.i ?? '');
+    // 3.27.2 (Nutzerwunsch 24.11.): im Training springt die Seite nie von selbst – schaust du auf die Übungsliste, bleibt sie an derselben Stelle
+    const wl = st.ov.type === 'workout' ? el.querySelector('#wList') : null; const wy = wl ? wl.getBoundingClientRect().top : null;
+    const fk = st.ov.type === 'workout' ? 'workout' : st.ov.type + (st.ov.i ?? '');
     el.className = 'overlay'; el.innerHTML = '<div class="inner">' + html + '</div>'; el.scrollTop = fk === st.ovKey ? keep : 0; st.ovKey = fk;
+    if (fk === 'workout' && wl && wy < innerHeight / 2) { const n = el.querySelector('#wList'); if (n) el.scrollTop += n.getBoundingClientRect().top - wy; }
     if (st.ov.type === 'workout') renderRest();
     document.body.style.overflow = 'hidden';
   }
@@ -1209,7 +1211,7 @@
       <div class="segbar" aria-label="Fortschritt">${a.exercises.map((e, i) => `<i class="${exState(e).finished ? 'on' : i === ci ? 'cur' : ''}"></i>`).join('')}</div>
       <div class="stack">
         ${ci >= 0 ? focusCard(a.exercises[ci], ci) : `<div class="card lime rings-bg stack"><h2 class="xl">Alles erledigt!</h2><div style="font-weight:700">Speichere dein Training oder hänge noch eine Übung an.</div><button class="btn dark big" data-a="finishAsk">Training speichern</button></div>${freeCard()}`}
-        <div class="section"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
+        <div class="section" id="wList"><div class="head"><h3>Übungen</h3><span class="small muted">${a.exercises.filter(e => exState(e).finished).length}/${a.exercises.length} fertig</span></div>
           <div class="tiny muted" style="margin:-4px 0 2px">Gedrückt halten zum Verschieben.</div>${a.timeNote ? `<div class="card flat tiny" style="margin:2px 0"><b>${a.timeNote.delta < 0 ? 'Kürzere' : 'Längere'} Einheit (≈ ${a.timeNote.minutes} min)</b><br>${esc(a.timeNote.notes.join(' · '))}</div>` : ''}
           ${(() => { const SL = ssLabels(a.exercises); return a.exercises.map((e, i) => { const S = exState(e); if (!S.ex) return ''; return `<button class="qrow ${S.finished ? 'done' : ''} ${SL[i] ? 'ss' : ''}" data-a="focusEx" data-i="${i}" data-drag="wo" data-s="${i}" ${i === ci ? 'style="box-shadow:inset 0 0 0 2px var(--lime)"' : ''}>${thumb(S.ex)}<div class="grow">${(e.adj || []).length ? `<div class="adjline in">${esc(e.adj.join(' · '))}</div>` : ''}<b>${SL[i] ? `<span class="sstag">${SL[i]}</span>` : ''}${esc(S.ex.name)}</b><div class="small muted">${S.done.length ? S.done.map(x => shortSet(S.ex, x)).join(' · ') : S.planned + ' Sätze · ' + rrText(S.presc.rr, S.ex)}</div></div><span class="num small" style="color:${S.finished ? 'var(--good)' : 'var(--muted)'}">${S.finished ? '✓' : S.done.length + '/' + S.planned}</span></button>`; }).join(''); })()}
           <button class="btn" data-a="pickEx" data-mode="workout">${I.plus} Übung hinzufügen</button></div>
@@ -1377,7 +1379,7 @@
         a.cur = nxt.i; const roundDone = pos + k >= grp.length; const nm = getEx(nxt.e.exId).name;
         msg += roundDone ? 'Runde fertig – Pause, dann ' + nm + '.' : 'Supersatz: direkt weiter mit ' + nm + '.';
         startRest(roundDone ? Math.max(...grp.map(x => x.e.presc.rest)) : 15, 'Nächste: ' + nm);
-        toast(msg, 6000, UNDO); Store.saveActive(); closeSheet(); render(); toFocus();
+        toast(msg, 6000, UNDO); Store.saveActive(); closeSheet(); render();
         return;
       }
     }
@@ -1394,7 +1396,7 @@
       startRest(entry.presc.rest, getEx(entry.exId).name);
     }
     toast(msg, 6000, UNDO);
-    Store.saveActive(); closeSheet(); render(); toFocus();
+    Store.saveActive(); closeSheet(); render();
   }
 
   /* Pause lernt pro Übung (3.15, Nutzerwunsch): profile.restAdj[exId] = {s: Zusatz-Sekunden, d}.
@@ -2263,15 +2265,15 @@
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
     wMin() { st.ov = null; keepAwake(false); render(); },
-    nextOpen() { const a = st.active; if (!a) return; a.pin = false; a.cur = null; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
-    focusEx(t) { const o = document.getElementById('ov'); const y = o ? o.scrollTop : 0; st.active.cur = +t.dataset.i; st.active.pin = true; Store.saveActive(); renderOverlay(); renderRest(); if (o) o.scrollTop = y; }, // 3.27.1: Seite springt nicht nach oben
+    nextOpen() { const a = st.active; if (!a) return; a.pin = false; a.cur = null; Store.saveActive(); renderOverlay(); renderRest(); },
+    focusEx(t) { st.active.cur = +t.dataset.i; st.active.pin = true; Store.saveActive(); renderOverlay(); renderRest(); }, // 3.27.1: Seite springt nicht nach oben
     toFocus() { toFocus(); },
     undoSet() {
       const u = st.undo; const a = st.active; if (!u || !a) return;
       const e = a.exercises.find(x => x.key === u.key); if (!e) return;
       const i = e.sets.findIndex(s => s.t === u.t); if (i < 0) return;
       e.sets.splice(i, 1); e.draft = u.draft; a.cur = u.cur != null ? u.cur : a.exercises.indexOf(e); st.rest = null; st.undo = null;
-      Store.saveActive(); toast('Satz zurückgenommen'); render(); toFocus();
+      Store.saveActive(); toast('Satz zurückgenommen'); render();
     },
     qAdj(t) {
       const i = +t.dataset.i; const e = st.active.exercises[i]; const S = exState(e); const f = t.dataset.f; const d = +t.dataset.d; const v = Object.assign({}, e.draft);
@@ -2287,7 +2289,7 @@
       const move = e.ss ? a.exercises.filter(x => x.ss === e.ss) : [e];
       a.exercises = a.exercises.filter(x => !move.includes(x)).concat(move);
       const k = a.exercises.findIndex(x => !move.includes(x) && !exState(x).finished); a.cur = k >= 0 ? k : a.exercises.indexOf(move[0]);
-      Store.saveActive(); closeSheet(); render(); toFocus(); toast(getEx(e.exId).name + ' kommt später dran');
+      Store.saveActive(); closeSheet(); render(); toast(getEx(e.exId).name + ' kommt später dran');
     },
     sportDay(t) { const p = P(); const k = +t.dataset.k; const s = new Set(p.sportDays || []); s.has(k) ? s.delete(k) : s.add(k); p.sportDays = [...s].sort(); Store.saveProfile(); renderSheet(); },
     bkLater() { st.bkLater = true; render(); },
@@ -2495,7 +2497,7 @@
     swLap() { const sw = T.sw; sw.laps.unshift(sw.acc + (Date.now() - sw.start)); render(); },
     swReset() { T.sw = { start: null, acc: 0, laps: [] }; render(); },
     restAdj(t) { if (!st.rest) return; liveSend(); st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
-    restSkip() { st.rest = null; renderRest(); toFocus(); liveSend(); }
+    restSkip() { st.rest = null; renderRest(); liveSend(); }
   };
   function applyPick(s, id) {
       const ex = getEx(id);
@@ -2508,7 +2510,7 @@
     if (!st.active) return;
     st.active.exercises.push(newEntry(id, null)); st.active.cur = st.active.exercises.length - 1;
     Store.saveActive(); closeSheet(); if (!st.ov) openWorkout(); else renderOverlay();
-    toFocus();
+    // Seite bleibt stehen (3.27.2)
   }
   function addToPlan(di, id) {
     const ex = getEx(id); const p = plan(); const day = p.days[di]; const r = roleOfEx(ex);
