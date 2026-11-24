@@ -374,6 +374,12 @@ await t('Mitteilung im Training: Abo, Push mit gültiger VAPID-Signatur, „Paus
     // Alarm → Pause vorbei
     await doObj.alarm();
     assert.equal(sent.length, 2); const st2 = await (await open(sub.token)).json(); assert.equal(st2.title, 'Los: Bankdrücken');
+    // neuer Wochenbericht → Mitteilung (Training ist mit „Los: …“ noch frisch → erst nach Ende)
+    const pc = id => call('/v1/coach', { method: 'PUT', body: JSON.stringify({ v: 1, id, title: 'Bericht ' + id, summary: 's', points: [], actions: [] }) }).then(r => r.json());
+    let rc = await pc('2099-W01'); assert.equal(rc.pushed, false, 'nicht während Training');
+    await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'Training gespeichert', body: '' }) }); const nSent = sent.length;
+    rc = await pc('2099-W02'); assert.equal(rc.pushed, true); assert.equal(sent.length, nSent + 1); assert.equal((await (await open(sub.token)).json()).title, 'Dein Wochenbericht ist da');
+    rc = await pc('2099-W02'); assert.equal(rc.pushed, false, 'gleicher Bericht nicht doppelt');
     // abgemeldetes Abo (410) wird gelöscht
     globalThis.fetch = async (u, o = {}) => (String(u).startsWith('https://push.example') ? new Response(null, { status: 410 }) : realFetch(u, o));
     await call('/v1/live', { method: 'POST', body: JSON.stringify({ title: 'y' }) });

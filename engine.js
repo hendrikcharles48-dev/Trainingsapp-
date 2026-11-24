@@ -878,6 +878,38 @@
   function sessionBest(ex, entry, bw) {
     let best = 0; for (const s of entry.sets || []) { const v = setScore(ex, s, entry.bw || bw); if (v > best) best = v; } return best;
   }
+  /* 3.27 (Nutzerwunsch 24.11.): Wie schnell steigerst du dich bei dieser Übung? Aus dem Verlauf:
+     rate = Zuwachs der besten Satzleistung in %/Woche, ok/fail = Gewichtssteigerungen, nach denen du im Wdh.-Bereich geblieben bist bzw.
+     darunter gefallen/zurückgegangen bist, toTop = Einheiten bis alle Sätze wieder oben. speed: 'fast' | 'normal' | 'slow' (zu wenig Verlauf = normal). */
+  function progProfile(ex, hist, rr, bw) {
+    const H = hist.filter(h => (h.entry.sets || []).some(s => s.done !== false && (+s.reps || 0) > 0));
+    const out = { speed: 'normal', rate: null, ok: 0, fail: 0, toTop: null, n: H.length };
+    if (H.length < 3 || !ex) return out;
+    const best = H.map(h => sessionBest(ex, h.entry, h.bw || bw));
+    const days = (new Date(H[H.length - 1].date) - new Date(H[0].date)) / 864e5;
+    if (days >= 10 && best[0] > 0) { const a = (best[0] + best[1]) / 2, b = (best[best.length - 1] + best[best.length - 2]) / 2; out.rate = Math.round(((b / a) - 1) / (days / 7) * 1000) / 10; }
+    const [lo, hi] = rr || ex.rr || [8, 12]; const w0 = h => +((h.entry.sets || []).find(s => s.done !== false) || {}).w || 0;
+    const top = h => { const s = (h.entry.sets || []).filter(x => x.done !== false); return s.length && s.every(x => (+x.reps || 0) >= hi); };
+    const tops = [];
+    for (let i = 1; i < H.length; i++) {
+      if (ex.kind !== 'load' && !(ex.kind === 'bw' && ex.bwf > 0)) break;
+      if (!(w0(H[i]) > w0(H[i - 1]) + 1e-9)) continue;
+      const first = +((H[i].entry.sets || []).find(s => s.done !== false) || {}).reps || 0;
+      const back = H[i + 1] && w0(H[i + 1]) < w0(H[i]) - 1e-9;
+      if (first >= lo && !back) out.ok++; else out.fail++;
+      for (let k = i + 1; k < H.length && w0(H[k]) === w0(H[i]); k++) if (top(H[k])) { tops.push(k - i); break; }
+    }
+    if (tops.length) out.toTop = Math.round(tops.reduce((a, b) => a + b, 0) / tops.length * 10) / 10;
+    const tries = out.ok + out.fail;
+    if (tries >= 2) {
+      const succ = out.ok / tries;
+      if (succ >= 0.8 && ((out.toTop != null && out.toTop <= 2) || (out.rate != null && out.rate >= 1.5))) out.speed = 'fast';
+      else if (succ < 0.5 || (out.rate != null && out.rate <= 0.3 && H.length >= 4)) out.speed = 'slow';
+    } else if (out.rate != null && H.length >= 4) {
+      if (out.rate >= 2.5) out.speed = 'fast'; else if (out.rate <= 0) out.speed = 'slow';
+    }
+    return out;
+  }
   function historyFor(exId, workouts) {
     const out = [];
     for (const w of workouts) for (const e of (w.exercises || [])) if (e.exId === exId && (e.sets || []).some(s => s.done !== false)) out.push({ date: w.date, bw: w.bw, entry: e, loc: w.loc });
@@ -1003,19 +1035,25 @@
       if (!done.length) {
         const r0 = +lastSets[0].reps || 0;
         const allTop = lastSets.every(s => (+s.reps || 0) >= hi && (+s.rir || 0) <= lastRIRT + 1);
+        // 3.27: gelerntes Steigerungstempo – schnell: größerer Sprung / +2 Wdh., langsam: erst 2× oben, dann kleinste Stufe
+        const pg = progProfile(ex, hist, presc.rr, bodyweight(profile)); out.prog = pg;
+        const prevH = hist.length > 1 ? hist[hist.length - 2] : null;
+        const prevTop = prevH && snap(+((prevH.entry.sets || []).find(s => s.done !== false) || {}).w || 0, opts) === anchor && (prevH.entry.sets || []).filter(s => s.done !== false).every(s => (+s.reps || 0) >= hi);
         let w = anchor, reps;
-        if (allTop) {
+        if (allTop && pg.speed === 'slow' && !prevTop) { reps = hi; notes.push('Hier steigerst du dich langsamer: Obergrenze noch einmal schaffen, dann mehr Gewicht'); }
+        else if (allTop) {
           // 3.24: Langhantel +2,5 kg (Oberkörper) / +5 kg (Unterkörper), Kurzhantel/Maschine/Kabel kleinste Stufe; Wdh. zurück ans untere Ende
-          const step = progStep(ex); const up = opts.find(o => o > anchor + 1e-9 && o >= anchor + step - 1e-9);
-          if (up != null && (baseLoad + up) > 0) { w = up; reps = lo; out.up = { from: anchor, to: up, reps0: hi }; notes.push('Alle Sätze oben geschafft: +' + String(Math.round((up - anchor) * 10) / 10).replace('.', ',') + ' kg, Wdh. zurück auf ' + lo); }
+          const step = progStep(ex); let up = opts.find(o => o > anchor + 1e-9 && o >= anchor + step - 1e-9);
+          if (up != null && pg.speed === 'fast') { const up2 = step ? opts.find(o => o >= anchor + 2 * step - 1e-9) : opts[opts.indexOf(up) + 1]; if (up2 != null && (up2 - anchor) / Math.max(anchor, 1) <= 0.1) up = up2; }
+          if (up != null && (baseLoad + up) > 0) { w = up; reps = lo; out.up = { from: anchor, to: up, reps0: hi }; notes.push((pg.speed === 'fast' ? 'Hier steigerst du dich schnell: +' : 'Alle Sätze oben geschafft: +') + String(Math.round((up - anchor) * 10) / 10).replace('.', ',') + ' kg, Wdh. zurück auf ' + lo); }
           else { reps = hi; notes.push('Schwerstes Gewicht: langsamer ablassen (3 s) macht es härter'); }
         } else if (r0 < lo - 1) {
           const dn = ai > 0 ? opts[ai - 1] : anchor; w = dn; reps = fit(capR(dn));
           notes.push(dn < anchor ? 'Letztes Mal unter dem Zielbereich: etwas leichter' : 'Leichtestes Gewicht: so viele Wdh. wie sauber möglich');
         } else {
-          const easier = (+lastSets[0].rir || 0) >= lastRIRT;
-          reps = fit(easier ? r0 + 1 : r0);
-          notes.push(easier ? 'Gleiches Gewicht, 1 Wdh. mehr als letztes Mal' : 'Gleiches Gewicht und gleiche Wdh. – letztes Mal war es härter als geplant');
+          const easier = (+lastSets[0].rir || 0) >= lastRIRT; const plus = easier ? (pg.speed === 'fast' ? 2 : 1) : 0;
+          reps = fit(r0 + plus);
+          notes.push(!easier ? 'Gleiches Gewicht und gleiche Wdh. – letztes Mal war es härter als geplant' : plus === 2 ? 'Gleiches Gewicht, 2 Wdh. mehr – hier steigerst du dich schnell' : 'Gleiches Gewicht, 1 Wdh. mehr als letztes Mal');
         }
         out.w = w; out.reps = reps; out.dp = true;
         if (ex.kind === 'load' && presc.role === 'main' && w >= 20) out.warmup = warmups(w, opts);
@@ -1137,7 +1175,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, readyDay, adjustDay, stalled, progStep, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, adjustDay, stalled, progStep, progProfile, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();
