@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.26.0';
+  const APP_VERSION = '3.26.1';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1125,7 +1125,7 @@
       <div><small style="text-align:center" id="restLbl">${over ? 'Pause · bereit' : S ? 'Nächster Satz' : 'Fertig'}</small><div class="big" id="restT">${over ? restTxt(left) : S ? (S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + 's' : fmt(S.rec.reps) + '×') : '✓'}</div>${resting ? `<div class="restof" id="restOf">von ${mmss(st.rest.len ?? st.rest.total)} Pause</div>` : ''}</div>
       <div style="text-align:right"><small>Satz</small><div class="v">${S ? Math.min(S.done.length + 1, S.planned) + '/' + S.planned : '–'}</div></div></div>
       ${resting ? `<div class="prog"><i id="restProg" style="width:${Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100))}%"></i></div>` : ''}
-      <div class="ctrl">${resting ? `<button data-a="restAdj" data-s="-15">−15 s</button><button data-a="restAdj" data-s="15">+15 s</button><button class="go" data-a="restSkip">Weiter</button>` : S ? `<button data-a="manualRest">${I.timer.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Pause</button><button class="go" data-a="doneCur">Satz fertig ✓</button>` : `<button class="go" data-a="finishAsk">Training beenden</button>`}</div></div>`;
+      <div class="ctrl">${resting ? `<button data-a="restAdj" data-s="-15">−15 s</button><button data-a="restAdj" data-s="15">+15 s</button><button class="go" data-a="restSkip">Weiter</button>` : S ? `<button data-a="manualRest">${I.timer.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Pause</button>${S.finished ? `<button class="go" data-a="nextOpen">Nächste Übung</button>` : `<button class="go" data-a="doneCur">Satz fertig ✓</button>`}` : `<button class="go" data-a="finishAsk">Training beenden</button>`}</div></div>`;
   }
   function holdPanel() { return `<div class="panel"><div class="cols"><div><small>Halten</small><div class="v" style="font-size:14px">${esc(st.hold.name)}</div></div><div><small style="text-align:center">Sekunden</small><div class="big" id="holdT">${mmss((Date.now() - st.hold.start) / 1000)}</div></div><div></div></div><div class="ctrl"><button class="go" data-a="holdStop">Stopp</button></div></div>`; }
   function tickRest(now) {
@@ -1196,7 +1196,8 @@
   }
   function curIndex() {
     const a = st.active; if (!a) return -1;
-    if (a.cur != null && a.exercises[a.cur] && !exState(a.exercises[a.cur]).finished) return a.cur;
+    // 3.26.1: bewusst angetippte (auch erledigte) Übung bleibt offen, bis ein Satz gespeichert oder eine andere gewählt wird
+    if (a.cur != null && a.exercises[a.cur] && (a.pin || !exState(a.exercises[a.cur]).finished)) return a.cur;
     const i = a.exercises.findIndex(e => !exState(e).finished); return i;
   }
   function workoutView() {
@@ -1347,6 +1348,7 @@
 
   function commitSet(idx, vals, rir) {
     if (Date.now() - (st.lastCommit || 0) < 400) return; // Doppeltipp-Schutz
+    if (st.active) st.active.pin = false; // nach dem Satz wieder automatisch zur nächsten offenen Übung
     st.lastCommit = Date.now(); st.ev = (st.ev || 0) + 1;
     const a = st.active; const entry = a.exercises[idx]; const ex = getEx(entry.exId);
     const undoCur = a.cur;
@@ -2257,7 +2259,8 @@
     freeWorkout() { if (st.active) { openWorkout(); return; } st.active = { id: uid(), dayIdx: null, name: 'Freies Training', loc: st.homeLoc || defLoc(), start: Date.now(), bw: E.bodyweight(P()), exercises: [], cur: 0 }; Store.saveActive(true); openWorkout(); openSheet({ type: 'pick', mode: 'workout', q: '' }); },
     resume() { openWorkout(); },
     wMin() { st.ov = null; keepAwake(false); render(); },
-    focusEx(t) { st.active.cur = +t.dataset.i; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
+    nextOpen() { const a = st.active; if (!a) return; a.pin = false; a.cur = null; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
+    focusEx(t) { st.active.cur = +t.dataset.i; st.active.pin = true; Store.saveActive(); renderOverlay(); renderRest(); toFocus(); },
     toFocus() { toFocus(); },
     undoSet() {
       const u = st.undo; const a = st.active; if (!u || !a) return;
