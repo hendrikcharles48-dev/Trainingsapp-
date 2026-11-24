@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.25.0';
+  const APP_VERSION = '3.25.1';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -706,8 +706,8 @@
     <div class="stack">
       <div class="card navy stack" style="gap:12px"><div class="minis"><div><b>${slots.length}</b><span>Übungen</span></div><div><b>${sets}</b><span>Sätze</span></div><div><b>${estMinutes(d, loc)}</b><span>Minuten</span></div></div>
         ${st.active ? `<button class="btn primary big" data-a="resume">${I.play} Weiter trainieren</button>` : `<button class="btn primary big" data-a="startWorkout" data-d="${di}" data-l="${loc}">Training starten</button>`}</div>
-      ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => adjLines(sl) + slotRow(sl, si)).join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
-      <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
+      ${orderHint(d, loc)}<div class="list">${d.slots.map((sl, si) => sl.ex[loc] ? adjLines(sl) + slotRow(sl, si) : '').join('')}<button class="li addrow" data-a="pickEx" data-mode="plan" data-d="${di}"><div class="thumb" style="display:grid;place-items:center">${I.plus.replace('<svg', '<svg width="22" height="22"')}</div> Übung hinzufügen</button></div>
+      <div class="tiny muted">Übung gedrückt halten und ziehen, um die Reihenfolge zu ändern.${(() => { const o = d.slots.filter(sl => !sl.ex[loc] && Object.values(sl.ex || {}).some(Boolean)).length; return o ? ' ' + o + (o === 1 ? ' Platz gilt' : ' Plätze gelten') + ' nur für ' + (loc === 'gym' ? 'Zuhause' : 'das Studio') + ' und ' + (o === 1 ? 'ist' : 'sind') + ' hier ausgeblendet.' : ''; })()}</div>
       ${dayVolCard(p, di, loc)}
     </div>`;
   }
@@ -2655,7 +2655,7 @@
     lp.timer = setTimeout(() => {
       if (!lp) return;
       lp.active = true; buzz(15);
-      const list = el.parentElement; lp.rows = [...list.querySelectorAll('[data-drag]')];
+      const list = el.parentElement; lp.rows = [...list.querySelectorAll('[data-drag]')]; lp.s = lp.rows.indexOf(el); // Zeilen-Nummer (ausgeblendete Plätze zählen nicht)
       lp.rects = lp.rows.map(r => r.getBoundingClientRect()); lp.to = lp.s;
       el.classList.add('dragging'); lp.rows.forEach(r => { if (r !== el) r.classList.add('shift'); });
     }, 380);
@@ -2679,7 +2679,7 @@
       const [m] = a.exercises.splice(L.s, 1); a.exercises.splice(L.to, 0, m);
       if (curKey) a.cur = a.exercises.findIndex(e => e.key === curKey);
       Store.saveActive(); toast('Reihenfolge geändert');
-    } else if (L.to !== L.s) { const slots = plan().days[L.d].slots; const [m] = slots.splice(L.s, 1); slots.splice(L.to, 0, m); touchPlan(); Store.saveProfile(); toast('Reihenfolge geändert'); }
+    } else if (L.to !== L.s) { const slots = plan().days[L.d].slots; const rs = L.rows.map(r => +r.dataset.s); const [m] = slots.splice(rs[L.s], 1); slots.splice(rs[L.to], 0, m); touchPlan(); Store.saveProfile(); toast('Reihenfolge geändert'); }
     render();
   }
   document.addEventListener('touchstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (el && !st.sheet) lpStart(el, e.touches[0].clientY); }, { passive: true });
