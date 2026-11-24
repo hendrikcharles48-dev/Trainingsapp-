@@ -693,6 +693,25 @@ button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:point
 .sheet{max-height:calc(100% - env(safe-area-inset-top,0px) - 28px)}
 /* 3.14.10: kurze Seiten (z. B. Übungen → Eigene) mindestens bildschirmhoch – iOS setzt die Tab-Leiste sonst höher */
 #app{min-height:100lvh;box-sizing:border-box}
+
+/* 3.27.2: Trainingsleiste kleiner, ganz unten am Rand (Nutzerwunsch 24.11.) */
+.panel{left:0;right:0;bottom:0;border-radius:22px 22px 0 0;border-bottom:0;padding:8px 14px calc(env(safe-area-inset-bottom,0px) + 6px)}
+.panel::before{top:5px;width:30px;height:3px;margin-left:-15px}
+.panel .pname{font-size:13px;min-height:18px;padding-top:2px}
+.panel .cols{margin-top:0;align-items:center}
+.panel .cols small{font-size:11px}
+.panel .cols .v{font-size:16px}
+.panel .big{font-size:32px}
+.panel .ctrl{margin-top:6px}
+.panel .ctrl button{min-height:44px}
+.panel.resting{padding-top:12px}
+.restrow{gap:12px}
+.ring{width:84px;height:84px}
+.ring .rtxt b{font-size:22px}
+.ring .rtxt small{font-size:10px;margin-top:1px}
+.panel.resting .nextup{padding:7px 10px}
+.panel.resting .stack{gap:4px!important}
+@media (max-width:380px){ .panel .big{font-size:30px} .ring{width:78px;height:78px} .ring .rtxt b{font-size:20px} }
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
