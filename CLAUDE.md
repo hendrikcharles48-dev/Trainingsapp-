@@ -35,7 +35,7 @@ Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/` und `docs/formwer
 - Beim Tippen nie die ganze Ansicht neu bauen (Suchfelder: nur die Trefferliste ersetzen: `libResults`/`#libRes`,
   `pickResults`/`#pickRes`, `later()` verzögert). Bei offenem Overlay baut `render()` die Seite dahinter nicht neu.
 - Training schnell halten: Verlauf über `histOf(exId)` (Cache, ungültig über `Store.wv`), `exState` hat einen Cache
-  (Schlüssel enthält `st.ev`, das jede Klick/Eingabe hochzählt). Die Trainingsseite springt nie von selbst (3.27.2: `renderOverlay` hält die Übungsliste `#wList` an ihrer Stelle); nach oben nur per Tipp auf „Als Nächstes“/Übungsname (`toFocus`). Trainingsleiste `.panel` kompakt ganz unten am Rand.
+  (Schlüssel enthält `st.ev`, das jede Klick/Eingabe hochzählt). Die Trainingsseite springt nie von selbst (3.27.2: `renderOverlay` hält die Übungsliste `#wList` an ihrer Stelle); nach oben nur per Tipp auf „Als Nächstes“/Übungsname (`toFocus`). Trainingsleiste `.panel` kompakt ganz unten am Rand, Pausenleiste flach (3.27.3: Ring 60 px, eine Zeile Pause · Dauer · Als Nächstes).
 - Version: `APP_VERSION` in `app.js` (Anzeige in den Einstellungen) + `CACHE` in `pwa/sw.js` bei jedem Release erhöhen.
 - Service Worker: Satzwerks eigene Dateien und Schriften „Cache zuerst, im Hintergrund auffrischen“; Unterordner (andere
   Apps) Netz zuerst. Neue Version lädt die Seite nur neu, wenn kein Training läuft (`build.js`, `controllerchange`).
