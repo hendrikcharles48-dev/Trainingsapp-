@@ -195,6 +195,10 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   (sofort Push + Alarm zum Pausenende), `GET /v1/live/state?t=<Token>` ohne Passwort (Token `push:token`). `pwa/sw.js`: `push` holt den Text, `showNotification`
   mit `tag: 'satzwerk-live'` (ersetzt die vorige), Zugang im Cache `live-cfg`. App: `liveSend()` bei Pausenstart/-Stopp/-Änderung, Trainingsstart, Ende;
   `FW.liveEnable()` nur auf Tipp (Schalter `settings.live` unter Einstellungen → Signale, nur mit Formwerk). Tests: `node tools/sw-push.test.js`, Worker-Test „Mitteilung im Training“.
+- Startfenster „Dein Training heute“ (3.26, Nutzerwunsch 24.11.): `startCalc(s)` = Tagesanpassung → bestätigte Vorschläge (`setSuggestions`: Wochenvolumen je Muskel =
+  diese Woche + heute + offene Plan-Tage gegen `volTargets`; ≥ 2 darunter → +1 Satz, ≥ 3 darüber → −1, höchstens 4, antippen = übernehmen, im Modus „auto“ vorgewählt)
+  → eigene Satz-Änderungen (−/+ je Übung, `s.dm`) → Zeit kürzer/länger. Dauer = `trainTime` (Satzzeit `setWorkSec` + Pausen + Aufwärmen), gleiche Rechnung in `estMinutes`
+  (Heute-Kachel, Einheit-Seite). Änderungen gelten nur für heute; `tfGo` übergibt den gerechneten Tag an `startWorkout`.
 - Ziel Muskelaufbau, Reserve (RIR) bewusst 1–2 (Nutzerwunsch), siehe `RIR_PLAN` in `engine.js`.
 - Der Nutzer spielt Baseball; Wochen-Check-in passt Volumen an. Spiel-/Trainingstage (`sportDays`) → Hinweis auf der
   Startseite, wenn heute/morgen Spieltag ist und der nächste Tag schwere Bein-/Überkopf-Grundübungen hat (`sportHint`).

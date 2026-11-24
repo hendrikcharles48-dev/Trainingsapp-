@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.25.1';
+  const APP_VERSION = '3.26.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -379,7 +379,24 @@
   function roleOfEx(ex) { return ex.role === 'c' ? 'sec' : ex.role === 'i' ? 'iso' : ex.role === 's' ? 'skill' : ex.role === 'x' ? 'cond' : 'core'; }
   function unitFor(ex) { return ex.kind === 'hold' || ex.kind === 'int' ? 's' : ''; }
   function rrText(rr, ex) { if (!rr) return ''; return ex && (ex.kind === 'hold' || ex.kind === 'int') ? `${rr[0]}–${rr[1]} s` : `${rr[0]}–${rr[1]}`; }
-  function estMinutes(day, loc) { return Math.round(6 + day.slots.filter(s => s.ex[loc]).reduce((t, sl) => t + sl.sets * (0.8 + sl.rest / 60), 0)); }
+  /* 3.26 (Nutzerwunsch 24.11.): Dauer = Arbeitszeit der Sätze (Wdh. × 3,5 s + 20 s Umsetzen, einseitig doppelt; Halten = Haltezeit + 10 s)
+     + Pausen + Aufwärmen (5 min mit Grundübung, sonst 3). items: {ex, sets, rr, rest, role} */
+  function setWorkSec(ex, rr) {
+    if (ex.kind === 'hold' || ex.kind === 'int') return Math.round((rr[0] + rr[1]) / 2) + 10;
+    return Math.round(((rr[0] + rr[1]) / 2 * 3.5 + 20) * (ex.uni ? 2 : 1));
+  }
+  function trainTime(items) {
+    let work = 0, rest = 0; for (const it of items) { work += it.sets * setWorkSec(it.ex, it.rr); rest += it.sets * it.rest; }
+    if (items.length) rest -= items[items.length - 1].rest; // nach dem letzten Satz keine Pause
+    const warm = items.some(i => i.role === 'main') ? 300 : 180;
+    return { work: Math.round(work / 60), rest: Math.max(0, Math.round(rest / 60)), warm: Math.round(warm / 60), total: Math.round((work + Math.max(0, rest) + warm) / 60), sets: items.reduce((t, i) => t + i.sets, 0) };
+  }
+  function slotItems(day, loc) {
+    const p = plan(); const ra = (P() && P().restAdj) || {};
+    return day.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); if (!ex) return null; const pr = E.prescription(sl, ex, P(), p);
+      return { slot: sl, slotId: sl.id, ex, sets: pr.sets, rr: pr.rr, rest: pr.rest + ((ra[ex.id] || {}).s || 0), role: pr.role, adj: sl._adj || [] }; }).filter(Boolean);
+  }
+  function estMinutes(day, loc) { return trainTime(slotItems(day, loc)).total; }
   function dateDE(iso, opts) { const d = new Date(iso.length <= 10 ? iso + 'T12:00:00' : iso); return d.toLocaleDateString('de-DE', opts || { weekday: 'short', day: 'numeric', month: 'short' }); }
   function durTxt(sec) { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; }
   function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -571,6 +588,45 @@
     const val = r.building ? 'Basis im Aufbau' : r.score == null ? 'noch keine Werte' : (r.estimated ? '~' : '') + r.score + ' %';
     const sub = n ? n + (n === 1 ? ' Änderung' : ' Änderungen') + ' beim Start' : (c.good || []).length && c.level !== 'rest' && c.level !== 'done' ? 'Gut heute: ' + c.good.slice(0, 3).join(', ') : (c.text || '');
     return `<button class="fwbox" data-a="formwerkSheet"><i class="fwdot ${esc(r.color || 'none')}"></i><span class="grow"><b class="ell">Erholung ${esc(val)} · ${esc(c.title || '')}</b><span class="ell">${esc(sub)}</span></span><span class="chev">${I.chev}</span></button>`;
+  }
+  const M2G = { chest: 'brust', lats: 'ruecken', upperback: 'ruecken', fdelt: 'schultern', sdelt: 'schultern', rdelt: 'schultern', biceps: 'bizeps', triceps: 'trizeps', forearms: 'griff', abs: 'rumpf', obliques: 'rumpf', lowback: 'rumpf', quads: 'vorn', hams: 'hinten', glutes: 'hinten', calves: 'waden' };
+  /* Satz-Vorschläge: Wochenvolumen je Muskel (diese Woche schon + heute + noch offene Einheiten des Plans) gegen das Ziel (`volTargets`).
+     Zu wenig (≥ 2 unter Ziel, Muskel nicht wund) → +1 Satz, deutlich zu viel (≥ 3 drüber) → −1 Satz. Höchstens 4, je Übung eine. */
+  function setSuggestions(day, di, loc, rd) {
+    const p = plan(); if (!p) return []; const T = E.volTargets(P(), p); const sowIso = E.todayISO(E.startOfWeek());
+    const wk = E.weeklyMuscleSets(st.workouts, sowIso);
+    const doneIds = new Set(st.workouts.filter(w => w.date >= sowIso && (!w.planId || w.planId === p.id)).map(w => w.dayId).filter(Boolean));
+    const vol = E.planVolume(p, P(), loc); const rest = {};
+    p.days.forEach((d, j) => { if (j === di || doneIds.has(d.id)) return; for (const m in vol.perDay[j]) rest[m] = (rest[m] || 0) + vol.perDay[j][m]; });
+    const slots = day.slots.filter(sl => sl.ex[loc] && getEx(sl.ex[loc])); const sess = {};
+    for (const sl of slots) { const ex = getEx(sl.ex[loc]); if (ex.role === 's' || ex.role === 'x') continue; for (const m of ex.prim) sess[m] = (sess[m] || 0) + sl.sets; for (const m of ex.sec || []) sess[m] = (sess[m] || 0) + sl.sets * 0.5; }
+    const sore = (rd && rd.sore) || {}; const out = []; const usedSlot = new Set();
+    const cap = sl => (sl.r === 'main' || sl.r === 'sec' ? 5 : 4);
+    const order = Object.keys(T).map(m => ({ m, gap: T[m] - ((wk[m] || 0) + (sess[m] || 0) + (rest[m] || 0)) })).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+    for (const { m, gap } of order) {
+      if (out.length >= 4) break; const g = M2G[m];
+      const c = slots.filter(sl => getEx(sl.ex[loc]).prim.includes(m) && !usedSlot.has(sl.id));
+      const proj = Math.round((wk[m] || 0) + (sess[m] || 0) + (rest[m] || 0));
+      if (gap >= 2 && !(sore[g] >= 1)) { const sl = c.filter(x => x.sets < cap(x)).sort((a, b) => (a.r === 'main') - (b.r === 'main') || a.sets - b.sets)[0]; if (sl) { usedSlot.add(sl.id); out.push({ id: 'sg:' + sl.id + ':+1', slotId: sl.id, delta: 1, text: '+1 Satz ' + getEx(sl.ex[loc]).name, why: D.MUSCLES[m] + ': Woche erst ≈ ' + proj + ' von ' + T[m] + ' Sätzen' }); } }
+      else if (gap <= -3) { const sl = c.filter(x => x.sets > 2).sort((a, b) => b.sets - a.sets || (b.r === 'iso') - (a.r === 'iso'))[0]; if (sl) { usedSlot.add(sl.id); out.push({ id: 'sg:' + sl.id + ':-1', slotId: sl.id, delta: -1, text: '−1 Satz ' + getEx(sl.ex[loc]).name, why: D.MUSCLES[m] + ': Woche schon ≈ ' + proj + ' von ' + T[m] + ' Sätzen' }); } }
+    }
+    return out;
+  }
+  // Alles fürs Startfenster: Tagesanpassung → bestätigte Vorschläge → eigene Satz-Änderungen → Zeit (kürzer/länger)
+  function startCalc(s) {
+    const p = plan(); const base = p.days[s.d]; const loc = s.l;
+    const A = dayAdjust(s.d, loc, s.acc || null);
+    let day = A ? A.day : base; day = Object.assign({}, day, { slots: day.slots.map(sl => Object.assign({}, sl)) });
+    const sug = setSuggestions(day, s.d, loc, A && A.rd); const sgOn = id => (s.sg && id in s.sg ? s.sg[id] : adjMode() === 'auto');
+    const clampS = n => Math.max(1, Math.min(8, n)); const find = id => day.slots.find(q => q.id === id);
+    for (const x of sug) if (sgOn(x.id)) { const sl = find(x.slotId); if (sl) sl.sets = clampS(sl.sets + x.delta); }
+    for (const [id, dl] of Object.entries(s.dm || {})) { const sl = find(id); if (sl) sl.sets = clampS(sl.sets + dl); }
+    const delta = tfDelta({ ti: s.ti ?? 1 }); const tp = delta ? E.timePlan(day, loc, delta, P(), p) : null; const ra = (P().restAdj || {});
+    const items = tp ? tp.items.map(it => { const pr = it.slot ? E.prescription(it.slot, it.ex, P(), p) : null;
+        return { slotId: it.slot ? it.slot.id : null, ex: it.ex, sets: it.spec ? it.sets : pr.sets + (it.boost || 0), rr: pr ? pr.rr : (it.ex.rr || [8, 12]), rest: (it.spec ? it.rest : Math.max(30, Math.round(pr.rest * it.factor / 5) * 5)) + ((ra[it.ex.id] || {}).s || 0), role: it.role, adj: it.slot ? (it.slot._adj || []) : [] }; })
+      : slotItems(day, loc);
+    for (const it of items) it.min = Math.round(it.sets * (setWorkSec(it.ex, it.rr) + it.rest) / 60);
+    return { A, day, sug, sgOn, delta, tp, items, time: trainTime(items) };
   }
   function readyFor(di, loc) {
     const b = FW.readiness(); const p = plan(); if (!b || !p || !p.days[di]) return null;
@@ -1895,26 +1951,25 @@
         ${s.preview && ch.length ? '<div class="small" style="font-weight:800">Das würde sich ändern. Übernehmen?</div><button class="btn primary" data-a="balanceApply">Übernehmen</button><button class="btn ghost" data-a="closeSheet">Abbrechen</button>' : '<button class="btn primary" data-a="closeSheet">Alles klar</button>'}</div>`;
     },
     time(s) {
-      const p = plan(); const base = p.days[s.d]; const A = dayAdjust(s.d, s.l, s.acc || null);
-      const day = A ? A.day : base; const ti = s.ti ?? 1; const delta = tfDelta({ ti });
-      const tp = delta ? E.timePlan(day, s.l, delta, P(), p) : null;
-      const lines = {}; for (const sl of day.slots) lines[sl.id] = sl._adj || [];
-      const items = tp ? tp.items.map(it => ({ ex: it.ex, sets: it.spec ? it.sets : E.prescription(it.slot, it.ex, P(), p).sets + (it.boost || 0), adj: it.slot ? lines[it.slot.id] || [] : [] }))
-        : day.slots.filter(x => x.ex[s.l]).map(x => { const ex = getEx(x.ex[s.l]); return { ex, sets: ex ? E.prescription(x, ex, P(), p).sets : 0, adj: x._adj || [] }; }).filter(x => x.ex);
-      const min = tp ? tp.minutes : estMinutes(day, s.l);
-      const label = { '-1': 'Etwas kürzer', '0': 'Wie geplant', '1': 'Etwas länger' }[delta] || '';
+      const p = plan(); const base = p.days[s.d]; const X = startCalc(s); const A = X.A; const ti = s.ti ?? 1; const T = X.time;
       const conf = s.acc && A && A.all.changes.length;
-      return `<div class="stack"><div><div class="eyebrow">${esc(base.name)}</div><h2>Bereit</h2>
-          <div class="small muted">${A ? (A.line ? 'Formwerk heute: ' + esc(A.line) + '.' : 'Formwerk: keine Auffälligkeiten.') + (A.adj.any ? ' Plan für heute angepasst.' : '') : FW.configured() ? 'Noch keine Formwerk-Daten für heute – normaler Plan.' : 'Normaler Plan.'}</div></div>
+      const label = { '-1': 'etwas kürzer', '0': '', '1': 'etwas länger' }[X.delta] || '';
+      const rrT = it => (it.rr[0] === it.rr[1] ? it.rr[0] : it.rr[0] + '–' + it.rr[1]) + (it.ex.kind === 'hold' || it.ex.kind === 'int' ? ' s' : '');
+      const row = it => `${it.adj.map(l => `<div class="adjline">${esc(l)}</div>`).join('')}<div class="exrow2"><div class="top">${thumb(it.ex)}<span class="grow ell" style="font-weight:700">${esc(it.ex.name)}</span><span class="tiny ink2 num">≈ ${it.min} min</span></div>
+          <div class="bot"><span class="tiny ink2">${it.sets} × ${rrT(it)} · Pause ${mmss(it.rest)}</span>${it.slotId ? `<span class="sstep"><button data-a="setDelta" data-id="${esc(it.slotId)}" data-d="-1" aria-label="Einen Satz weniger" ${it.sets <= 1 ? 'disabled' : ''}>−</button><b>${it.sets} ${it.sets === 1 ? 'Satz' : 'Sätze'}</b><button data-a="setDelta" data-id="${esc(it.slotId)}" data-d="1" aria-label="Einen Satz mehr" ${it.sets >= 8 ? 'disabled' : ''}>+</button></span>` : ''}</div></div>`;
+      return `<div class="stack"><div><div class="eyebrow">${esc(base.name)}</div><h2>Dein Training heute</h2>
+          <div class="small muted">${A ? (A.line ? 'Formwerk: ' + esc(A.line) + '.' : 'Formwerk: keine Auffälligkeiten.') + (A.adj.any ? ' Plan für heute angepasst.' : '') : FW.configured() ? 'Noch keine Formwerk-Daten für heute – normaler Plan.' : 'Normaler Plan.'}</div></div>
+        <div class="card navy stack" style="gap:4px"><div class="row between" style="align-items:flex-end"><div><div class="eyebrow">Dauer ungefähr${label ? ' · ' + label : ''}</div><div style="font-size:30px;font-weight:900;line-height:1.1" class="num">≈ ${T.total} min</div></div><span class="small ink2 num">${T.sets} Sätze</span></div><div class="tiny ink2">Sätze ≈ ${T.work} min · Pausen ≈ ${T.rest} min · Aufwärmen ≈ ${T.warm} min</div></div>
         ${A && A.adj.banner.length ? `<div class="card flat small" style="border:1px solid var(--highlight)">${A.adj.banner.map(esc).join('<br>')}</div>` : ''}
         ${conf ? `<div class="stack" style="gap:6px"><div class="row between"><div class="eyebrow">Anpassungen – antippen zum Bestätigen</div><button class="btn ghost sm" data-a="accAll">Alle</button></div>${A.all.changes.map(c => `<button class="li accrow" data-a="accTog" data-id="${esc(c.id)}" aria-pressed="${s.acc.has(c.id)}"><span class="accbox">${s.acc.has(c.id) ? I.check : ''}</span><div class="grow small">${esc(c.text)}</div></button>`).join('')}</div>` : ''}
+        ${X.sug.length ? `<div class="stack" style="gap:6px"><div class="eyebrow">Vorschläge für deine Muskeln – antippen zum Übernehmen</div>${X.sug.map(x => `<button class="li accrow" data-a="sgTog" data-id="${esc(x.id)}" aria-pressed="${X.sgOn(x.id)}"><span class="accbox">${X.sgOn(x.id) ? I.check : ''}</span><div class="grow"><div class="small" style="font-weight:700">${esc(x.text)}</div><div class="tiny muted">${esc(x.why)}</div></div></button>`).join('')}</div>` : ''}
         <div><div class="eyebrow" style="margin-bottom:8px">Zeit</div><div class="tfrow">${['Knapp', 'Normal', 'Viel'].map((o, k) => `<button class="tf" data-a="tfPick" data-k="ti" data-v="${k}" aria-pressed="${ti === k}">${o}</button>`).join('')}</div></div>
-        <div class="card navy stack" style="gap:10px"><div class="row between"><div class="eyebrow">Heute</div><span class="small ink2 num">${label} · ≈ ${min} min</span></div>
-          <div class="planlist">${items.map(it => `${it.adj.map(l => `<div class="adjline">${esc(l)}</div>`).join('')}<div class="pl-row">${thumb(it.ex)}<span class="grow ell">${esc(it.ex.name)}</span><span class="num muted">${it.sets} Sätze</span></div>`).join('')}</div>
+        <div class="card navy stack" style="gap:8px"><div class="eyebrow">Übungen und Sätze</div>
+          <div class="planlist" style="gap:0">${X.items.map(row).join('')}</div>
           ${A && A.adj.removed.length ? `<div class="tiny ink2">Gestrichen: ${esc(A.adj.removed.map(r => r.ex.name + ' (' + r.why + ')').join(', '))}</div>` : ''}
           ${A && A.adj.noUp ? '<div class="tiny ink2">Heute keine Gewichtssteigerung.</div>' : ''}
-          ${tp && tp.notes.length ? `<div class="tiny ink2">${esc(tp.notes.join(' · '))}</div>` : ''}</div>
-        <button class="btn primary big" data-a="tfGo">Training starten</button></div>`;
+          ${X.tp && X.tp.notes.length ? `<div class="tiny ink2">${esc(X.tp.notes.join(' · '))}</div>` : ''}</div>
+        <button class="btn primary big" data-a="tfGo">Training starten · ≈ ${T.total} min</button></div>`;
     },
     level(s) {
       const entry = st.active.exercises[s.i]; const S = exState(entry); const ex = S.ex; const nb = levelNeighbors(entry); const rc = levelRec(entry, S, nb);
@@ -2191,7 +2246,10 @@
     rateW(t) { const w = st.summary; if (!w) return; w.rating = +t.dataset.r; Store.saveWorkout(w); renderSheet(); },
     chartPick(t) { st.chartEx = t.dataset.id; render(); },
     tfPick(t) { st.sheet[t.dataset.k] = +t.dataset.v; renderSheet(); },
-    tfGo() { const s = st.sheet; const d = tfDelta({ ti: s.ti ?? 1 }); const A = dayAdjust(s.d, s.l, s.acc || null); closeSheet(); startWorkout(s.d, s.l, d, A && A.adj.any ? A : null); },
+    tfGo() { const s = st.sheet; const X = startCalc(s); closeSheet();
+      startWorkout(s.d, s.l, X.delta, { day: X.day, adj: X.A ? X.A.adj : { any: false, removed: [], noUp: false }, rd: X.A ? X.A.rd : {}, line: X.A ? X.A.line : '', counts: true }); },
+    setDelta(t) { const s = st.sheet; s.dm = Object.assign({}, s.dm); s.dm[t.dataset.id] = (s.dm[t.dataset.id] || 0) + +t.dataset.d; renderSheet(); },
+    sgTog(t) { const s = st.sheet; const id = t.dataset.id; const cur = s.sg && id in s.sg ? s.sg[id] : adjMode() === 'auto'; s.sg = Object.assign({}, s.sg, { [id]: !cur }); renderSheet(); },
     accTog(t) { const a = st.sheet.acc; if (!a) return; const id = t.dataset.id; if (a.has(id)) a.delete(id); else a.add(id); renderSheet(); },
     accAll() { const s = st.sheet; const A = dayAdjust(s.d, s.l, null); if (A) s.acc = new Set(A.adj.changes.map(c => c.id)); renderSheet(); },
     tfMode(t) { st.sheet.mode = t.dataset.k; renderSheet(); },
