@@ -712,6 +712,21 @@ button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:point
 .panel.resting .nextup{padding:7px 10px}
 .panel.resting .stack{gap:4px!important}
 @media (max-width:380px){ .panel .big{font-size:30px} .ring{width:78px;height:78px} .ring .rtxt b{font-size:20px} }
+
+/* 3.27.3: Pausenleiste um ein Drittel flacher */
+.panel.resting{padding-top:10px}
+.panel.resting .restrow{gap:10px}
+.panel.resting .ring{width:60px;height:60px}
+.panel.resting .ring .rtxt b{font-size:17px}
+.panel.resting .ring .rtxt small{font-size:9px;margin-top:0}
+.panel.resting .nextup{padding:6px 10px;gap:1px;border-radius:14px}
+.panel.resting .nextup small{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel.resting .nextup b{font-size:14px}
+.panel.resting .nextup span.ell{font-size:12px}
+.panel.resting .nextup small span{display:inline;font-size:inherit;color:inherit}
+.panel.resting .ctrl{margin-top:6px}
+.panel.resting .ctrl button{min-height:44px}
+@media (max-width:380px){ .panel.resting .ring{width:58px;height:58px} .panel.resting .ring .rtxt b{font-size:16px} }
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>

@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.2';
+  const APP_VERSION = '3.27.3';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1120,7 +1120,7 @@
       const nx = S ? `${esc(S.ex.name)}` : 'Training beenden';
       const nd = S ? `Satz ${Math.min(S.done.length + 1, S.planned)} von ${S.planned} · ${S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + ' s' : (S.rec.w ? fmt(S.rec.w) + ' kg × ' : '') + fmt(S.rec.reps) + ' Wdh.'}` : '';
       el.innerHTML = `<div class="panel resting"><div class="restrow"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rtrack" cx="60" cy="60" r="52"/><circle id="restRing" class="rbar ${left <= 10 ? 'hot' : ''}" cx="60" cy="60" r="52" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - fr)).toFixed(1)}" transform="rotate(-90 60 60)"/></svg><div class="rtxt"><b id="restT">${restTxt(left)}</b><small id="restOf">von ${mmss(st.rest.len ?? st.rest.total)}</small></div></div>
-        <div class="grow stack" style="gap:8px;min-width:0"><div class="eyebrow" id="restLbl">${left > 0 ? 'Pause' : 'Bereit – du bestimmst'}</div><button class="nextup" data-a="toFocus"><small>Als Nächstes</small><b class="ell">${nx}</b><span class="ell">${nd}</span></button><div class="tiny muted">Dauer <span class="num" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</span></div></div></div>
+        <button class="nextup grow" data-a="toFocus"><small><span id="restLbl">${left > 0 ? 'Pause' : 'Bereit'}</span> · Dauer <span class="num" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</span> · Als Nächstes</small><b class="ell">${nx}</b><span class="ell">${nd}</span></button></div>
         <div class="ctrl"><button data-a="restAdj" data-s="-15">−15 s</button><button class="go" data-a="restSkip">Stopp</button><button data-a="restAdj" data-s="15">+15 s</button></div></div>`;
       return;
     }
