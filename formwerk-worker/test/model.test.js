@@ -387,5 +387,28 @@ await t('Mitteilung im Training: Abo, Push mit gültiger VAPID-Signatur, „Paus
   } finally { globalThis.fetch = realFetch; }
 });
 
+await t('Geldwerk-Erinnerungen: Abo, nur Datum + Titel, Push um 8 Uhr, Text nur mit Token', async () => {
+  const sent = []; const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, o = {}) => { if (String(u).startsWith('https://push.example/gw')) { sent.push(String(u)); return new Response(null, { status: 201 }); } return realFetch(u, o); };
+  try {
+    const sub = await (await call('/v1/gw/subscribe', { method: 'POST', body: JSON.stringify({ sub: { endpoint: 'https://push.example/gw1' } }) })).json();
+    assert.ok(sub.ok && sub.token && sub.key);
+    const today = doObj.today();
+    const r = await (await call('/v1/gw/reminders', { method: 'PUT', body: JSON.stringify({ items: [{ d: today, t: 'Kündigen: Kfz – noch 3 Tage', amount: 456 }, { d: '2099-01-01', t: 'x'.repeat(300) }, { d: 'kaputt', t: 'y' }] }) })).json();
+    assert.equal(r.n, 2);
+    const stored = await storage.get('gw:rem'); assert.equal(stored[1].t.length, 90); assert.equal(stored[0].amount, undefined, 'keine Beträge gespeichert');
+    const open = t => worker.fetch(new Request('https://w.example/v1/gw/state?t=' + t), env);
+    assert.equal((await open('falsch')).status, 401);
+    const d1 = await (await doObj.fetch(new Request('https://store/internal/gw', { method: 'POST' }))).json();
+    assert.equal(d1.sent, 1); assert.equal(sent.length, 1);
+    assert.match((await (await open(sub.token)).json()).body, /Kündigen: Kfz/);
+    const d2 = await (await doObj.fetch(new Request('https://store/internal/gw', { method: 'POST' }))).json(); assert.equal(d2.sent, 0, 'nicht doppelt am selben Tag');
+    assert.equal((await storage.get('gw:rem')).length, 1, 'Erledigtes entfernt');
+    assert.equal((await (await call('/v1/gw/test', { method: 'POST', body: '{}' })).json()).ok, true); assert.equal(sent.length, 2);
+    await call('/v1/gw/off', { method: 'POST', body: '{}' }); assert.equal(await storage.get('gw:sub'), undefined);
+    assert.equal((await worker.fetch(new Request('https://w.example/v1/gw/reminders'), env)).status, 401, 'ohne Passwort kein Zugriff');
+  } finally { globalThis.fetch = realFetch; }
+});
+
 console.log(`\n${n - fails}/${n} Tests bestanden`);
 if (fails) process.exit(1);

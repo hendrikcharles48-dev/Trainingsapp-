@@ -117,3 +117,10 @@ Kompakter Tageszustand für Satzwerk (ohne `date` = heute). Antwort:
 Gruppen wie `GROUPS` (brust, ruecken, schultern, bizeps, trizeps, griff, rumpf, vorn, hinten, waden). Schmerzbereiche im Morgen-Check:
 schulter (inj shoulder), ellbogen (elbow), knie (knee), ruecken (lowback), sonstiges (ohne Zuordnung); ältere Bereiche bleiben gültig.
 Gespeichert wird weiter auf der Skala 1–5 (Muskelkater leicht 2 / mittel 3 / stark 5, Schmerz ja = 3).
+
+## Geldwerk-Erinnerungen (Worker 2.12)
+Eigenes Push-Abo der Geldwerk-App (gleicher VAPID-Schlüssel `GET /v1/push/key`). Gespeichert werden nur Datum und kurzer Titel.
+- `POST /v1/gw/subscribe {sub}` → `{ok, token, key}`; `POST /v1/gw/off` löscht Abo und Termine.
+- `PUT /v1/gw/reminders {items:[{d:'JJJJ-MM-TT', t:'…'}]}` ersetzt alle Termine (max. 200, Titel max. 90 Zeichen, andere Felder werden verworfen).
+- Täglich 8 Uhr (Cron `0 6,7 * * *`, nur der Lauf mit lokal 8 Uhr): fällige Termine von heute (und verpasste der letzten 3 Tage) als eine Mitteilung, Erledigtes wird entfernt.
+- `GET /v1/gw/state?t=<token>` ohne Passwort: Text der letzten Mitteilung für den Service Worker. `POST /v1/gw/test`: Test-Mitteilung.
