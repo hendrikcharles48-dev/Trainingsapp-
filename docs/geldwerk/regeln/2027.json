@@ -1,0 +1,322 @@
+{
+  "jahr": 2027,
+  "stand": "2026-11-25",
+  "hinweis": "Keine Steuerberatung. Jede Regel mit Quelle und Stand; \"geprueft\": false wird in der App als \"ungeprüft\" angezeigt.",
+  "regeln": {
+    "entfernungspauschale": {
+      "titel": "Entfernungspauschale",
+      "wert": 0.38,
+      "text": "0,38 € je vollem Kilometer der einfachen Strecke ab dem 1. km (seit 2026 unbefristet), einmal pro Arbeitstag. Höchstbetrag 4.500 € gilt nicht bei Fahrten mit dem eigenen Auto.",
+      "hoechstbetrag": 4500,
+      "quelle": "§ 9 Abs. 1 Satz 3 Nr. 4 EStG i. d. F. des Steueränderungsgesetzes 2025 (Bundestag 04.12.2025, Bundesrat 19.12.2025, BGBl. I 2025 Nr. 363)",
+      "link": "https://www.gesetze-im-internet.de/estg/__9.html",
+      "link2": "https://kpmg.com/de/de/themen/2025/12/staendg2025-zustimmung-br.html",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "bildungseinrichtung": {
+      "titel": "Schule als erste Tätigkeitsstätte",
+      "text": "Eine Bildungseinrichtung, die für eine vollzeitige Bildungsmaßnahme außerhalb eines Dienstverhältnisses besucht wird, gilt als erste Tätigkeitsstätte. Fahrten dorthin nur mit der Entfernungspauschale, keine Reisekosten.",
+      "quelle": "§ 9 Abs. 4 Satz 8 EStG",
+      "link": "https://www.gesetze-im-internet.de/estg/__9.html",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "an_pauschbetrag": {
+      "titel": "Arbeitnehmer-Pauschbetrag",
+      "wert": 1230,
+      "text": "1.230 € Werbungskosten werden ohne Nachweis abgezogen, höchstens bis zur Höhe des Arbeitslohns. Lohnt sich nur, wenn die eigenen Kosten darunter liegen.",
+      "quelle": "§ 9a Satz 1 Nr. 1 Buchst. a und Satz 2 EStG",
+      "link": "https://www.gesetze-im-internet.de/estg/__9a.html",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "fortbildung": {
+      "titel": "Fortbildungskosten",
+      "text": "Kosten einer Fortbildung nach abgeschlossener Erstausbildung (Lehrgang, Prüfung, Fachbücher, Arbeitsmittel, Fahrten) sind Werbungskosten – auch vorab für den späteren Beruf.",
+      "quelle": "§ 9 Abs. 6 EStG; Finanzverwaltung NRW: Fortbildungskosten",
+      "link": "https://www.finanzamt.nrw.de/steuerinfos/privatpersonen/arbeitnehmende/werbungskosten/fortbildungskosten",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "zuschuss": {
+      "titel": "Zuschüsse mindern die Kosten",
+      "text": "Steuerfreie Zuschüsse, die genau diese Kosten ersetzen (z. B. Zuschussanteil Aufstiegs-BAföG am Maßnahmebeitrag), werden von den Fortbildungskosten abgezogen. Der Darlehensanteil mindert nicht – die damit bezahlten Kosten zählen.",
+      "quelle": "§ 3 Nr. 37 EStG, § 3c EStG; Finanzverwaltung NRW: Fortbildungskosten",
+      "link": "https://www.finanzamt.nrw.de/steuerinfos/privatpersonen/arbeitnehmende/werbungskosten/fortbildungskosten",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "afbg_erlass": {
+      "titel": "Darlehenserlass Aufstiegs-BAföG",
+      "text": "Wird nach bestandener Prüfung ein Teil des Darlehens erlassen, kann das steuerlich erfasst werden (Rückfluss von Werbungskosten bzw. steuerpflichtiger Vorteil). Die Frage liegt beim BFH – im Erlass-Jahr prüfen lassen.",
+      "quelle": "Bund der Steuerzahler: erlassene Kreditschulden sind steuerpflichtig; NWB Experten-Blog zum BFH-Verfahren",
+      "link": "https://steuerzahler.de/aktuelles/detail/berufliche-weiterbildung-erlassene-kreditschulden-sind-steuerpflichtig/",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "arbeitsmittel": {
+      "titel": "Arbeitsmittel (GWG-Grenze)",
+      "wert": 800,
+      "brutto": 952,
+      "text": "Arbeitsmittel bis 800 € netto (952 € mit 19 % USt) sofort im Kaufjahr absetzbar. Teurere Dinge werden über die Nutzungsdauer verteilt. Bei privater Mitnutzung nur der berufliche Anteil.",
+      "quelle": "§ 9 Abs. 1 Satz 3 Nr. 6 und 7 i. V. m. § 6 Abs. 2 EStG",
+      "link": "https://www.gesetze-im-internet.de/estg/__6.html",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "computer": {
+      "titel": "Computer und Software",
+      "text": "Für Computer-Hardware und Software darf eine Nutzungsdauer von 1 Jahr angesetzt werden – dann im Kaufjahr voll absetzbar (beruflicher Anteil).",
+      "quelle": "BMF-Schreiben vom 22.02.2022, IV C 3 - S 2190/21/10002 :025, BStBl I 2022 S. 187",
+      "link": "https://www.ihk.de/blueprint/servlet/resource/blob/5503784/477169aa20e2f5afe493340680db64dc/bmf-schreiben-2022-0222-data.pdf",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "privatanteil": {
+      "titel": "Beruflicher Anteil bei Technik",
+      "wert": 50,
+      "text": "Vorbelegung 50 % beruflich für Computer/Technik, die auch privat genutzt wird. Das ist eine Annahme der App – den tatsächlichen Anteil einstellen. Ab 90 % beruflich zählt der volle Betrag.",
+      "quelle": "Annahme der App (Aufteilung nach BFH-Rechtsprechung, keine feste Quote im Gesetz)",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "tagespauschale": {
+      "titel": "Tagespauschale (Lernen zu Hause)",
+      "wert": 6,
+      "max_tage": 210,
+      "text": "6 € je Tag, an dem überwiegend zu Hause gearbeitet und die erste Tätigkeitsstätte (Schule) nicht aufgesucht wird, höchstens 210 Tage (1.260 €). Nicht an Schultagen. Ob reine Lerntage einer Vollzeit-Fortbildung zählen, ist nicht sicher geklärt – darum nur in der oberen Spanne.",
+      "quelle": "§ 4 Abs. 5 Satz 1 Nr. 6c EStG i. V. m. § 9 Abs. 5 EStG; BMF-Schreiben vom 15.08.2023",
+      "link": "https://www.haufe.de/finance/steuern-finanzen/betriebsausgabenwerbungskosten-homeoffice-pauschale_190_543844.html",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "kontofuehrung": {
+      "titel": "Kontoführungspauschale",
+      "wert": 16,
+      "text": "16 € pro Jahr werden von den Finanzämtern ohne Nachweis anerkannt (Verwaltungspraxis, kein Gesetz). Nur in Jahren mit Arbeitslohn.",
+      "quelle": "Verwaltungspraxis der Finanzämter – keine amtliche Fundstelle gefunden",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "telefon": {
+      "titel": "Telefon und Internet",
+      "text": "Ohne Einzelnachweis werden 20 % der Rechnung, höchstens 20 € im Monat als beruflich anerkannt.",
+      "quelle": "R 9.1 Abs. 5 LStR (Verwaltungsanweisung) – nicht für dieses Jahr geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "minijob": {
+      "titel": "Minijob (pauschal versteuert)",
+      "text": "Lohn aus einem pauschal versteuerten Minijob bleibt in der Einkommensteuererklärung außen vor. Dafür gibt es auch keine Werbungskosten – Fahrten zum Minijob zählen nicht.",
+      "quelle": "§ 40a Abs. 2 und 5 i. V. m. § 40 Abs. 3 EStG; steuertipps.de: Minijob & Steuererklärung",
+      "link": "https://www.steuertipps.de/beruf-ausbildung/minijob-midijob-nebenjob/themen",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "verlust": {
+      "titel": "Verlustvortrag",
+      "text": "Ist der Gesamtbetrag der Einkünfte negativ (z. B. Fortbildungskosten ohne Lohn), stellt das Finanzamt den Verlust fest. Er mindert die Einkünfte der Folgejahre. Antrag auf Feststellung bis zu 7 Jahre rückwirkend.",
+      "quelle": "§ 10d Abs. 2 und 4 EStG; BFH, Urteil vom 13.01.2015, IX R 22/14",
+      "link": "https://wundertax.de/ratgeber-steuern/steuererklaerung-ohne-einkommen-verlustvortrag/",
+      "stand": "2026-11-25",
+      "geprueft": true
+    },
+    "fristen": {
+      "titel": "Abgabefristen",
+      "pflicht": "2028-07-31",
+      "beraten": "2029-02-28",
+      "freiwillig": "2031-12-31",
+      "verlust": "2034-12-31",
+      "text": "Wer abgeben muss: bis 31.07.2028 (mit Steuerberater 28.02.2029). Freiwillig: 4 Jahre, bis 31.12.2031. Nur Verlustfeststellung: bis 31.12.2034.",
+      "quelle": "§ 149 Abs. 2 AO, § 169 Abs. 2 AO – Termine für 2027 nach derselben Regel abgeleitet, nicht gesondert geprüft",
+      "link": "https://taxfix.de/steuererklaerung-2026-frist/",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "tarif": {
+      "titel": "Einkommensteuertarif 2027",
+      "grundfreibetrag": 12348,
+      "zonen": [
+        {
+          "bis": 12348,
+          "typ": "null"
+        },
+        {
+          "bis": 17799,
+          "typ": "y",
+          "a": 914.51,
+          "b": 1400,
+          "ab": 12348
+        },
+        {
+          "bis": 69878,
+          "typ": "z",
+          "a": 173.1,
+          "b": 2397,
+          "c": 1034.87,
+          "ab": 17799
+        },
+        {
+          "bis": 277825,
+          "typ": "lin",
+          "a": 0.42,
+          "c": 11135.63
+        },
+        {
+          "bis": null,
+          "typ": "lin",
+          "a": 0.45,
+          "c": 19470.38
+        }
+      ],
+      "text": "Für 2027 ist noch kein Tarif geprüft (ein Regierungsentwurf mit anderen Werten ist noch nicht Gesetz). Die App rechnet vorläufig mit dem Tarif 2026 – die Schätzung ist deshalb ungeprüft.",
+      "quelle": "Vorläufig § 32a EStG Stand 2026; Entwurf 2027 noch nicht in Kraft (deutschland-rechner.de: Steuerreform 2027)",
+      "link": "https://www.gesetze-im-internet.de/estg/__32a.html",
+      "link2": "https://www.finanzamt.nrw.de/steuerinfos/weitere-themen/steuererklaerung/einkommensteuertarif",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "soli": {
+      "titel": "Solidaritätszuschlag",
+      "freigrenze": 20350,
+      "satz": 5.5,
+      "milderung": 11.9,
+      "text": "Soli fällt erst an, wenn die Einkommensteuer über der Freigrenze liegt – bei deinem Einkommen praktisch nie.",
+      "quelle": "§ 3 und § 4 SolZG 1995 – Freigrenze 2026 nicht geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "kirchensteuer": {
+      "titel": "Kirchensteuer",
+      "satz": 9,
+      "text": "9 % der Einkommensteuer, nur wenn auf der Lohnsteuerbescheinigung Kirchensteuer steht.",
+      "quelle": "Kirchensteuerrahmengesetz Niedersachsen – nicht geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "sonderausgaben": {
+      "titel": "Sonderausgaben und Vorsorge",
+      "pauschbetrag": 36,
+      "hoechst_sonstige": 1900,
+      "text": "Rentenversicherung (Arbeitnehmeranteil) voll, Kranken- und Pflegeversicherung (Basis, ohne 4 % Krankengeld-Anteil) voll; Arbeitslosenversicherung nur bis 1.900 € zusammen mit KV/PV. Ohne Angaben schätzt die App 21,75 % des Bruttolohns. Sonderausgaben-Pauschbetrag 36 €.",
+      "quelle": "§ 10 Abs. 1 Nr. 2 und 3, Abs. 3 und 4, § 10c EStG – Werte nicht für 2026 geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "gewaehrleistung": {
+      "titel": "Gewährleistung und Rückgabe",
+      "text": "Gewährleistung beim Kauf vom Händler 2 Jahre ab Übergabe. Online-Kauf: 14 Tage Widerrufsrecht ab Erhalt der Ware. Im Laden gibt es kein gesetzliches Rückgaberecht – nur freiwillig nach Händlerregeln.",
+      "quelle": "§ 438 Abs. 1 Nr. 3 BGB, § 355 Abs. 2 und § 356 Abs. 2 BGB – nicht gesondert geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    },
+    "kuendigung": {
+      "titel": "Kündigung nach Mindestlaufzeit",
+      "text": "Verträge mit Verbrauchern, die seit 01.03.2022 geschlossen wurden, verlängern sich nach der Mindestlaufzeit nur noch auf unbestimmte Zeit und sind dann mit höchstens 1 Monat Frist kündbar.",
+      "quelle": "§ 309 Nr. 9 BGB (Gesetz für faire Verbraucherverträge) – nicht gesondert geprüft",
+      "link": "",
+      "stand": "2026-11-25",
+      "geprueft": false
+    }
+  },
+  "feiertage": {
+    "quelle": "Niedersächsisches Gesetz über die Feiertage (NFeiertagsG) § 2; Daten berechnet und gegen Osterformel getestet",
+    "geprueft": true,
+    "tage": [
+      [
+        "2027-01-01",
+        "Neujahr"
+      ],
+      [
+        "2027-03-26",
+        "Karfreitag"
+      ],
+      [
+        "2027-03-29",
+        "Ostermontag"
+      ],
+      [
+        "2027-05-01",
+        "Tag der Arbeit"
+      ],
+      [
+        "2027-05-06",
+        "Christi Himmelfahrt"
+      ],
+      [
+        "2027-05-17",
+        "Pfingstmontag"
+      ],
+      [
+        "2027-10-03",
+        "Tag der Deutschen Einheit"
+      ],
+      [
+        "2027-10-31",
+        "Reformationstag"
+      ],
+      [
+        "2027-12-25",
+        "1. Weihnachtstag"
+      ],
+      [
+        "2027-12-26",
+        "2. Weihnachtstag"
+      ]
+    ]
+  },
+  "ferien": {
+    "quelle": "Niedersächsisches Kultusministerium, Ferienordnung Schuljahr 2026/27; Termine ab Sommer 2027 nur aus Ferienkalendern (ungeprüft)",
+    "link": "https://www.mk.niedersachsen.de/download/190060",
+    "stand": "2026-11-25",
+    "geprueft": true,
+    "zeiten": [
+      [
+        "2026-12-23",
+        "2027-01-09",
+        "Weihnachtsferien"
+      ],
+      [
+        "2027-02-01",
+        "2027-02-02",
+        "Halbjahresferien"
+      ],
+      [
+        "2027-03-22",
+        "2027-04-03",
+        "Osterferien"
+      ],
+      [
+        "2027-05-07",
+        "2027-05-07",
+        "Tag nach Himmelfahrt"
+      ],
+      [
+        "2027-05-18",
+        "2027-05-18",
+        "Pfingstdienstag"
+      ],
+      [
+        "2027-07-08",
+        "2027-08-18",
+        "Sommerferien",
+        false
+      ],
+      [
+        "2027-10-16",
+        "2027-10-30",
+        "Herbstferien",
+        false
+      ]
+    ],
+    "hinweis": "Weihnachtsferien 2027/28 sind noch nicht festgelegt – bei Bedarf im Kalender als frei markieren."
+  }
+}
