@@ -3,7 +3,7 @@
 Trainings-PWA (Vanilla JS). Quellen im Repo-Root: `index.html`, `app.js`, `engine.js`,
 `exercises.js`, `howto.js`, `figures.js`. `node pwa/build.js` baut nach `pwa/dist`, danach
 `pwa/dist/*` nach `docs/` kopieren (GitHub Pages läuft aus `main:/docs`).
-Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/` und `docs/formwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
+Achtung: `docs/toleranzen/`, `docs/stunden/`, `docs/kochwerk/`, `docs/formwerk/` und `docs/geldwerk/` gehören zu anderen Apps – nie löschen oder überschreiben
 (also kein `rm -rf docs/*`). Bei jedem Release `CACHE` in `pwa/sw.js` hochzählen.
 
 ## Arbeitsregeln (Satzwerk)
@@ -236,6 +236,7 @@ Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`
 
 ## Weitere Apps im Repo (eigene CLAUDE.md in ihrem Ordner, lädt nur dort)
 - `kochwerk/` – Abnehm-App Kochwerk: Regeln in `kochwerk/CLAUDE.md`. Satzwerk dafür nie anfassen, Speicher nur mit Präfix `kochwerk_`.
+- `geldwerk/` – Steuer-Sammler, Verträge, Belege: Regeln in `geldwerk/CLAUDE.md`. Satzwerk dafür nie anfassen, Speicher nur `geldwerk_` / IndexedDB `geldwerk`.
 - `formwerk/` und `formwerk-worker/` – Whoop-Alternative Formwerk: Regeln in `formwerk/CLAUDE.md`, offene Schritte in `formwerk/OFFEN.md` (zuerst lesen, Nutzer erinnern).
 
 ## Sparregeln (gelten immer)
