@@ -8,7 +8,7 @@ const GROUP_KEYS = new Set(GROUPS.map(g => g.k)), PAIN_KEYS = new Set(PAIN_AREAS
 import { PAGE } from './page.js';
 import { vapidKeys, sendPush, b64u } from './push.js';
 
-export const WORKER_VERSION = '2.11.0';
+export const WORKER_VERSION = '2.12.0';
 // Wird diese Zahl erhöht, lädt der Worker die Garmin-Daten einmal komplett neu (z. B. nach Änderungen in normalize.js)
 const NORM_VERSION = 3; // 2: Tageswerte v2 verschachtelt; 3: Schlaf mit SpO2 (Stresszeichen)
 const HISTORY_DAYS = 120;          // 90 Tage Verlauf + 30 Tage Basis
@@ -67,7 +67,7 @@ export default {
     if (url.pathname === '/' || url.pathname === '/index.html') return new Response(PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' } });
     if (!url.pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, ch);
     if (!env.APP_PASSWORD) return json({ error: 'setup', message: 'Secret APP_PASSWORD fehlt im Worker.' }, 503, ch);
-    if (url.pathname !== '/v1/live/state' && !(await authorized(req, env))) { await new Promise(r => setTimeout(r, 800)); return json({ error: 'auth', message: 'Passwort falsch.' }, 401, ch); }
+    if (url.pathname !== '/v1/live/state' && url.pathname !== '/v1/gw/state' && !(await authorized(req, env))) { await new Promise(r => setTimeout(r, 800)); return json({ error: 'auth', message: 'Passwort falsch.' }, 401, ch); }
     try {
       const res = await store(env).fetch(new Request('https://store' + url.pathname + url.search, { method: req.method, headers: { 'Content-Type': 'application/json' }, body: req.method === 'GET' ? undefined : await req.text() }));
       const out = new Response(res.body, res);
@@ -83,6 +83,8 @@ export default {
       const h = +new Intl.DateTimeFormat('en-GB', { timeZone: env.TZ || 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(new Date(event.scheduledTime || Date.now()));
       if (h !== 8) return;
     }
+    // Geldwerk-Erinnerungen (2.12): einmal am Tag um 8 Uhr, unabhängig vom Garmin-Abruf
+    if (event.cron === '0 6,7 * * *') ctx.waitUntil(store(env).fetch('https://store/internal/gw', { method: 'POST' }).catch(() => {}));
     ctx.waitUntil(store(env).fetch('https://store/internal/refresh', { method: 'POST' }).catch(() => {}));
   }
 };
@@ -95,6 +97,8 @@ export class FormwerkStore {
     const url = new URL(req.url); const p = url.pathname;
     try {
       if (p === '/internal/refresh') { await this.refresh('cron'); return json({ ok: true }); }
+      if (p === '/internal/gw') return json(await this.gwDaily());
+      if (p.startsWith('/v1/gw/')) return await this.gw(p, req, url);
       if (p === '/v1/ping') return json({ ok: true, worker: WORKER_VERSION, model: MODEL_VERSION, garminKey: !!this.env.GARMIN_API_KEY, meta: await this.meta() });
       if (p === '/v1/raw') return json(await this.raw(Math.min(14, Math.max(1, +url.searchParams.get('days') || 7))));
       if (p === '/v1/summary') return json(await this.summary(url.searchParams.get('force') === '1', 'full'));
@@ -295,6 +299,52 @@ export class FormwerkStore {
     const live = await this.st.get('live'); if (!live || !live.restEnd) return;
     await this.st.put('live', { title: live.endTitle || 'Pause vorbei', body: live.endBody || '', t: Date.now() });
     await this.pushNow();
+  }
+
+  /* ----- Geldwerk-Erinnerungen (2.12): eigenes Push-Abo der Geldwerk-App, gespeichert werden NUR Datum + kurzer Titel.
+     Keine Beträge, keine Belege. Der Push kommt ohne Text, der Service Worker holt ihn mit Token von /v1/gw/state. ----- */
+  async gw(p, req, url) {
+    const cut = (x, n) => String(x == null ? '' : x).replace(/[\u0000-\u001f]/g, ' ').slice(0, n);
+    if (p === '/v1/gw/state') {
+      const token = await this.st.get('gw:token'); const t = url.searchParams.get('t');
+      if (!token || !t || t !== token) return json({ error: 'auth' }, 401);
+      return json((await this.st.get('gw:msg')) || { title: 'Geldwerk', body: '' });
+    }
+    if (p === '/v1/gw/subscribe' && req.method === 'POST') {
+      const b = await req.json(); const s = b && b.sub;
+      if (!s || typeof s.endpoint !== 'string' || !/^https:\/\//.test(s.endpoint) || s.endpoint.length > 600) return json({ ok: false, error: 'Abo ungültig' });
+      await this.st.put('gw:sub', { endpoint: s.endpoint, t: Date.now() });
+      let token = await this.st.get('gw:token');
+      if (!token) { token = b64u(crypto.getRandomValues(new Uint8Array(24))); await this.st.put('gw:token', token); }
+      return json({ ok: true, token, key: (await vapidKeys(this.st)).pub });
+    }
+    if (p === '/v1/gw/reminders' && (req.method === 'PUT' || req.method === 'POST')) {
+      const b = await req.json(); const items = Array.isArray(b && b.items) ? b.items : [];
+      const clean = items.filter(x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && x.t).slice(0, 200).map(x => ({ d: x.d, t: cut(x.t, 90) }));
+      await this.st.put('gw:rem', clean);
+      return json({ ok: true, n: clean.length });
+    }
+    if (p === '/v1/gw/reminders') return json({ items: (await this.st.get('gw:rem')) || [], sub: !!(await this.st.get('gw:sub')) });
+    if (p === '/v1/gw/test' && req.method === 'POST') { await this.st.put('gw:msg', { title: 'Geldwerk', body: 'Mitteilungen funktionieren. Fristen kommen ab jetzt um 8 Uhr.' }); return json(await this.gwPush()); }
+    if (p === '/v1/gw/off' && req.method === 'POST') { await this.st.delete(['gw:sub', 'gw:rem', 'gw:msg']); return json({ ok: true }); }
+    return json({ error: 'not_found' }, 404);
+  }
+  async gwPush() {
+    const sub = await this.st.get('gw:sub'); if (!sub) return { ok: false, error: 'kein Abo' };
+    try { const r = await sendPush(this.st, sub, 'https://formwerk.workers.dev'); if (r.gone) await this.st.delete('gw:sub'); return { ok: r.ok, status: r.status, gone: r.gone }; }
+    catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+  // Täglich 8 Uhr: fällige Erinnerungen von heute (und verpasste der letzten 3 Tage) als eine Mitteilung
+  async gwDaily() {
+    const today = this.today(); const rem = (await this.st.get('gw:rem')) || [];
+    if (!rem.length || (await this.st.get('gw:sent')) === today) return { ok: true, sent: 0 };
+    const due = rem.filter(x => x.d <= today && x.d >= addDays(today, -3));
+    await this.st.put('gw:rem', rem.filter(x => x.d > today));
+    if (!due.length || !(await this.st.get('gw:sub'))) return { ok: true, sent: 0 };
+    await this.st.put('gw:msg', { title: due.length === 1 ? 'Geldwerk' : 'Geldwerk: ' + due.length + ' Erinnerungen', body: due.map(x => x.t).join('\n').slice(0, 400) });
+    await this.st.put('gw:sent', today);
+    const r = await this.gwPush();
+    return { ok: !!r.ok, sent: due.length };
   }
 
   /* ----- Tageszustand für Satzwerk (Erholung, Ampel, Muskelkater, Schmerz, gestern Baseball) ----- */

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Geldwerk</title>
+<meta name="description" content="Belege, Fahrten, Verträge und Fristen sammeln – am Jahresende die fertige Steuermappe.">
+<meta name="theme-color" content="#090B0F">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Geldwerk">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="view" class="view" aria-live="polite"></main>
+<nav class="tabbar" id="tabbar" aria-label="Bereiche">
+  <button type="button" data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg><span>Übersicht</span></button>
+  <button type="button" data-tab="belege"><svg viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/></svg><span>Belege</span></button>
+  <button type="button" class="plus" data-a="plus" aria-label="Neu: Beleg, Vertrag oder Block"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" data-tab="vertraege"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12.5h6M9.5 16h4"/></svg><span>Verträge</span></button>
+  <button type="button" data-tab="steuer"><svg viewBox="0 0 24 24"><path d="M5 20V10M10 20V5M15 20v-7M20 20V8"/></svg><span>Steuer</span></button>
+</nav>
+<div id="page" class="page" hidden></div>
+<div id="page2" class="page" hidden></div>
+<div id="sheet" class="sheet-wrap" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+<input type="file" id="f-cam" accept="image/*" capture="environment" hidden>
+<input type="file" id="f-file" accept="image/*,application/pdf,.pdf" hidden>
+<input type="file" id="f-backup" accept="application/json,.json" hidden>
+<script src="core.js"></script>
+<script src="parse.js"></script>
+<script src="mappe.js"></script>
+<script src="sync.js"></script>
+<script src="store.js"></script>
+<script src="ocr.js"></script>
+<script src="push.js"></script>
+<script src="app.js"></script>
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {}));</script>
+</body>
+</html>
