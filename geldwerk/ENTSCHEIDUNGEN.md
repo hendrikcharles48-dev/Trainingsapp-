@@ -51,3 +51,13 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
 22. **Aus vergleichbaren Apps übernommen** (WISO, Taxfix, Finanzguru): Erstattung live mit Spanne, Checkliste „Bereit für
     die Erklärung“, Fixkosten nach Art, Preiserhöhungen, Suche über Belege und Verträge, Warnung bei doppeltem Beleg,
     mehrseitige Belege, Belegliste als CSV. Bewusst nicht: Bankanbindung, E-Mail-Import (bräuchte einen Server).
+
+## Version 1.2 (26.11.2026, heller und einladender)
+23. **Hell als Grundstil, dunkel automatisch:** folgt der iPhone-Einstellung; Einstellungen → Darstellung: Automatisch / Hell /
+    Dunkel (nur auf dem Gerät, `geldwerk_theme`). Alle Farben als Variablen in `style.css`, Diagramme über CSS-Klassen
+    (Safari kennt keine Variablen in SVG-Attributen).
+24. **Farbwelt aus den Vorlagen:** Indigo statt Eisblau, weiße Karten mit weichem Schatten, Bankkarte in kräftigem Indigo mit
+    orangem Schmuck-Fleck (Orange nur als Schmuck und Hinweis-Pille), runde Systemschrift (SF Rounded) für Titel und Zahlen.
+    Kontraste geprüft: Indigo 5,8:1 auf Weiß, Grau-Text 4,9:1, Grün 4,6:1; dunkel Indigo 5,7:1.
+25. **Statusleiste „default“** statt durchsichtig: sonst wäre die Uhrzeit im hellen Modus weiß auf hell. Gilt ab dem nächsten
+    Hinzufügen zum Home-Bildschirm.
