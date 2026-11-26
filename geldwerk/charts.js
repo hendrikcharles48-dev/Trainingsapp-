@@ -74,7 +74,7 @@
       const w = Math.max(r.v ? 1.5 : 0, Math.abs(r.v) / max * 100);
       h += '<div class="hb"' + (r.a ? ' data-a="' + r.a + '"' + (r.d ? ' data-d="' + esc(r.d) + '"' : '') + ' role="button" tabindex="0"' : '') + '><div class="hb-top"><span class="ell' + (r.c ? ' k-' + r.c : '') + '">' + (r.icon || '') + esc(r.l) + (r.tag ? ' <span class="tag grey">' + esc(r.tag) + '</span>' : '') + '</span><b>' + esc(r.txt != null ? r.txt : G.eur(Math.round(r.v))) + '</b></div><div class="hb-track"><i' + (r.c ? ' class="k-' + r.c + '"' : '') + ' style="width:' + w.toFixed(1) + '%' + (r.v < 0 ? ';background:var(--muted)' : '') + '"></i></div></div>';
     }
-    if (o.mark) h += '<div class="hb-mark" style="--m:' + (o.mark.v / max * 100).toFixed(1) + '%"><span>' + esc(o.mark.l) + '</span></div>';
+    if (o.mark) { const mp = o.mark.v / max * 100; h += '<div class="hb-mark' + (mp > 62 ? ' end' : mp < 18 ? ' start' : '') + '" style="--m:' + mp.toFixed(1) + '%"><span>' + esc(o.mark.l) + '</span></div>'; }
     return h + '</div>';
   }
   // Fortschrittsring (z. B. Checkliste 3 von 5)
