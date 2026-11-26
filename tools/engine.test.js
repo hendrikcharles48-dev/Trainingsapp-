@@ -131,5 +131,10 @@ t('Tempo: zu wenig Verlauf = normal', () => {
   assert.equal(E.progProfile(D.byId['bench'], HS('bench', [[60, 8, 10], [60, 9, 3]]), [6, 10], 80).speed, 'normal');
 });
 
+t('Dropsatz/Myo-Reps zählt im Wochenvolumen 1,5 Sätze (3.28)', () => {
+  const w = [{ date: '2026-11-24', exercises: [{ exId: 'cable-lateral', sets: [{ w: 5, reps: 12 }, { w: 5, reps: 12 }], tech: 'drop' }, { exId: 'cable-lateral', sets: [{ w: 5, reps: 12 }] }] }];
+  const v = E.weeklyMuscleSets(w, '2026-11-23'); assert.equal(v.sdelt, 3.5);
+});
+
 console.log(`\n${n - fails}/${n} Tests bestanden`);
 if (fails) process.exit(1);

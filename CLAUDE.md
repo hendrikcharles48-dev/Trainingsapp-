@@ -199,6 +199,10 @@ aus allen Plänen nehmen (anderer Ort springt ein, sonst Platz weg), aus Favorit
   diese Woche + heute + offene Plan-Tage gegen `volTargets`; ≥ 2 darunter → +1 Satz, ≥ 3 darüber → −1, höchstens 4, antippen = übernehmen, im Modus „auto“ vorgewählt)
   → eigene Satz-Änderungen (−/+ je Übung, `s.dm`) → Zeit kürzer/länger. Dauer = `trainTime` (Satzzeit `setWorkSec` + Pausen + Aufwärmen), gleiche Rechnung in `estMinutes`
   (Heute-Kachel, Einheit-Seite). Änderungen gelten nur für heute; `tfGo` übergibt den gerechneten Tag an `startWorkout`.
+- Dropsatz/Myo-Reps (3.28, Nutzerwunsch 24.11.: Volumen reinholen, Kraft bleibt Priorität): `setSuggestions` schlägt höchstens 2 vor – nur Isolation/Rumpf,
+  Muskel ≥ 3 Sätze unter Ziel (nach +1-Vorschlägen), Erholung nicht gelb/rot/krank, kein Muskelkater an der Gruppe, kein Schmerz passend zu `inj`, keine leichtere Woche.
+  Last-Übung = Dropsatz, sonst Myo-Reps. Antippen → `slot.tech` → `entry.tech` + Zeile `TECH_TXT` über der Übung; gespeichert `workout.exercises[].tech` (Zusatzfeld);
+  `E.weeklyMuscleSets` zählt so eine Übung +0,5 Satz. Grundübungen nie.
 - Steigerungstempo je Übung (3.27, Nutzerwunsch 24.11.): `E.progProfile(ex, hist, rr, bw)` → `speed` fast/normal/slow (Rate %/Woche der besten Satzleistung,
   geklappte/gescheiterte Gewichtssteigerungen, Einheiten bis wieder oben; < 3 Einheiten = normal). In `recommendCore` (Doppelprogression): schnell = doppelte Stufe
   (max. +10 %) bzw. +2 Wdh., langsam = erst nach 2× Obergrenze steigern. Anzeige in der Übungsinfo („Dein Tempo“), Stand je Übung in `profile.prog[exId]` (nach jedem Training).
