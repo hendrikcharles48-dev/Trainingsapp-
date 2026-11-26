@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const G = window.GW, S = G.Store, LS = S.LS, Y = G.Y;
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const RULE_YEARS = [2026, 2027];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -192,7 +192,7 @@
     return h;
   }
   function homeCap(wm, i) { const p = wm[i]; return p ? '<b>' + G.MONTHS[i] + ':</b> +' + eur(Math.round(p.add)) + ' · zusammen ' + eur(Math.round(p.v)) : ''; }
-  const blob = () => '<svg class="blob" viewBox="0 0 200 160" aria-hidden="true"><path d="M60 0h140v118c-18 22-52 30-78 14-24-15-22-46-46-58C52 62 30 70 18 52 6 34 26 6 60 0z" fill="var(--navy2)"/><path d="M96 158C120 118 150 128 166 92 178 64 190 52 200 50" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity=".45"/></svg>';
+  const blob = () => '<svg class="blob" viewBox="0 0 200 160" aria-hidden="true"><path class="bl-fill" d="M96 0h104v104c-14 16-40 20-58 8-18-12-16-36-34-46-16-9-34-4-40-22C62 26 74 6 96 0z"/><path class="bl-line" d="M70 158C96 120 128 132 146 96 160 68 182 56 200 56"/></svg>';
   function heroTop(res, yr) {
     if (!res) return '<span class="lbl">Steuer</span>';
     if (res.noIncome && res.loss > 0) return '<span class="lbl">Verlustvortrag ' + yr + '</span><span class="big">' + eur(Math.round(res.carryOut)) + '</span><span class="sub">gesichert, sobald du die Erklärung abgibst</span>';
@@ -731,6 +731,8 @@
     h += '<label class="field"><span>Urlaubstage ' + y0 + '</span><input class="inp" type="text" inputmode="numeric" value="' + ((s.vacation || {})[y0] || 0) + '" data-ch="vacCh" data-y="' + y0 + '"></label>';
     h += '<div class="flabel" style="margin-top:16px">SCHULE (' + esc(s.school.place) + ')</div><div class="two"><input class="inp" type="date" aria-label="Schule von" value="' + s.school.from + '" data-ch="setRange" data-k="school" data-f="from"><input class="inp" type="date" aria-label="Schule bis" value="' + s.school.to + '" data-ch="setRange" data-k="school" data-f="to"></div><div style="margin-top:8px">' + dayChips('school', s.school.days) + '</div>';
     h += '<div class="flabel" style="margin-top:16px">MINIJOB (ZÄHLT NICHT)</div>' + dayChips('jobDays', s.jobDays) + '</div>';
+    const th = LS.get('theme', 'auto');
+    h += '<div class="sec-h"><h2>Darstellung</h2></div><div class="card"><div class="seg">' + [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([k, l]) => '<button type="button" class="' + (th === k ? 'on' : '') + '" data-a="theme" data-t="' + k + '">' + l + '</button>').join('') + '</div><p class="hint">Automatisch folgt dem iPhone (hell am Tag, dunkel wenn das iPhone dunkel ist).</p></div>';
     h += '<div class="sec-h"><h2>Profil</h2></div><div class="card"><label class="field" style="margin-top:0"><span>Dein Name (Begrüßung, Kündigungen)</span><input class="inp" type="text" autocomplete="name" value="' + esc(s.name || '') + '" placeholder="Vor- und Nachname" data-ch="myName"></label></div>';
     h += '<div class="sec-h"><h2>Steuer</h2></div><div class="card"><button type="button" class="toggle' + (s.kontofuehrung !== false ? ' on' : '') + '" data-a="toggleKonto"><span class="main"><b>Kontoführungspauschale 16 €</b><div class="muted" style="font-size:13.5px">Verwaltungspraxis, ungeprüft – nur in Jahren mit Lohn</div></span><span class="sw"></span></button></div>';
     // Sicherung
@@ -1049,6 +1051,7 @@
     else if (c === 'belege') { const k = spendByMonth(st.spanN || 6)[i].k; st.month = st.month === k ? null : k; render(); }
     else if (c === 'cal') { const p = st.stack[st.stack.length - 1]; p.month = i; renderPage(); }
   };
+  A.theme = el => { const t = el.dataset.t; LS.set('theme', t); applyTheme(); renderPage(); };
   A.spanN = el => { st.spanN = +el.dataset.n; st.month = null; render(); };
   A.monthClear = () => { st.month = null; render(); };
   A.catFold = () => { st.catOpen = !st.catOpen; render(); };
@@ -1249,6 +1252,12 @@
 
   /* ================= Start ================= */
   // Kein Zoomen: Doppeltipp und Zwei-Finger-Zoom abfangen (zusätzlich zu viewport und touch-action)
+  function applyTheme() {
+    const t = LS.get('theme', 'auto'), r = document.documentElement;
+    if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
+    const dark = t === 'dark' || (t !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.querySelectorAll('meta[name=theme-color]').forEach(m => { m.setAttribute('content', dark ? '#0E1020' : '#F3F4FA'); if (t !== 'auto') m.removeAttribute('media'); });
+  }
   function noZoom() {
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
     document.addEventListener('touchmove', e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
@@ -1267,7 +1276,7 @@
     document.addEventListener('touchend', () => { lastKey = null; }, { passive: true });
   }
   function bind() {
-    noZoom(); scrub();
+    noZoom(); scrub(); applyTheme();
     document.addEventListener('click', e => {
       const t = e.target.closest('[data-tab]');
       if (t && t.closest('.tabbar')) { A.tab(t); return; }

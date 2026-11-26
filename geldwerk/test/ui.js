@@ -204,6 +204,12 @@ const tap = async (page, sel) => { await page.locator(sel).first().click(); awai
   const nFiles = await page.evaluate(async () => (await window.GW.Store.fileKeys()).length);
   ok(nFiles >= 3, 'Fotos/PDF zurückgeholt: ' + nFiles);
   await tap(page, '.tabbar [data-tab=belege]'); await shot(page, '33-belege-wiederhergestellt');
+  // Dunkler Modus: dieselben Bildschirme
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await tap(page, '.tabbar [data-tab=home]'); await shot(page, '40-dunkel-uebersicht');
+  await tap(page, '.tabbar [data-tab=steuer]'); await shot(page, '41-dunkel-steuer');
+  await tap(page, '.tabbar [data-tab=belege]'); await shot(page, '42-dunkel-belege');
+  await page.emulateMedia({ colorScheme: 'light' });
   // Offline-Start (Service Worker)
   await page.waitForTimeout(1500);
   await ctx.setOffline(true); await page.reload(); await page.waitForSelector('.tabbar', { timeout: 10000 });

@@ -12,6 +12,8 @@ Bauplan `PLAN.md`, eigene Entscheidungen `ENTSCHEIDUNGEN.md`, Blockformat `BLOCK
   Neues Steuerjahr: Datei anlegen, Feiertage (Test prüft gegen Osterformel) und Ferien eintragen, `RULE_YEARS` in `app.js`
   und `CORE` in `sw.js` ergänzen.
 - Bei jedem Release `CACHE` in `sw.js` hochzählen und `VERSION` in `app.js`.
+- Design (1.2): hell + dunkel über Variablen in `style.css` (`:root`, Dunkel-Block zweimal: Media-Query und `[data-theme=dark]`).
+  Keine festen Farben in HTML/SVG – Diagramme nur über Klassen `ch-…`, `ring-…`, `bl-…`.
 - Tests: `node geldwerk/test/run.js` (Logik) und mit Server im Repo-Root (`python3 -m http.server 8123`)
   `node geldwerk/test/ui.js <ordner>` (Durchlauf als neuer Nutzer im iPhone-Format, nachgebautes GitHub).
   Worker: `cd formwerk-worker && node test/model.test.js`.

@@ -1,18 +1,17 @@
 /* Geldwerk – kleine Diagramme als SVG/HTML ohne Bibliothek.
    Eine Farbe (Eisblau), Größe über Länge/Höhe, Auswahl per Tipp (data-a="chSel"), Wert als Pille über dem gewählten Punkt.
-   Kontraste auf --surface: Eisblau 8,3:1, gedämpfte Balken #557AA6 4,1:1, Raster/Achsen zurückhaltend. */
+   Farben nur über CSS-Klassen (ch-…, Safari nimmt keine CSS-Variablen in SVG-Attributen). Hell: Indigo 5,8:1, Balken 3,2:1; dunkel 5,7:1 / 3,5:1. */
 (function (root) {
   'use strict';
   const G = root.GW;
-  const ACC = 'var(--accent)', MUTE = '#557AA6', GRID = 'var(--line)', TXT = 'var(--muted)', INK = 'var(--ink)';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const short = v => { const a = Math.abs(v); return (v < 0 ? '−' : '') + (a >= 10000 ? Math.round(a / 1000) + ' Tsd. €' : G.eur(Math.round(a))); };
   // Pille mit Wert über einem Punkt (bleibt im Bild)
   function pill(x, y, text, W) {
     const w = Math.max(44, text.length * 6.6 + 18), h = 24;
     const px = Math.min(W - w - 2, Math.max(2, x - w / 2));
-    return '<g><rect x="' + px.toFixed(1) + '" y="' + (y - h - 8).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h + '" rx="12" fill="var(--navy2)" stroke="var(--accent)" stroke-width="1"/>' +
-      '<text x="' + (px + w / 2).toFixed(1) + '" y="' + (y - 8 - 7.5).toFixed(1) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="' + INK + '">' + esc(text) + '</text></g>';
+    return '<g><rect class="ch-pill" x="' + px.toFixed(1) + '" y="' + (y - h - 8).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h + '" rx="12"/>' +
+      '<text class="ch-pill-t" x="' + (px + w / 2).toFixed(1) + '" y="' + (y - 8 - 7.5).toFixed(1) + '" text-anchor="middle" font-size="12.5">' + esc(text) + '</text></g>';
   }
   // Monoton steigende Kurve (Fritsch-Carlson) – schießt nicht über die Punkte hinaus
   function smooth(P) {
@@ -35,19 +34,19 @@
     const P = pts.slice(0, last + 1).map((p, i) => [X(i), Yv(p.v)]);
     const sel = Math.min(o.sel != null ? o.sel : last, last);
     let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label || '') + '">';
-    s += '<line x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="' + GRID + '" stroke-width="1"/>';
-    if (o.ref) { const y = Yv(o.ref.v); s += '<line x1="0" x2="' + W + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="' + TXT + '" stroke-width="1" stroke-dasharray="3 4"/><text x="' + (W - 2) + '" y="' + (y - 5).toFixed(1) + '" text-anchor="end" font-size="10.5" fill="' + TXT + '">' + esc(o.ref.l) + '</text>'; }
+    s += '<line class="ch-grid" x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>';
+    if (o.ref) { const y = Yv(o.ref.v); s += '<line class="ch-ref" x1="0" x2="' + W + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/><text class="ch-txt" x="' + (W - 2) + '" y="' + (y - 5).toFixed(1) + '" text-anchor="end" font-size="10.5">' + esc(o.ref.l) + '</text>'; }
     if (P.length > 1) {
       const path = smooth(P);
-      s += '<path d="' + path + 'L' + P[P.length - 1][0].toFixed(1) + ',' + (H - B) + 'L' + P[0][0].toFixed(1) + ',' + (H - B) + 'Z" fill="' + ACC + '" fill-opacity=".12"/>';
-      s += '<path d="' + path + '" fill="none" stroke="' + ACC + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+      s += '<path d="' + path + 'L' + P[P.length - 1][0].toFixed(1) + ',' + (H - B) + 'L' + P[0][0].toFixed(1) + ',' + (H - B) + 'Z" class="ch-area"/>';
+      s += '<path class="ch-line" d="' + path + '"/>';
     }
     const sx = X(sel), sy = Yv(pts[sel].v);
-    s += '<line x1="' + sx.toFixed(1) + '" x2="' + sx.toFixed(1) + '" y1="' + sy.toFixed(1) + '" y2="' + (H - B) + '" stroke="' + TXT + '" stroke-width="1"/>';
-    s += '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="5" fill="' + ACC + '" stroke="var(--chart-bg, var(--surface))" stroke-width="2"/>';
+    s += '<line x1="' + sx.toFixed(1) + '" x2="' + sx.toFixed(1) + '" y1="' + sy.toFixed(1) + '" y2="' + (H - B) + '" class="ch-cross"/>';
+    s += '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="5.5" class="ch-dot"/>';
     s += pill(sx, sy, short(pts[sel].v), W);
-    pts.forEach((p, i) => { if (n > 7 && i % 2 && i !== sel) return; if (n > 7 && i !== sel && Math.abs(i - sel) === 1) return; s += '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '" font-size="10.5" font-weight="' + (i === sel ? 700 : 500) + '" fill="' + (i === sel ? INK : TXT) + '">' + esc(p.l) + '</text>'; });
-    for (let i = 0; i <= last; i++) { const x0 = i === 0 ? 0 : (X(i - 1) + X(i)) / 2, x1 = i === n - 1 ? W : (X(i) + X(i + 1)) / 2; s += '<rect data-a="chSel" data-c="' + o.id + '" data-i="' + i + '" x="' + x0.toFixed(1) + '" y="0" width="' + (x1 - x0).toFixed(1) + '" height="' + H + '" fill="transparent"/>'; }
+    pts.forEach((p, i) => { if (n > 7 && i % 2 && i !== sel) return; if (n > 7 && i !== sel && Math.abs(i - sel) === 1) return; s += '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="ch-txt' + (i === sel ? ' on' : '') + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '" font-size="10.5">' + esc(p.l) + '</text>'; });
+    for (let i = 0; i <= last; i++) { const x0 = i === 0 ? 0 : (X(i - 1) + X(i)) / 2, x1 = i === n - 1 ? W : (X(i) + X(i + 1)) / 2; s += '<rect data-a="chSel" data-c="' + o.id + '" data-i="' + i + '" x="' + x0.toFixed(1) + '" y="0" width="' + (x1 - x0).toFixed(1) + '" height="' + H + '" class="ch-hit"/>'; }
     return s + '</svg>';
   }
   // Säulen je Monat; gewählte Säule hell, die anderen gedämpft
@@ -57,12 +56,12 @@
     const max = Math.max(1, ...pts.map(p => p.v)) * 1.05;
     const slot = W / n, bw = Math.min(26, slot - 8);
     let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label || '') + '">';
-    s += '<line x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="' + GRID + '" stroke-width="1"/>';
+    s += '<line class="ch-grid" x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>';
     pts.forEach((p, i) => {
       const x = slot * i + (slot - bw) / 2, h = p.v > 0 ? Math.max(3, (H - T - B) * p.v / max) : 0, y = H - B - h, on = i === o.sel, r = Math.min(4, h / 2);
-      if (h) s += '<path d="M' + x.toFixed(1) + ',' + (H - B) + 'V' + (y + r).toFixed(1) + 'Q' + x.toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + r).toFixed(1) + ',' + y.toFixed(1) + 'H' + (x + bw - r).toFixed(1) + 'Q' + (x + bw).toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + bw).toFixed(1) + ',' + (y + r).toFixed(1) + 'V' + (H - B) + 'Z" fill="' + (on ? ACC : MUTE) + '"/>';
-      s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10.5" font-weight="' + (on ? 700 : 500) + '" fill="' + (on ? INK : TXT) + '">' + esc(p.l) + '</text>';
-      s += '<rect data-a="chSel" data-c="' + o.id + '" data-i="' + i + '" x="' + (slot * i).toFixed(1) + '" y="0" width="' + slot.toFixed(1) + '" height="' + H + '" fill="transparent"/>';
+      if (h) s += '<path d="M' + x.toFixed(1) + ',' + (H - B) + 'V' + (y + r).toFixed(1) + 'Q' + x.toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + r).toFixed(1) + ',' + y.toFixed(1) + 'H' + (x + bw - r).toFixed(1) + 'Q' + (x + bw).toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + bw).toFixed(1) + ',' + (y + r).toFixed(1) + 'V' + (H - B) + 'Z" class="ch-bar' + (on ? ' on' : '') + '"/>';
+      s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" class="ch-txt' + (on ? ' on' : '') + '" text-anchor="middle" font-size="10.5">' + esc(p.l) + '</text>';
+      s += '<rect data-a="chSel" data-c="' + o.id + '" data-i="' + i + '" x="' + (slot * i).toFixed(1) + '" y="0" width="' + slot.toFixed(1) + '" height="' + H + '" class="ch-hit"/>';
     });
     if (o.sel != null && pts[o.sel]) { const p = pts[o.sel], h = p.v > 0 ? Math.max(3, (H - T - B) * p.v / max) : 0; s += pill(slot * o.sel + slot / 2, H - B - h, short(p.v), W); }
     return s + '</svg>';
@@ -81,9 +80,9 @@
   // Fortschrittsring (z. B. Checkliste 3 von 5)
   function ring(done, total, size = 64) {
     const r = size / 2 - 5, c = 2 * Math.PI * r, f = total ? done / total : 0;
-    return '<svg class="ring" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="' + done + ' von ' + total + '"><circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke="var(--line)" stroke-width="6"/>' +
-      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke="' + (f >= 1 ? 'var(--green)' : ACC) + '" stroke-width="6" stroke-linecap="round" stroke-dasharray="' + (c * f).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 ' + size / 2 + ' ' + size / 2 + ')"/>' +
-      '<text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="' + (size / 4.2).toFixed(0) + '" font-weight="800" fill="' + INK + '">' + done + '/' + total + '</text></svg>';
+    return '<svg class="ring" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="' + done + ' von ' + total + '"><circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" class="ring-bg"/>' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" class="ring-fg' + (f >= 1 ? ' full' : '') + '" stroke-dasharray="' + (c * f).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 ' + size / 2 + ' ' + size / 2 + ')"/>' +
+      '<text class="ring-t" x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="' + (size / 4.2).toFixed(0) + '">' + done + '/' + total + '</text></svg>';
   }
   // Spanne der Schätzung als Band mit Punkt (unten/oben beschriftet)
   function range(low, mid, high, o = {}) {
