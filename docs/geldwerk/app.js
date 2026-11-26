@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const G = window.GW, S = G.Store, LS = S.LS, Y = G.Y;
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const RULE_YEARS = [2026, 2027];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -121,6 +121,11 @@
     fitness: '<path d="M6.5 8v8M17.5 8v8M4 10v4M20 10v4M6.5 12h11"/>',
     sonst: '<path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4"/>'
   };
+  // Farben mit Bedeutung (geprüft gegen Farbschwäche, alle Paare): c1 Indigo = Fortbildung/Arbeit, c2 Türkis = Arbeitsmittel/Schule,
+  // c3 Gelb = Fahrten/Reisen, cn Grau = Rest. Status: green erledigt/Geld zurück, warn (Orange) bald fällig/teurer, red abgelaufen.
+  const AREA_C = { fortbildung: 'c1', arbeitsmittel: 'c2', reise: 'c3', fahrten: 'c3', weitere: 'cn', tagespauschale: 'cn', spende: 'cn' };
+  const catC = k => { const c = G.CAT[k]; return c && c.area ? AREA_C[c.area] || 'cn' : 'cn'; };
+  const AREA_L = { fortbildung: 'Fortbildung', arbeitsmittel: 'Arbeitsmittel', reise: 'Fahrten & Reisen', weitere: 'Weiteres' };
   const cic = (k, cls) => '<span class="ci' + (cls ? ' ' + cls : '') + '"><svg viewBox="0 0 24 24">' + (CI[k] || CI.none) + '</svg></span>';
 
   // ---------- Daten für Diagramme ----------
@@ -156,7 +161,8 @@
   function inboxRow(i) {
     const k = i.kind === 'pruefen' ? ((st.db.receipts[i.id] || {}).cat || 'none') : i.kind === 'kuendigung' || i.kind === 'noetig' ? ((st.db.contracts[i.id] || {}).tpl || 'sonst') : i.kind === 'lohnsteuer' || i.kind === 'steuerfrist' ? 'fortbildung' : ((st.db.receipts[i.id] || {}).cat || 'none');
     const when = i.days != null && i.kind !== 'pruefen' ? ' · ' + daysWord(i.days) : '';
-    return '<button type="button" class="row" data-a="inboxOpen" data-key="' + esc(i.key) + '">' + cic(k, i.sev === 'red' ? 'red' : '') + '<span class="main"><span class="t ell">' + esc(i.t) + '</span><span class="s">' + esc(i.sub) + '<span class="' + (i.sev === 'red' ? 'red' : '') + '">' + esc(when) + '</span></span></span>' + I.chev + '</button>';
+    const urg = i.sev === 'red' ? 'red' : i.days != null && i.days <= (i.kind === 'kuendigung' ? 14 : 7) ? 'warn' : i.kind === 'pruefen' ? catC((st.db.receipts[i.id] || {}).cat) : '';
+    return '<button type="button" class="row" data-a="inboxOpen" data-key="' + esc(i.key) + '">' + cic(k, urg) + '<span class="main"><span class="t ell">' + esc(i.t) + '</span><span class="s">' + esc(i.sub) + '<span class="' + (urg === 'red' ? 'red' : urg === 'warn' ? 'warn-t' : '') + '">' + esc(when) + '</span></span></span>' + I.chev + '</button>';
   }
   const QA = [['cam', 'Foto', I.cam], ['pickFile', 'Datei', I.file], ['newContract', 'Vertrag', I.doc], ['openBlock', 'Block', I.block], ['openCal', 'Fahrten', I.car], ['mappe', 'Mappe', I.share]];
   function viewHome() {
@@ -176,7 +182,7 @@
     h += '</section>';
     // Schnellaktionen
     h += '<div class="qa">' + QA.map(([a, l, ic]) => '<button type="button" data-a="' + a + '"><span>' + ic + '</span>' + l + '</button>').join('') + '</div>';
-    h += '<div class="sec-h"><h2>Zu erledigen</h2>' + (st.inbox.length ? '<span class="count">' + st.inbox.length + '</span>' : '') + '</div>';
+    h += '<div class="sec-h"><h2>Zu erledigen</h2>' + (st.inbox.length ? '<span class="count' + (st.inbox.some(i => i.sev === 'red') ? ' red' : st.inbox.some(i => i.days != null && i.days <= 14) ? ' warn' : '') + '">' + st.inbox.length + '</span>' : '') + '</div>';
     if (!st.inbox.length) h += '<div class="card done"><div class="check">' + I.check + '</div><b>Alles erledigt</b><span class="muted">Neue Belege einfach mit dem Plus fotografieren.</span></div>';
     else h += '<div class="list">' + st.inbox.slice(0, 6).map(inboxRow).join('') + '</div>' + (st.inbox.length > 6 ? '<p class="hint">… und ' + (st.inbox.length - 6) + ' weitere</p>' : '');
     // zwei Kacheln wie „Ausgaben / Einnahmen“
@@ -240,7 +246,7 @@
     if (G.isUnsure(r)) badge = '<span class="tag warn">prüfen</span> ';
     else if (x.returnUntil && x.returnUntil >= t) badge = '<span class="tag">Rückgabe bis ' + G.fmtShort(x.returnUntil) + '</span> ';
     const img = (r.files || []).some(f => f.type === 'jpg');
-    return '<button type="button" class="row" data-a="openReceipt" data-id="' + r.id + '">' + cic(r.cat || 'none') + '<span class="main"><span class="t ell">' + esc(r.merchant || 'Beleg') + '</span><span class="s ell">' + badge + esc(catL(r.cat)) + (r.date ? ' · ' + G.fmtShort(r.date) : '') + (img ? '' : ' · ohne Foto') + '</span></span><span class="v">' + (r.amount != null ? '−' + eur(r.amount, 2) : '–') + '</span></button>';
+    return '<button type="button" class="row" data-a="openReceipt" data-id="' + r.id + '">' + cic(r.cat || 'none', catC(r.cat)) + '<span class="main"><span class="t ell">' + esc(r.merchant || 'Beleg') + '</span><span class="s ell">' + badge + esc(catL(r.cat)) + (r.date ? ' · ' + G.fmtShort(r.date) : '') + (img ? '' : ' · ohne Foto') + '</span></span><span class="v">' + (r.amount != null ? '−' + eur(r.amount, 2) : '–') + '</span></button>';
   }
   function contractMatches(c, q) { const s = ((c.name || '') + ' ' + (c.provider || '') + ' ' + (c.customerNo || '') + ' ' + (c.contractNo || '') + ' ' + (c.note || '')).toLowerCase(); return q.toLowerCase().split(/\s+/).every(w => s.includes(w)); }
   function receiptListHtml() {
@@ -271,8 +277,9 @@
     // steuerlich relevant je Kategorie
     if (n && !st.q) {
       const y = st.year, by = {};
-      for (const r of all) { const a = G.CAT[r.cat] && G.CAT[r.cat].area ? G.receiptYearAmount(r, y, st.rules[y]) : 0; if (a) by[r.cat] = (by[r.cat] || 0) + a; }
-      const rows = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ l: catL(k), v, icon: '<svg class="hb-ic" viewBox="0 0 24 24">' + (CI[k] || CI.none) + '</svg>' }));
+      for (const r of all) { const c = G.CAT[r.cat], a = c && c.area && c.area !== 'spende' ? G.receiptYearAmount(r, y, st.rules[y]) : 0; if (a) by[c.area] = (by[c.area] || 0) + a; }
+      const AI = { fortbildung: 'fortbildung', arbeitsmittel: 'arbeitsmittel', reise: 'reise', weitere: 'bewerbung' };
+      const rows = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ l: AREA_L[k] || k, v, c: AREA_C[k] || 'cn', icon: '<svg class="hb-ic" viewBox="0 0 24 24">' + (CI[AI[k]] || CI.none) + '</svg>' }));
       if (rows.length) h += '<details class="card fold"' + (st.catOpen ? ' open' : '') + '><summary data-a="catFold"><span>Steuerlich relevant ' + y + '</span><span style="display:flex;align-items:center;gap:6px"><b>' + eur(Math.round(rows.reduce((a, r) => a + r.v, 0))) + '</b>' + I.chev + '</span></summary>' + G.Chart.hbars(rows) + '<p class="hint">Beruflicher Anteil, teure Arbeitsmittel anteilig.</p></details>';
     }
     const F = [['alle', 'Alle ' + n], ['steuer', 'Steuer ' + String(st.year).slice(2)], ['garantie', 'Garantie'], ['pruefen', 'Prüfen' + (un ? ' ' + un : '')]];
@@ -285,8 +292,8 @@
   function contractRow(c) {
     const t = today(), n = G.nextCancel(c, t), pc = G.priceChange(c);
     const s = c.ended ? 'Gekündigt zum ' + G.fmtDate(c.ended) : !n || n.unknown ? 'Beginn fehlt – Frist unbekannt' : n.anytime ? 'Jederzeit kündbar · Ende frühestens ' + G.fmtShort(n.end) + n.end.slice(0, 4) : 'Kündigen bis ' + G.fmtDate(n.deadline) + ' · ' + daysWord(n.days);
-    const soon = n && !n.anytime && n.days != null && n.days <= 30 && !c.ended;
-    return '<button type="button" class="row" data-a="openContract" data-id="' + c.id + '">' + cic(c.tpl || 'sonst') + '<span class="main"><span class="t ell">' + esc(c.name || c.provider || 'Vertrag') + (c.name && c.provider ? ' <span class="muted" style="font-weight:400">· ' + esc(c.provider) + '</span>' : '') + '</span><span class="s">' + (soon ? '<span class="tag">' + esc(s) + '</span>' : esc(s)) + (pc && pc.pct ? ' <span class="tag grey">' + (pc.pct > 0 ? '+' : '') + String(pc.pct).replace('.', ',') + ' %</span>' : '') + '</span></span><span class="v">' + (c.amount != null ? eur(c.amount, 2) : '–') + '<span class="s" style="display:block;font-weight:400">' + esc((G.RHYTHM[c.rhythm] || G.RHYTHM.m).l) + '</span></span></button>';
+    const soon = n && !n.anytime && n.days != null && n.days <= 30 && !c.ended, hot = soon && n.days <= 14;
+    return '<button type="button" class="row" data-a="openContract" data-id="' + c.id + '">' + cic(c.tpl || 'sonst', hot ? 'warn' : '') + '<span class="main"><span class="t ell">' + esc(c.name || c.provider || 'Vertrag') + (c.name && c.provider ? ' <span class="muted" style="font-weight:400">· ' + esc(c.provider) + '</span>' : '') + '</span><span class="s">' + (soon ? '<span class="tag' + (hot ? ' orange' : '') + '">' + esc(s) + '</span>' : n && n.anytime && !c.ended ? '<span class="tag green">Jederzeit kündbar</span> Ende frühestens ' + G.fmtShort(n.end) + n.end.slice(0, 4) : esc(s)) + (pc && pc.pct ? ' <span class="tag ' + (pc.pct > 0 ? 'orange' : 'green') + '">' + (pc.pct > 0 ? 'teurer +' : 'günstiger ') + String(pc.pct).replace('.', ',') + ' %</span>' : '') + '</span></span><span class="v">' + (c.amount != null ? eur(c.amount, 2) : '–') + '<span class="s" style="display:block;font-weight:400">' + esc((G.RHYTHM[c.rhythm] || G.RHYTHM.m).l) + '</span></span></button>';
   }
   function viewVertraege() {
     const t = today();
@@ -336,7 +343,7 @@
     if (res.noIncome && res.loss > 0) h += '<span class="lbl">Verlustvortrag ' + y + '</span><span class="big">' + eur(Math.round(res.carryOut)) + '</span><span class="sub">Gesichert, sobald du die Erklärung abgibst – senkt später die Steuer auf deinen Lohn. Abgabe bis ' + G.fmtDate(R.regeln.fristen.verlust) + '.</span>';
     else if (res.refund != null) {
       const pos = res.refund >= 0;
-      h += '<span class="lbl">' + (pos ? 'Erstattung ' : 'Nachzahlung ') + y + ' · Schätzung</span><span class="big ' + (pos ? 'green' : '') + '">ca. ' + eur(Math.abs(Math.round(res.refund / 10) * 10)) + '</span><span class="sub">' + (pos ? 'zurück vom Finanzamt' : 'an das Finanzamt') + (res.loss > 0 ? ' · Verlust ' + eur(Math.round(res.loss)) + ' wird vorgetragen' : '') + (!R.regeln.tarif.geprueft ? ' · Tarif ungeprüft' : '') + (res.vorsorge.estimated ? ' · Sozialversicherung geschätzt' : '') + '</span>';
+      h += '<span class="lbl">' + (pos ? 'Erstattung ' : 'Nachzahlung ') + y + ' · Schätzung</span><span class="big ' + (pos ? 'green' : 'warn-t') + '">ca. ' + eur(Math.abs(Math.round(res.refund / 10) * 10)) + '</span><span class="sub">' + (pos ? 'zurück vom Finanzamt' : 'an das Finanzamt') + (res.loss > 0 ? ' · Verlust ' + eur(Math.round(res.loss)) + ' wird vorgetragen' : '') + (!R.regeln.tarif.geprueft ? ' · Tarif ungeprüft' : '') + (res.vorsorge.estimated ? ' · Sozialversicherung geschätzt' : '') + '</span>';
       h += G.Chart.range(res.range[0], res.refund, res.range[1], { lowL: 'mind. ' + eur(Math.floor(res.range[0] / 10) * 10), highL: 'bis ' + eur(Math.ceil(res.range[1] / 10) * 10), bothL: eur(Math.floor(res.range[0] / 10) * 10) + ' – ' + eur(Math.ceil(res.range[1] / 10) * 10) });
     } else h += '<span class="lbl">Werbungskosten ' + y + '</span><span class="big">' + eur(Math.round(res.wk)) + '</span><span class="sub">' + (res.trips.work.days ? 'Für die Erstattung fehlen noch Bruttolohn und Lohnsteuer – unten eintragen oder die Lohnsteuerbescheinigung als Block einfügen.' : 'Gesammelt für dieses Jahr.') + '</span>';
     h += '</div></section>';
@@ -344,13 +351,13 @@
     // Zusammensetzung als Balken mit Pauschbetrag-Markierung
     const areaRows = [];
     const sumA = f => G.r2(res.lines.filter(f).reduce((a, l) => a + l.eur, 0));
-    const fa = sumA(l => l.area === 'fahrten'); if (fa) areaRows.push({ l: 'Fahrten', v: fa, a: 'openCal' });
-    const fb = sumA(l => l.area === 'fortbildung'); if (fb) areaRows.push({ l: 'Fortbildung (nach Zuschuss)', v: fb, a: 'filterTax' });
-    const am = sumA(l => l.area === 'arbeitsmittel'); if (am) areaRows.push({ l: 'Arbeitsmittel', v: am, a: 'filterTax' });
-    const rk = sumA(l => l.area === 'reise'); if (rk) areaRows.push({ l: 'Reisekosten', v: rk, a: 'filterTax' });
-    const pa = sumA(l => l.area === 'weitere' || l.area === 'tagespauschale'); if (pa) areaRows.push({ l: 'Pauschalen und Weiteres', v: pa, a: 'rules' });
+    const fa = sumA(l => l.area === 'fahrten'); if (fa) areaRows.push({ l: 'Fahrten', v: fa, a: 'openCal', c: 'c3' });
+    const fb = sumA(l => l.area === 'fortbildung'); if (fb) areaRows.push({ l: 'Fortbildung (nach Zuschuss)', v: fb, a: 'filterTax', c: 'c1' });
+    const am = sumA(l => l.area === 'arbeitsmittel'); if (am) areaRows.push({ l: 'Arbeitsmittel', v: am, a: 'filterTax', c: 'c2' });
+    const rk = sumA(l => l.area === 'reise'); if (rk) areaRows.push({ l: 'Reisekosten', v: rk, a: 'filterTax', c: 'c3' });
+    const pa = sumA(l => l.area === 'weitere' || l.area === 'tagespauschale'); if (pa) areaRows.push({ l: 'Pauschalen und Weiteres', v: pa, c: 'cn', a: 'rules' });
     if (areaRows.length) {
-      h += '<div class="sec-h"><h2>Werbungskosten ' + y + '</h2><b>' + eur(Math.round(res.wk)) + '</b></div><div class="card">' + G.Chart.hbars([{ l: 'Zusammen', v: res.wk }].concat(areaRows), { mark: res.gross > 0 || res.trips.work.days ? { v: res.pausch, l: 'Pauschbetrag ' + eur(res.pausch) } : null }) +
+      h += '<div class="sec-h"><h2>Werbungskosten ' + y + '</h2><b>' + eur(Math.round(res.wk)) + '</b></div><div class="card">' + G.Chart.hbars([{ l: 'Zusammen', v: res.wk, c: 'tot' }].concat(areaRows), { mark: res.gross > 0 || res.trips.work.days ? { v: res.pausch, l: 'Pauschbetrag ' + eur(res.pausch) } : null }) +
         (res.gross > 0 || res.trips.work.days ? '<p class="hint">' + (res.wk > res.pausch ? 'Über dem Pauschbetrag – es zählen deine echten Kosten: ' + eur(Math.round(res.wk - res.pausch)) + ' mehr als ohne Belege.' : 'Noch unter dem Pauschbetrag – das Finanzamt rechnet mit ' + eur(res.pausch) + '.') + '</p>' : '') + '</div>';
     }
     // Einzelposten
@@ -702,8 +709,8 @@
     h += '<p class="lead" style="margin-top:0">Fahrten rechnen sich selbst. Nur Ausnahmen antippen: krank, frei, Prüfung, anderer Weg, Lernen zu Hause.</p>';
     h += '<div class="statrow"><div class="stat"><b>' + tr.sum.work.days + '</b><span>Arbeit · ' + eur(Math.round(tr.sum.work.eur)) + '</span></div><div class="stat"><b>' + tr.sum.school.days + '</b><span>Schule · ' + eur(Math.round(tr.sum.school.eur)) + '</span></div><div class="stat"><b>' + tr.sum.home.days + '</b><span>zu Hause</span></div></div>';
     if (!(+s.kmWork > 0) || !(+s.kmSchool > 0)) h += '<div class="info">Kilometer fehlen – <button type="button" class="link" data-a="settings">in den Einstellungen eintragen</button>.</div>';
-    const mp = G.MONTHS.map((_, i) => ({ l: G.MONTHS[i].slice(0, 3).replace('Mär', 'Mär'), v: G.r2(tr.days.filter(d => +d.d.slice(5, 7) === i + 1 && (d.k === 'work' || d.k === 'school')).reduce((a, d) => a + Math.floor(d.km) * tr.sum.rate, 0)) }));
-    if (mp.some(x => x.v)) h += '<div class="card chartcard" style="margin-top:12px"><div class="chart-h"><span>Fahrten-Pauschale je Monat</span><span class="muted">' + eur(Math.round(tr.sum.eur)) + '</span></div>' + G.Chart.bars({ id: 'cal', pts: mp, sel: m, label: 'Entfernungspauschale je Monat' }) + '</div>';
+    const mp = G.MONTHS.map((_, i) => ({ l: G.MONTHS[i].slice(0, 3).replace('Mär', 'Mär'), v: G.r2(tr.days.filter(d => +d.d.slice(5, 7) === i + 1 && (d.k === 'work' || d.k === 'school')).reduce((a, d) => a + Math.floor(d.km) * tr.sum.rate, 0)), c: tr.days.some(d => +d.d.slice(5, 7) === i + 1 && d.k === 'school') ? 'c2' : 'c1' }));
+    if (mp.some(x => x.v)) h += '<div class="card chartcard" style="margin-top:12px"><div class="chart-h"><span>Fahrten-Pauschale je Monat</span><span class="muted">' + eur(Math.round(tr.sum.eur)) + '</span></div><div class="legend" style="margin:2px 0 0"><span><i class="lg-c1"></i>Arbeit</span><span><i class="lg-c2"></i>Schule</span></div>' + G.Chart.bars({ id: 'cal', pts: mp, sel: m, label: 'Entfernungspauschale je Monat' }) + '</div>';
     h += '<div class="cal-nav"><button type="button" data-a="calMonth" data-d="-1" aria-label="Voriger Monat">' + I.back + '</button><b>' + G.MONTHS[m] + ' ' + y + '</b><button type="button" data-a="calMonth" data-d="1" aria-label="Nächster Monat" style="transform:scaleX(-1)">' + I.back + '</button></div>';
     h += '<div class="cal">' + G.DOW.map(d => '<div class="dh">' + d + '</div>').join('');
     const first = y + '-' + G.pad(m + 1) + '-01';
@@ -715,7 +722,7 @@
       h += '<button type="button" class="d ' + cls + (di.exc ? ' exc' : '') + (di.d === t ? ' today' : '') + '" data-a="calDay" data-d="' + di.d + '" aria-label="' + G.fmtDate(di.d) + ' ' + lab + '">' + (+di.d.slice(8)) + '<small>' + lab + (di.job && di.k !== 'none' ? '·J' : '') + '</small></button>';
     }
     h += '</div>';
-    h += '<div class="legend"><span><i style="background:var(--navy)"></i>Arbeit</span><span><i style="background:var(--navy2)"></i>Schule</span><span><i style="background:var(--accent);border-radius:50%;width:8px;height:8px"></i>Ausnahme</span><span>·J = Minijob (zählt nicht)</span></div>';
+    h += '<div class="legend"><span><i class="lg-c1"></i>Arbeit</span><span><i class="lg-c2"></i>Schule</span><span><i class="lg-c3"></i>zu Hause</span><span><i class="lg-exc"></i>Ausnahme</span><span>·J = Minijob (zählt nicht)</span></div>';
     if (tr.sum.vacation) h += '<p class="hint">' + tr.sum.vacation + ' Urlaubstage werden pauschal von den Arbeitstagen abgezogen (Einstellungen).</p>';
     const fer = R && R.ferien; if (fer) h += '<p class="hint">Ferien: ' + esc(fer.quelle) + (fer.hinweis ? '. ' + esc(fer.hinweis) : '') + '</p>';
     return h + '</div>';

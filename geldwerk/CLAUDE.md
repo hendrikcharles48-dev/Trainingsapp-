@@ -14,6 +14,9 @@ Bauplan `PLAN.md`, eigene Entscheidungen `ENTSCHEIDUNGEN.md`, Blockformat `BLOCK
 - Bei jedem Release `CACHE` in `sw.js` hochzählen und `VERSION` in `app.js`.
 - Design (1.2): hell + dunkel über Variablen in `style.css` (`:root`, Dunkel-Block zweimal: Media-Query und `[data-theme=dark]`).
   Keine festen Farben in HTML/SVG – Diagramme nur über Klassen `ch-…`, `ring-…`, `bl-…`.
+- Farben mit Bedeutung (1.3): `--c1` Indigo Fortbildung/Arbeit, `--c2` Türkis Arbeitsmittel/Schule, `--c3` Gelb Fahrten/Reisen,
+  `--cn` grau; Status `--green`, `--warn` (Orange), `--red`. Zuordnung `AREA_C`/`catC` in `app.js`. Neue Farben nur nach Prüfung
+  mit dem dataviz-Prüfskript (alle Paare), nie Blau neben Indigo.
 - Tests: `node geldwerk/test/run.js` (Logik) und mit Server im Repo-Root (`python3 -m http.server 8123`)
   `node geldwerk/test/ui.js <ordner>` (Durchlauf als neuer Nutzer im iPhone-Format, nachgebautes GitHub).
   Worker: `cd formwerk-worker && node test/model.test.js`.

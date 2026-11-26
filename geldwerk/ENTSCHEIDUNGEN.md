@@ -61,3 +61,12 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
     Kontraste geprüft: Indigo 5,8:1 auf Weiß, Grau-Text 4,9:1, Grün 4,6:1; dunkel Indigo 5,7:1.
 25. **Statusleiste „default“** statt durchsichtig: sonst wäre die Uhrzeit im hellen Modus weiß auf hell. Gilt ab dem nächsten
     Hinzufügen zum Home-Bildschirm.
+
+## Version 1.3 (26.11.2026, Farben mit Bedeutung)
+26. **Farbe nur dort, wo sie etwas sagt.** Drei Bereichsfarben (vom dataviz-Prüfskript freigegeben, alle Paare, hell und dunkel:
+    Farbschwäche ΔE ≥ 11,1, Normalsicht ΔE ≥ 21,1): **Indigo** = Fortbildung bzw. Arbeit, **Türkis** = Arbeitsmittel bzw. Schule,
+    **Gelb** = Fahrten & Reisen bzw. zu Hause; Rest grau. Blau neben Indigo und Pink neben Türkis fielen in der Prüfung durch – darum nicht.
+27. **Statusfarben fest:** Grün = erledigt / Geld zurück / jederzeit kündbar / günstiger; **Orange** = bald fällig (Kündigung ≤ 14 Tage,
+    sonst ≤ 7) / teurer geworden / Nachzahlung; Rot = abgelaufen. Farbe steht nie allein – immer mit Text oder Symbol.
+28. Symbole in getönten Kreisen (Kontrast ≥ 4,4:1), gewählte Kategorie-Chips in Bereichsfarbe (hell weiße, dunkel dunkle Schrift, ≥ 5:1).
+    Ausgaben je Monat bleiben einfarbig (eine Größe, keine Kategorien).
