@@ -81,3 +81,5 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
 31. **Schnellaktionen kräftig statt pastell:** Rückmeldung „Farben nebeneinander zu ähnlich“. Jede Aktion eigene volle Farbe
     (Indigo, Türkis, Orange, Blau, Gelb, Pink) in einer Reihenfolge, in der Nachbarn klar verschieden sind (Prüfskript hell + dunkel:
     Farbschwäche ΔE ≥ 11,7, Normalsicht ≥ 22). Beschriftung „Pauschbetrag“ im Verlauf links, damit die Wert-Pille sie nicht verdeckt.
+32. **1.4.2 – wieder blass** (Rückmeldung „Blass war schöner“): Pastell bleibt, aber sechs verschiedene Farbtöne statt je zwei gleicher;
+    Symbol in kräftigem Ton (Kontrast ≥ 4,2:1), dunkel helles Symbol auf getöntem Grund.

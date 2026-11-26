@@ -464,22 +464,29 @@ h1, .big, .mid, .q, .stat b, .cal-nav b, .count, .bigopt > span:last-child { fon
 .cal .d.school { background: var(--c2-bg); } .cal .d.school small { color: var(--c2-ic); }
 .cal .d.home { background: var(--c3-bg); } .cal .d.home small { color: var(--c3-ic); }
 .cal .d.exc::after { background: var(--red); }
-/* Schnellaktionen (1.5): jede Aktion eine eigene kräftige Farbe, Nachbarn klar verschieden (Prüfskript: Farbschwäche ΔE ≥ 11,7,
-   Normalsicht ≥ 22). Weißes Symbol (≥ 3,3:1), auf Gelb dunkles Symbol (7:1). Name steht immer darunter. */
-.qa button span { color: #FFFFFF; }
-.qa button[data-a=cam] span { background: #5B4FE0; }
-.qa button[data-a=pickFile] span { background: #0A9C80; }
-.qa button[data-a=newContract] span { background: #E8661F; }
-.qa button[data-a=openBlock] span { background: #2A72D4; }
-.qa button[data-a=openCal] span { background: #E3A008; color: #2A1C00; }
-.qa button[data-a=mappe] span { background: #D6457F; }
-:root[data-theme="dark"] .qa button[data-a=cam] span { background: #7067F0; }
-:root[data-theme="dark"] .qa button[data-a=openCal] span { background: #D28E05; }
+/* Schnellaktionen (1.4.2): blass, aber sechs verschiedene Farbtöne – Nachbarn nie gleich (Indigo, Türkis, Orange, Blau, Gelb, Pink).
+   Symbol in kräftigem Ton auf Pastell (≥ 4,2:1), dunkel: helles Symbol auf getöntem Grund (≥ 5,9:1). Name steht immer darunter. */
+.qa button[data-a=cam] span { background: #E3E0FC; color: #4B3FD6; }
+.qa button[data-a=pickFile] span { background: #D3F2EA; color: #0A7C67; }
+.qa button[data-a=newContract] span { background: #FFE1CF; color: #B54C10; }
+.qa button[data-a=openBlock] span { background: #DCEAFB; color: #1B63B8; }
+.qa button[data-a=openCal] span { background: #FFEDBF; color: #7A5000; }
+.qa button[data-a=mappe] span { background: #FCDCE8; color: #B3366B; }
+:root[data-theme="dark"] .qa button[data-a=cam] span { background: #201F4E; color: #A9A3FF; }
+:root[data-theme="dark"] .qa button[data-a=pickFile] span { background: #0B3439; color: #3FD1B0; }
+:root[data-theme="dark"] .qa button[data-a=newContract] span { background: #422520; color: #FFA066; }
+:root[data-theme="dark"] .qa button[data-a=openBlock] span { background: #15284B; color: #7DB6F7; }
+:root[data-theme="dark"] .qa button[data-a=openCal] span { background: #3D2E1A; color: #F0B53A; }
+:root[data-theme="dark"] .qa button[data-a=mappe] span { background: #3E1D37; color: #F27FB0; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .qa button[data-a=cam] span { background: #7067F0; }
-  :root:not([data-theme="light"]) .qa button[data-a=openCal] span { background: #D28E05; }
+  :root:not([data-theme="light"]) .qa button[data-a=cam] span { background: #201F4E; color: #A9A3FF; }
+  :root:not([data-theme="light"]) .qa button[data-a=pickFile] span { background: #0B3439; color: #3FD1B0; }
+  :root:not([data-theme="light"]) .qa button[data-a=newContract] span { background: #422520; color: #FFA066; }
+  :root:not([data-theme="light"]) .qa button[data-a=openBlock] span { background: #15284B; color: #7DB6F7; }
+  :root:not([data-theme="light"]) .qa button[data-a=openCal] span { background: #3D2E1A; color: #F0B53A; }
+  :root:not([data-theme="light"]) .qa button[data-a=mappe] span { background: #3E1D37; color: #F27FB0; }
 }
-.qa button span svg { stroke-width: 2; }
+.qa button span svg { stroke-width: 1.9; }
 .qa button span { box-shadow: none; }
 /* Kategorie-Chips im Beleg: gewählte in Bereichsfarbe */
 .chip.on[data-c=fortbildung] { background: var(--c1-ic); border-color: var(--c1-ic); color: var(--chip-ink); }
