@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.3';
+  const APP_VERSION = '3.27.4';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -908,7 +908,7 @@
     if (!st.chartEx || !exWithHist.includes(st.chartEx)) st.chartEx = mostFrequent(exWithHist);
     if (!total) return `<div class="empty">Noch keine Trainings gespeichert. Nach deinem ersten Training siehst du hier Kraftkurven, Rekorde und Sätze pro Muskelgruppe.</div>`;
     const cw = FW.coach();
-    return `${cw ? `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht · ${esc(cw.id)}</div><b class="ell">${esc(cw.title)}</b></div><span class="chev">${I.chev}</span></button>` : ''}<div class="kpis"><div class="kpi"><b>${total}</b><span>Trainings gesamt</span></div><div class="kpi"><b>${w7.length}</b><span>Letzte 7 Tage</span></div><div class="kpi"><b>${weeksStreak()}</b><span>Wochen am Stück</span></div></div>
+    return `${cw ? `<button class="card row" style="width:100%;text-align:left;gap:12px" data-a="coachOpen"><div class="grow" style="min-width:0"><div class="eyebrow">Wochenbericht · ${esc(cw.id)}</div><b class="ell" style="display:block">${esc(cw.title)}</b></div><span class="chev">${I.chev}</span></button>` : ''}<div class="kpis"><div class="kpi"><b>${total}</b><span>Trainings gesamt</span></div><div class="kpi"><b>${w7.length}</b><span>Letzte 7 Tage</span></div><div class="kpi"><b>${weeksStreak()}</b><span>Wochen am Stück</span></div></div>
       ${(() => { const rec = recovery(); return `<div class="card stack"><div class="row between"><h3>Erholung</h3><span class="small muted">Muskelgruppen</span></div><div class="bars">${rec.map(r => `<div class="bar"><span class="ell">${r.g}</span><div class="track"><i class="${r.pct < 50 ? 'warn' : ''}" style="width:${r.pct}%"></i></div><span class="num small" style="text-align:right">${r.pct}%</span></div>`).join('')}</div><div class="tiny muted">Geschätzt aus Sätzen und Zeit seit dem letzten Training. Voller Balken = bereit.</div></div>`; })()}
       <div class="section"><div class="head"><h3>Kraftentwicklung</h3></div>
         <div class="chips">${exWithHist.slice().sort((x, y) => (x === st.chartEx ? -1 : y === st.chartEx ? 1 : 0)).slice(0, 14).map(id => `<button class="chip ${id === st.chartEx ? 'on' : ''}" data-a="chartPick" data-id="${id}">${esc(getEx(id).name)}</button>`).join('')}</div>
