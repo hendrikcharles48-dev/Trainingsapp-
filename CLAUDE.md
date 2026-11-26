@@ -243,6 +243,9 @@ Ruhepuls/Schlaf – zu wenig Nutzen. Die Tagesform kommt aus der Satzleistung (`
 - `geldwerk/` – Steuer-Sammler, Verträge, Belege: Regeln in `geldwerk/CLAUDE.md`. Satzwerk dafür nie anfassen, Speicher nur `geldwerk_` / IndexedDB `geldwerk`.
 - `formwerk/` und `formwerk-worker/` – Whoop-Alternative Formwerk: Regeln in `formwerk/CLAUDE.md`, offene Schritte in `formwerk/OFFEN.md` (zuerst lesen, Nutzer erinnern).
 
+## App-Prüfung (alle Apps, auch mit Haiku)
+- `node tools/uicheck.js <seite unter docs/> --width 375,390 --deep` findet Programmfehler, Überlappungen und Überlauf; Ablauf und Grenzen in `tools/UICHECK.md`.
+
 ## Sparregeln (gelten immer)
 - Große Dateien nie komplett lesen: erst `grep -n`, dann gezielt Zeilenbereiche. Dieselbe Datei nicht mehrfach lesen.
 - Suche über viele Dateien an den Explore-Subagenten geben (läuft auf Haiku), nur das Ergebnis übernehmen.
