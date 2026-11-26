@@ -112,6 +112,18 @@ const tap = async (page, sel) => { await page.locator(sel).first().click(); awai
   const tripsTxt = await page.locator('#page .card').first().innerText();
   ok(/Arbeitstage/.test(tripsTxt), 'Fahrten nach der Einrichtung berechnet: ' + tripsTxt.replace(/\s+/g, ' '));
   await tap(page, '[data-a=setupFinish]');
+  // Rundgang mit Sprechblasen
+  await page.waitForSelector('#tour .tour-bub', { timeout: 5000 });
+  let steps = 0;
+  while (await page.locator('#tour .tour-bub').count()) {
+    await page.waitForTimeout(450); steps++;
+    await page.screenshot({ path: path.join(OUT, 'tour-' + String(steps).padStart(2, '0') + '.png') });
+    const inView = await page.evaluate(() => { const b = document.querySelector('#tour .tour-bub').getBoundingClientRect(), h = document.querySelector('#tour .tour-hole').getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && (b.bottom <= h.top + 1 || b.top >= h.bottom - 1); });
+    ok(inView, 'Rundgang Schritt ' + steps + ': Sprechblase sichtbar und überdeckt das Ziel nicht');
+    await page.locator('#tour [data-a=tourNext]').click(); await page.waitForTimeout(100);
+    if (steps > 15) break;
+  }
+  ok(steps >= 8, 'Rundgang mit ' + steps + ' Schritten durchlaufen');
   await shot(page, '12-uebersicht-leer');
 
   // Beleg per Foto (echte Texterkennung)
@@ -181,6 +193,7 @@ const tap = async (page, sel) => { await page.locator(sel).first().click(); awai
   fs.writeFileSync(path.join(OUT, 'Steuermappe-2026.pdf'), Buffer.from(pdfB64, 'base64'));
   await page.evaluate(() => document.querySelector('#sheet').click());
   await tap(page, '.tabbar [data-tab=home]'); await shot(page, '29-uebersicht');
+  await tap(page, '[data-a=help]'); await shot(page, '29b-hilfe', true); await tap(page, '[data-a=back]');
   await tap(page, '[data-a=settings]'); await shot(page, '30-einstellungen', true);
 
   // Sicherung abwarten, dann alles löschen und wiederherstellen

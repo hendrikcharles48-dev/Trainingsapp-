@@ -477,3 +477,22 @@ h1, .big, .mid, .q, .stat b, .cal-nav b, .count, .bigopt > span:last-child { fon
 .chip.on[data-c=bewerbung], .chip.on[data-c=spende], .chip.on[data-c=privat] { background: var(--cn-ic); border-color: var(--cn-ic); color: var(--chip-ink); }
 .count.warn { background: var(--warm); color: #2A1400; }
 .count.red { background: var(--red); color: #fff; }
+
+/* ---------- 1.4: Rundgang mit Sprechblasen, Hilfe ---------- */
+.tour { position: fixed; inset: 0; z-index: 90; }
+.tour-hole { position: fixed; border-radius: 22px; box-shadow: 0 0 0 9999px rgba(15, 16, 35, .62); outline: 3px solid var(--warm); outline-offset: 2px; transition: all .3s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.tour-bub { position: fixed; left: 16px; right: 16px; max-width: 420px; margin: 0 auto; background: var(--surface); color: var(--ink); border-radius: 20px; padding: 16px 16px 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .25); animation: toastIn .3s cubic-bezier(.2, .8, .2, 1); }
+.tour-bub b { font-size: 18px; font-family: var(--round); }
+.tour-bub p { margin: 6px 0 10px; color: var(--ink2); font-size: 15px; line-height: 1.45; }
+.tour-bub::after { content: ""; position: absolute; left: var(--ax); width: 20px; height: 20px; background: var(--surface); transform: rotate(45deg); border-radius: 4px; }
+.tour-bub.below::after { top: -8px; }
+.tour-bub.above::after { bottom: -8px; }
+.tour-ft { display: flex; align-items: center; gap: 10px; }
+.tour-ft span { color: var(--muted); font-size: 13px; font-weight: 700; margin-right: auto; }
+.tour-ft .btn { width: auto; min-height: 46px; padding: 0 22px; margin: 0; }
+.helpcard { margin-top: 12px; }
+.help-h { display: flex; align-items: center; gap: 12px; }
+.help-h b { font-size: 17px; font-family: var(--round); }
+.helpcard ul { margin: 10px 0 2px; padding-left: 20px; color: var(--ink2); font-size: 15px; line-height: 1.45; }
+.helpcard li + li { margin-top: 6px; }
+.top-row .icon-btn + .icon-btn { margin-left: 2px; }

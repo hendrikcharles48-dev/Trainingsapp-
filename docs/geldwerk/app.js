@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const G = window.GW, S = G.Store, LS = S.LS, Y = G.Y;
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const RULE_YEARS = [2026, 2027];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -35,6 +35,7 @@
     share: '<svg viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11v8.5h12V11"/></svg>',
     cloud: '<svg viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 10a4 4 0 0 1-.5 8.5z"/></svg>',
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    help: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 16.8v.2"/></svg>',
     down: '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
     school: '<svg viewBox="0 0 24 24"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 11.5V16c2.8 2 7.2 2 10 0v-4.5M21 9.5v5"/></svg>',
     shield: '<svg viewBox="0 0 24 24"><path d="M12 3.5 19 6v6c0 4.2-3 7.2-7 8.5-4-1.3-7-4.3-7-8.5V6z"/></svg>'
@@ -169,7 +170,7 @@
     const yr = defaultYear(), res = st.chain[yr];
     const d = new Date(), wd = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][d.getDay()];
     const name = (st.db.settings.name || '').trim().split(/\s+/)[0];
-    let h = '<header class="top"><div class="top-row"><div style="flex:1;min-width:0"><div class="date">' + wd + ', ' + d.getDate() + '. ' + G.MONTHS[d.getMonth()] + '</div><h1>Moin' + (name ? ', ' + esc(name) : '') + '</h1></div><button class="icon-btn avatar" type="button" data-a="settings" aria-label="Einstellungen">' + avatar() + '</button></div></header>';
+    let h = '<header class="top"><div class="top-row"><div style="flex:1;min-width:0"><div class="date">' + wd + ', ' + d.getDate() + '. ' + G.MONTHS[d.getMonth()] + '</div><h1>Moin' + (name ? ', ' + esc(name) : '') + '</h1></div><button class="icon-btn" type="button" data-a="help" aria-label="Was kann Geldwerk?" id="helpBtn">' + I.help + '</button><button class="icon-btn avatar" type="button" data-a="settings" aria-label="Einstellungen" id="setBtn">' + avatar() + '</button></div></header>';
     // Karte wie eine Bankkarte: Erstattung + Verlauf
     h += '<section class="bank">' + blob() + '<button type="button" class="bank-top" data-a="tab" data-t="steuer">' + heroTop(res, yr) + '</button>';
     const wm = wkByMonth(yr);
@@ -759,11 +760,30 @@
     h += '</div>';
     // Daten
     h += '<div class="sec-h"><h2>Daten</h2></div><div class="card"><div class="btns"><button type="button" class="btn" data-a="exportFile">' + I.share + 'Als Datei sichern</button><button type="button" class="btn" data-a="importFile">Datei laden (wird zusammengeführt)</button><button type="button" class="btn" data-a="openBlock">' + I.block + 'Geldwerk-Block einfügen</button><button type="button" class="btn danger" data-a="wipeAsk">Alle Daten auf diesem Gerät löschen</button></div><p class="hint">Löschen betrifft nur Geldwerk auf diesem Gerät. Mit Sicherung kommt alles über „Ich habe schon eine Sicherung“ zurück.</p></div>';
+    h += '<div class="sec-h"><h2>Hilfe</h2></div><div class="list"><button type="button" class="row" data-a="help"><span class="ci c1">' + I.help + '</span><span class="main"><span class="t">Was kann Geldwerk?</span><span class="s">Alle Funktionen kurz erklärt</span></span>' + I.chev + '</button><button type="button" class="row" data-a="tourStart"><span class="ci c2">' + I.info + '</span><span class="main"><span class="t">Rundgang noch einmal</span><span class="s">Sprechblasen zu den wichtigsten Knöpfen</span></span>' + I.chev + '</button></div>';
     h += '<div class="sec-h"><h2>Über</h2></div><div class="list"><button type="button" class="row" data-a="rules"><span class="main"><span class="t">Regeln und Quellen</span><span class="s">Steuerregeln je Jahr mit Stand</span></span>' + I.chev + '</button><div class="row"><span class="main"><span class="t">Geldwerk ' + VERSION + '</span><span class="s">Keine Steuerberatung. Daten nur auf dem Gerät und in deinem privaten Repository.</span></span></div></div>';
     return h + '</div>';
   };
 
   // ---------- Regeln ----------
+  // ---------- Was kann Geldwerk? ----------
+  const HELP = [
+    ['c2', 'receipt', 'Belege sammeln', ['Plus → „Beleg fotografieren“ oder „Datei wählen“ (PDF). Betrag, Datum, Händler und Kategorie erkennt Geldwerk selbst – ein Tipp auf „Passt“ speichert.', 'Mehrseitige Rechnungen: „+ Weitere Seite fotografieren“. Doppelte Belege meldet die App.', 'Händler, die du korrigierst, merkt sie sich fürs nächste Mal.']],
+    ['c3', 'car', 'Fahrten von selbst', ['Arbeits- und Schultage werden aus deinen Zeiträumen berechnet – Feiertage und Schulferien in Niedersachsen sind schon abgezogen.', 'Im Fahrten-Kalender nur Ausnahmen antippen: krank, frei, Prüfung, anderer Weg, Lernen zu Hause.']],
+    ['c1', 'euro', 'Steuer', ['Reiter „Steuer“: geschätzte Erstattung mit Spanne, Werbungskosten nach Bereichen, Checkliste bis zur Abgabe.', 'Jahre ohne Lohn: Geldwerk zeigt den Verlustvortrag, den du dir mit der Erklärung sicherst.', 'Jede Regel mit Quelle und Stand – Ungeprüftes ist markiert. Keine Steuerberatung.']],
+    ['c1', 'doc', 'Verträge und Fristen', ['Vorlagen (Kfz, Handy, Internet, Strom, Streaming, Fitness): Geldwerk rechnet aus, bis wann du kündigen musst.', 'Fixkosten pro Monat, Preiserhöhungen in Prozent, fertiger Kündigungstext oder Mail, einmal im Jahr „Noch nötig?“.']],
+    ['c2', 'shield', 'Rückgabe und Garantie', ['Online-Käufe: 14 Tage Rückgabe. Gewährleistung 2 Jahre, Herstellergarantie wählbar.', 'Filter „Garantie“ zeigt alles, was noch abgesichert ist.']],
+    ['warn', 'bell', 'Erinnerungen', ['„Zu erledigen“ auf der Übersicht zeigt nur, was ansteht – orange heißt bald fällig, rot abgelaufen.', 'Als Mitteilung aufs iPhone (Einstellungen → Mitteilungen): Kündigung 14 und 3 Tage vorher, Rückgabe, Gewährleistung, Steuerfrist, einmal im Monat ein Sammelhinweis.']],
+    ['c1', 'block', 'Geldwerk-Block', ['Dokument (Lohnsteuerbescheinigung, Steuerbescheid, BAföG-Bescheid, Versicherungsschein) im Claude-Chat fotografieren und „Geldwerk“ schreiben.', 'Den Block hier über Plus → „Block einfügen“ übernehmen – die Felder füllen sich selbst.']],
+    ['green', 'share', 'Am Jahresende', ['Steuer → „ELSTER-Spickzettel“: welcher Betrag in welchen Bereich gehört.', '„Steuermappe als PDF“ mit allen Belegen und Fotos, „Belegliste als Tabelle“ für Excel/Numbers.']],
+    ['cn', 'cloud', 'Sicherung', ['Automatisch in dein privates GitHub-Repository „Geldwerk-Daten“, Fotos inklusive. Auf einem neuen iPhone: „Ich habe schon eine Sicherung“.', 'Zusätzlich jederzeit als Datei (Einstellungen → Daten).']]
+  ];
+  PAGES.help = () => {
+    let h = bar('Was kann Geldwerk?') + '<div class="pbody"><p class="lead" style="margin-top:0">Geldwerk sammelt alles, was dir Geld bringt oder spart – fast ohne Tippen. Hier alles auf einen Blick.</p>';
+    h += '<button type="button" class="btn primary" data-a="tourStart" style="margin-top:14px">' + I.info + 'Rundgang starten</button>';
+    for (const [c, ic, t, pts] of HELP) h += '<div class="card helpcard"><div class="help-h"><span class="ci ' + c + '">' + I[ic] + '</span><b>' + esc(t) + '</b></div><ul>' + pts.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
+    return h + '</div>';
+  };
   PAGES.rules = p => {
     const y = p.year || st.year, R = st.rules[y];
     let h = bar('Regeln ' + y) + '<div class="pbody"><p class="lead" style="margin-top:0">Keine Steuerberatung. Jede Regel mit Quelle und Stand. „Ungeprüft“ heißt: nicht in einer amtlichen Quelle für dieses Jahr bestätigt.</p>';
@@ -1049,8 +1069,46 @@
     try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: name }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
   }
+  /* ================= Rundgang (Sprechblasen) ================= */
+  const TOUR = [
+    { sel: '#view .bank-top', t: 'Deine Erstattung', d: 'Hier steht, wie viel du ungefähr vom Finanzamt zurückbekommst – mit Spanne. Antippen öffnet den Reiter Steuer.' },
+    { sel: '#ch-home', t: 'Gesammelt übers Jahr', d: 'Fahrten und Belege wachsen hier mit. Mit dem Finger drüberwischen zeigt jeden Monat. Über der gestrichelten Linie (Pauschbetrag) lohnen sich deine Belege richtig.' },
+    { sel: '#view .qa', t: 'Schnell erfassen', d: 'Foto vom Kassenbon, PDF-Rechnung, Vertrag, Block aus dem Claude-Chat, Fahrten-Kalender oder Steuermappe – mit einem Tipp.' },
+    { sel: '#view .list, #view .done', t: 'Zu erledigen', d: 'Nur das, was du tun musst: Belege prüfen, Kündigungsfristen, Rückgaben. Orange = bald fällig, Rot = abgelaufen. Leer = alles erledigt.' },
+    { sel: '.tabbar .plus', t: 'Der Plus-Knopf', d: 'Das Wichtigste: Beleg fotografieren, Datei wählen, Vertrag anlegen oder Block einfügen.' },
+    { sel: '.tabbar [data-tab=belege]', t: 'Belege', d: 'Alle Belege mit Suche, Ausgaben je Monat, Filter für Steuer, Garantie und „Prüfen“.' },
+    { sel: '.tabbar [data-tab=vertraege]', t: 'Verträge', d: 'Fixkosten, Kündigungsdatum, Preiserhöhungen und fertige Kündigung.' },
+    { sel: '.tabbar [data-tab=steuer]', t: 'Steuer', d: 'Schätzung, Checkliste, Fahrten-Kalender, ELSTER-Spickzettel und Steuermappe als PDF.' },
+    { sel: '#helpBtn', t: 'Hilfe', d: 'Hier findest du jederzeit „Was kann Geldwerk?“ und diesen Rundgang wieder.' },
+    { sel: '#setBtn', t: 'Einstellungen', d: 'Kilometer und Zeiträume, Sicherung, Mitteilungen, Hell/Dunkel. Viel Spaß mit Geldwerk!' }
+  ];
+  function tourStart() { closeSheet(); if (st.stack.length) closeAllPages(); st.tab = 'home'; LS.set('tab', 'home'); render(); window.scrollTo(0, 0); st.tour = 0; setTimeout(tourShow, 250); }
+  function tourEnd() { st.tour = null; LS.set('tourDone', 1); const el = $('#tour'); if (el) el.remove(); }
+  function tourShow() {
+    while (st.tour != null && st.tour < TOUR.length && !document.querySelector(TOUR[st.tour].sel)) st.tour++;
+    if (st.tour == null || st.tour >= TOUR.length) { tourEnd(); return; }
+    const step = TOUR[st.tour], el = document.querySelector(step.sel);
+    const fixed = !!el.closest('.tabbar');
+    if (!fixed) { const r0 = el.getBoundingClientRect(); if (r0.top < 70 || r0.bottom > innerHeight - 260) window.scrollTo({ top: Math.max(0, scrollY + r0.top - 110), behavior: 'smooth' }); }
+    setTimeout(() => {
+      const r = el.getBoundingClientRect(), pad = 6;
+      const box = { x: Math.max(6, r.left - pad), y: r.top - pad, w: Math.min(innerWidth - 12, r.width + 2 * pad), h: Math.min(r.height + 2 * pad, innerHeight * 0.5) };
+      const below = box.y + box.h / 2 < innerHeight / 2;
+      const n = TOUR.length, last = st.tour === n - 1;
+      let w = document.getElementById('tour');
+      if (!w) { w = document.createElement('div'); w.id = 'tour'; w.className = 'tour'; document.body.appendChild(w); }
+      const ax = Math.min(innerWidth - 40, Math.max(28, r.left + r.width / 2));
+      w.innerHTML = '<div class="tour-hole" style="left:' + box.x + 'px;top:' + box.y + 'px;width:' + box.w + 'px;height:' + box.h + 'px"></div>' +
+        '<div class="tour-bub ' + (below ? 'below' : 'above') + '" role="dialog" aria-live="polite" style="' + (below ? 'top:' + (box.y + box.h + 14) : 'bottom:' + (innerHeight - box.y + 14)) + 'px;--ax:' + (ax - 16) + 'px">' +
+        '<b>' + esc(step.t) + '</b><p>' + esc(step.d) + '</p><div class="tour-ft"><span>' + (st.tour + 1) + ' / ' + n + '</span>' + (last ? '' : '<button type="button" class="link" data-a="tourSkip">Überspringen</button>') + '<button type="button" class="btn primary" data-a="tourNext">' + (last ? 'Fertig' : 'Weiter') + '</button></div></div>';
+    }, fixed ? 30 : 380);
+  }
   /* ================= Aktionen ================= */
   const A = {};
+  A.help = () => { closeSheet(); pushPage({ k: 'help' }); };
+  A.tourStart = () => tourStart();
+  A.tourNext = () => { haptic(); st.tour++; tourShow(); };
+  A.tourSkip = () => tourEnd();
   A.chSel = el => {
     const c = el.dataset.c, i = +el.dataset.i;
     haptic();
@@ -1191,7 +1249,7 @@
     s.upd = now(); commit({ render: false }); haptic(); renderPage();
   };
   A.vacStep = el => { const s = st.db.settings, y = +s.work.from.slice(0, 4); s.vacation = Object.assign({}, s.vacation, { [y]: Math.max(0, ((s.vacation || {})[y] || 0) + +el.dataset.d) }); s.upd = now(); renderPage(); };
-  A.setupFinish = () => { setS('setupDone', true); commit({ now: true }); closeAllPages(); st.tab = 'home'; render(); };
+  A.setupFinish = () => { setS('setupDone', true); commit({ now: true }); closeAllPages(); st.tab = 'home'; render(); if (!LS.get('tourDone', 0)) setTimeout(tourStart, 500); };
   A.restoreStart = () => openSheet({ k: 'restore' });
   A.restoreGo = async () => {
     const s = st.sheet; const ok = await connectSync(s, true);
@@ -1330,6 +1388,7 @@
     } else {
       Sync.adopt().then(ok => { if (ok) Sync.run(); }).catch(() => { });
       Sync.schedule(2500);
+      if (!LS.get('tourDone', 0)) setTimeout(() => { if (!st.stack.length && !st.sheet) tourStart(); }, 700);
     }
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
     window.__gw = { st, commit, G };   // für die automatischen Oberflächen-Tests
