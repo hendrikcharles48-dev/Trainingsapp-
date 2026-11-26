@@ -464,11 +464,22 @@ h1, .big, .mid, .q, .stat b, .cal-nav b, .count, .bigopt > span:last-child { fon
 .cal .d.school { background: var(--c2-bg); } .cal .d.school small { color: var(--c2-ic); }
 .cal .d.home { background: var(--c3-bg); } .cal .d.home small { color: var(--c3-ic); }
 .cal .d.exc::after { background: var(--red); }
-/* Schnellaktionen: Belege türkis, Vertrag/Block indigo, Fahrten gelb, Mappe grün (Ergebnis) */
-.qa button[data-a=cam] span, .qa button[data-a=pickFile] span { color: var(--c2-ic); background: var(--c2-bg); }
-.qa button[data-a=newContract] span, .qa button[data-a=openBlock] span { color: var(--c1-ic); background: var(--c1-bg); }
-.qa button[data-a=openCal] span { color: var(--c3-ic); background: var(--c3-bg); }
-.qa button[data-a=mappe] span { color: var(--green); background: var(--green-bg); }
+/* Schnellaktionen (1.5): jede Aktion eine eigene kräftige Farbe, Nachbarn klar verschieden (Prüfskript: Farbschwäche ΔE ≥ 11,7,
+   Normalsicht ≥ 22). Weißes Symbol (≥ 3,3:1), auf Gelb dunkles Symbol (7:1). Name steht immer darunter. */
+.qa button span { color: #FFFFFF; }
+.qa button[data-a=cam] span { background: #5B4FE0; }
+.qa button[data-a=pickFile] span { background: #0A9C80; }
+.qa button[data-a=newContract] span { background: #E8661F; }
+.qa button[data-a=openBlock] span { background: #2A72D4; }
+.qa button[data-a=openCal] span { background: #E3A008; color: #2A1C00; }
+.qa button[data-a=mappe] span { background: #D6457F; }
+:root[data-theme="dark"] .qa button[data-a=cam] span { background: #7067F0; }
+:root[data-theme="dark"] .qa button[data-a=openCal] span { background: #D28E05; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .qa button[data-a=cam] span { background: #7067F0; }
+  :root:not([data-theme="light"]) .qa button[data-a=openCal] span { background: #D28E05; }
+}
+.qa button span svg { stroke-width: 2; }
 .qa button span { box-shadow: none; }
 /* Kategorie-Chips im Beleg: gewählte in Bereichsfarbe */
 .chip.on[data-c=fortbildung] { background: var(--c1-ic); border-color: var(--c1-ic); color: var(--chip-ink); }

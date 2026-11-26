@@ -35,7 +35,7 @@
     const sel = Math.min(o.sel != null ? o.sel : last, last);
     let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label || '') + '">';
     s += '<line class="ch-grid" x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>';
-    if (o.ref) { const y = Yv(o.ref.v); s += '<line class="ch-ref" x1="0" x2="' + W + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/><text class="ch-txt" x="' + (W - 2) + '" y="' + (y - 5).toFixed(1) + '" text-anchor="end" font-size="10.5">' + esc(o.ref.l) + '</text>'; }
+    if (o.ref) { const y = Yv(o.ref.v); s += '<line class="ch-ref" x1="0" x2="' + W + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/><text class="ch-txt" x="2" y="' + (y - 5).toFixed(1) + '" text-anchor="start" font-size="10.5">' + esc(o.ref.l) + '</text>'; }
     if (P.length > 1) {
       const path = smooth(P);
       s += '<path d="' + path + 'L' + P[P.length - 1][0].toFixed(1) + ',' + (H - B) + 'L' + P[0][0].toFixed(1) + ',' + (H - B) + 'Z" class="ch-area"/>';
