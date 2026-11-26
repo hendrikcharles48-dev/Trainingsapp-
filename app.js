@@ -392,12 +392,12 @@
     return { work: Math.round(work / 60), rest: Math.max(0, Math.round(rest / 60)), warm: Math.round(warm / 60), total: Math.round((work + Math.max(0, rest) + warm) / 60), sets: items.reduce((t, i) => t + i.sets, 0) };
   }
   const TECH_TXT = { drop: 'Letzter Satz als Dropsatz: direkt danach Gewicht −25 % und ohne Pause weiter, bis noch 1–2 Wdh. gingen', myo: 'Letzter Satz mit Myo-Reps: danach 15 s Pause, 3–5 Wdh., das 3× – jeweils 1–2 Wdh. vor Schluss stoppen' };
-  function slotItems(day, loc) {
-    const p = plan(); const ra = (P() && P().restAdj) || {};
-    return day.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); if (!ex) return null; const pr = E.prescription(sl, ex, P(), p);
+  function slotItems(day, loc, prof = P(), pl = plan()) {
+    const p = pl; const ra = (prof && prof.restAdj) || {};
+    return day.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); if (!ex) return null; const pr = E.prescription(sl, ex, prof, p);
       return { slot: sl, slotId: sl.id, ex, sets: pr.sets, rr: pr.rr, rest: pr.rest + ((ra[ex.id] || {}).s || 0), role: pr.role, adj: sl._adj || [] }; }).filter(Boolean);
   }
-  function estMinutes(day, loc) { return trainTime(slotItems(day, loc)).total; }
+  function estMinutes(day, loc, prof, pl) { return trainTime(slotItems(day, loc, prof, pl)).total; }
   function dateDE(iso, opts) { const d = new Date(iso.length <= 10 ? iso + 'T12:00:00' : iso); return d.toLocaleDateString('de-DE', opts || { weekday: 'short', day: 'numeric', month: 'short' }); }
   function durTxt(sec) { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; }
   function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -1656,7 +1656,7 @@
       <div class="stack"><h1>${esc(p.splitName)}, ${p.days.length}× pro Woche</h1>
       <p class="ink2" style="margin:0">Aus ${E.allExercises(r.prof).length} Übungen wurden die ausgewählt, die zu deiner Ausrüstung, deinem Level (≈${ab.tests.P} Klimmzüge, ≈${ab.tests.PU} Liegestütze) ${(a.injuries || []).length ? 'und deinen Beschwerden ' : ''}passen. Tippe im Plan später auf eine Übung, um sie zu tauschen.</p>
       ${p.locs.length > 1 ? `<div class="seg">${p.locs.map(l => `<button data-a="resultLoc" data-l="${l}" aria-pressed="${loc === l}">${LOCN[l]}</button>`).join('')}</div>` : ''}
-      ${p.days.map(d => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">≈ ${estMinutes(d, loc)} min</span></div><div class="list">${d.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); const pr = E.prescription(sl, ex, r.prof, p); return `<div class="li">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div>${sl.why[loc] && sl.why[loc].length ? `<div class="why" style="margin-top:4px">${sl.why[loc].map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div></div>`; }).join('')}</div></div>`).join('')}
+      ${p.days.map(d => `<div class="section"><div class="head"><h2>${esc(d.name)}</h2><span class="small muted">≈ ${estMinutes(d, loc, r.prof, p)} min</span></div><div class="list">${d.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); const pr = E.prescription(sl, ex, r.prof, p); return `<div class="li">${plateHTML(sl.r)}<div class="grow"><div style="font-weight:600">${esc(ex.name)}</div><div class="small muted">${pr.sets} × ${rrText(pr.rr, ex)}${ex.uni ? ' pro Seite' : ''}</div>${sl.why[loc] && sl.why[loc].length ? `<div class="why" style="margin-top:4px">${sl.why[loc].map(w => `<span>${esc(w)}</span>`).join('')}</div>` : ''}</div></div>`; }).join('')}</div></div>`).join('')}
       <button class="btn primary big" data-a="acceptPlan">Plan übernehmen</button>
       <button class="btn" data-a="resultOwn">Lieber eigenen Plan bauen</button>
       <button class="btn" data-a="reroll">Andere Übungsauswahl vorschlagen</button></div>`;
