@@ -674,8 +674,11 @@
   const SORE_T = ['', 'leicht', 'mittel', 'stark'];
   const BB_G = new Set(['schultern', 'brust', 'griff', 'rumpf']);
   function groupsOfEx(ex) { return Object.keys(ADJ_G).filter(g => ex.prim.some(m => ADJ_G[g].includes(m))); }
+  // 3.27.6 (Nutzerwunsch 19.11., wie Formwerk-Worker bbRelevant): Baseball zählt nur mit Schmerz oder Muskelkater an Schultern, Armen oder Beinen
+  function bbHurt(rd) { return !!rd && ((rd.pain || []).length > 0 || ['schultern', 'bizeps', 'trizeps', 'griff', 'vorn', 'hinten'].some(g => ((rd.sore || {})[g] || 0) > 0)); }
   function adjustDay(day, loc, profile, plan, rd, opts) {
     opts = opts || {};
+    if (rd && rd.yesterdayBaseball && !bbHurt(rd)) rd = Object.assign({}, rd, { yesterdayBaseball: false });
     const exOf = id => DB.byId[id] || ((profile && profile.custom) || []).find(e => e.id === id);
     const out = { slots: [], removed: [], changes: [], banner: [], any: false, noUp: false };
     const base = day.slots.filter(sl => sl.ex[loc] && exOf(sl.ex[loc]));
@@ -1175,7 +1178,7 @@
 
   window.ENGINE = {
     Q, BANDS, canBand, bandKg, abilities, buildPlan, fillDay, alternatives, timePlan, balancePlan, planVolume, prescription, recommend, historyFor, sessionBest, setScore,
-    loadOptions, locEquip, available, readyDay, adjustDay, stalled, progStep, progProfile, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
+    loadOptions, locEquip, available, readyDay, adjustDay, stalled, progStep, progProfile, bbHurt, learnVolume, volTargets, bodyweight, weekInfo, mesoWeek, todayISO, weeklyMuscleSets, startOfWeek,
     estimate1RM, allExercises, effLoad, refreshSelection, defaultRest, goalRanges, isCut, setWorkouts, mesoBreak, phaseOf, applyCheckin, CHECKIN, PLAN_VERSION, TEMPLATES, SPLIT_NAMES, chainStep, snap, EXP_LVL
   };
 })();
