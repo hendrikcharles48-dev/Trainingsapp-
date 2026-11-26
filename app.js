@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.28.0';
+  const APP_VERSION = '3.28.1';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -137,8 +137,9 @@
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
       this.busy = true;
       try {
-        // Nie eine Sicherung mit Trainings überschreiben, die hier fehlen (z. B. neues/geleertes Handy)
-        if (!this.state().checked) {
+        // Nie eine Sicherung mit Trainings überschreiben, die hier fehlen (z. B. neues/geleertes Handy).
+        // Ab 3.28.1 bei JEDEM Hochladen prüfen, nicht nur beim ersten Mal: ein zweites Gerät kann in der Zwischenzeit Trainings hochgeladen haben.
+        {
           const p = await this.pull();
           if (p.d && Array.isArray(p.d.workouts)) { const have = new Set(st.workouts.map(w => w.id)); const miss = p.d.workouts.filter(w => w && !have.has(w.id)).length; if (miss) { this.setState({ conflict: miss, err: '' }); if (!st.ov && !st.sheet) render(); return false; } }
           else if (p.error && !/Noch keine/.test(p.error)) { this.setState({ err: p.error, errAt: Date.now() }); return false; }
