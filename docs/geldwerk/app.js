@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const G = window.GW, S = G.Store, LS = S.LS, Y = G.Y;
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const RULE_YEARS = [2026, 2027];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -35,11 +35,12 @@
     share: '<svg viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11v8.5h12V11"/></svg>',
     cloud: '<svg viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 10a4 4 0 0 1-.5 8.5z"/></svg>',
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
     school: '<svg viewBox="0 0 24 24"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 11.5V16c2.8 2 7.2 2 10 0v-4.5M21 9.5v5"/></svg>',
     shield: '<svg viewBox="0 0 24 24"><path d="M12 3.5 19 6v6c0 4.2-3 7.2-7 8.5-4-1.3-7-4.3-7-8.5V6z"/></svg>'
   };
 
-  const st = { db: null, rules: {}, chain: {}, inbox: [], tab: LS.get('tab', 'home'), year: null, q: '', filter: 'alle', stack: [], sheet: null, files: {}, ocrJobs: {} };
+  const st = { db: null, rules: {}, chain: {}, inbox: [], tab: LS.get('tab', 'home'), year: null, q: '', filter: 'alle', month: null, spanN: 6, chSel: {}, stack: [], sheet: null, files: {}, ocrJobs: {} };
 
   /* ================= Daten ================= */
   function recalc() {
@@ -99,37 +100,109 @@
   }
   function refresh() { render(); if (st.stack.length) renderPage(); if (st.sheet) renderSheet(); }
 
+  // ---------- Kategorie- und Vertragssymbole (runde Kacheln wie in Banking-Apps) ----------
+  const CI = {
+    fortbildung: '<path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 11.5V16c2.8 2 7.2 2 10 0v-4.5"/>',
+    fachbuch: '<path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H19v14H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/>',
+    technik: '<rect x="4.5" y="5" width="15" height="10" rx="1.5"/><path d="M2.5 19h19"/>',
+    arbeitsmittel: '<path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6l-8.2 8.2a1.8 1.8 0 0 1-2.5-2.5l8.2-8.2z"/><path d="M15 5l4 4"/>',
+    buero: '<path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13.5 6.5l4 4"/>',
+    kleidung: '<path d="M8.5 4 4 6.5 5.5 10 7.5 9v11h9V9l2 1L20 6.5 15.5 4a3.5 3.5 0 0 1-7 0z"/>',
+    reise: '<rect x="6" y="3.5" width="12" height="13" rx="3"/><path d="M6 11h12M9 20l1.5-3.5M15 20l-1.5-3.5"/>',
+    bewerbung: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
+    spende: '<path d="M12 20s-7-4.4-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.6 12 20 12 20z"/>',
+    privat: '<path d="M6 8h12l-1 12H7z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+    none: '<path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z"/><path d="M9 8h6M9 11.5h6"/>',
+    kfz: '<path d="M5 16.5V12l2-5h10l2 5v4.5M3.5 16.5h17M7 19v-2.5M17 19v-2.5"/>',
+    handy: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+    internet: '<path d="M4 9.5a12 12 0 0 1 16 0M7 12.5a7.5 7.5 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"/><circle cx="12" cy="18.5" r=".8"/>',
+    strom: '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
+    streaming: '<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M10.5 8.5v5l4-2.5z"/><path d="M8 20h8"/>',
+    fitness: '<path d="M6.5 8v8M17.5 8v8M4 10v4M20 10v4M6.5 12h11"/>',
+    sonst: '<path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4"/>'
+  };
+  const cic = (k, cls) => '<span class="ci' + (cls ? ' ' + cls : '') + '"><svg viewBox="0 0 24 24">' + (CI[k] || CI.none) + '</svg></span>';
+
+  // ---------- Daten für Diagramme ----------
+  const MS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  // Gesammelte Werbungskosten je Monat (Fahrten + Belege), aufsummiert
+  function wkByMonth(y) {
+    const R = st.rules[y]; if (!R) return null;
+    const m = new Array(12).fill(0);
+    const tr = G.trips(st.db, y, R);
+    for (const d of tr.days) if (d.k === 'work' || d.k === 'school') m[+d.d.slice(5, 7) - 1] += Math.floor(d.km) * tr.sum.rate;
+    if (tr.sum.vacation) { // Urlaub pauschal: gleichmäßig auf die Arbeitsmonate
+      const wm = [...new Set(tr.days.filter(d => d.k === 'work').map(d => +d.d.slice(5, 7) - 1))];
+      for (const i of wm) m[i] -= tr.sum.vacation * Math.floor(+st.db.settings.kmWork || 0) * tr.sum.rate / wm.length;
+    }
+    for (const r of G.live(st.db, 'receipts')) {
+      const c = G.CAT[r.cat]; if (!c || !c.area || c.area === 'spende') continue;
+      const a = G.receiptYearAmount(r, y, R); if (!a) continue;
+      m[r.date && r.date.startsWith(String(y)) ? +r.date.slice(5, 7) - 1 : 0] += a;
+    }
+    let s = 0; return m.map((v, i) => ({ l: MS[i], v: G.r2(s += v), add: G.r2(v) }));
+  }
+  // Ausgaben (alle Belege) je Monat, die letzten n Monate bis heute
+  function spendByMonth(n) {
+    const t = today(), out = [];
+    for (let i = n - 1; i >= 0; i--) { const k = G.addMonths(t.slice(0, 8) + '01', -i).slice(0, 7); out.push({ k, l: MS[+k.slice(5, 7) - 1], v: 0, n: 0 }); }
+    const idx = Object.fromEntries(out.map((o, i) => [o.k, i]));
+    for (const r of G.live(st.db, 'receipts')) { const i = r.date ? idx[r.date.slice(0, 7)] : undefined; if (i != null) { out[i].v += +r.amount || 0; out[i].n++; } }
+    return out.map(o => Object.assign(o, { v: G.r2(o.v) }));
+  }
+  const avatar = () => { const n = (st.db.settings.name || '').trim(); return n ? esc(n.split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase()) : I.gear; };
+
   // ---------- Übersicht ----------
   function inboxRow(i) {
-    const icon = { pruefen: I.receipt, kuendigung: I.doc, rueckgabe: I.receipt, gewaehr: I.shield, garantie: I.shield, noetig: I.doc, lohnsteuer: I.euro, steuerfrist: I.cal }[i.kind] || I.info;
+    const k = i.kind === 'pruefen' ? ((st.db.receipts[i.id] || {}).cat || 'none') : i.kind === 'kuendigung' || i.kind === 'noetig' ? ((st.db.contracts[i.id] || {}).tpl || 'sonst') : i.kind === 'lohnsteuer' || i.kind === 'steuerfrist' ? 'fortbildung' : ((st.db.receipts[i.id] || {}).cat || 'none');
     const when = i.days != null && i.kind !== 'pruefen' ? ' · ' + daysWord(i.days) : '';
-    return '<button type="button" class="row" data-a="inboxOpen" data-key="' + esc(i.key) + '"><span class="ic' + (i.sev === 'red' ? ' red' : '') + '">' + icon + '</span><span class="main"><span class="t ell">' + esc(i.t) + '</span><span class="s">' + esc(i.sub) + '<span class="' + (i.sev === 'red' ? 'red' : '') + '">' + esc(when) + '</span></span></span>' + I.chev + '</button>';
+    return '<button type="button" class="row" data-a="inboxOpen" data-key="' + esc(i.key) + '">' + cic(k, i.sev === 'red' ? 'red' : '') + '<span class="main"><span class="t ell">' + esc(i.t) + '</span><span class="s">' + esc(i.sub) + '<span class="' + (i.sev === 'red' ? 'red' : '') + '">' + esc(when) + '</span></span></span>' + I.chev + '</button>';
   }
+  const QA = [['cam', 'Foto', I.cam], ['pickFile', 'Datei', I.file], ['newContract', 'Vertrag', I.doc], ['openBlock', 'Block', I.block], ['openCal', 'Fahrten', I.car], ['mappe', 'Mappe', I.share]];
   function viewHome() {
-    const yr = defaultYear();
-    const res = st.chain[yr];
-    let h = head('Übersicht', 'Hier steht nur, was du tun musst. Belege, Fahrten und Fristen sammelt Geldwerk von selbst.');
-    h += '<div class="sec-h"><h2>Zu erledigen</h2>' + (st.inbox.length ? '<span class="muted">' + st.inbox.length + '</span>' : '') + '</div>';
+    const yr = defaultYear(), res = st.chain[yr];
+    const d = new Date(), wd = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][d.getDay()];
+    const name = (st.db.settings.name || '').trim().split(/\s+/)[0];
+    let h = '<header class="top"><div class="top-row"><div style="flex:1;min-width:0"><div class="date">' + wd + ', ' + d.getDate() + '. ' + G.MONTHS[d.getMonth()] + '</div><h1>Moin' + (name ? ', ' + esc(name) : '') + '</h1></div><button class="icon-btn avatar" type="button" data-a="settings" aria-label="Einstellungen">' + avatar() + '</button></div></header>';
+    // Karte wie eine Bankkarte: Erstattung + Verlauf
+    h += '<section class="bank">' + blob() + '<button type="button" class="bank-top" data-a="tab" data-t="steuer">' + heroTop(res, yr) + '</button>';
+    const wm = wkByMonth(yr);
+    if (wm && wm.some(p => p.v)) {
+      const upto = +today().slice(0, 4) > yr ? 11 : +today().slice(5, 7) - 1;
+      const sel = st.chSel.home != null ? st.chSel.home : upto;
+      h += '<div class="chart-h"><span>Gesammelt ' + yr + '</span><span class="muted">Fahrten + Belege</span></div><div id="ch-home">' + G.Chart.line({ id: 'home', pts: wm, upto, sel, ref: { v: st.rules[yr].regeln.an_pauschbetrag.wert, l: 'Pauschbetrag 1.230 €' }, label: 'Gesammelte Werbungskosten je Monat' }) + '</div>';
+      h += '<p class="chart-cap" id="cap-home">' + homeCap(wm, Math.min(sel, upto)) + '</p>';
+    }
+    h += '</section>';
+    // Schnellaktionen
+    h += '<div class="qa">' + QA.map(([a, l, ic]) => '<button type="button" data-a="' + a + '"><span>' + ic + '</span>' + l + '</button>').join('') + '</div>';
+    h += '<div class="sec-h"><h2>Zu erledigen</h2>' + (st.inbox.length ? '<span class="count">' + st.inbox.length + '</span>' : '') + '</div>';
     if (!st.inbox.length) h += '<div class="card done"><div class="check">' + I.check + '</div><b>Alles erledigt</b><span class="muted">Neue Belege einfach mit dem Plus fotografieren.</span></div>';
-    else h += '<div class="list">' + st.inbox.slice(0, 8).map(inboxRow).join('') + '</div>' + (st.inbox.length > 8 ? '<p class="hint">… und ' + (st.inbox.length - 8) + ' weitere</p>' : '');
-    // Kacheln
-    h += '<div class="sec-h"><h2>Auf einen Blick</h2></div><div class="tiles">';
-    h += '<button type="button" class="tile wide" data-a="tab" data-t="steuer">' + refundTile(res, yr) + '</button>';
+    else h += '<div class="list">' + st.inbox.slice(0, 6).map(inboxRow).join('') + '</div>' + (st.inbox.length > 6 ? '<p class="hint">… und ' + (st.inbox.length - 6) + ' weitere</p>' : '');
+    // zwei Kacheln wie „Ausgaben / Einnahmen“
     const cs = G.live(st.db, 'contracts').filter(c => !c.ended);
-    const fix = cs.reduce((a, c) => a + G.monthly(c), 0);
-    h += '<button type="button" class="tile" data-a="tab" data-t="vertraege"><span class="lbl">Fixkosten</span><span class="mid">' + eur(Math.round(fix)) + '</span><span class="sub">pro Monat · ' + cs.length + (cs.length === 1 ? ' Vertrag' : ' Verträge') + '</span></button>';
-    const nx = nextDeadline();
-    h += '<button type="button" class="tile" data-a="' + (nx ? 'inboxOpenDl' : 'tab') + '" data-t="vertraege" data-key="' + (nx ? esc(nx.key) : '') + '"><span class="lbl">Nächste Frist</span>' +
-      (nx ? '<span class="mid' + (nx.days < 0 ? ' red' : '') + '">' + (nx.days === 0 ? 'Heute' : nx.days === 1 ? '1 Tag' : nx.days + ' Tage') + '</span><span class="sub ell" style="white-space:normal">' + esc(nx.label) + '</span>' : '<span class="mid">–</span><span class="sub">Keine Frist offen</span>') + '</button>';
-    h += '</div>';
+    const fix = cs.reduce((a, c) => a + G.monthly(c), 0), nx = nextDeadline();
+    h += '<div class="tiles" style="margin-top:12px"><button type="button" class="tile" data-a="tab" data-t="vertraege"><span class="arrow">' + I.down + '</span><span class="lbl">Fixkosten</span><span class="mid">' + eur(Math.round(fix)) + '</span><span class="sub">pro Monat · ' + cs.length + (cs.length === 1 ? ' Vertrag' : ' Verträge') + '</span></button>';
+    h += '<button type="button" class="tile" data-a="' + (nx ? 'inboxOpenDl' : 'tab') + '" data-t="vertraege" data-key="' + (nx ? esc(nx.key) : '') + '"><span class="arrow">' + I.cal + '</span><span class="lbl">Nächste Frist</span>' +
+      (nx ? '<span class="mid' + (nx.days < 0 ? ' red' : '') + '">' + (nx.days === 0 ? 'Heute' : nx.days === 1 ? '1 Tag' : nx.days + ' Tage') + '</span><span class="sub clamp2">' + esc(nx.label) + '</span>' : '<span class="mid">–</span><span class="sub">Keine Frist offen</span>') + '</button></div>';
+    // Zuletzt erfasst (wie Umsätze)
+    const last = G.live(st.db, 'receipts').sort((a, b) => (b.upd || 0) - (a.upd || 0)).slice(0, 4);
+    if (last.length) h += '<div class="sec-h"><h2>Zuletzt erfasst</h2><button type="button" data-a="tab" data-t="belege">Alle</button></div><div class="list">' + last.map(receiptRow).join('') + '</div>';
     h += syncStatusLine();
     return h;
   }
-  function refundTile(res, yr) {
+  function homeCap(wm, i) { const p = wm[i]; return p ? '<b>' + G.MONTHS[i] + ':</b> +' + eur(Math.round(p.add)) + ' · zusammen ' + eur(Math.round(p.v)) : ''; }
+  const blob = () => '<svg class="blob" viewBox="0 0 200 160" aria-hidden="true"><path d="M60 0h140v118c-18 22-52 30-78 14-24-15-22-46-46-58C52 62 30 70 18 52 6 34 26 6 60 0z" fill="var(--navy2)"/><path d="M96 158C120 118 150 128 166 92 178 64 190 52 200 50" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity=".45"/></svg>';
+  function heroTop(res, yr) {
     if (!res) return '<span class="lbl">Steuer</span>';
-    if (res.noIncome && res.loss > 0) return '<span class="lbl">Steuer ' + yr + '</span><span class="big">' + eur(Math.round(res.carryOut)) + '</span><span class="sub">Verlustvortrag gesichert, sobald du die Erklärung abgibst</span>';
-    if (res.refund != null) return '<span class="lbl">Erstattung ' + yr + '</span><span class="big ' + (res.refund >= 0 ? 'green' : '') + '">' + (res.refund >= 0 ? 'ca. ' + eur(Math.round(res.refund / 10) * 10) : eur(Math.round(res.refund))) + '</span><span class="sub">' + (res.refund >= 0 ? 'zurück · Spanne ' + eur(Math.max(0, Math.floor(res.range[0] / 10) * 10)) + ' – ' + eur(Math.ceil(res.range[1] / 10) * 10) : 'Nachzahlung möglich') + ' · Schätzung</span>';
-    return '<span class="lbl">Steuer ' + yr + '</span><span class="big">' + eur(Math.round(res.wk)) + '</span><span class="sub">Werbungskosten gesammelt. Die Erstattung erscheint, sobald Lohn und Lohnsteuer eingetragen sind.</span>';
+    if (res.noIncome && res.loss > 0) return '<span class="lbl">Verlustvortrag ' + yr + '</span><span class="big">' + eur(Math.round(res.carryOut)) + '</span><span class="sub">gesichert, sobald du die Erklärung abgibst</span>';
+    if (res.refund != null) { const pos = res.refund >= 0; return '<span class="lbl">' + (pos ? 'Erstattung ' : 'Nachzahlung ') + yr + ' · Schätzung</span><span class="big' + (pos ? ' green' : '') + '">ca. ' + eur(Math.abs(Math.round(res.refund / 10) * 10)) + '</span><span class="sub">Spanne ' + eur(Math.floor(res.range[0] / 10) * 10) + ' – ' + eur(Math.ceil(res.range[1] / 10) * 10) + monthBadge(yr) + '</span>'; }
+    return '<span class="lbl">Werbungskosten ' + yr + '</span><span class="big">' + eur(Math.round(res.wk)) + '</span><span class="sub">Erstattung erscheint mit Lohn und Lohnsteuer' + monthBadge(yr) + '</span>';
+  }
+  function monthBadge(yr) {
+    const wm = wkByMonth(yr); if (!wm || !today().startsWith(String(yr))) return '';
+    const add = wm[+today().slice(5, 7) - 1].add;
+    return add > 0 ? ' <span class="badge">+' + eur(Math.round(add)) + ' im ' + G.MONTHS[+today().slice(5, 7) - 1] + '</span>' : '';
   }
   function nextDeadline() {
     const t = today();
@@ -148,12 +221,13 @@
   // ---------- Belege ----------
   function receiptMatches(r, q) {
     if (!q) return true;
-    const s = (r.merchant + ' ' + catL(r.cat) + ' ' + (r.note || '') + ' ' + G.fmtDate(r.date) + ' ' + money(r.amount) + ' ' + (r.text || '').slice(0, 2000)).toLowerCase();
+    const s = (r.merchant + ' ' + catL(r.cat) + ' ' + (r.note || '') + ' ' + G.fmtDate(r.date) + ' ' + money2(r.amount) + ' ' + (r.text || '').slice(0, 2000)).toLowerCase();
     return q.toLowerCase().split(/\s+/).every(w => s.includes(w));
   }
   function receiptList() {
     const t = today(), y = st.year;
     let list = G.live(st.db, 'receipts').filter(r => receiptMatches(r, st.q));
+    if (st.month) list = list.filter(r => r.date && r.date.startsWith(st.month));
     if (st.filter === 'steuer') list = list.filter(r => G.CAT[r.cat] && G.CAT[r.cat].area && G.receiptYearAmount(r, y, st.rules[y]) > 0);
     if (st.filter === 'garantie') list = list.filter(r => { const x = G.receiptDates(r); return (x.warrantyUntil && x.warrantyUntil >= t) || (x.guaranteeUntil && x.guaranteeUntil >= t); });
     if (st.filter === 'pruefen') list = list.filter(G.isUnsure);
@@ -165,21 +239,42 @@
     let badge = '';
     if (G.isUnsure(r)) badge = '<span class="tag warn">prüfen</span> ';
     else if (x.returnUntil && x.returnUntil >= t) badge = '<span class="tag">Rückgabe bis ' + G.fmtShort(x.returnUntil) + '</span> ';
-    return '<button type="button" class="row" data-a="openReceipt" data-id="' + r.id + '">' + thumbOf(r) + '<span class="main"><span class="t ell">' + esc(r.merchant || 'Beleg') + '</span><span class="s ell">' + badge + esc(catL(r.cat)) + (r.date ? ' · ' + G.fmtShort(r.date) : '') + '</span></span><span class="v">' + (r.amount != null ? eur(r.amount, 2) : '–') + '</span></button>';
+    const img = (r.files || []).some(f => f.type === 'jpg');
+    return '<button type="button" class="row" data-a="openReceipt" data-id="' + r.id + '">' + cic(r.cat || 'none') + '<span class="main"><span class="t ell">' + esc(r.merchant || 'Beleg') + '</span><span class="s ell">' + badge + esc(catL(r.cat)) + (r.date ? ' · ' + G.fmtShort(r.date) : '') + (img ? '' : ' · ohne Foto') + '</span></span><span class="v">' + (r.amount != null ? '−' + eur(r.amount, 2) : '–') + '</span></button>';
   }
+  function contractMatches(c, q) { const s = ((c.name || '') + ' ' + (c.provider || '') + ' ' + (c.customerNo || '') + ' ' + (c.contractNo || '') + ' ' + (c.note || '')).toLowerCase(); return q.toLowerCase().split(/\s+/).every(w => s.includes(w)); }
   function receiptListHtml() {
     const list = receiptList();
-    if (!list.length) return '<div class="empty">' + (G.live(st.db, 'receipts').length ? 'Nichts gefunden.' : 'Noch keine Belege. Tippe unten auf Plus und fotografiere den ersten Kassenbon.') + '</div>';
-    let h = '', cur = null, buf = [];
+    let h = '';
+    if (st.q) { const cs = G.live(st.db, 'contracts').filter(c => contractMatches(c, st.q)); if (cs.length) h += '<div class="month-h">Verträge</div><div class="list">' + cs.map(contractRow).join('') + '</div>'; }
+    if (!list.length) return h + '<div class="empty">' + (G.live(st.db, 'receipts').length ? (st.q || st.month || st.filter !== 'alle' ? 'Keine Belege für diese Auswahl.' : '') : 'Noch keine Belege. Tippe unten auf Plus und fotografiere den ersten Kassenbon.') + '</div>';
+    let cur = null, buf = [];
     const flush = () => { if (buf.length) h += '<div class="month-h">' + esc(cur) + '</div><div class="list">' + buf.join('') + '</div>'; buf = []; };
     for (const r of list) { const m = r.date ? G.MONTHS[+r.date.slice(5, 7) - 1] + ' ' + r.date.slice(0, 4) : 'Ohne Datum'; if (m !== cur) { flush(); cur = m; } buf.push(receiptRow(r)); }
     flush();
     return h;
   }
+  function belegeChart() {
+    const n = st.spanN || 6, pts = spendByMonth(n);
+    const sel = st.month ? pts.findIndex(p => p.k === st.month) : null;
+    let h = '<div class="card chartcard"><div class="chart-h"><span>Ausgaben je Monat</span><div class="seg mini">' + [6, 12].map(k => '<button type="button" class="' + (n === k ? 'on' : '') + '" data-a="spanN" data-n="' + k + '">' + k + ' M</button>').join('') + '</div></div>';
+    h += G.Chart.bars({ id: 'belege', pts, sel: sel >= 0 ? sel : null, label: 'Ausgaben je Monat' });
+    if (st.month) { const p = pts[sel]; h += '<div class="chart-cap"><span><b>' + G.MONTHS[+st.month.slice(5) - 1] + ':</b> ' + eur(p ? p.v : 0, 2) + ' · ' + (p ? p.n : 0) + ' Belege</span><button type="button" class="link" data-a="monthClear">Alle zeigen</button></div>'; }
+    else { const tot = pts.reduce((a, p) => a + p.v, 0); h += '<div class="chart-cap"><span>' + eur(Math.round(tot)) + ' in ' + n + ' Monaten · Säule antippen zum Filtern</span></div>'; }
+    return h + '</div>';
+  }
   function viewBelege() {
-    const n = G.live(st.db, 'receipts').length, un = G.live(st.db, 'receipts').filter(G.isUnsure).length;
+    const all = G.live(st.db, 'receipts'), n = all.length, un = all.filter(G.isUnsure).length;
     let h = head('Belege', 'Jeden Beleg mit dem Plus fotografieren – Datum, Betrag und Kategorie erkennt Geldwerk selbst.');
-    h += '<div class="search"><input class="inp" type="search" placeholder="Suchen: Händler, Betrag, Text …" value="' + esc(st.q) + '" data-in="q" enterkeyhint="search" autocomplete="off" aria-label="Belege durchsuchen"></div>';
+    h += '<div class="search"><input class="inp" type="search" placeholder="Suchen: Händler, Betrag, Vertrag …" value="' + esc(st.q) + '" data-in="q" enterkeyhint="search" autocomplete="off" aria-label="Belege und Verträge durchsuchen"></div>';
+    if (n) h += belegeChart();
+    // steuerlich relevant je Kategorie
+    if (n && !st.q) {
+      const y = st.year, by = {};
+      for (const r of all) { const a = G.CAT[r.cat] && G.CAT[r.cat].area ? G.receiptYearAmount(r, y, st.rules[y]) : 0; if (a) by[r.cat] = (by[r.cat] || 0) + a; }
+      const rows = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ l: catL(k), v, icon: '<svg class="hb-ic" viewBox="0 0 24 24">' + (CI[k] || CI.none) + '</svg>' }));
+      if (rows.length) h += '<details class="card fold"' + (st.catOpen ? ' open' : '') + '><summary data-a="catFold"><span>Steuerlich relevant ' + y + '</span><span style="display:flex;align-items:center;gap:6px"><b>' + eur(Math.round(rows.reduce((a, r) => a + r.v, 0))) + '</b>' + I.chev + '</span></summary>' + G.Chart.hbars(rows) + '<p class="hint">Beruflicher Anteil, teure Arbeitsmittel anteilig.</p></details>';
+    }
     const F = [['alle', 'Alle ' + n], ['steuer', 'Steuer ' + String(st.year).slice(2)], ['garantie', 'Garantie'], ['pruefen', 'Prüfen' + (un ? ' ' + un : '')]];
     h += '<div class="filters">' + F.map(([k, l]) => '<button type="button" class="chip' + (st.filter === k ? ' on' : '') + '" data-a="filter" data-f="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
     h += '<div id="rlist">' + receiptListHtml() + '</div>';
@@ -187,65 +282,100 @@
   }
 
   // ---------- Verträge ----------
+  function contractRow(c) {
+    const t = today(), n = G.nextCancel(c, t), pc = G.priceChange(c);
+    const s = c.ended ? 'Gekündigt zum ' + G.fmtDate(c.ended) : !n || n.unknown ? 'Beginn fehlt – Frist unbekannt' : n.anytime ? 'Jederzeit kündbar · Ende frühestens ' + G.fmtShort(n.end) + n.end.slice(0, 4) : 'Kündigen bis ' + G.fmtDate(n.deadline) + ' · ' + daysWord(n.days);
+    const soon = n && !n.anytime && n.days != null && n.days <= 30 && !c.ended;
+    return '<button type="button" class="row" data-a="openContract" data-id="' + c.id + '">' + cic(c.tpl || 'sonst') + '<span class="main"><span class="t ell">' + esc(c.name || c.provider || 'Vertrag') + (c.name && c.provider ? ' <span class="muted" style="font-weight:400">· ' + esc(c.provider) + '</span>' : '') + '</span><span class="s">' + (soon ? '<span class="tag">' + esc(s) + '</span>' : esc(s)) + (pc && pc.pct ? ' <span class="tag grey">' + (pc.pct > 0 ? '+' : '') + String(pc.pct).replace('.', ',') + ' %</span>' : '') + '</span></span><span class="v">' + (c.amount != null ? eur(c.amount, 2) : '–') + '<span class="s" style="display:block;font-weight:400">' + esc((G.RHYTHM[c.rhythm] || G.RHYTHM.m).l) + '</span></span></button>';
+  }
   function viewVertraege() {
     const t = today();
     const dl = c => (G.nextCancel(c, t) || {}).deadline || 'z';
     const cs = G.live(st.db, 'contracts').sort((a, b) => (!!a.ended - !!b.ended) || (dl(a) < dl(b) ? -1 : dl(a) > dl(b) ? 1 : 0));
     const active = cs.filter(c => !c.ended);
     const fix = active.reduce((a, c) => a + G.monthly(c), 0);
+    const up = active.filter(c => { const p = G.priceChange(c); return p && p.pct > 0; });
     let h = head('Verträge', 'Jeden Vertrag einmal eintragen – Geldwerk sagt dir rechtzeitig, bis wann du kündigen kannst.');
-    h += '<div class="card navy"><span class="flabel" style="margin:0">FIXKOSTEN</span><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b style="font-size:34px;font-weight:900;letter-spacing:-.02em">' + eur(Math.round(fix)) + '</b><span class="muted">pro Monat · ' + eur(Math.round(fix * 12)) + ' im Jahr</span></div></div>';
+    h += '<section class="bank">' + blob() + '<div class="bank-top"><span class="lbl">Fixkosten</span><span class="big">' + eur(Math.round(fix)) + '<small> / Monat</small></span><span class="sub">' + eur(Math.round(fix * 12)) + ' im Jahr · ' + active.length + (active.length === 1 ? ' Vertrag' : ' Verträge') + (up.length ? ' <span class="badge">' + up.length + '× teurer geworden</span>' : '') + '</span></div>';
+    if (active.length) {
+      const by = {};
+      for (const c of active) by[c.tpl || 'sonst'] = (by[c.tpl || 'sonst'] || 0) + G.monthly(c);
+      const rows = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ l: (G.TEMPLATES[k] || G.TEMPLATES.sonst).l, v, txt: eur(v, 2), icon: '<svg class="hb-ic" viewBox="0 0 24 24">' + (CI[k] || CI.sonst) + '</svg>' }));
+      h += '<div class="chart-h" style="margin-top:14px"><span>Pro Monat nach Art</span></div>' + G.Chart.hbars(rows);
+    }
+    h += '</section>';
     h += '<div class="sec-h"><h2>Deine Verträge</h2><button type="button" data-a="newContract">+ Vertrag</button></div>';
     if (!cs.length) return h + '<div class="empty">Noch keine Verträge. Tippe auf „+ Vertrag“ und wähle eine Vorlage – z. B. Kfz-Versicherung.</div>';
-    h += '<div class="list">' + cs.map(c => {
-      const n = G.nextCancel(c, t), pc = G.priceChange(c);
-      let s = c.ended ? 'Gekündigt zum ' + G.fmtDate(c.ended) : !n || n.unknown ? 'Beginn fehlt – Frist unbekannt' : n.anytime ? 'Jederzeit kündbar · Ende frühestens ' + G.fmtShort(n.end) + n.end.slice(0, 4) : 'Kündigen bis ' + G.fmtDate(n.deadline) + ' · ' + daysWord(n.days);
-      const soon = n && !n.anytime && n.days != null && n.days <= 30 && !c.ended;
-      return '<button type="button" class="row" data-a="openContract" data-id="' + c.id + '"><span class="ic">' + I.doc + '</span><span class="main"><span class="t ell">' + esc(c.name || c.provider || 'Vertrag') + (c.name && c.provider ? ' <span class="muted" style="font-weight:400">· ' + esc(c.provider) + '</span>' : '') + '</span><span class="s">' + (soon ? '<span class="tag">' + esc(s) + '</span>' : esc(s)) + (pc && pc.pct ? ' <span class="tag grey">' + (pc.pct > 0 ? '+' : '') + String(pc.pct).replace('.', ',') + ' %</span>' : '') + '</span></span><span class="v">' + (c.amount != null ? eur(c.amount, 2) : '–') + '<span class="s" style="display:block;font-weight:400">' + esc((G.RHYTHM[c.rhythm] || G.RHYTHM.m).l) + '</span></span></button>';
-    }).join('') + '</div>';
-    return h;
+    return h + '<div class="list">' + cs.map(contractRow).join('') + '</div>';
   }
 
   // ---------- Steuer ----------
+  function checklist(y, res) {
+    const s = st.db.settings, t = st.db.tax[y] || {};
+    const schoolY = s.school && s.school.from <= y + '-12-31' && s.school.to >= y + '-01-01';
+    const unsure = G.live(st.db, 'receipts').filter(r => r.date && r.date.startsWith(String(y)) && G.isUnsure(r)).length;
+    const items = [
+      { ok: +s.kmWork > 0 || +s.kmSchool > 0, l: 'Fahrten eingerichtet', a: 'openCal' },
+      { ok: res.hasLSt || (!res.trips.work.days && !(+t.gross > 0)), l: res.trips.work.days ? 'Lohn und Lohnsteuer eingetragen' : 'Kein Lohn – nichts einzutragen', a: 'sheetLst' },
+      schoolY ? { ok: t.zuschuss != null || t.noBafoeg, l: 'Aufstiegs-BAföG-Zuschuss eingetragen', a: 'sheetZuschuss' } : null,
+      { ok: !unsure, l: unsure ? unsure + (unsure === 1 ? ' Beleg' : ' Belege') + ' noch prüfen' : 'Alle Belege geprüft', a: 'filterCheck' },
+      { ok: !!t.filed, l: 'Erklärung abgegeben', a: 'filed' }
+    ].filter(Boolean);
+    const done = items.filter(i => i.ok).length;
+    let h = '<div class="card checkcard"><div class="check-top">' + G.Chart.ring(done, items.length) + '<div><b>Bereit für die Erklärung ' + y + '</b><div class="muted" style="font-size:14px">' + (done === items.length ? 'Alles erledigt.' : 'Noch ' + (items.length - done) + (items.length - done === 1 ? ' Schritt' : ' Schritte')) + '</div></div></div>';
+    h += items.map(i => '<button type="button" class="ck' + (i.ok ? ' ok' : '') + '" data-a="' + i.a + '"><span class="ckb">' + (i.ok ? I.check : '') + '</span><span>' + esc(i.l) + '</span>' + I.chev + '</button>').join('');
+    return h + '</div>';
+  }
   function viewSteuer() {
     const y = st.year, res = st.chain[y], R = st.rules[y];
     let h = '<header class="top"><div class="top-row"><h1>Steuer</h1><button class="icon-btn" type="button" data-a="settings" aria-label="Einstellungen">' + I.gear + '</button></div>';
     h += '<div class="seg yearseg" role="tablist">' + RULE_YEARS.map(x => '<button type="button" class="' + (x === y ? 'on' : '') + '" data-a="year" data-y="' + x + '">' + x + '</button>').join('') + '</div>';
     h += '<button type="button" class="disc" data-a="rules">' + I.info + '<span>Keine Steuerberatung – Regeln mit Quelle und Stand ›</span></button></header>';
     if (!res || !R) return h + '<div class="empty">Für ' + y + ' gibt es noch keine Regeldatei.</div>';
-    // Ergebnis
-    h += '<div class="hero">';
-    if (res.noIncome && res.loss > 0) h += '<div class="lbl">Verlustvortrag ' + y + '</div><div class="big">' + eur(Math.round(res.carryOut)) + '</div><div class="sub">Gesichert, sobald du die Erklärung abgibst – er senkt später die Steuer auf deinen Lohn. Abgabe bis ' + G.fmtDate(R.regeln.fristen.verlust) + '.</div>';
+    h += '<section class="bank">' + blob() + '<div class="bank-top">';
+    if (res.noIncome && res.loss > 0) h += '<span class="lbl">Verlustvortrag ' + y + '</span><span class="big">' + eur(Math.round(res.carryOut)) + '</span><span class="sub">Gesichert, sobald du die Erklärung abgibst – senkt später die Steuer auf deinen Lohn. Abgabe bis ' + G.fmtDate(R.regeln.fristen.verlust) + '.</span>';
     else if (res.refund != null) {
       const pos = res.refund >= 0;
-      h += '<div class="lbl">' + (pos ? 'Erstattung ' : 'Nachzahlung ') + y + ' · Schätzung</div><div class="big ' + (pos ? 'green' : '') + '">ca. ' + eur(Math.abs(Math.round(res.refund / 10) * 10)) + '</div><div class="sub">' + (pos ? 'zurück vom Finanzamt · ' : '') + 'Spanne ' + eur(Math.floor(res.range[0] / 10) * 10) + ' bis ' + eur(Math.ceil(res.range[1] / 10) * 10) + (res.loss > 0 ? ' · Verlust ' + eur(Math.round(res.loss)) + ' wird vorgetragen' : '') + (!R.regeln.tarif.geprueft ? ' · Tarif ungeprüft' : '') + (res.vorsorge.estimated ? ' · Sozialversicherung geschätzt' : '') + '</div>';
-    } else h += '<div class="lbl">Werbungskosten ' + y + '</div><div class="big">' + eur(Math.round(res.wk)) + '</div><div class="sub">' + (res.trips.work.days ? 'Für die Erstattung fehlen noch Bruttolohn und Lohnsteuer – trag sie unten ein oder füge die Lohnsteuerbescheinigung als Block ein.' : 'Gesammelt für dieses Jahr.') + '</div>';
-    h += '</div>';
-    // Werbungskosten
-    h += '<div class="sec-h"><h2>So setzt es sich zusammen</h2></div><div class="list lines">';
+      h += '<span class="lbl">' + (pos ? 'Erstattung ' : 'Nachzahlung ') + y + ' · Schätzung</span><span class="big ' + (pos ? 'green' : '') + '">ca. ' + eur(Math.abs(Math.round(res.refund / 10) * 10)) + '</span><span class="sub">' + (pos ? 'zurück vom Finanzamt' : 'an das Finanzamt') + (res.loss > 0 ? ' · Verlust ' + eur(Math.round(res.loss)) + ' wird vorgetragen' : '') + (!R.regeln.tarif.geprueft ? ' · Tarif ungeprüft' : '') + (res.vorsorge.estimated ? ' · Sozialversicherung geschätzt' : '') + '</span>';
+      h += G.Chart.range(res.range[0], res.refund, res.range[1], { lowL: 'mind. ' + eur(Math.floor(res.range[0] / 10) * 10), highL: 'bis ' + eur(Math.ceil(res.range[1] / 10) * 10), bothL: eur(Math.floor(res.range[0] / 10) * 10) + ' – ' + eur(Math.ceil(res.range[1] / 10) * 10) });
+    } else h += '<span class="lbl">Werbungskosten ' + y + '</span><span class="big">' + eur(Math.round(res.wk)) + '</span><span class="sub">' + (res.trips.work.days ? 'Für die Erstattung fehlen noch Bruttolohn und Lohnsteuer – unten eintragen oder die Lohnsteuerbescheinigung als Block einfügen.' : 'Gesammelt für dieses Jahr.') + '</span>';
+    h += '</div></section>';
+    h += checklist(y, res);
+    // Zusammensetzung als Balken mit Pauschbetrag-Markierung
+    const areaRows = [];
+    const sumA = f => G.r2(res.lines.filter(f).reduce((a, l) => a + l.eur, 0));
+    const fa = sumA(l => l.area === 'fahrten'); if (fa) areaRows.push({ l: 'Fahrten', v: fa, a: 'openCal' });
+    const fb = sumA(l => l.area === 'fortbildung'); if (fb) areaRows.push({ l: 'Fortbildung (nach Zuschuss)', v: fb, a: 'filterTax' });
+    const am = sumA(l => l.area === 'arbeitsmittel'); if (am) areaRows.push({ l: 'Arbeitsmittel', v: am, a: 'filterTax' });
+    const rk = sumA(l => l.area === 'reise'); if (rk) areaRows.push({ l: 'Reisekosten', v: rk, a: 'filterTax' });
+    const pa = sumA(l => l.area === 'weitere' || l.area === 'tagespauschale'); if (pa) areaRows.push({ l: 'Pauschalen und Weiteres', v: pa, a: 'rules' });
+    if (areaRows.length) {
+      h += '<div class="sec-h"><h2>Werbungskosten ' + y + '</h2><b>' + eur(Math.round(res.wk)) + '</b></div><div class="card">' + G.Chart.hbars([{ l: 'Zusammen', v: res.wk }].concat(areaRows), { mark: res.gross > 0 || res.trips.work.days ? { v: res.pausch, l: 'Pauschbetrag ' + eur(res.pausch) } : null }) +
+        (res.gross > 0 || res.trips.work.days ? '<p class="hint">' + (res.wk > res.pausch ? 'Über dem Pauschbetrag – es zählen deine echten Kosten: ' + eur(Math.round(res.wk - res.pausch)) + ' mehr als ohne Belege.' : 'Noch unter dem Pauschbetrag – das Finanzamt rechnet mit ' + eur(res.pausch) + '.') + '</p>' : '') + '</div>';
+    }
+    // Einzelposten
+    h += '<details class="card fold"' + (st.linesOpen ? ' open' : '') + ' style="margin-top:10px"><summary data-a="linesFold"><span>Alle Posten mit Rechenweg</span>' + I.chev + '</summary><div class="list lines" style="background:transparent">';
     for (const l of res.lines) {
       const act = l.area === 'fahrten' || l.key === 'tagespauschale' ? 'data-a="openCal"' : l.key.startsWith('belege-') || l.key === 'zuschuss' ? 'data-a="filterTax"' : l.rule ? 'data-a="rules"' : '';
       h += '<button type="button" class="row" ' + act + '><span class="main"><span class="t">' + esc(l.l) + (l.sure ? '' : ' <span class="tag grey">ungeprüft</span>') + '</span><span class="s">' + esc(l.detail || '') + '</span></span><span class="v' + (l.eur < 0 ? ' muted' : '') + '">' + eur(l.eur, 0) + '</span></button>';
     }
     if (!res.lines.length) h += '<div class="row"><span class="main"><span class="s">Noch nichts gesammelt. Fahrten erscheinen, sobald die Kilometer eingetragen sind.</span></span></div>';
-    h += '<div class="sum-row"><span>Werbungskosten</span><span>' + eur(Math.round(res.wk)) + '</span></div></div>';
-    if (res.gross > 0 || res.trips.work.days) h += '<p class="hint">' + (res.wk > res.pausch ? 'Mehr als der Arbeitnehmer-Pauschbetrag (' + eur(res.pausch) + ') – es zählen deine echten Kosten.' : 'Weniger als der Arbeitnehmer-Pauschbetrag – das Finanzamt rechnet automatisch mit ' + eur(res.pausch) + '.') + '</p>';
+    h += '</div></details>';
     // Angaben
     const t = st.db.tax[y] || {};
     h += '<div class="sec-h"><h2>Deine Angaben ' + y + '</h2></div><div class="list">';
-    h += '<button type="button" class="row" data-a="sheetLst"><span class="ic">' + I.euro + '</span><span class="main"><span class="t">Lohn und Lohnsteuer</span><span class="s">' + (res.hasLSt ? 'Brutto ' + eur(t.gross) + ' · Lohnsteuer ' + eur(t.lst) : res.trips.work.days ? 'Fehlt noch – aus Gehaltsabrechnung oder Lohnsteuerbescheinigung' : 'Kein Lohn in diesem Jahr (Minijob zählt nicht)') + '</span></span>' + I.chev + '</button>';
-    h += '<button type="button" class="row" data-a="sheetZuschuss"><span class="ic">' + I.school + '</span><span class="main"><span class="t">Aufstiegs-BAföG</span><span class="s">' + (t.zuschuss ? 'Zuschuss Lehrgang/Prüfung ' + eur(t.zuschuss) + ' wird abgezogen' : 'Zuschussanteil Lehrgangs- und Prüfungsgebühren eintragen') + '</span></span>' + I.chev + '</button>';
-    h += '<button type="button" class="row" data-a="sheetCarry"><span class="ic">' + I.cal + '</span><span class="main"><span class="t">Verlustvortrag aus ' + (y - 1) + '</span><span class="s">' + eur(res.carryIn) + (y === RULE_YEARS[0] ? ' · aus deiner letzten Erklärung' : ' · aus ' + (y - 1) + ' übernommen') + '</span></span>' + I.chev + '</button>';
+    h += '<button type="button" class="row" data-a="sheetLst">' + cic('fortbildung') + '<span class="main"><span class="t">Lohn und Lohnsteuer</span><span class="s">' + (res.hasLSt ? 'Brutto ' + eur(t.gross) + ' · Lohnsteuer ' + eur(t.lst) : res.trips.work.days ? 'Fehlt noch – aus Gehaltsabrechnung oder Lohnsteuerbescheinigung' : 'Kein Lohn in diesem Jahr (Minijob zählt nicht)') + '</span></span>' + I.chev + '</button>';
+    h += '<button type="button" class="row" data-a="sheetZuschuss">' + cic('fortbildung') + '<span class="main"><span class="t">Aufstiegs-BAföG</span><span class="s">' + (t.zuschuss ? 'Zuschuss Lehrgang/Prüfung ' + eur(t.zuschuss) + ' wird abgezogen' : t.noBafoeg ? 'Kein Zuschuss in diesem Jahr' : 'Zuschussanteil Lehrgangs- und Prüfungsgebühren eintragen') + '</span></span>' + I.chev + '</button>';
+    h += '<button type="button" class="row" data-a="sheetCarry">' + cic('none') + '<span class="main"><span class="t">Verlustvortrag aus ' + (y - 1) + '</span><span class="s">' + eur(res.carryIn) + (y === RULE_YEARS[0] ? ' · aus deiner letzten Erklärung' : ' · aus ' + (y - 1) + ' übernommen') + '</span></span>' + I.chev + '</button>';
     h += '</div>';
-    // Abgabe
     const f = R.regeln.fristen, filed = !!t.filed;
     h += '<div class="sec-h"><h2>Abgabe</h2></div><div class="card"><div class="muted" style="font-size:14.5px">' + esc(f.text) + (f.geprueft ? '' : ' <span class="tag grey">ungeprüft</span>') + '</div>';
     if (res.loss > 0) h += '<div class="info"><b>Tipp:</b> Auch ohne Lohn abgeben – nur dann wird der Verlust von ' + eur(Math.round(res.loss)) + ' festgestellt und senkt später deine Steuer.</div>';
     h += '<button type="button" class="toggle' + (filed ? ' on' : '') + '" data-a="filed" style="margin-top:8px"><span class="main"><b>Erklärung ' + y + ' abgegeben</b><div class="muted" style="font-size:13.5px">Stoppt die Erinnerungen an die Frist</div></span><span class="sw"></span></button></div>';
-    // Jahresende
     h += '<div class="sec-h"><h2>Für die Erklärung</h2></div>';
     h += '<button type="button" class="bigopt" data-a="cheat"><span class="ic">' + I.doc + '</span><span>ELSTER-Spickzettel<small>Welcher Betrag in welchen Bereich gehört</small></span></button>';
     h += '<button type="button" class="bigopt" data-a="mappe"><span class="ic">' + I.share + '</span><span>Steuermappe als PDF<small>Übersicht, Fahrten, alle Belege mit Fotos</small></span></button>';
+    h += '<button type="button" class="bigopt" data-a="csv"><span class="ic">' + I.receipt + '</span><span>Belegliste als Tabelle<small>CSV für Excel/Numbers</small></span></button>';
     h += '<button type="button" class="bigopt" data-a="openCal"><span class="ic">' + I.car + '</span><span>Fahrten-Kalender ' + y + '<small>' + res.trips.work.days + ' Arbeitstage, ' + res.trips.school.days + ' Schultage – Ausnahmen antippen</small></span></button>';
     return h;
   }
@@ -286,6 +416,7 @@
     const next = (label, dis) => '<div class="grow"></div><div class="btns" style="margin-top:22px"><button type="button" class="btn primary" data-a="setupNext"' + (dis ? ' disabled' : '') + '>' + (label || 'Weiter') + '</button></div>';
     if (k === 'welcome') {
       h += '<img class="logo" src="icon-192.png" alt=""><div class="q">Willkommen bei Geldwerk</div><p class="lead">Belege, Fahrten und Verträge sammeln sich hier fast von selbst. Am Jahresende bekommst du eine fertige Steuermappe.</p>';
+      h += '<label class="field"><span>Wie heißt du? (optional)</span><input class="inp" type="text" autocomplete="name" value="' + esc(s.name || '') + '" placeholder="Vor- und Nachname" data-ch="myName"></label>';
       h += '<div class="info">9 kurze Fragen, dauert 2–3 Minuten. Alles ist später in den Einstellungen änderbar.</div>';
       h += '<div class="grow"></div><div class="btns" style="margin-top:22px"><button type="button" class="btn primary" data-a="setupNext">Los geht’s</button><button type="button" class="btn ghost" data-a="restoreStart">Ich habe schon eine Sicherung</button></div>';
     } else if (k === 'kmWork') {
@@ -377,6 +508,9 @@
     h += '<div class="pbody">';
     if (img) { const u = fileURL(img.id); if (!u) loadFileURL(img.id).then(x => { const el = $('#rimg'); if (el && x) el.src = x; }); h += '<div class="photo" data-a="fullImg" data-id="' + img.id + '"><img id="rimg" alt="Beleg" src="' + (u || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=') + '"></div>'; }
     else if (pdf) h += '<div class="photo"><div class="pdfbox">' + I.file + ' PDF</div></div>';
+    const imgs = (d.files || []).filter(f => f.type === 'jpg');
+    if (imgs.length > 1) h += '<div class="pages">' + imgs.map((f, i) => { const u = fileURL(f.id); if (!u) loadFileURL(f.id).then(x => { const el = document.querySelector('[data-pg="' + f.id + '"]'); if (el && x) el.src = x; }); return '<img data-a="fullImg" data-id="' + f.id + '" data-pg="' + f.id + '" alt="Seite ' + (i + 1) + '" src="' + (u || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=') + '">'; }).join('') + '</div>';
+    if (!pdf) h += '<button type="button" class="link" data-a="addPage" style="margin-top:6px">+ Weitere Seite fotografieren</button>';
     if (p.ocr) h += '<div class="ocr">' + (p.ocr.done ? (p.ocr.err ? '<span class="red">' + esc(p.ocr.err) + '</span>' : (un.size ? 'Erkannt – gestrichelte Felder kurz prüfen.' : 'Alles erkannt.')) : '<span class="spin"></span>' + esc(p.ocr.msg || 'Text wird gelesen …')) + '</div>';
     const fl = (k, l, inner, extra) => '<label class="field' + (un.has(k) ? ' unsure' : '') + '"' + (extra || '') + '><span>' + l + '</span>' + inner + '</label>';
     h += fl('amount', 'Betrag in €', '<input class="inp big" type="text" inputmode="decimal" placeholder="0,00" value="' + esc(money2(d.amount)) + '" data-in="rf" data-k="amount" autocomplete="off">');
@@ -446,6 +580,15 @@
     const files = ['tesseract/tesseract.min.js', 'tesseract/worker.min.js', 'tesseract/tesseract-core-simd-lstm.wasm.js', 'tesseract/deu.traineddata.gz', 'pdfjs/pdf.min.mjs', 'pdfjs/pdf.worker.min.mjs'].map(f => new URL('vendor/' + f, location.href).href);
     caches.open('geldwerk-vendor-1').then(async c => { for (const f of files) if (!(await c.match(f))) await c.add(f).catch(() => { }); }).catch(() => { });
   }
+  async function addReceiptPage(page, file) {
+    if (!file) return;
+    try {
+      const c = await G.compress(file), fid = G.uid();
+      await S.putFile({ id: fid, type: 'jpg', blob: c.blob, w: c.w, h: c.h, up: false });
+      page.d.files = (page.d.files || []).concat([{ id: fid, type: 'jpg', w: c.w, h: c.h }]);
+      renderIfTop(page); toast('Seite ' + page.d.files.filter(f => f.type === 'jpg').length + ' hinzugefügt');
+    } catch (e) { toast('Foto ging nicht: ' + (e && e.message || e)); }
+  }
   function setOcr(page, msg) { page.ocr = { msg }; const el = $('#page .ocr'); if (el && st.stack[st.stack.length - 1] === page) el.innerHTML = '<span class="spin"></span>' + esc(msg); }
   function renderIfTop(page) { if (st.stack[st.stack.length - 1] === page) renderPage(); }
   function applyOcr(page, text) {
@@ -473,6 +616,10 @@
   }
   function saveReceipt(page) {
     const d = page.d;
+    if (page.isNew && !page.dupOk && d.amount != null && d.date) {
+      const dup = G.live(st.db, 'receipts').find(r => r.id !== d.id && r.date === d.date && Math.abs((+r.amount || 0) - d.amount) < 0.005);
+      if (dup) { openSheet({ k: 'confirm', title: 'Schon erfasst?', text: 'Es gibt bereits einen Beleg vom ' + G.fmtDate(dup.date) + ' über ' + eur(dup.amount, 2) + (dup.merchant ? ' (' + dup.merchant + ')' : '') + '. Trotzdem speichern?', yes: 'Trotzdem speichern', fn: () => { page.dupOk = true; saveReceipt(page); } }); return; }
+    }
     const r = Object.assign({}, d);
     delete r.unsureOld;
     if (r.amount != null) r.amount = G.r2(r.amount);
@@ -555,6 +702,8 @@
     h += '<p class="lead" style="margin-top:0">Fahrten rechnen sich selbst. Nur Ausnahmen antippen: krank, frei, Prüfung, anderer Weg, Lernen zu Hause.</p>';
     h += '<div class="statrow"><div class="stat"><b>' + tr.sum.work.days + '</b><span>Arbeit · ' + eur(Math.round(tr.sum.work.eur)) + '</span></div><div class="stat"><b>' + tr.sum.school.days + '</b><span>Schule · ' + eur(Math.round(tr.sum.school.eur)) + '</span></div><div class="stat"><b>' + tr.sum.home.days + '</b><span>zu Hause</span></div></div>';
     if (!(+s.kmWork > 0) || !(+s.kmSchool > 0)) h += '<div class="info">Kilometer fehlen – <button type="button" class="link" data-a="settings">in den Einstellungen eintragen</button>.</div>';
+    const mp = G.MONTHS.map((_, i) => ({ l: G.MONTHS[i].slice(0, 3).replace('Mär', 'Mär'), v: G.r2(tr.days.filter(d => +d.d.slice(5, 7) === i + 1 && (d.k === 'work' || d.k === 'school')).reduce((a, d) => a + Math.floor(d.km) * tr.sum.rate, 0)) }));
+    if (mp.some(x => x.v)) h += '<div class="card chartcard" style="margin-top:12px"><div class="chart-h"><span>Fahrten-Pauschale je Monat</span><span class="muted">' + eur(Math.round(tr.sum.eur)) + '</span></div>' + G.Chart.bars({ id: 'cal', pts: mp, sel: m, label: 'Entfernungspauschale je Monat' }) + '</div>';
     h += '<div class="cal-nav"><button type="button" data-a="calMonth" data-d="-1" aria-label="Voriger Monat">' + I.back + '</button><b>' + G.MONTHS[m] + ' ' + y + '</b><button type="button" data-a="calMonth" data-d="1" aria-label="Nächster Monat" style="transform:scaleX(-1)">' + I.back + '</button></div>';
     h += '<div class="cal">' + G.DOW.map(d => '<div class="dh">' + d + '</div>').join('');
     const first = y + '-' + G.pad(m + 1) + '-01';
@@ -582,6 +731,7 @@
     h += '<label class="field"><span>Urlaubstage ' + y0 + '</span><input class="inp" type="text" inputmode="numeric" value="' + ((s.vacation || {})[y0] || 0) + '" data-ch="vacCh" data-y="' + y0 + '"></label>';
     h += '<div class="flabel" style="margin-top:16px">SCHULE (' + esc(s.school.place) + ')</div><div class="two"><input class="inp" type="date" aria-label="Schule von" value="' + s.school.from + '" data-ch="setRange" data-k="school" data-f="from"><input class="inp" type="date" aria-label="Schule bis" value="' + s.school.to + '" data-ch="setRange" data-k="school" data-f="to"></div><div style="margin-top:8px">' + dayChips('school', s.school.days) + '</div>';
     h += '<div class="flabel" style="margin-top:16px">MINIJOB (ZÄHLT NICHT)</div>' + dayChips('jobDays', s.jobDays) + '</div>';
+    h += '<div class="sec-h"><h2>Profil</h2></div><div class="card"><label class="field" style="margin-top:0"><span>Dein Name (Begrüßung, Kündigungen)</span><input class="inp" type="text" autocomplete="name" value="' + esc(s.name || '') + '" placeholder="Vor- und Nachname" data-ch="myName"></label></div>';
     h += '<div class="sec-h"><h2>Steuer</h2></div><div class="card"><button type="button" class="toggle' + (s.kontofuehrung !== false ? ' on' : '') + '" data-a="toggleKonto"><span class="main"><b>Kontoführungspauschale 16 €</b><div class="muted" style="font-size:13.5px">Verwaltungspraxis, ungeprüft – nur in Jahren mit Lohn</div></span><span class="sw"></span></button></div>';
     // Sicherung
     const c = Sync.cfg(), ss = LS.get('syncState', {});
@@ -736,7 +886,7 @@
     const y = st.year, t = st.db.tax[y] || {};
     return '<h2>Aufstiegs-BAföG ' + y + '</h2><p class="lead">Nur der <b>Zuschussanteil</b> zu Lehrgangs- und Prüfungsgebühren (steht im Bescheid) wird von den Fortbildungskosten abgezogen. Darlehen und Unterhaltsbeitrag nicht.</p>' +
       '<label class="field"><span>Zuschuss Lehrgang/Prüfung in ' + y + '</span><input class="inp big" type="text" inputmode="decimal" placeholder="0,00" value="' + esc(money(t.zuschuss)) + '" data-in="tax" data-y="' + y + '" data-k="zuschuss"></label>' +
-      '<div class="info">' + esc(st.rules[y].regeln.afbg_erlass.text) + ' <span class="tag grey">ungeprüft</span></div><div class="btns" style="margin-top:16px"><button type="button" class="btn primary" data-a="sheetDone">Fertig</button></div>';
+      '<div class="info">' + esc(st.rules[y].regeln.afbg_erlass.text) + ' <span class="tag grey">ungeprüft</span></div><div class="btns" style="margin-top:16px"><button type="button" class="btn primary" data-a="sheetDone">Fertig</button><button type="button" class="btn ghost" data-a="noBafoeg">' + (t.noBafoeg ? 'Doch ein Zuschuss' : 'Kein Zuschuss in ' + y) + '</button></div>';
   };
   SHEETS.carry = s => {
     const y = st.year;
@@ -885,9 +1035,38 @@
     } catch (e) { openSheet({ k: 'mappe', err: 'PDF ging nicht: ' + (e && e.message || e) }); }
   }
 
+  async function shareFile(blob, name, type) {
+    const f = new File([blob], name, { type });
+    try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: name }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
   /* ================= Aktionen ================= */
   const A = {};
-  A.tab = el => { st.tab = el.dataset.t || el.dataset.tab; LS.set('tab', st.tab); closeAllPages(); window.scrollTo(0, 0); };
+  A.chSel = el => {
+    const c = el.dataset.c, i = +el.dataset.i;
+    haptic();
+    if (c === 'home') { st.chSel.home = i; const yr = defaultYear(), wm = wkByMonth(yr), upto = +today().slice(0, 4) > yr ? 11 : +today().slice(5, 7) - 1; $('#ch-home').innerHTML = G.Chart.line({ id: 'home', pts: wm, upto, sel: i, ref: { v: st.rules[yr].regeln.an_pauschbetrag.wert, l: 'Pauschbetrag 1.230 €' } }); $('#cap-home').innerHTML = homeCap(wm, i); }
+    else if (c === 'belege') { const k = spendByMonth(st.spanN || 6)[i].k; st.month = st.month === k ? null : k; render(); }
+    else if (c === 'cal') { const p = st.stack[st.stack.length - 1]; p.month = i; renderPage(); }
+  };
+  A.spanN = el => { st.spanN = +el.dataset.n; st.month = null; render(); };
+  A.monthClear = () => { st.month = null; render(); };
+  A.catFold = () => { st.catOpen = !st.catOpen; render(); };
+  A.linesFold = () => { st.linesOpen = !st.linesOpen; render(); };
+  A.filterCheck = () => { st.tab = 'belege'; st.filter = 'pruefen'; st.month = null; LS.set('tab', 'belege'); render(); window.scrollTo(0, 0); };
+  A.noBafoeg = () => { const y = st.year; const t = st.db.tax[y] = Object.assign({}, st.db.tax[y] || {}); t.noBafoeg = !t.noBafoeg; touch(t); closeSheet(); commit(); };
+  A.csv = () => {
+    const y = st.year, R = st.rules[y], q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', n = v => v == null || v === '' ? '' : (+v).toFixed(2).replace('.', ',');
+    const rows = [['Datum', 'Händler', 'Kategorie', 'Betrag', 'Beruflich %', 'Zählt ' + y, 'Kaufart', 'Notiz', 'Status']];
+    for (const r of G.live(st.db, 'receipts').filter(r => r.date && (r.date.startsWith(String(y)) || G.receiptYearAmount(r, y, R) > 0)).sort((a, b) => a.date < b.date ? -1 : 1)) {
+      const c = G.CAT[r.cat] || {};
+      rows.push([G.fmtDate(r.date), r.merchant || '', catL(r.cat), n(r.amount), c.area ? (r.share != null ? r.share : c.share) : '', c.area ? n(G.receiptYearAmount(r, y, R)) : '', r.kind === 'online' ? 'online' : 'Laden', r.note || '', G.isUnsure(r) ? 'prüfen' : '']);
+    }
+    const blob = new Blob(['\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' });
+    shareFile(blob, 'Belege-' + y + '.csv', 'text/csv');
+  };
+  A.addPage = () => { st.addPageTo = st.stack[st.stack.length - 1]; $('#f-cam').value = ''; $('#f-cam').click(); };
+  A.tab = el => { st.month = null; st.tab = el.dataset.t || el.dataset.tab; LS.set('tab', st.tab); closeAllPages(); window.scrollTo(0, 0); };
   A.plus = () => { haptic(); openSheet({ k: 'plus' }); };
   A.closeSheet = () => closeSheet();
   A.toastAct = () => { $('#toast').hidden = true; if (st.toastAct) st.toastAct(); };
@@ -1066,10 +1245,29 @@
   CH.cStart = el => { cp().start = el.value || null; renderPage(); };
   CH.cYearEnd = el => { const m = /(\d{1,2})\.(\d{1,2})/.exec(el.value); if (m) cp().yearEnd = G.pad(+m[2]) + '-' + G.pad(+m[1]); renderPage(); };
   CH.excKm = el => { const d = st.sheet.d; const e = st.db.exc[d]; if (!e) return; e.km = num(el.value); touch(e); commit({ render: false }); render(); renderPage(); };
-  CH.myName = el => { setS('name', el.value.trim()); commit({ render: false }); renderSheet(); };
+  CH.myName = el => { setS('name', el.value.trim()); commit({ render: false }); if (st.sheet) renderSheet(); };
 
   /* ================= Start ================= */
+  // Kein Zoomen: Doppeltipp und Zwei-Finger-Zoom abfangen (zusätzlich zu viewport und touch-action)
+  function noZoom() {
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+  }
+  // Über ein Diagramm wischen = Monat wählen (wie in Banking-Apps)
+  function scrub() {
+    let lastKey = null;
+    document.addEventListener('touchmove', e => {
+      const t = e.touches && e.touches[0]; if (!t) return;
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (!el || !el.matches || !el.matches('.chart [data-a=chSel]')) return;
+      const key = el.dataset.c + ':' + el.dataset.i;
+      if (key !== lastKey && el.dataset.c === 'home') { lastKey = key; A.chSel(el); }
+    }, { passive: true });
+    document.addEventListener('touchend', () => { lastKey = null; }, { passive: true });
+  }
   function bind() {
+    noZoom(); scrub();
     document.addEventListener('click', e => {
       const t = e.target.closest('[data-tab]');
       if (t && t.closest('.tabbar')) { A.tab(t); return; }
@@ -1080,7 +1278,7 @@
     document.addEventListener('input', e => { const el = e.target.closest('[data-in]'); if (el && IN[el.dataset.in]) IN[el.dataset.in](el); });
     document.addEventListener('change', e => { const el = e.target.closest('[data-ch]'); if (el && CH[el.dataset.ch]) CH[el.dataset.ch](el); });
     document.addEventListener('focusin', e => { if (e.target.matches('input,textarea')) setTimeout(() => { try { e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { } }, 300); });
-    $('#f-cam').addEventListener('change', e => newReceiptFromFile(e.target.files[0]));
+    $('#f-cam').addEventListener('change', e => { if (st.addPageTo) { const p = st.addPageTo; st.addPageTo = null; addReceiptPage(p, e.target.files[0]); } else newReceiptFromFile(e.target.files[0]); });
     $('#f-file').addEventListener('change', e => newReceiptFromFile(e.target.files[0]));
     $('#f-backup').addEventListener('change', async e => {
       const f = e.target.files[0]; if (!f) return;

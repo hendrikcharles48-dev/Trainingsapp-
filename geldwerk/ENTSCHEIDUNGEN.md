@@ -39,3 +39,15 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
     abgeschnittene Texte, waagerechtes Scrollen und Verdecken durch die Tab-Leiste.
 17. **Systemschrift** (SF Pro auf dem iPhone) statt Inter von Google Fonts – wirkt nativer und lädt nichts von außen.
 18. **Sicherung bündelt** Änderungen 8 s, beim Verlassen der App sofort; Fotos werden genau einmal hochgeladen.
+
+## Version 1.1 (26.11.2026, Design-Wunsch mit Vorlagen)
+19. **Kein Zoomen:** `maximum-scale=1, user-scalable=no`, `touch-action: manipulation` (kein Doppeltipp-Zoom) und
+    Abfangen der iOS-Gesten (`gesturestart`) gegen Zwei-Finger-Zoom. Eingabefelder bleiben ≥ 16 px (sonst zoomt iOS beim Tippen).
+20. **Look aus den Vorlagen, Farben aus Geldwerk:** Karten wie Bankkarten (Tiefblau mit dunklerer Wellenform und dünner
+    Eisblau-Linie statt Orange), runde Symbol-Kacheln für Kategorien/Verträge wie bei Umsätzen, Schnellaktionen-Reihe,
+    Begrüßung mit Datum, Wert-Pille über dem gewählten Punkt. Dunkel bleibt, keine Verläufe, Grün nur für Geld zurück.
+21. **Diagramme nur in einer Farbe** (Eisblau, gedämpfte Balken #557AA6 mit 4:1 Kontrast) und als Balken/Linie statt
+    Torte – Längen sind leichter zu vergleichen, und nichts wird bunt. Auswahl per Tipp, auf der Übersicht auch per Wischen.
+22. **Aus vergleichbaren Apps übernommen** (WISO, Taxfix, Finanzguru): Erstattung live mit Spanne, Checkliste „Bereit für
+    die Erklärung“, Fixkosten nach Art, Preiserhöhungen, Suche über Belege und Verträge, Warnung bei doppeltem Beleg,
+    mehrseitige Belege, Belegliste als CSV. Bewusst nicht: Bankanbindung, E-Mail-Import (bräuchte einen Server).
