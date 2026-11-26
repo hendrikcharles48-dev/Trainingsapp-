@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.4';
+  const APP_VERSION = '3.27.5';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -1119,7 +1119,7 @@
       const C = 2 * Math.PI * 52, fr = Math.max(0, Math.min(1, left / (st.rest.total || 1)));
       const nx = S ? `${esc(S.ex.name)}` : 'Training beenden';
       const nd = S ? `Satz ${Math.min(S.done.length + 1, S.planned)} von ${S.planned} · ${S.ex.kind === 'hold' || S.ex.kind === 'int' ? fmt(S.rec.sec) + ' s' : (S.rec.w ? fmt(S.rec.w) + ' kg × ' : '') + fmt(S.rec.reps) + ' Wdh.'}` : '';
-      el.innerHTML = `<div class="panel resting"><div class="restrow"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rtrack" cx="60" cy="60" r="52"/><circle id="restRing" class="rbar ${left <= 10 ? 'hot' : ''}" cx="60" cy="60" r="52" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - fr)).toFixed(1)}" transform="rotate(-90 60 60)"/></svg><div class="rtxt"><b id="restT">${restTxt(left)}</b><small id="restOf">von ${mmss(st.rest.len ?? st.rest.total)}</small></div></div>
+      el.innerHTML = `<div class="panel resting"><div class="restrow"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rtrack" cx="60" cy="60" r="52"/><circle id="restRing" class="rbar ${left <= 10 ? 'hot' : ''}" cx="60" cy="60" r="52" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - fr)).toFixed(1)}" transform="rotate(-90 60 60)"/></svg><div class="rtxt"><b id="restT" class="${restTxt(left).length > 4 ? 'long' : ''}">${restTxt(left)}</b><small id="restOf" class="${mmss(st.rest.len ?? st.rest.total).length > 4 ? 'long' : ''}">von ${mmss(st.rest.len ?? st.rest.total)}</small></div></div>
         <button class="nextup grow" data-a="toFocus"><small><span id="restLbl">${left > 0 ? 'Pause' : 'Bereit'}</span> · Dauer <span class="num" id="pElapsed">${mmss((Date.now() - a.start) / 1000)}</span> · Als Nächstes</small><b class="ell">${nx}</b><span class="ell">${nd}</span></button></div>
         <div class="ctrl"><button data-a="restAdj" data-s="-15">−15 s</button><button class="go" data-a="restSkip">Stopp</button><button data-a="restAdj" data-s="15">+15 s</button></div></div>`;
       return;
@@ -1136,7 +1136,7 @@
     if (!st.rest) return;
     const left = (st.rest.end - now) / 1000;
     const t = $('#restT'), p = $('#restProg');
-    if (t) t.textContent = restTxt(left);
+    if (t) { t.textContent = restTxt(left); if (t.closest('.ring')) t.classList.toggle('long', t.textContent.length > 4); }
     if (p) p.style.width = Math.max(0, Math.min(100, (1 - left / st.rest.total) * 100)) + '%';
     const rg = $('#restRing'); if (rg) { const C = 2 * Math.PI * 52; rg.setAttribute('stroke-dashoffset', (C * (1 - Math.max(0, Math.min(1, left / (st.rest.total || 1))))).toFixed(1)); rg.classList.toggle('hot', left <= 10); }
     if (left <= 3 && left > 0 && st.rest.beeped !== Math.ceil(left)) { st.rest.beeped = Math.ceil(left); beep(700, 0.1); }
@@ -1695,8 +1695,8 @@
       const bw = E.bodyweight(P());
       const best = h.reduce((m, x) => Math.max(m, E.sessionBest(ex, x.entry, x.bw || bw)), 0);
       const pctTable = ex.kind === 'load' && best > 0 ? `<div class="card stack" style="gap:8px"><div class="row between"><b>1RM-Tabelle</b><span class="small muted">geschätztes Maximum ${fmt(best, 1)} kg</span></div><div class="tbl"><table><thead><tr><th>%</th><th class="r">Gewicht</th><th class="r">≈ Wdh.</th></tr></thead><tbody>${[100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => `<tr><td>${p} %</td><td class="r num">${fmt(Math.round(best * p / 100 * 2) / 2)} kg</td><td class="r num">${p === 100 ? 1 : Math.max(1, Math.round(30 * (100 / p - 1)))}</td></tr>`).join('')}</tbody></table></div></div>` : '';
-      return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div><button class="favbtn ${isFav(ex.id) ? 'on' : ''}" data-a="favToggle" data-id="${ex.id}" aria-label="${isFav(ex.id) ? 'Favorit entfernen' : 'Als Favorit markieren'}" aria-pressed="${isFav(ex.id)}">★</button>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
-        <div class="row wrap" style="gap:6px">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div>
+      return `<div class="stack"><div class="stage" style="aspect-ratio:1/0.82"><div class="over"><div class="eyebrow">${esc(D.PATTERNS[ex.pat] || '')}</div><h2>${esc(ex.name)}</h2></div>${figSVG(ex, { anim: 2.6 })}<div class="setpill" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= ex.lvl ? 'on' : ''}"></i>`).reverse().join('')}<b>Lvl ${ex.lvl}</b></div></div>
+        <div class="row" style="gap:10px;align-items:flex-start"><div class="row wrap grow" style="gap:6px;min-width:0">${ex.prim.map(m => `<span class="chip on">${D.MUSCLES[m]}</span>`).join('')}${(ex.sec || []).map(m => `<span class="chip">${D.MUSCLES[m]}</span>`).join('')}</div><button class="favbtn inl ${isFav(ex.id) ? 'on' : ''}" data-a="favToggle" data-id="${ex.id}" aria-label="${isFav(ex.id) ? 'Favorit entfernen' : 'Als Favorit markieren'}" aria-pressed="${isFav(ex.id)}">★</button></div>
         ${noteChip(ex.id)}
         ${(() => { const pg = E.progProfile(ex, h, ex.rr, bw); if (pg.n < 3) return ''; const sp = { fast: 'Du steigerst dich hier schnell – größere Sprünge', slow: 'Hier geht es langsamer – erst 2× oben, dann kleinste Stufe', normal: 'Normales Tempo' }[pg.speed];
           return `<div class="card flat small"><b>Dein Tempo</b><div class="muted">${sp}${pg.rate != null ? ' · ≈ ' + (pg.rate > 0 ? '+' : '') + String(pg.rate).replace('.', ',') + ' % pro Woche' : ''}${pg.ok + pg.fail ? ' · Steigerungen ' + pg.ok + ' von ' + (pg.ok + pg.fail) + ' geklappt' : ''}</div></div>`; })()}
@@ -2496,7 +2496,7 @@
     swToggle() { const sw = T.sw; if (sw.start) { sw.acc += Date.now() - sw.start; sw.start = null; } else sw.start = Date.now(); render(); },
     swLap() { const sw = T.sw; sw.laps.unshift(sw.acc + (Date.now() - sw.start)); render(); },
     swReset() { T.sw = { start: null, acc: 0, laps: [] }; render(); },
-    restAdj(t) { if (!st.rest) return; liveSend(); st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) o.textContent = 'von ' + mmss(st.rest.len) + ' Pause'; st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
+    restAdj(t) { if (!st.rest) return; liveSend(); st.rest.end += +t.dataset.s * 1000; st.rest.len = Math.max(0, (st.rest.len ?? st.rest.total) + +t.dataset.s); const o = $('#restOf'); if (o) { o.textContent = 'von ' + mmss(st.rest.len) + (o.closest('.ring') ? '' : ' Pause'); o.classList.toggle('long', o.textContent.length > 8); } st.rest.total = Math.max(st.rest.total, (st.rest.end - Date.now()) / 1000); st.rest.fired = false; tickRest(Date.now()); },
     restSkip() { st.rest = null; renderRest(); liveSend(); }
   };
   function applyPick(s, id) {

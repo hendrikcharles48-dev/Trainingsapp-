@@ -730,6 +730,17 @@ button.card{border:1px solid var(--line);color:inherit;font:inherit;cursor:point
 .panel.resting .ctrl{margin-top:6px}
 .panel.resting .ctrl button{min-height:44px}
 @media (max-width:380px){ .panel.resting .ring{width:58px;height:58px} .panel.resting .ring .rtxt b{font-size:16px} }
+
+/* 3.27.5: Zeit bleibt immer innerhalb des Pausenrings (auch bei über 10 min) */
+.panel.resting .ring{width:64px;height:64px}
+.panel.resting .ring .rtxt b{font-size:16px;line-height:1}
+.panel.resting .ring .rtxt b.long{font-size:12.5px}
+.panel.resting .ring .rtxt small{font-size:8.5px;line-height:1.1;margin-top:3px}
+.panel.resting .ring .rtxt small.long{display:none}
+@media (max-width:380px){ .panel.resting .ring{width:62px;height:62px} .panel.resting .ring .rtxt b{font-size:15.5px} .panel.resting .ring .rtxt b.long{font-size:12px} }
+
+/* 3.27.5: Favoriten-Stern nicht mehr auf dem Übungsbild, sondern rechts neben den Muskeln */
+.favbtn.inl{position:static;flex:none;width:44px;height:44px;font-size:21px}
 </style>
 
 <div id="app"><div class="loading"><div><h2>Satzwerk</h2><p class="muted">Lade deine Trainingsdaten …</p></div></div></div>
