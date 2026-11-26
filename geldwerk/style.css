@@ -338,6 +338,8 @@ html, body { touch-action: manipulation; }
 .hbars .hb:first-child .hb-top b { font-size: 16px; }
 .hb-mark { position: absolute; top: 0; bottom: 0; left: var(--m); width: 0; border-left: 1.5px dashed var(--ink); pointer-events: none; }
 .hb-mark span { position: absolute; bottom: -22px; left: 0; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--muted); background: var(--surface); padding: 0 4px; }
+.hb-mark.end span { transform: translateX(-100%); }
+.hb-mark.start span { transform: none; }
 .card .hbars:has(.hb-mark) { margin-bottom: 22px; }
 /* Spanne */
 .range { position: relative; margin: 16px 4px 4px; width: calc(100% - 8px); }
