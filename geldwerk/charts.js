@@ -59,7 +59,7 @@
     s += '<line class="ch-grid" x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>';
     pts.forEach((p, i) => {
       const x = slot * i + (slot - bw) / 2, h = p.v > 0 ? Math.max(3, (H - T - B) * p.v / max) : 0, y = H - B - h, on = i === o.sel, r = Math.min(4, h / 2);
-      if (h) s += '<path d="M' + x.toFixed(1) + ',' + (H - B) + 'V' + (y + r).toFixed(1) + 'Q' + x.toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + r).toFixed(1) + ',' + y.toFixed(1) + 'H' + (x + bw - r).toFixed(1) + 'Q' + (x + bw).toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + bw).toFixed(1) + ',' + (y + r).toFixed(1) + 'V' + (H - B) + 'Z" class="ch-bar' + (on ? ' on' : '') + '"/>';
+      if (h) s += '<path d="M' + x.toFixed(1) + ',' + (H - B) + 'V' + (y + r).toFixed(1) + 'Q' + x.toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + r).toFixed(1) + ',' + y.toFixed(1) + 'H' + (x + bw - r).toFixed(1) + 'Q' + (x + bw).toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + bw).toFixed(1) + ',' + (y + r).toFixed(1) + 'V' + (H - B) + 'Z" class="' + (p.c ? 'ch-bar k-' + p.c + (o.sel != null && !on ? ' dim' : '') : 'ch-bar' + (on ? ' on' : '')) + '"/>';
       s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" class="ch-txt' + (on ? ' on' : '') + '" text-anchor="middle" font-size="10.5">' + esc(p.l) + '</text>';
       s += '<rect data-a="chSel" data-c="' + o.id + '" data-i="' + i + '" x="' + (slot * i).toFixed(1) + '" y="0" width="' + slot.toFixed(1) + '" height="' + H + '" class="ch-hit"/>';
     });
@@ -72,7 +72,7 @@
     let h = '<div class="hbars">';
     for (const r of rows) {
       const w = Math.max(r.v ? 1.5 : 0, Math.abs(r.v) / max * 100);
-      h += '<div class="hb"' + (r.a ? ' data-a="' + r.a + '"' + (r.d ? ' data-d="' + esc(r.d) + '"' : '') + ' role="button" tabindex="0"' : '') + '><div class="hb-top"><span class="ell">' + (r.icon || '') + esc(r.l) + (r.tag ? ' <span class="tag grey">' + esc(r.tag) + '</span>' : '') + '</span><b>' + esc(r.txt != null ? r.txt : G.eur(Math.round(r.v))) + '</b></div><div class="hb-track"><i style="width:' + w.toFixed(1) + '%' + (r.v < 0 ? ';background:var(--muted)' : '') + '"></i></div></div>';
+      h += '<div class="hb"' + (r.a ? ' data-a="' + r.a + '"' + (r.d ? ' data-d="' + esc(r.d) + '"' : '') + ' role="button" tabindex="0"' : '') + '><div class="hb-top"><span class="ell' + (r.c ? ' k-' + r.c : '') + '">' + (r.icon || '') + esc(r.l) + (r.tag ? ' <span class="tag grey">' + esc(r.tag) + '</span>' : '') + '</span><b>' + esc(r.txt != null ? r.txt : G.eur(Math.round(r.v))) + '</b></div><div class="hb-track"><i' + (r.c ? ' class="k-' + r.c + '"' : '') + ' style="width:' + w.toFixed(1) + '%' + (r.v < 0 ? ';background:var(--muted)' : '') + '"></i></div></div>';
     }
     if (o.mark) h += '<div class="hb-mark" style="--m:' + (o.mark.v / max * 100).toFixed(1) + '%"><span>' + esc(o.mark.l) + '</span></div>';
     return h + '</div>';
