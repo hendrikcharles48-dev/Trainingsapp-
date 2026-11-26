@@ -20,6 +20,7 @@ Bauplan `PLAN.md`, eigene Entscheidungen `ENTSCHEIDUNGEN.md`, Blockformat `BLOCK
 - `core.js` (`GW`): Datum, Feiertage NI, `trips` (Fahrten), `taxYear`/`taxChain` (Schätzung, Verlustvortrag), `nextCancel`
   (Kündigungsdatum), `merge` (Sicherung), `inbox` (Zu erledigen), `reminders` (Push-Termine).
 - `parse.js`: `receipt(text)` (Texterkennung auswerten), `blocks(text)` (Geldwerk-Block). `mappe.js`: PDF-Schreiber + Steuermappe.
+- `charts.js` (`GW.Chart`): `line`, `bars`, `hbars`, `ring`, `range` als SVG/HTML, eine Farbe; Auswahl `data-a="chSel"` (`st.chSel`, `st.month`).
 - `sync.js` (`GW.Y`): privates Repo `Geldwerk-Daten`, Datei `geldwerk-daten.json`, Fotos `belege/<id>.jpg|pdf`.
 - `push.js`: Formwerk-Worker `/v1/gw/subscribe|reminders|test|off`, `GET /v1/gw/state?t=` (ohne Passwort, Token).
 - `app.js`: Zustand `st`, Reiter `viewHome/viewBelege/viewVertraege/viewSteuer`, Seiten-Stapel `PAGES` (setup, receipt,

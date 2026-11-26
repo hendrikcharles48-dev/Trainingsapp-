@@ -42,7 +42,7 @@ async function audit(page, name) {
     const root = document.querySelector('#sheet:not([hidden])') || document.querySelector('#page:not([hidden])') || document;
     const vis = el => { const s = getComputedStyle(el); const b = el.getBoundingClientRect(); return s.visibility !== 'hidden' && s.display !== 'none' && b.width > 0 && b.height > 0 && b.bottom > 0 && b.top < innerHeight; };
     for (const el of root.querySelectorAll('button, a, input, select, textarea, [data-a]')) {
-      if (!vis(el) || el.closest('.cal') && el.classList.contains('pad')) continue;
+      if (!vis(el) || el.closest('.cal') && el.classList.contains('pad') || el.closest('.chart')) continue; // Diagramm-Spalten: volle Höhe, Auswahl auch per Wischen
       const b = el.getBoundingClientRect();
       if ((b.height < 43.5 && !el.matches('input[type=date]')) || (b.width < 43.5 && !el.closest('.chips,.seg'))) out.small.push((el.dataset.a || el.tagName) + ' ' + Math.round(b.width) + '×' + Math.round(b.height) + ' „' + (el.textContent || el.value || '').trim().slice(0, 20) + '“');
     }
@@ -138,7 +138,7 @@ const tap = async (page, sel) => { await page.locator(sel).first().click(); awai
   await tap(page, '[data-a=receiptSave]');
 
   // Block: Lohnsteuerbescheinigung + Kfz-Vertrag + Beleg ohne Foto
-  await tap(page, '.tabbar .plus'); await tap(page, '[data-a=openBlock]');
+  await tap(page, '.tabbar .plus'); await tap(page, '#sheet [data-a=openBlock]');
   await page.fill('textarea[data-in=blockText]', '#GELDWERK\ntyp: Lohnsteuerbescheinigung\njahr: 2026\nbruttolohn: 22.416,00\nlohnsteuer: 2.391,50\nrentenversicherung: 2.084,69\nkrankenversicherung: 1.961,40\npflegeversicherung: 537,98\narbeitslosenversicherung: 291,41\n#ENDE\n\n#GELDWERK\ntyp: Vertrag\nvorlage: Kfz-Versicherung\nanbieter: HUK-Coburg\nbetrag: 456,12\nrhythmus: jährlich\nkündigungsfrist: 1 Monat\nablauf: 31.12.\nsteuerlich: ja\n#ENDE\n\n#GELDWERK\ntyp: Beleg\nhändler: Technikakademie Northeim\nbetrag: 1.450,00\ndatum: 15.08.2026\nkategorie: Lehrgang\n#ENDE');
   await page.waitForTimeout(700);
   await shot(page, '17-block-vorschau', true);
@@ -162,11 +162,11 @@ const tap = async (page, sel) => { await page.locator(sel).first().click(); awai
   await tap(page, '.tabbar [data-tab=belege]'); await shot(page, '22-belege');
   await page.fill('[data-in=q]', 'würth'); await page.waitForTimeout(200); ok(await page.locator('#rlist .row').count() === 1, 'Suche findet PDF-Rechnung'); await page.fill('[data-in=q]', '');
   await tap(page, '.tabbar [data-tab=steuer]'); await shot(page, '23-steuer'); await shot(page, '23b-steuer-ganz', true);
-  const hero = await page.locator('.hero').innerText();
+  const hero = await page.locator('#view .bank-top').innerText();
   ok(/zurück|nach/.test(hero), 'Steuer-Reiter zeigt Schätzung: ' + hero.replace(/\s+/g, ' ').slice(0, 90));
   ok(await page.locator('text=Keine Steuerberatung').count() > 0, 'Hinweis „Keine Steuerberatung“ sichtbar');
   await tap(page, '[data-a=year][data-y="2027"]'); await shot(page, '23c-steuer-2027');
-  ok(/verlustvortrag/i.test(await page.locator('.hero').innerText()), '2027 ohne Lohn: Verlustvortrag angezeigt');
+  ok(/verlustvortrag/i.test(await page.locator('#view .bank-top').innerText()), '2027 ohne Lohn: Verlustvortrag angezeigt');
   await tap(page, '[data-a=year][data-y="2026"]');
   await tap(page, '[data-a=openCal]'); await shot(page, '24-kalender');
   await tap(page, '.cal .d.school'); await shot(page, '25-tag'); await tap(page, '[data-a=setExc][data-t=krank]');

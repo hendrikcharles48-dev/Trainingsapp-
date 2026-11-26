@@ -1,8 +1,8 @@
 // Geldwerk – Service Worker. Eigene Dateien: Cache zuerst, im Hintergrund auffrischen (Start ohne Netz).
 // Texterkennung/PDF-Leser (vendor/) erst bei Bedarf geladen, danach aus dem Cache. Löscht nur eigene Caches (geldwerk-app-…).
-const CACHE = 'geldwerk-app-v1';
+const CACHE = 'geldwerk-app-v2';
 const VENDOR = 'geldwerk-vendor-1';
-const CORE = ['./', './index.html', './style.css', './core.js', './parse.js', './mappe.js', './sync.js', './store.js', './ocr.js', './push.js', './app.js',
+const CORE = ['./', './index.html', './style.css', './core.js', './parse.js', './mappe.js', './charts.js', './sync.js', './store.js', './ocr.js', './push.js', './app.js',
   './regeln/2026.json', './regeln/2027.json', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(CORE.map(f => fetch(f, { cache: 'reload' }).then(r => { if (r.ok) return c.put(f, r); }).catch(() => { })))).then(() => self.skipWaiting()));

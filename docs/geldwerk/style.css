@@ -253,3 +253,89 @@ pre.copy { white-space: pre-wrap; background: var(--bg); border-radius: var(--r-
 .filters .chip { flex: none; min-height: 44px; font-size: 14.5px; padding: 0 14px; }
 .month-h { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin: 18px 4px 8px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- 1.1: Kein Zoom, Bankkarten-Look, Schnellaktionen, Diagramme ---------- */
+html, body { touch-action: manipulation; }
+.top .date { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+.avatar { background: var(--navy2); color: var(--accent); font-weight: 800; font-size: 16px; letter-spacing: .02em; }
+.bank { position: relative; overflow: hidden; background: var(--navy); border-radius: 28px; padding: 18px 16px 12px; --chart-bg: var(--navy); }
+.bank .blob { position: absolute; top: 0; right: 0; width: 62%; max-width: 260px; height: auto; pointer-events: none; }
+.bank-top { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; text-align: left; padding: 0 2px 4px; }
+.bank .lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #AFC0D6; }
+.bank .big { font-size: 42px; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.bank .big small { font-size: 17px; font-weight: 700; color: #AFC0D6; letter-spacing: 0; }
+.bank .sub { color: #B6C2D4; font-size: 14px; }
+.badge { display: inline-block; margin-left: 4px; padding: 2px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 800; white-space: nowrap; vertical-align: 1px; }
+.chart-h { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 2px 2px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #AFC0D6; }
+.chart-h .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; position: relative; }
+.chart text { font-family: inherit; }
+.chart-cap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #B6C2D4; font-size: 13.5px; margin: 2px 2px 0; min-height: 28px; flex-wrap: wrap; }
+.chartcard { margin-top: 12px; padding: 12px 14px 10px; }
+.chartcard .chart-h { margin-top: 0; color: var(--muted); }
+.chartcard .chart-cap { color: var(--muted); }
+.seg.mini { padding: 2px; border-radius: 12px; }
+.seg.mini button { min-height: 44px; min-width: 56px; font-size: 13px; border-radius: 10px; }
+.qa { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 16px 0 4px; }
+.qa button { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--muted); min-height: 72px; }
+.qa button span { width: 50px; height: 50px; border-radius: 18px; background: var(--surface); display: grid; place-items: center; color: var(--accent); transition: transform .12s; }
+.qa button:active span { transform: scale(.92); background: var(--surface2); }
+.qa svg { width: 23px; height: 23px; }
+.ci { width: 42px; height: 42px; border-radius: 50%; background: var(--navy2); display: grid; place-items: center; color: var(--accent); flex: none; }
+.ci svg { width: 21px; height: 21px; }
+.ci.red { background: var(--red-bg); color: var(--red); }
+.tile .arrow { width: 34px; height: 34px; border-radius: 50%; background: var(--navy2); color: var(--accent); display: grid; place-items: center; margin-bottom: 8px; }
+.tile .arrow svg { width: 18px; height: 18px; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.count { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 800; display: inline-grid; place-items: center; }
+.sec-h b { font-size: 15px; }
+/* waagerechte Balken */
+.hbars { position: relative; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.hb { display: block; min-height: 44px; padding: 2px 0; border-radius: 10px; }
+.hb[role=button]:active { background: rgba(255, 255, 255, .03); }
+.hb-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14.5px; margin-bottom: 6px; }
+.hb-top span { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.hb-top b { white-space: nowrap; }
+.hb-ic { width: 18px; height: 18px; color: var(--accent); }
+.hb-track { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.bank .hb-track { background: rgba(255, 255, 255, .07); }
+.hb-track i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.hbars .hb:first-child .hb-top b { font-size: 16px; }
+.hb-mark { position: absolute; top: 0; bottom: 0; left: var(--m); width: 0; border-left: 1.5px dashed var(--ink); pointer-events: none; }
+.hb-mark span { position: absolute; bottom: -22px; left: 0; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--muted); background: var(--surface); padding: 0 4px; }
+.card .hbars:has(.hb-mark) { margin-bottom: 22px; }
+/* Spanne */
+.range { position: relative; margin: 16px 4px 4px; width: calc(100% - 8px); }
+.range-track { position: relative; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .08); }
+.range-track i { position: absolute; top: 0; height: 100%; border-radius: 4px; background: var(--green); opacity: .45; }
+.range-track b { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid var(--navy); transform: translate(-50%, -50%); }
+.range-lab { position: relative; height: 20px; margin-top: 6px; font-size: 12px; color: #B6C2D4; }
+.range-lab span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.range-lab span:first-child { transform: translateX(-80%); }
+.range-lab span:last-child { transform: translateX(-20%); }
+/* Checkliste */
+.checkcard { margin-top: 12px; }
+.check-top { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.check-top b { font-size: 17px; }
+.ck { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; text-align: left; font-size: 15px; border-top: 1px solid var(--line); }
+.ck .chev { margin-left: auto; color: var(--muted); width: 18px; height: 18px; }
+.ckb { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; flex: none; }
+.ck.ok .ckb { background: var(--green); border-color: var(--green); color: #0B1A12; }
+.ck.ok .ckb svg { width: 15px; height: 15px; stroke-width: 3; }
+.ck.ok > span:nth-child(2) { color: var(--muted); }
+/* aufklappbare Karten */
+details.fold summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-weight: 700; cursor: pointer; }
+details.fold summary::-webkit-details-marker { display: none; }
+details.fold summary .chev { width: 18px; height: 18px; color: var(--muted); transition: transform .2s; }
+details.fold[open] summary .chev { transform: rotate(90deg); }
+details.fold .lines .row { padding-left: 0; padding-right: 0; }
+details.fold .lines .row + .row::before { left: 0; }
+/* mehrseitige Belege */
+.pages { display: flex; gap: 8px; overflow-x: auto; margin-top: 8px; padding-bottom: 2px; }
+.pages img { width: 56px; height: 72px; object-fit: cover; border-radius: 10px; background: #000; flex: none; }
+/* Diagramme: globale Symbol-Regel (Kontur, 24 px) nicht vererben */
+.chart, .ring, .blob { stroke: none; stroke-width: 1; fill: none; }
+.chart { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.ring { width: 64px; height: 64px; flex: none; }
+.bank .blob { width: 48%; max-width: 200px; opacity: .9; }
+.range-lab span.one { transform: translateX(-50%) !important; }
