@@ -2786,6 +2786,10 @@
       st.ov = null; render(); return true;
     }
     if (st.tab === 'plan' && st.planDay) { A.dayBack(); return true; }
+    // Unteransichten: Fortschritt-Segment, ausgewählter Tag auf Heute, sonst zurück auf Heute
+    if (st.tab === 'fortschritt' && st.progSeg && st.progSeg !== 'overview') { st.progSeg = 'overview'; render(); window.scrollTo(0, 0); return true; }
+    if (st.tab === 'heute' && st.homeDay != null) { st.homeDay = null; render(); window.scrollTo(0, 0); return true; }
+    if (st.tab !== 'heute') { st.tab = 'heute'; render(); window.scrollTo(0, 0); return true; }
     return false;
   }
   let edge = null;
