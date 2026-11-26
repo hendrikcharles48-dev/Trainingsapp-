@@ -42,8 +42,13 @@ t('Schmerz Schulter: keine Übung mit Schulterbelastung mehr', () => {
   for (const s of o.slots) assert.ok(!(D.byId[s.ex.gym].inj || []).includes('shoulder'), D.byId[s.ex.gym].name);
   assert.ok(o.changes.some(c => /Schmerz Schulter/.test(c.text)));
 });
-t('Gestern Baseball: Drücken/Schulter −1, kein schweres Überkopf', () => {
+t('Gestern Baseball ohne Beschwerden: keine Änderung (3.27.6)', () => {
   const o = adj({ checkin: true, color: 'green', sore: {}, pain: [], yesterdayBaseball: true });
+  assert.ok(o.slots.some(s => s.ex.gym === 'ohp'), 'Schulterdrücken bleibt'); assert.equal(by(o, 's1').sets, 4, 'Bankdrücken bleibt 4');
+  assert.ok(!o.changes.some(c => /Baseball/.test(c.text || '')), 'keine Baseball-Änderung');
+});
+t('Gestern Baseball + Muskelkater Unterarme: Drücken/Schulter −1, kein schweres Überkopf', () => {
+  const o = adj({ checkin: true, color: 'green', sore: { griff: 1 }, pain: [], yesterdayBaseball: true });
   assert.ok(!o.slots.some(s => s.ex.gym === 'ohp'), 'Schulterdrücken weg');
   assert.equal(by(o, 's1').sets, 2, 'Bankdrücken 4 → 2'); assert.equal(by(o, 's5').sets, 4, 'Beine unverändert'); assert.equal(by(o, 's2').sets, 3, 'Ziehen unverändert');
 });

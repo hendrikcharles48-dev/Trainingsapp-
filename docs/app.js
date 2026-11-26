@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.5';
+  const APP_VERSION = '3.27.6';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -580,7 +580,7 @@
     const parts = []; if (rd.recovery != null) parts.push('Erholung ' + rd.recovery + ' %');
     const so = Object.entries(rd.sore || {}).map(([k, v]) => (g[k] || k) + ' ' + ['', 'leicht', 'mittel', 'stark'][v]); if (so.length) parts.push('Muskelkater ' + so.join(', '));
     if ((rd.pain || []).length) parts.push('Schmerz ' + rd.pain.map(x => x.label).join(', '));
-    if (rd.yesterdayBaseball) parts.push('gestern Baseball');
+    if (rd.yesterdayBaseball && E.bbHurt(rd)) parts.push('gestern Baseball');
     return { rd, adj: a, all, line: parts.join(' · '), day: Object.assign({}, d, { slots: a.slots }), counts: true };
   }
   // 3.24.2 (Nutzerwunsch 19.11.): Formwerk steht nur noch in der „Nächste Einheit“-Kachel – eine Zeile: wie fit, was es für heute heißt
@@ -2646,6 +2646,7 @@
     const ti = (new Date().getDay() + 6) % 7; const tm = (ti + 1) % 7;
     const today = fp && FW.today() ? !!fp.baseballToday : sd.includes(ti); // in Formwerk abgewählt/angetippt zählt
     const when = today ? 'Heute' : sd.includes(tm) ? 'Morgen' : ''; if (!when) return '';
+    const rdy = FW.readyData(); if (rdy && !E.bbHurt(rdy)) return ''; // 3.27.6: mit Formwerk nur bei Schmerz/Muskelkater
     const p = plan(); const loc = st.homeLoc || defLoc(); const di = st.homeDay ?? nextDayIdx(); const d = p.days[di];
     if (!d || !heavyDay(d, loc)) return '';
     const alt = p.days.map((x, i) => ({ x, i })).find(o => o.i !== di && o.x.slots.some(s => s.ex[loc]) && !heavyDay(o.x, loc));
