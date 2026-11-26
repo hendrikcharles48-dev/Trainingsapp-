@@ -70,3 +70,9 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
     sonst ≤ 7) / teurer geworden / Nachzahlung; Rot = abgelaufen. Farbe steht nie allein – immer mit Text oder Symbol.
 28. Symbole in getönten Kreisen (Kontrast ≥ 4,4:1), gewählte Kategorie-Chips in Bereichsfarbe (hell weiße, dunkel dunkle Schrift, ≥ 5:1).
     Ausgaben je Monat bleiben einfarbig (eine Größe, keine Kategorien).
+
+## Version 1.4 (26.11.2026, Einführung)
+29. **Rundgang mit Sprechblasen** (10 Schritte) einmal nach der Einrichtung bzw. beim ersten Start nach dem Update
+    (`geldwerk_tourDone`), jederzeit wieder über das Fragezeichen oben auf der Übersicht oder Einstellungen → Hilfe.
+    Hervorhebung mit Rahmen in Warm-Orange, Blase immer neben dem Ziel (Test prüft: sichtbar, verdeckt nichts).
+30. **Seite „Was kann Geldwerk?“** mit allen Funktionen in neun kurzen Abschnitten, in den Bereichsfarben.
