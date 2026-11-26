@@ -1128,8 +1128,9 @@
       for (const e of w.exercises || []) {
         const ex = EX[e.exId] || e.custom; if (!ex) continue;
         const n = (e.sets || []).filter(s => s.done !== false).length; if (!n) continue;
-        for (const m of ex.prim) res[m] += n;
-        for (const m of ex.sec || []) res[m] += n * 0.5;
+        const tx = e.tech ? 0.5 : 0; // 3.28: Dropsatz/Myo-Reps im letzten Satz zählt 1,5
+        for (const m of ex.prim) res[m] += n + tx;
+        for (const m of ex.sec || []) res[m] += (n + tx) * 0.5;
       }
     }
     return res;

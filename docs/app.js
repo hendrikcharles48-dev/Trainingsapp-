@@ -8,7 +8,7 @@
   const fmt = (n, d) => n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: d ?? 2 });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const APP_VERSION = '3.27.6';
+  const APP_VERSION = '3.28.0';
   // Kurz verzögert ausführen (z. B. Suchfelder), damit beim Tippen nichts flackert
   const later = (key, ms, fn) => { clearTimeout(later[key]); later[key] = setTimeout(fn, ms); };
 
@@ -391,6 +391,7 @@
     const warm = items.some(i => i.role === 'main') ? 300 : 180;
     return { work: Math.round(work / 60), rest: Math.max(0, Math.round(rest / 60)), warm: Math.round(warm / 60), total: Math.round((work + Math.max(0, rest) + warm) / 60), sets: items.reduce((t, i) => t + i.sets, 0) };
   }
+  const TECH_TXT = { drop: 'Letzter Satz als Dropsatz: direkt danach Gewicht −25 % und ohne Pause weiter, bis noch 1–2 Wdh. gingen', myo: 'Letzter Satz mit Myo-Reps: danach 15 s Pause, 3–5 Wdh., das 3× – jeweils 1–2 Wdh. vor Schluss stoppen' };
   function slotItems(day, loc) {
     const p = plan(); const ra = (P() && P().restAdj) || {};
     return day.slots.filter(s => s.ex[loc]).map(sl => { const ex = getEx(sl.ex[loc]); if (!ex) return null; const pr = E.prescription(sl, ex, P(), p);
@@ -612,6 +613,18 @@
       if (gap >= 2 && !(sore[g] >= 1)) { const sl = c.filter(x => x.sets < cap(x)).sort((a, b) => (a.r === 'main') - (b.r === 'main') || a.sets - b.sets)[0]; if (sl) { usedSlot.add(sl.id); out.push({ id: 'sg:' + sl.id + ':+1', slotId: sl.id, delta: 1, text: '+1 Satz ' + getEx(sl.ex[loc]).name, why: D.MUSCLES[m] + ': Woche erst ≈ ' + proj + ' von ' + T[m] + ' Sätzen' }); } }
       else if (gap <= -3) { const sl = c.filter(x => x.sets > 2).sort((a, b) => b.sets - a.sets || (b.r === 'iso') - (a.r === 'iso'))[0]; if (sl) { usedSlot.add(sl.id); out.push({ id: 'sg:' + sl.id + ':-1', slotId: sl.id, delta: -1, text: '−1 Satz ' + getEx(sl.ex[loc]).name, why: D.MUSCLES[m] + ': Woche schon ≈ ' + proj + ' von ' + T[m] + ' Sätzen' }); } }
     }
+    // 3.28 (Nutzerwunsch 24.11.): Dropsatz / Myo-Reps nur bei Isolation/Rumpf, wenn ein Muskel klar unter Ziel ist (≥ 3 Sätze),
+    // Erholung gut (nicht gelb/rot), kein Muskelkater/Schmerz dort, keine leichtere Woche – höchstens 2, zählt als 1,5 Sätze
+    const wi = E.weekInfo(p, P()); const bad = rd && (rd.color === 'red' || rd.color === 'yellow' || rd.sick);
+    const painInj = new Set(((rd && rd.pain) || []).map(x => x.inj).filter(Boolean)); let nt = 0;
+    if (!wi.deload && !bad) for (const { m } of order) {
+      if (nt >= 2) break; const g = M2G[m]; if (sore[g] >= 1) continue;
+      const plus = out.filter(x => x.delta > 0 && getEx(slots.find(q => q.id === x.slotId).ex[loc]).prim.includes(m)).length;
+      const gap = T[m] - ((wk[m] || 0) + (sess[m] || 0) + (rest[m] || 0)) - plus; if (gap < 3) continue;
+      const sl = slots.find(x => (x.r === 'iso' || x.r === 'core') && getEx(x.ex[loc]).prim.includes(m) && !out.some(o => o.tech && o.slotId === x.id) && !(getEx(x.ex[loc]).inj || []).some(i => painInj.has(i)));
+      if (!sl) continue; const ex = getEx(sl.ex[loc]); const tech = ex.kind === 'load' ? 'drop' : 'myo';
+      out.push({ id: 'dp:' + sl.id, slotId: sl.id, tech, text: (tech === 'drop' ? 'Dropsatz: ' : 'Myo-Reps: ') + ex.name, why: D.MUSCLES[m] + ': Woche ≈ ' + Math.round(gap) + ' Sätze unter Ziel – letzter Satz zählt dann 1,5' }); nt++;
+    }
     return out;
   }
   // Alles fürs Startfenster: Tagesanpassung → bestätigte Vorschläge → eigene Satz-Änderungen → Zeit (kürzer/länger)
@@ -621,7 +634,7 @@
     let day = A ? A.day : base; day = Object.assign({}, day, { slots: day.slots.map(sl => Object.assign({}, sl)) });
     const sug = setSuggestions(day, s.d, loc, A && A.rd); const sgOn = id => (s.sg && id in s.sg ? s.sg[id] : adjMode() === 'auto');
     const clampS = n => Math.max(1, Math.min(8, n)); const find = id => day.slots.find(q => q.id === id);
-    for (const x of sug) if (sgOn(x.id)) { const sl = find(x.slotId); if (sl) sl.sets = clampS(sl.sets + x.delta); }
+    for (const x of sug) if (sgOn(x.id)) { const sl = find(x.slotId); if (!sl) continue; if (x.tech) sl.tech = x.tech; else sl.sets = clampS(sl.sets + x.delta); }
     for (const [id, dl] of Object.entries(s.dm || {})) { const sl = find(id); if (sl) sl.sets = clampS(sl.sets + dl); }
     const delta = tfDelta({ ti: s.ti ?? 1 }); const tp = delta ? E.timePlan(day, loc, delta, P(), p) : null; const ra = (P().restAdj || {});
     const items = tp ? tp.items.map(it => { const pr = it.slot ? E.prescription(it.slot, it.ex, P(), p) : null;
@@ -1169,6 +1182,8 @@
       const by = {}; for (const sl of day.slots) by[sl.id] = sl;
       for (const e of exercises) { const sl = by[e.slotId]; if (!sl) continue; if ((sl._adj || []).length) e.adj = sl._adj.slice(); if (sl._loadF) e.presc.loadF = sl._loadF; if (rd.adj.noUp) e.presc.noUp = rd.rd.color === 'red' ? 'red' : 'yellow'; if (sl._from) { e.adjFrom = sl._from; e.adjEx = e.exId; } }
     }
+    { const by = {}; for (const sl of day.slots) by[sl.id] = sl; // 3.28: Dropsatz/Myo-Reps aus dem Startfenster
+      for (const e of exercises) { const sl = by[e.slotId]; if (!sl || !sl.tech) continue; e.tech = sl.tech; e.adj = (e.adj || []).concat(TECH_TXT[sl.tech]); } }
     const counts = !rd || rd.counts; // angepasst und weniger als die Hälfte übrig → Plan-Tag bleibt als Nächstes dran
     st.active = { id: uid(), planId: p.id, dayIdx: counts ? di : null, dayId: counts ? day.id : null, name: rd && !rd.adj ? day.name + ' · angepasst' : day.name, loc, adjRemoved: rd && rd.adj ? rd.adj.removed.map(r => r.slotId).filter(Boolean) : undefined, adjLine: rd && rd.adj ? rd.line : undefined, start: Date.now(), bw: E.bodyweight(P()), exercises, cur: 0, timeNote };
     st.homeDay = null;
@@ -1570,7 +1585,7 @@
       const restNote = learnRest(a);
       if (restNote.length) setTimeout(() => toast('Pause angepasst: ' + restNote.join(', '), 5000), 900);
       const bw = E.bodyweight(P());
-      const exs = a.exercises.map(e => { const ex = getEx(e.exId); const sets = e.sets.filter(s => s.done).map(s => { const o = { rir: s.rir }; if (s.w != null) o.w = s.w; if (s.reps != null) o.reps = s.reps; if (s.sec != null) o.sec = s.sec; if (s.band) o.band = s.band; return o; }); return { exId: e.exId, sets, rirT: e.presc.rir, rr: e.presc.rr, note: (e.note || '').trim() || undefined, best: ex ? E.sessionBest(ex, { sets: sets.map(s => Object.assign({ done: true }, s)) }, bw) : 0 }; }).filter(e => e.sets.length);
+      const exs = a.exercises.map(e => { const ex = getEx(e.exId); const sets = e.sets.filter(s => s.done).map(s => { const o = { rir: s.rir }; if (s.w != null) o.w = s.w; if (s.reps != null) o.reps = s.reps; if (s.sec != null) o.sec = s.sec; if (s.band) o.band = s.band; return o; }); return { exId: e.exId, sets, rirT: e.presc.rir, rr: e.presc.rr, tech: e.tech || undefined, note: (e.note || '').trim() || undefined, best: ex ? E.sessionBest(ex, { sets: sets.map(s => Object.assign({ done: true }, s)) }, bw) : 0 }; }).filter(e => e.sets.length);
       const prs = [];
       for (const e of exs) {
         const ex = getEx(e.exId); if (!ex || !e.best) continue;
