@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const G = window.GW, S = G.Store, LS = S.LS, Y = G.Y;
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
   const RULE_YEARS = [2026, 2027];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

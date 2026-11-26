@@ -76,3 +76,8 @@ Kurz festgehalten, was ich ohne Rückfrage entschieden habe (Leitlinie: wenig Ar
     (`geldwerk_tourDone`), jederzeit wieder über das Fragezeichen oben auf der Übersicht oder Einstellungen → Hilfe.
     Hervorhebung mit Rahmen in Warm-Orange, Blase immer neben dem Ziel (Test prüft: sichtbar, verdeckt nichts).
 30. **Seite „Was kann Geldwerk?“** mit allen Funktionen in neun kurzen Abschnitten, in den Bereichsfarben.
+
+## Version 1.4.1 (26.11.2026)
+31. **Schnellaktionen kräftig statt pastell:** Rückmeldung „Farben nebeneinander zu ähnlich“. Jede Aktion eigene volle Farbe
+    (Indigo, Türkis, Orange, Blau, Gelb, Pink) in einer Reihenfolge, in der Nachbarn klar verschieden sind (Prüfskript hell + dunkel:
+    Farbschwäche ΔE ≥ 11,7, Normalsicht ≥ 22). Beschriftung „Pauschbetrag“ im Verlauf links, damit die Wert-Pille sie nicht verdeckt.
